@@ -1,0 +1,5 @@
+Module: dune-vem
+Version: 2015.10
+Maintainer: nolte@mathematik.uni-freiburg.de
+Whitespace-Hook: Yes
+Depends: dune-fem
