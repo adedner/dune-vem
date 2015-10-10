@@ -19,7 +19,7 @@ namespace Dune
       // findUniqueSection
       // -----------------
 
-      SectionMap::const_iterator findUniqueSection ( const SectionMap &sectionMap, const std::string &sectionName )
+      inline static SectionMap::const_iterator findUniqueSection ( const SectionMap &sectionMap, const std::string &sectionName )
       {
         if( sectionMap.count( sectionName ) != std::size_t( 1 ) )
           DUNE_THROW( IOError, "A Gmsh file requires exactly one '" + sectionName + "' section" );
@@ -33,7 +33,7 @@ namespace Dune
       // parseNodes
       // ----------
 
-      std::vector< std::pair< std::size_t, FieldVector< double, 3 > > > parseNodes ( const SectionMap &sectionMap )
+      std::vector< Node > parseNodes ( const SectionMap &sectionMap )
       {
         if( sectionMap.count( "Nodes" ) != std::size_t( 1 ) )
           DUNE_THROW( IOError, "A Gmsh file requires exactly one 'Nodes' section" );
@@ -48,7 +48,7 @@ namespace Dune
         if( !input || (section->second.size() != numNodes+1) )
           DUNE_THROW( IOError, "Section 'Nodes' must contain exactly numNodes+1 lines." );
 
-        std::vector< std::pair< std::size_t, FieldVector< double, 3 > > > nodes( numNodes );
+        std::vector< Node > nodes( numNodes );
         for( std::size_t i = 0; i < numNodes; ++i )
         {
           std::istringstream input( section->second[ i+1 ] );
@@ -56,6 +56,12 @@ namespace Dune
           if( !input )
             DUNE_THROW( IOError, "Unable to read line " << (i+1) << " of 'Nodes' section" );
         }
+
+        // sort nodes and ensure there are no duplicates
+        std::sort( nodes.begin(), nodes.end(), [] ( const Node &a, const Node &b ) { return (a.first < b.first); } );
+        const auto pos = std::adjacent_find( nodes.begin(), nodes.end(), [] ( const Node &a, const Node &b ) { return (a.first == b.first); } );
+        if( pos != nodes.end() )
+          DUNE_THROW( IOError, "Duplicate node " << pos->first << " in 'Nodes' section" );
 
         return std::move( nodes );
       }
