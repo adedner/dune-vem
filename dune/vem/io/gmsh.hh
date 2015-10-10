@@ -5,6 +5,9 @@
 #include <string>
 #include <tuple>
 #include <vector>
+#include <utility>
+
+#include <dune/common/fvector.hh>
 
 namespace Dune
 {
@@ -20,6 +23,7 @@ namespace Dune
 
       enum Format { ascii = 0, binary = 1 };
 
+      std::vector< std::pair< std::size_t, FieldVector< double, 3 > > > parseNodes ( const SectionMap &sectionMap );
       std::tuple< double, Format, std::size_t > parseMeshFormat ( const SectionMap &sectionMap );
 
       SectionMap readFile ( const std::string &filename );

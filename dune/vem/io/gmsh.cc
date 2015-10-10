@@ -2,7 +2,6 @@
 
 #include <fstream>
 #include <sstream>
-#include <utility>
 
 #include <dune/common/exceptions.hh>
 
@@ -17,22 +16,64 @@ namespace Dune
     namespace Gmsh
     {
 
+      // findUniqueSection
+      // -----------------
+
+      SectionMap::const_iterator findUniqueSection ( const SectionMap &sectionMap, const std::string &sectionName )
+      {
+        if( sectionMap.count( sectionName ) != std::size_t( 1 ) )
+          DUNE_THROW( IOError, "A Gmsh file requires exactly one '" + sectionName + "' section" );
+        SectionMap::const_iterator section = sectionMap.find( sectionName );
+        assert( section != sectionMap.end() );
+        return section;
+      }
+
+
+
+      // parseNodes
+      // ----------
+
+      std::vector< std::pair< std::size_t, FieldVector< double, 3 > > > parseNodes ( const SectionMap &sectionMap )
+      {
+        if( sectionMap.count( "Nodes" ) != std::size_t( 1 ) )
+          DUNE_THROW( IOError, "A Gmsh file requires exactly one 'Nodes' section" );
+
+        SectionMap::const_iterator section = findUniqueSection( sectionMap, "Nodes" );
+        if( section->second.empty() )
+          DUNE_THROW( IOError, "Section 'Nodes' must contain at least one line" );
+
+        std::istringstream input( section->second.front() );
+        std::size_t numNodes = 0;
+        input >> numNodes;
+        if( !input || (section->second.size() != numNodes+1) )
+          DUNE_THROW( IOError, "Section 'Nodes' must contain exactly numNodes+1 lines." );
+
+        std::vector< std::pair< std::size_t, FieldVector< double, 3 > > > nodes( numNodes );
+        for( std::size_t i = 0; i < numNodes; ++i )
+        {
+          std::istringstream input( section->second[ i+1 ] );
+          input >> nodes[ i ].first >> nodes[ i ].second[ 0 ] >> nodes[ i ].second[ 1 ] >> nodes[ i ].second[ 2 ];
+          if( !input )
+            DUNE_THROW( IOError, "Unable to read line " << (i+1) << " of 'Nodes' section" );
+        }
+
+        return std::move( nodes );
+      }
+
+
+
       // parseMeshFormat
       // ---------------
 
       std::tuple< double, Format, std::size_t > parseMeshFormat ( const SectionMap &sectionMap )
       {
-        if( sectionMap.count( "MeshFormat" ) != std::size_t( 1 ) )
-          DUNE_THROW( IOError, "A Gmsh file requires exactly one 'MeshFormat' section" );
-
-        SectionMap::const_iterator section = sectionMap.find( "MeshFormat" );
-        assert( section != sectionMap.end() );
+        SectionMap::const_iterator section = findUniqueSection( sectionMap, "MeshFormat" );
         if( section->second.size() != std::size_t( 1 ) )
           DUNE_THROW( IOError, "Section 'MeshFormat' must consist of exactly one line" );
 
         double version = 0.0;
         std::size_t fileType = 0, floatSize = 0;
-        std::istringstream input( sectionMap.find( "MeshFormat" )->second.front() );
+        std::istringstream input( section->second.front() );
         input >> version >> fileType >> floatSize;
         if( !input )
           DUNE_THROW( IOError, "Unable to parse section 'MeshFormat'" );
