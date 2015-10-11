@@ -2,6 +2,7 @@
 #define DUNE_VEM_IO_GMSH_HH
 
 #include <map>
+#include <memory>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -18,13 +19,28 @@ namespace Dune
     namespace Gmsh
     {
 
+      enum Format { ascii = 0, binary = 1 };
+
+      struct ElementType
+      {
+        std::size_t numNodes;
+      };
+
       typedef std::vector< std::string > Section;
       typedef std::multimap< std::string, Section > SectionMap;
 
       typedef std::pair< std::size_t, FieldVector< double, 3 > > Node;
 
-      enum Format { ascii = 0, binary = 1 };
+      struct Element
+      {
+        std::size_t id = 0;
+        const ElementType *type = nullptr;
+        std::unique_ptr< std::size_t[] > nodes;
+        std::size_t numTags = 0;
+        std::unique_ptr< int[] > tags;
+      };
 
+      std::vector< Element > parseElements ( const SectionMap &sectionMap );
       std::vector< Node > parseNodes ( const SectionMap &sectionMap );
       std::tuple< double, Format, std::size_t > parseMeshFormat ( const SectionMap &sectionMap );
 

@@ -16,6 +16,55 @@ namespace Dune
     namespace Gmsh
     {
 
+      // ElementTypeImpl
+      // ---------------
+
+      struct ElementTypeImpl
+        : public ElementType
+      {
+        ElementTypeImpl ( std::size_t id, std::size_t nNodes )
+        {
+          identifier = id;
+          numNodes = nNodes;
+        }
+
+        operator std::pair< const std::size_t, const ElementType * > () const { return std::make_pair( identifier, this ); }
+
+        std::size_t identifier;
+      };
+
+
+
+      // Element Types
+      // -------------
+
+      static const ElementTypeImpl order1Line( 1, 2 );
+      static const ElementTypeImpl order1Triangle( 2, 3 );
+      static const ElementTypeImpl order1Quadrangle( 3, 4 );
+      static const ElementTypeImpl order1Tetrahedron( 4, 4 );
+      static const ElementTypeImpl order1Hexahedron( 5, 8 );
+      static const ElementTypeImpl order1Prism( 6, 6 );
+      static const ElementTypeImpl order1Pyramid( 7, 5 );
+
+
+
+      // makeElementTypes
+      // ----------------
+
+      static std::map< std::size_t, const ElementType * > makeElementTypes ()
+      {
+        std::map< std::size_t, const ElementType * > types;
+        types.insert( order1Line );
+        types.insert( order1Triangle );
+        types.insert( order1Quadrangle );
+        types.insert( order1Tetrahedron );
+        types.insert( order1Prism );
+        types.insert( order1Pyramid );
+        return std::move( types );
+      }
+
+
+
       // findUniqueSection
       // -----------------
 
@@ -30,14 +79,67 @@ namespace Dune
 
 
 
+      // parseElements
+      // -------------
+
+      std::vector< Element > parseElements ( const SectionMap &sectionMap )
+      {
+        SectionMap::const_iterator section = findUniqueSection( sectionMap, "Elements" );
+        if( section->second.empty() )
+          DUNE_THROW( IOError, "Section 'Elements' must contain at least one line" );
+
+        std::istringstream input( section->second.front() );
+        std::size_t numElements = 0;
+        input >> numElements;
+        if( !input || (section->second.size() != numElements+1) )
+          DUNE_THROW( IOError, "Section 'Elements' must contain exactly numElements+1 lines." );
+
+        const std::map< std::size_t, const ElementType * > types = makeElementTypes();
+
+        std::vector< Element > elements( numElements );
+        for( std::size_t i = 0; i < numElements; ++i )
+        {
+          std::istringstream input( section->second[ i+1 ] );
+          std::size_t typeId = 0;
+          input >> elements[ i ].id >> typeId >> elements[ i ].numTags;
+          if( !input )
+            DUNE_THROW( IOError, "Unable to read line " << (i+1) << " of 'Elements' section" );
+
+          const auto typeIt = types.find( typeId );
+          if( typeIt == types.end() )
+            DUNE_THROW( IOError, "Unknown element type " << typeId << " encountered in 'Elements' section" );
+          elements[ i ].type = typeIt->second;
+
+          if( elements[ i ].numTags > 4096 )
+            DUNE_THROW( IOError, "Too many element tags encountered in 'Elements' section" );
+          elements[ i ].tags = std::make_unique< int[] >( elements[ i ].numTags );
+          for( std::size_t j = 0; j < elements[ i ].numTags; ++j )
+            input >> elements[ i ].tags[ j ];
+
+          elements[ i ].nodes = std::make_unique< std::size_t[] >( elements[ i ].type->numNodes );
+          for( std::size_t j = 0; j < elements[ i ].type->numNodes; ++j )
+            input >> elements[ i ].nodes[ j ];
+
+          if( !input )
+            DUNE_THROW( IOError, "Unable to read line " << (i+1) << " of 'Elements' section" );
+        }
+
+        // sort elements and ensure there are no duplicates
+        std::sort( elements.begin(), elements.end(), [] ( const Element &a, const Element &b ) { return (a.id < b.id); } );
+        const auto pos = std::adjacent_find( elements.begin(), elements.end(), [] ( const Element &a, const Element &b ) { return (a.id == b.id); } );
+        if( pos != elements.end() )
+          DUNE_THROW( IOError, "Duplicate element " << pos->id << " in 'Elements' section" );
+
+        return std::move( elements );
+      }
+
+
+
       // parseNodes
       // ----------
 
       std::vector< Node > parseNodes ( const SectionMap &sectionMap )
       {
-        if( sectionMap.count( "Nodes" ) != std::size_t( 1 ) )
-          DUNE_THROW( IOError, "A Gmsh file requires exactly one 'Nodes' section" );
-
         SectionMap::const_iterator section = findUniqueSection( sectionMap, "Nodes" );
         if( section->second.empty() )
           DUNE_THROW( IOError, "Section 'Nodes' must contain at least one line" );
