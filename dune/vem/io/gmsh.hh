@@ -16,6 +16,7 @@
 
 #include <dune/grid/common/gridfactory.hh>
 #include <dune/grid/common/mcmgmapper.hh>
+#include <dune/grid/common/rangegenerators.hh>
 
 namespace Dune
 {
@@ -85,7 +86,10 @@ namespace Dune
 
       SectionMap readFile ( const std::string &filename );
 
+      std::vector< int > tags ( const std::vector< Element > &elements, const std::vector< std::size_t > &ids, std::size_t tag );
+
       std::vector< std::size_t > vertices ( const std::vector< DuneEntity > &entities );
+
 
 
       // Grid Factory Manipulation
@@ -94,14 +98,15 @@ namespace Dune
       template< class Grid >
       inline void insertVertices ( GridFactory< Grid > &factory, const std::vector< std::size_t > &vertices, const std::vector< Node > &nodes )
       {
+        const int dimWorld = Grid::dimensionworld;
         for( std::size_t v : vertices )
         {
           const auto pos = std::lower_bound( nodes.begin(), nodes.end(), v, [] ( const Node &a, std::size_t b ) { return (a.id < b); } );
           if( (pos == nodes.end()) || (pos->id != v) )
             DUNE_THROW( Exception, "Unable to find node " << v << " in nodes vector" );
 
-          FieldVector< typename Grid::ctype, Grid::dimensionworld > position( 0 );
-          for( int i = 0; i < std::min( Grid::dimensionworld, 3 ); ++i )
+          FieldVector< typename Grid::ctype, dimWorld > position( 0 );
+          for( int i = 0; i < std::min( dimWorld, 3 ); ++i )
             position[ i ] = pos->position[ i ];
 
           factory.insertVertex( position );
@@ -135,7 +140,7 @@ namespace Dune
         MultipleCodimMultipleGeomTypeMapper< GridView, MCMGElementLayout > mapper( gridView );
         std::vector< std::size_t > ids( mapper.size(), std::size_t( 0 ) );
         for( const auto element : elements( gridView, Partitions::all ) )
-          ids[ mapper.index( element ) ] = entities[ factory.insertionIndex( element ) ].id;
+          ids[ mapper.index( element ) ] = entities[ factory.insertionIndex( element ) ].id();
         return std::move( ids );
       }
 

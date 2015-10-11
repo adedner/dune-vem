@@ -76,6 +76,11 @@ namespace Dune
         types.insert( order1Tetrahedron );
         types.insert( order1Prism );
         types.insert( order1Pyramid );
+        types.insert( order2Line );
+        types.insert( order2Triangle );
+        types.insert( order2Quadrangle );
+        types.insert( point );
+        types.insert( reducedOrder2Quadrangle );
         return std::move( types );
       }
 
@@ -129,8 +134,8 @@ namespace Dune
         std::transform( entity.vertices().begin(), entity.vertices().end(), indices.begin(), [ &vertices ] ( std::size_t id ) {
             const auto pos = std::lower_bound( vertices.begin(), vertices.end(), id );
             if( (pos == vertices.end()) || (*pos != id) )
-              DUNE_THROW( Exception, "Unable to find vertex " << id );
-            return *pos;
+              DUNE_THROW( RangeError, "No such vertex: " << id );
+            return (pos - vertices.begin());
           } );
       }
 
@@ -302,6 +307,27 @@ namespace Dune
           DUNE_THROW( IOError, "Unterminated Gmsh section: '" << section->first << "'" );
 
         return std::move( sectionMap );
+      }
+
+
+
+      // tags
+      // ----
+
+      std::vector< int > tags ( const std::vector< Element > &elements, const std::vector< std::size_t > &ids, std::size_t tag )
+      {
+        std::vector< int > tags;
+        tags.reserve( ids.size() );
+        for( std::size_t id : ids )
+        {
+          const auto pos = std::lower_bound( elements.begin(), elements.end(), id, [] ( const Element &a, std::size_t b ) { return (a.id < b); } );
+          if( (pos == elements.end()) || (pos->id != id) )
+            DUNE_THROW( RangeError, "No such element: " << id );
+          if( tag >= pos->numTags )
+            DUNE_THROW( RangeError, "Element " << id << " does not have tag " << tag );
+          tags.push_back( pos->tags[ tag ] );
+        }
+        return std::move( tags );
       }
 
 
