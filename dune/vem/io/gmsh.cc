@@ -154,16 +154,16 @@ namespace Dune
         for( std::size_t i = 0; i < numNodes; ++i )
         {
           std::istringstream input( section->second[ i+1 ] );
-          input >> nodes[ i ].first >> nodes[ i ].second[ 0 ] >> nodes[ i ].second[ 1 ] >> nodes[ i ].second[ 2 ];
+          input >> nodes[ i ].id >> nodes[ i ].position[ 0 ] >> nodes[ i ].position[ 1 ] >> nodes[ i ].position[ 2 ];
           if( !input )
             DUNE_THROW( IOError, "Unable to read line " << (i+1) << " of 'Nodes' section" );
         }
 
         // sort nodes and ensure there are no duplicates
-        std::sort( nodes.begin(), nodes.end(), [] ( const Node &a, const Node &b ) { return (a.first < b.first); } );
-        const auto pos = std::adjacent_find( nodes.begin(), nodes.end(), [] ( const Node &a, const Node &b ) { return (a.first == b.first); } );
+        std::sort( nodes.begin(), nodes.end(), [] ( const Node &a, const Node &b ) { return (a.id < b.id); } );
+        const auto pos = std::adjacent_find( nodes.begin(), nodes.end(), [] ( const Node &a, const Node &b ) { return (a.id == b.id); } );
         if( pos != nodes.end() )
-          DUNE_THROW( IOError, "Duplicate node " << pos->first << " in 'Nodes' section" );
+          DUNE_THROW( IOError, "Duplicate node " << pos->id << " in 'Nodes' section" );
 
         return std::move( nodes );
       }

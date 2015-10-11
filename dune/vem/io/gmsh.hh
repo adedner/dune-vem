@@ -29,7 +29,11 @@ namespace Dune
       typedef std::vector< std::string > Section;
       typedef std::multimap< std::string, Section > SectionMap;
 
-      typedef std::pair< std::size_t, FieldVector< double, 3 > > Node;
+      struct Node
+      {
+        std::size_t id;
+        FieldVector< double, 3 > position;
+      };
 
       struct Element
       {
