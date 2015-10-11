@@ -1,6 +1,8 @@
 #include <cassert>
 
+#include <algorithm>
 #include <fstream>
+#include <initializer_list>
 #include <sstream>
 
 #include <dune/common/exceptions.hh>
@@ -22,10 +24,14 @@ namespace Dune
       struct ElementTypeImpl
         : public ElementType
       {
-        ElementTypeImpl ( std::size_t id, std::size_t nNodes )
+        ElementTypeImpl ( std::size_t id, Dune::GeometryType::BasicType basicType, int dim,
+                          std::initializer_list< std::pair< unsigned int, unsigned int > > subs )
         {
           identifier = id;
-          numNodes = nNodes;
+          duneType = GeometryType( basicType, dim );
+          numNodes = subs.size();
+          subEntity = std::make_unique< std::pair< unsigned int, unsigned int >[] >( numNodes );
+          std::copy( subs.begin(), subs.end(), subEntity.get() );
         }
 
         operator std::pair< const std::size_t, const ElementType * > () const { return std::make_pair( identifier, this ); }
@@ -38,13 +44,21 @@ namespace Dune
       // Element Types
       // -------------
 
-      static const ElementTypeImpl order1Line( 1, 2 );
-      static const ElementTypeImpl order1Triangle( 2, 3 );
-      static const ElementTypeImpl order1Quadrangle( 3, 4 );
-      static const ElementTypeImpl order1Tetrahedron( 4, 4 );
-      static const ElementTypeImpl order1Hexahedron( 5, 8 );
-      static const ElementTypeImpl order1Prism( 6, 6 );
-      static const ElementTypeImpl order1Pyramid( 7, 5 );
+      static const ElementTypeImpl order1Line( 1, GeometryType::cube, 1, { { 0, 1 }, { 1, 1 } } );
+      static const ElementTypeImpl order1Triangle( 2, GeometryType::simplex, 2, { { 0, 2 }, { 1, 2 }, { 2, 2 } } );
+      static const ElementTypeImpl order1Quadrangle( 3, GeometryType::cube, 2, { { 0, 2 }, { 1, 2 }, { 3, 2 }, { 2, 2 } } );
+      static const ElementTypeImpl order1Tetrahedron( 4, GeometryType::simplex, 3, { { 0, 3 }, { 1, 3 }, { 2, 3 }, { 3, 3 } } );
+      static const ElementTypeImpl order1Hexahedron( 5, GeometryType::cube, 3, { { 0, 3 }, { 1, 3 }, { 3, 3 }, { 2, 3 }, { 4, 3 }, { 5, 3 }, { 7, 3 }, { 6, 3 } } );
+      static const ElementTypeImpl order1Prism( 6, GeometryType::prism, 3, { { 0, 3 }, { 1, 3 }, { 2, 3 }, { 3, 3 }, { 4, 3 }, { 5, 3 } } );
+      static const ElementTypeImpl order1Pyramid( 7, GeometryType::pyramid, 3 , { { 0, 3 }, { 1, 3 }, { 3, 3 }, { 2, 3 }, { 4, 3 } } );
+
+      static const ElementTypeImpl order2Line( 8, GeometryType::cube, 1, { { 0, 1 }, { 1, 1 }, { 0, 0 } } );
+      static const ElementTypeImpl order2Triangle( 9, GeometryType::simplex, 2, { { 0, 2 }, { 1, 2 }, { 2, 2 }, { 0, 1 }, { 2, 1 }, { 1, 1 } } );
+      static const ElementTypeImpl order2Quadrangle( 10, GeometryType::cube, 2, { { 0, 2 }, { 1, 2 }, { 3, 2 }, { 2, 2 }, { 2, 1 }, { 1, 1 }, { 3, 1 }, { 0, 1 }, { 0, 0 } } );
+
+      static const ElementTypeImpl point( 15, GeometryType::cube, 0, { { 0, 0 } } );
+
+      static const ElementTypeImpl reducedOrder2Quadrangle( 16, GeometryType::cube, 2, { { 0, 2 }, { 1, 2 }, { 3, 2 }, { 2, 2 }, { 2, 1 }, { 1, 1 }, { 3, 1 }, { 0, 1 } } );
 
 
 

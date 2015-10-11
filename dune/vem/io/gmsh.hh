@@ -10,6 +10,8 @@
 
 #include <dune/common/fvector.hh>
 
+#include <dune/geometry/type.hh>
+
 namespace Dune
 {
 
@@ -23,7 +25,9 @@ namespace Dune
 
       struct ElementType
       {
+        Dune::GeometryType duneType;
         std::size_t numNodes;
+        std::unique_ptr< std::pair< unsigned int, unsigned int >[] > subEntity;
       };
 
       typedef std::vector< std::string > Section;
