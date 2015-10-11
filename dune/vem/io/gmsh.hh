@@ -15,6 +15,7 @@
 #include <dune/geometry/type.hh>
 
 #include <dune/grid/common/gridfactory.hh>
+#include <dune/grid/common/mcmgmapper.hh>
 
 namespace Dune
 {
@@ -116,6 +117,26 @@ namespace Dune
           findVertices( entity, vertices, indices );
           factory.insertElement( entity.type(), indices );
         }
+      }
+
+      template< class GridView >
+      inline std::vector< std::size_t > vertices ( const GridView &gridView, const GridFactory< typename GridView::Grid > &factory, const std::vector< std::size_t > &vertices )
+      {
+        MultipleCodimMultipleGeomTypeMapper< GridView, MCMGVertexLayout > mapper( gridView );
+        std::vector< std::size_t > ids( mapper.size(), std::size_t( 0 ) );
+        for( const auto vertex : vertices( gridView, Partitions::all ) )
+          ids[ mapper.index( vertex ) ] = vertices[ factory.insertionIndex( vertex ) ];
+        return std::move( ids );
+      }
+
+      template< class GridView >
+      inline std::vector< std::size_t > elements ( const GridView &gridView, const GridFactory< typename GridView::Grid > &factory, const std::vector< DuneEntity > &entities )
+      {
+        MultipleCodimMultipleGeomTypeMapper< GridView, MCMGElementLayout > mapper( gridView );
+        std::vector< std::size_t > ids( mapper.size(), std::size_t( 0 ) );
+        for( const auto element : elements( gridView, Partitions::all ) )
+          ids[ mapper.index( element ) ] = entities[ factory.insertionIndex( element ) ].id;
+        return std::move( ids );
       }
 
     } // namespace Gmsh
