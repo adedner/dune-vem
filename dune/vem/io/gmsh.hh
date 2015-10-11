@@ -48,11 +48,16 @@ namespace Dune
         std::unique_ptr< int[] > tags;
       };
 
+      template< class Iterator >
+      Iterator findNode ( Iterator begin, Iterator end, const std::size_t nodeId );
+
       std::vector< Element > parseElements ( const SectionMap &sectionMap );
       std::vector< Node > parseNodes ( const SectionMap &sectionMap );
       std::tuple< double, Format, std::size_t > parseMeshFormat ( const SectionMap &sectionMap );
 
       SectionMap readFile ( const std::string &filename );
+
+      std::vector< Node > vertices ( const std::vector< Element > &elements, const std::vector< Node > &nodes, unsigned int dim );
 
     } // namespace Gmsh
 

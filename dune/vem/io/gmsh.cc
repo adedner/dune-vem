@@ -261,6 +261,37 @@ namespace Dune
         return std::move( sectionMap );
       }
 
+
+
+      // vertices
+      // --------
+
+      std::vector< Node > vertices ( const std::vector< Element > &elements, const std::vector< Node > &nodes, unsigned int dim )
+      {
+        // create list of all nodes used as vertices
+        std::vector< Node > vertices;
+        for( const Element &element : elements )
+        {
+          if( element.type->duneType.dim() != dim )
+            continue;
+          for( std::size_t i = 0; i < element.type->numNodes; ++i )
+          {
+            if( element.type->subEntity[ i ].second == dim )
+            {
+              const auto pos = std::lower_bound( nodes.begin(), nodes.end(), element.nodes[ i ], [] ( const Node &a, std::size_t b ) { return (a.id < b); } );
+              if( (pos == nodes.end()) || (pos->id != element.nodes[ i ]) )
+                DUNE_THROW( Exception, "Unable to find node " << element.nodes[ i ] << " in nodes vector" );
+              vertices.push_back( *pos );
+            }
+          }
+        }
+
+        // remove duplicate nodes
+        std::sort( vertices.begin(), vertices.end(), [] ( const Node &a, const Node &b ) { return (a.id < b.id); } );
+        vertices.erase( std::unique( vertices.begin(), vertices.end(), [] ( const Node &a, const Node &b ) { return (a.id == b.id); } ), vertices.end() );
+        return std::move( vertices );
+      }
+
     } // namespace Gmsh
 
   } // namespace Vem
