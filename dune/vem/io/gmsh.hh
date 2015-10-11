@@ -48,6 +48,15 @@ namespace Dune
         std::unique_ptr< int[] > tags;
       };
 
+      struct DuneEntity
+      {
+        std::size_t id = 0;
+        GeometryType type;
+        std::unique_ptr< std::size_t[] > vertices;
+      };
+
+      std::vector< DuneEntity > duneEntities ( const std::vector< Element > &elements, unsigned int dim );
+
       template< class Iterator >
       Iterator findNode ( Iterator begin, Iterator end, const std::size_t nodeId );
 

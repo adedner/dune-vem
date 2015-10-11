@@ -7,6 +7,8 @@
 
 #include <dune/common/exceptions.hh>
 
+#include <dune/geometry/genericgeometry/subtopologies.hh>
+
 #include <dune/vem/io/gmsh.hh>
 
 namespace Dune
@@ -75,6 +77,35 @@ namespace Dune
         types.insert( order1Prism );
         types.insert( order1Pyramid );
         return std::move( types );
+      }
+
+
+
+      // duneEntities
+      // ------------
+
+      std::vector< DuneEntity > duneEntities ( const std::vector< Element > &elements, unsigned int dim )
+      {
+        std::vector< DuneEntity > entities;
+        for( const Element &element : elements )
+        {
+          if( element.type->duneType.dim() != dim )
+            continue;
+
+          DuneEntity entity;
+          entity.id = element.id;
+          entity.type = element.type->duneType;
+          entity.vertices = std::make_unique< std::size_t[] >( GenericGeometry::size( entity.type.id(), dim, dim ) );
+
+          for( std::size_t i = 0; i < element.type->numNodes; ++i )
+          {
+            if( element.type->subEntity[ i ].second == dim )
+              entity.vertices[ element.type->subEntity[ i ].first ] = element.nodes[ i ];
+          }
+
+          entities.push_back( std::move( entity ) );
+        }
+        return std::move( entities );
       }
 
 
