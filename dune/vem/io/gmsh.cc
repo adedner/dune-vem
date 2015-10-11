@@ -1,3 +1,5 @@
+#include <config.h>
+
 #include <cassert>
 
 #include <algorithm>
@@ -6,8 +8,6 @@
 #include <sstream>
 
 #include <dune/common/exceptions.hh>
-
-#include <dune/geometry/genericgeometry/subtopologies.hh>
 
 #include <dune/vem/io/gmsh.hh>
 
@@ -92,15 +92,11 @@ namespace Dune
           if( element.type->duneType.dim() != dim )
             continue;
 
-          DuneEntity entity;
-          entity.id = element.id;
-          entity.type = element.type->duneType;
-          entity.vertices = std::make_unique< std::size_t[] >( GenericGeometry::size( entity.type.id(), dim, dim ) );
-
+          DuneEntity entity( element.id, element.type->duneType );;
           for( std::size_t i = 0; i < element.type->numNodes; ++i )
           {
             if( element.type->subEntity[ i ].second == dim )
-              entity.vertices[ element.type->subEntity[ i ].first ] = element.nodes[ i ];
+              entity.vertices().begin()[ element.type->subEntity[ i ].first ] = element.nodes[ i ];
           }
 
           entities.push_back( std::move( entity ) );
@@ -120,6 +116,22 @@ namespace Dune
         SectionMap::const_iterator section = sectionMap.find( sectionName );
         assert( section != sectionMap.end() );
         return section;
+      }
+
+
+
+      // findVertices
+      // ------------
+
+      void findVertices ( const DuneEntity &entity, const std::vector< std::size_t > &vertices, std::vector< unsigned int > &indices )
+      {
+        indices.resize( entity.size() );
+        std::transform( entity.vertices().begin(), entity.vertices().end(), indices.begin(), [ &vertices ] ( std::size_t id ) {
+            const auto pos = std::lower_bound( vertices.begin(), vertices.end(), id );
+            if( (pos == vertices.end()) || (*pos != id) )
+              DUNE_THROW( Exception, "Unable to find vertex " << id );
+            return *pos;
+          } );
       }
 
 
@@ -297,29 +309,16 @@ namespace Dune
       // vertices
       // --------
 
-      std::vector< Node > vertices ( const std::vector< Element > &elements, const std::vector< Node > &nodes, unsigned int dim )
+      std::vector< std::size_t > vertices ( const std::vector< DuneEntity > &entities )
       {
-        // create list of all nodes used as vertices
-        std::vector< Node > vertices;
-        for( const Element &element : elements )
-        {
-          if( element.type->duneType.dim() != dim )
-            continue;
-          for( std::size_t i = 0; i < element.type->numNodes; ++i )
-          {
-            if( element.type->subEntity[ i ].second == dim )
-            {
-              const auto pos = std::lower_bound( nodes.begin(), nodes.end(), element.nodes[ i ], [] ( const Node &a, std::size_t b ) { return (a.id < b); } );
-              if( (pos == nodes.end()) || (pos->id != element.nodes[ i ]) )
-                DUNE_THROW( Exception, "Unable to find node " << element.nodes[ i ] << " in nodes vector" );
-              vertices.push_back( *pos );
-            }
-          }
-        }
+        // collect all used vertices
+        std::vector< std::size_t > vertices;
+        for( const DuneEntity &entity : entities )
+          vertices.insert( vertices.end(), entity.vertices().begin(), entity.vertices().end() );
 
-        // remove duplicate nodes
-        std::sort( vertices.begin(), vertices.end(), [] ( const Node &a, const Node &b ) { return (a.id < b.id); } );
-        vertices.erase( std::unique( vertices.begin(), vertices.end(), [] ( const Node &a, const Node &b ) { return (a.id == b.id); } ), vertices.end() );
+        // remove duplicates
+        std::sort( vertices.begin(), vertices.end() );
+        vertices.erase( std::unique( vertices.begin(), vertices.end() ), vertices.end() );
         return std::move( vertices );
       }
 

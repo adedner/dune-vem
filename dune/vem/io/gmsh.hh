@@ -8,9 +8,13 @@
 #include <vector>
 #include <utility>
 
+#include <dune/common/iteratorrange.hh>
 #include <dune/common/fvector.hh>
 
+#include <dune/geometry/genericgeometry/subtopologies.hh>
 #include <dune/geometry/type.hh>
+
+#include <dune/grid/common/gridfactory.hh>
 
 namespace Dune
 {
@@ -50,15 +54,29 @@ namespace Dune
 
       struct DuneEntity
       {
-        std::size_t id = 0;
-        GeometryType type;
-        std::unique_ptr< std::size_t[] > vertices;
+        DuneEntity ( std::size_t id, GeometryType type )
+          : id_( id ), type_( type ),
+            vertices_( std::make_unique< std::size_t[] >( size() ) )
+        {}
+
+        std::size_t id () const { return id_; }
+
+        std::size_t size () const { return GenericGeometry::size( type().id(), type().dim(), type().dim() ); }
+
+        GeometryType type () const { return type_; }
+
+        IteratorRange< std::size_t * > vertices () { return { vertices_.get(), vertices_.get() + size() }; }
+        IteratorRange< const std::size_t * > vertices () const { return { vertices_.get(), vertices_.get() + size() }; }
+
+      private:
+        std::size_t id_;
+        GeometryType type_;
+        std::unique_ptr< std::size_t[] > vertices_;
       };
 
       std::vector< DuneEntity > duneEntities ( const std::vector< Element > &elements, unsigned int dim );
 
-      template< class Iterator >
-      Iterator findNode ( Iterator begin, Iterator end, const std::size_t nodeId );
+      void findVertices ( const DuneEntity &entity, const std::vector< std::size_t > &vertices, std::vector< unsigned int > &indices );
 
       std::vector< Element > parseElements ( const SectionMap &sectionMap );
       std::vector< Node > parseNodes ( const SectionMap &sectionMap );
@@ -66,7 +84,39 @@ namespace Dune
 
       SectionMap readFile ( const std::string &filename );
 
-      std::vector< Node > vertices ( const std::vector< Element > &elements, const std::vector< Node > &nodes, unsigned int dim );
+      std::vector< std::size_t > vertices ( const std::vector< DuneEntity > &entities );
+
+
+      // Grid Factory Manipulation
+      // -------------------------
+
+      template< class Grid >
+      inline void insertVertices ( GridFactory< Grid > &factory, const std::vector< std::size_t > &vertices, const std::vector< Node > &nodes )
+      {
+        for( std::size_t v : vertices )
+        {
+          const auto pos = std::lower_bound( nodes.begin(), nodes.end(), v, [] ( const Node &a, std::size_t b ) { return (a.id < b); } );
+          if( (pos == nodes.end()) || (pos->id != v) )
+            DUNE_THROW( Exception, "Unable to find node " << v << " in nodes vector" );
+
+          FieldVector< typename Grid::ctype, Grid::dimensionworld > position( 0 );
+          for( int i = 0; i < std::min( Grid::dimensionworld, 3 ); ++i )
+            position[ i ] = pos->position[ i ];
+
+          factory.insertVertex( position );
+        }
+      }
+
+      template< class Grid >
+      inline void insertElements ( GridFactory< Grid > &factory, const std::vector< DuneEntity > &entities, const std::vector< std::size_t > &vertices )
+      {
+        std::vector< unsigned int > indices;
+        for( const DuneEntity &entity : entities )
+        {
+          findVertices( entity, vertices, indices );
+          factory.insertElement( entity.type(), indices );
+        }
+      }
 
     } // namespace Gmsh
 
