@@ -14,7 +14,7 @@ namespace Gmsh
   using namespace Dune::Vem::Gmsh;
 }
 
-typedef Dune::ALUGrid< 2, 2, Dune::cube, Dune::nonconforming > Grid;
+typedef Dune::ALUGrid< 2, 2, Dune::simplex, Dune::nonconforming > Grid;
 
 int main ( int argc, char **argv )
 try
@@ -41,10 +41,13 @@ try
   std::unique_ptr< Grid > grid( factory.createGrid() );
 
   std::vector< std::size_t > elementIds = Gmsh::elements( grid->leafGridView(), factory, entities );
-  std::vector< int > partition = Gmsh::tags( elements, elementIds, 3 );
+  std::array< std::vector< int >, 4 > tags;
+  for( int i = 0; i < 4; ++i )
+    tags[ i ] = Gmsh::tags( elements, elementIds, i );
 
   Dune::VTKWriter< Grid::LeafGridView > vtkWriter( grid->leafGridView() );
-  vtkWriter.addCellData( partition, "partition" );
+  for( int i = 0; i < 4; ++i )
+    vtkWriter.addCellData( tags[ i ], "tag-" + std::to_string( i ) );
   vtkWriter.write( "test-gmsh" );
 
   return 0;
