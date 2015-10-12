@@ -46,6 +46,7 @@ try
     tags[ i ] = Gmsh::tags( elements, elementIds, i );
 
   Dune::VTKWriter< Grid::LeafGridView > vtkWriter( grid->leafGridView() );
+  vtkWriter.addCellData( elementIds, "id" );
   for( int i = 0; i < 4; ++i )
     vtkWriter.addCellData( tags[ i ], "tag-" + std::to_string( i ) );
   vtkWriter.write( "test-gmsh" );
