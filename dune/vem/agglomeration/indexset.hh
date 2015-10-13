@@ -54,6 +54,12 @@ namespace Dune
         return (codim == 0 ? 1u : agglomerate( entity ).size( dimension - codim ));
       }
 
+      std::size_t size ( int codim ) const
+      {
+        assert( (codim >= 0) && (codim <= dimension) );
+        return size_[ dimension-codim ];
+      }
+
     private:
       const Agglomerate &agglomerate ( const EntityType &entity ) const { return agglomerates_[ index( entity ) ]; }
 
@@ -62,6 +68,7 @@ namespace Dune
       AllocatorType allocator_;
       std::vector< std::size_t > agglomerateIndices_;
       std::vector< Agglomerate > agglomerates_;
+      std::array< std::size_t, dimension+1 > size_;
     };
 
 
@@ -191,18 +198,18 @@ namespace Dune
       std::vector< std::size_t > offset( GlobalGeometryTypeIndex::size( dimension ) );
       for( int dim = 0; dim < dimension; ++dim )
       {
-        std::size_t size = 0;
+        size_[ dim ] = 0;
         for( std::size_t typeIndex = GlobalGeometryTypeIndex::offset( dim ); typeIndex < GlobalGeometryTypeIndex::offset( dim+1 ); ++typeIndex )
         {
-          offset[ i ] = size;
-          size += subAgglomerates[ typeIndex ].size();
+          offset[ i ] = size_[ dim ];
+          size_[ dim ] += subAgglomerates[ typeIndex ].size();
         }
       }
 
       // build connectivity
 
-      const std::size_t numAgglomerates = *std::max_element( agglomerateIndices_.begin(), agglomerateIndices_.end() ) + 1u;
-      std::vector< std::array< std::vector< std::size_t >, dimension > > connectivity( numAgglomerates );
+      size_[ dimension ] = *std::max_element( agglomerateIndices_.begin(), agglomerateIndices_.end() ) + 1u;
+      std::vector< std::array< std::vector< std::size_t >, dimension > > connectivity( size_[ dimension ] );
 
       for( const auto element : elements( gridPart, Partitions::interiorBorder ) )
       {
@@ -234,7 +241,7 @@ namespace Dune
 
       // compress connectivity
 
-      agglomerates_.reserve( numAgglomerates );
+      agglomerates_.reserve( size_[ dimension ] );
       for( auto &c : connectivity )
       {
         for( int dim = 0; dim < dimension; ++dim )
