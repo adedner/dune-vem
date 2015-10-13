@@ -25,8 +25,6 @@ namespace Dune
     {
       typedef AgglomerationIndexSet< GridPart > ThisType;
 
-      struct Agglomerate;
-
     public:
       typedef GridPart GridPartType;
 
@@ -34,10 +32,33 @@ namespace Dune
 
       static const int dimension = GridPartType::dimension;
 
+    private:
+      typedef typename GridPartType::IndexSetType IndexSetType;
+
+      struct Agglomerate;
+
+    public:
       AgglomerationIndexSet ( const GridPartType &gridPart, std::vector< std::size_t > agglomerateIndices, AllocatorType allocator = AllocatorType() );
 
+      std::size_t index ( const EntityType &entity ) const { return agglomerateIndices_[ indexSet_.index( entity ) ]; }
+
+      std::size_t subIndex ( const EntityType &entity, int i, int codim ) const
+      {
+        assert( (codim >= 0) && (codim <= dimension) );
+        return (codim == 0 ? index( entity ) : agglomerate( entity ).index( i, dimension - codim ));
+      }
+
+      std::size_t subAgglomerates ( const EntityType &entity, int codim ) const
+      {
+        assert( (codim >= 0) && (codim <= dimension) );
+        return (codim == 0 ? 1u : agglomerate( entity ).size( dimension - codim ));
+      }
+
     private:
+      const Agglomerate &agglomerate ( const EntityType &entity ) const { return agglomerates_[ index( entity ) ]; }
+
       const GridPartType &gridPart_;
+      const IndexSetType &indexSet_;
       AllocatorType allocator_;
       std::vector< std::size_t > agglomerateIndices_;
       std::vector< Agglomerate > agglomerates_;
@@ -100,14 +121,15 @@ namespace Dune
         return *this;
       }
 
-      std::size_t subEntities ( int codim ) const
+      std::size_t index ( std::size_t i, int dim ) const
       {
-        assert( (codim >= 0) && (codim <= dimension) );
-        return (codim == 0 ? 1u : size( dimension - codim ));
+        assert( i < size( dim ) );
+        return *(connectivity[ dim ] + i);
       }
 
-    private:
       std::size_t size ( int dim ) const { return (connectivity_[ dim+1 ] - connectivity[ dim ]); }
+
+    private:
 
       AllocatorType &allocator () { return static_cast< AllocatorType & >( *this ); }
 
@@ -123,22 +145,23 @@ namespace Dune
     template< class I >
     inline AgglomerationIndexSet< GridPart, Allocator >
       ::AgglomerationIndexSet ( const GridPartType &gridPart, std::vector< I > agglomerateIndices, AllocatorType allocator )
-      : gridPart_( gridPart ), allocator_( std::move( allocator ) ), agglomerateIndices_( std::move( agglomerateIndices ) )
+      : gridPart_( gridPart ),
+        indexSet_( gridPart_.indexSet() ),
+        allocator_( std::move( allocator ) ),
+        agglomerateIndices_( std::move( agglomerateIndices ) )
     {
-      const typename GridPart::IndexSetType &indexSet = gridPart_.indexSet();
-
-      std::vector< std::vector< typename GridPart::IndexSetType::IndexType > subAgglomerates( GlobalGeometryTypeIndex::size( dimension-1 ) );
+      std::vector< std::vector< typename IndexSetType::IndexType > subAgglomerates( GlobalGeometryTypeIndex::size( dimension-1 ) );
 
       // find subagglomerates
 
       for( const auto element : elements( gridPart, Partitions::interiorBorder ) )
       {
-        const std::size_t agIndex = agglomerateIndices_[ indexSet.index( element ) ];
+        const std::size_t agIndex = index( element );
         const auto &refElement = ReferenceElements< typename GridPart::ctype, dimension >::general( element.type() );
         for( const auto intersection : intersections( gridPart, element ) )
         {
           assert( intersection.conforming() );
-          if( !intersection.neighbor() || (agglomerateIndices_[ indexSet.index( intersection.outside() ) ] != agIndex) )
+          if( !intersection.neighbor() || (index( intersection.outside() ) ] != agIndex) )
           {
             const int face = intersection.indexInInside();
             for( int codim = 1; codim <= dimension; ++codim )
@@ -148,7 +171,7 @@ namespace Dune
               {
                 const int k = refElement.subentity( face, 1, i, codim );
                 const std::size_t typeIndex = GlobalGeometryTypeIndex::index( refElement.type( k, codim ) );
-                subAgglomerates[ typeIndex ].push_back( indexSet.subIndex( element, k, codim ) );
+                subAgglomerates[ typeIndex ].push_back( indexSet_.subIndex( element, k, codim ) );
               }
             }
           }
@@ -183,12 +206,12 @@ namespace Dune
 
       for( const auto element : elements( gridPart, Partitions::interiorBorder ) )
       {
-        const std::size_t agIndex = agglomerateIndices_[ indexSet.index( element ) ];
+        const std::size_t agIndex = agglomerateIndices_[ indexSet_.index( element ) ];
         const auto &refElement = ReferenceElements< typename GridPart::ctype, dimension >::general( element.type() );
         for( const auto intersection : intersections( gridPart, element ) )
         {
           assert( intersection.conforming() );
-          if( !intersection.neighbor() || (agglomerateIndices_[ indexSet.index( intersection.outside() ) ] != agIndex) )
+          if( !intersection.neighbor() || (agglomerateIndices_[ indexSet_.index( intersection.outside() ) ] != agIndex) )
           {
             const int face = intersection.indexInInside();
             for( int codim = 1; codim <= dimension; ++codim )
@@ -200,8 +223,8 @@ namespace Dune
                 const int k = refElement.subentity( face, 1, i, codim );
                 const std::size_t typeIndex = GlobalGeometryTypeIndex::index( refElement.type( k, codim ) );
                 const auto &subAgs = subAgglomerates[ typeIndex ];
-                const auto pos = std::lower_bound( subAgs.begin(), subAgs.end(), indexSet.subIndex( element, k, codim ) );
-                assert( (pos != subAgs.end()) && (*pos == indexSet.subIndex( element, k, codim )) );
+                const auto pos = std::lower_bound( subAgs.begin(), subAgs.end(), indexSet_.subIndex( element, k, codim ) );
+                assert( (pos != subAgs.end()) && (*pos == indexSet_.subIndex( element, k, codim )) );
                 list.push_back( offset[ typeIndex ] + static_cast< std::size_t >( pos - subAgs.begin() ) );
               }
             }
