@@ -32,6 +32,8 @@ namespace Dune
 
       static const int dimension = GridPartType::dimension;
 
+      typedef FieldVector< typename GridPartType::ctype, GridPartType::dimensionworld > GlobalCoordinate;
+
     private:
       typedef typename GridPartType::IndexSetType IndexSetType;
 
@@ -69,6 +71,7 @@ namespace Dune
       std::vector< std::size_t > agglomerateIndices_;
       std::vector< Agglomerate > agglomerates_;
       std::array< std::size_t, dimension+1 > size_;
+      std::vector< GlobalCoordinate > corners_;
     };
 
 
@@ -250,6 +253,19 @@ namespace Dune
           c[ dim ].erase( std::unique( c[ dim ].begin(), c[ dim ].end() ), c[ dim ].end() );
         }
         agglomerate_.emplace_back( c, allocator_ );
+      }
+
+      // copy corners
+
+      corners_.resize( size_[ 0 ] );
+      for( const auto vertex : vertices( gridPart, Partitions::interiorBorder ) )
+      {
+        const std::size_t typeIndex = GlobalGeometryTypeIndex::index( vertex.type() );
+        const auto &subAgs = subAgglomerates[ typeIndex ];
+        const auto vertexIndex = indexSet_.index( vertex );
+        const auto pos = std::lower_bound( subAgs.begin(), subAgs.end(), vertexIndex );
+        if( (pos != subAgs.end()) && (*pos == vertexIndex) )
+          corners_[ offset[ typeIndex ] + static_cast< std::size_t >( pos - subAgs.begin() ) ] = vertex.geometry().center();
       }
     }
 
