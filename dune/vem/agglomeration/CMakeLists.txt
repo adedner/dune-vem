@@ -1,4 +1,6 @@
 set( HEADERS
+  agglomeration.hh
+  boundingbox.hh
   indexset.hh
 )
 
