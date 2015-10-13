@@ -22,7 +22,7 @@ namespace Dune
     template< class GridPart >
     class Agglomeration
     {
-      typedef Agglomeration< GridPart > This;
+      typedef Agglomeration< GridPart > ThisType;
 
     public:
       typedef GridPart GridPartType;

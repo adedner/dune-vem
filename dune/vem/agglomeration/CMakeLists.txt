@@ -1,6 +1,8 @@
 set( HEADERS
   agglomeration.hh
+  basisfunctionset.hh
   boundingbox.hh
+  dgspace.hh
   indexset.hh
 )
 
