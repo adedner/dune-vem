@@ -30,7 +30,7 @@ namespace Dune
     public:
       typedef GridPart GridPartType;
 
-      typedef Vem::Agglomeration< GridPartType > Agglomeration;
+      typedef Agglomeration< GridPartType > AgglomerationType;
 
       typedef typename Allocator::rebind< std::size_t >::other AllocatorType;
 
@@ -42,7 +42,7 @@ namespace Dune
       struct Agglomerate;
 
     public:
-      AgglomerationIndexSet ( const Agglomeration &agglomeration, AllocatorType allocator = AllocatorType() );
+      AgglomerationIndexSet ( const AgglomerationType &agglomeration, AllocatorType allocator = AllocatorType() );
 
       std::size_t index ( const ElementType &entity ) const { return agglomeration.index( entity ); }
 
@@ -67,7 +67,7 @@ namespace Dune
     private:
       const Agglomerate &agglomerate ( const EntityType &entity ) const { return agglomerates_[ index( entity ) ]; }
 
-      const Agglomeration &agglomeration_;
+      const AgglomerationType &agglomeration_;
       AllocatorType allocator_;
       std::vector< Agglomerate > agglomerates_;
       std::array< std::size_t, dimension+1 > size_;
@@ -151,7 +151,7 @@ namespace Dune
     // ---------------------------------------
 
     template< class GridPart, class Allocator >
-    inline AgglomerationIndexSet< GridPart, Allocator >::AgglomerationIndexSet ( const Agglomeration &agglomeration, AllocatorType allocator )
+    inline AgglomerationIndexSet< GridPart, Allocator >::AgglomerationIndexSet ( const AgglomerationType &agglomeration, AllocatorType allocator )
       : agglomeration_( agglomeration ),
         allocator_( std::move( allocator ) )
     {
