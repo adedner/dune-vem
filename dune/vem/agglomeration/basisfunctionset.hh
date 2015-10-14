@@ -40,8 +40,9 @@ namespace Dune
 
       BoundingBoxBasisFunctionSet () = default;
 
-      explicit BoundingBoxBasisFunctionSet ( const EntityType &entity, ShapeFunctionSet shapeFunctionSet = ShapeFunctionSet() )
-        : entity_( &entity ), shapeFunctionSet_( std::move( shapeFunctionSet ) )
+      BoundingBoxBasisFunctionSet ( const EntityType &entity, std::pair< DomainType, DomainType > bbox,
+                                    ShapeFunctionSet shapeFunctionSet = ShapeFunctionSet() )
+        : entity_( &entity ), shapeFunctionSet_( std::move( shapeFunctionSet ) ), bbox_( std::move( bbox ) )
       {
         assert( shapeFunctionSet_.type().isCube() );
       }

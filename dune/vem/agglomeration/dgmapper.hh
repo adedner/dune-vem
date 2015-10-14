@@ -90,7 +90,6 @@ namespace Dune
         return (Entity::codimension == 0 ? 1 : 0);
       }
 
-
       // compatibility: methods deprecated for non-adaptive mappers
 
       static constexpr bool consecutive () noexcept { return false; }
@@ -104,6 +103,10 @@ namespace Dune
 
       static constexpr SizeType oldOffSet ( int ) noexcept { return 0; }
       static constexpr SizeType offSet ( int ) noexcept { return 0; }
+
+      // implementation-defined methods
+
+      const AgglomerationType &agglomeration () const { return agglomeration_; }
 
     private:
       const AgglomerationType &agglomeration_;
