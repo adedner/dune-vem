@@ -34,8 +34,13 @@ namespace Dune
       {
         assert( indices_.size() == mapper.size() );
         if( !indices_.empty() )
-          size_ = *std::max_element( agglomerateIndices.begin(), agglomerateIndices.end() ) + 1u;
+          size_ = *std::max_element( indices_.begin(), indices_.end() ) + 1u;
       }
+
+      template< class T >
+      Agglomeration ( const GridPartType &gridPart, const std::vector< T > &indices )
+        : Agglomeration( gridPart, convert( indices ) )
+      {}
 
       const GridPart &gridPart () const { return gridPart_; }
 
@@ -44,6 +49,15 @@ namespace Dune
       std::size_t size () const { return size_; }
 
     private:
+      static std::vector< std::size_t > convert ( const std::vector< T > &v )
+      {
+        std::vector< std::size_t > w;
+        w.reserve( v.size() );
+        for( const T &i : v )
+          w.emplace_back( i );
+        return std::move( w );
+      }
+
       const GridPart &gridPart_;
       MultipleCodimMultipleGeomTypeMapper< typename GridPartType::GridViewType, MCMGElementLayout > mapper_;
       std::vector< std::size_t > indices_;
