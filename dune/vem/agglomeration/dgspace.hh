@@ -25,19 +25,19 @@ namespace Dune
     // -----------------------------
 
     template< class FunctionSpace, class GridPart, int polOrder >
-    class AgglomerateDGSpace;
+    class AgglomerationDGSpace;
 
 
 
-    // AgglomerateDGSpaceTraits
-    // ------------------------
+    // AgglomerationDGSpaceTraits
+    // --------------------------
 
     template< class FunctionSpace, class GridPart, int polOrder >
-    struct AgglomerateDGSpaceTraits
+    struct AgglomerationDGSpaceTraits
     {
-      friend class AgglomerateDGSpace< FunctionSpace, GridPart, polOrder >;
+      friend class AgglomerationDGSpace< FunctionSpace, GridPart, polOrder >;
 
-      typedef AgglomerateDGSpace< FunctionSpace, GridPart, polOrder > DiscreteFunctionSpaceType;
+      typedef AgglomerationDGSpace< FunctionSpace, GridPart, polOrder > DiscreteFunctionSpaceType;
 
       typedef FunctionSpace FunctionSpaceType;
       typedef GridPart GridPartType;
@@ -65,15 +65,15 @@ namespace Dune
 
 
 
-    // AgglomerateDGSpace
-    // ------------------
+    // AgglomerationDGSpace
+    // --------------------
 
     template< class FunctionSpace, class GridPart, int polOrder >
-    class AgglomerateDGSpace
-      : public DiscreteFunctionSpaceDefault< AgglomerateDGSpaceTraits< FunctionSpace, GridPart, polOrder > >
+    class AgglomerationDGSpace
+      : public DiscreteFunctionSpaceDefault< AgglomerationDGSpaceTraits< FunctionSpace, GridPart, polOrder > >
     {
-      typedef AgglomerateDGSpace< FunctionSpace, GridPart, polOrder > ThisType;
-      typedef DiscreteFunctionSpaceDefault< AgglomerateDGSpaceTraits< FunctionSpace, GridPart, polOrder > > BaseType;
+      typedef AgglomerationDGSpace< FunctionSpace, GridPart, polOrder > ThisType;
+      typedef DiscreteFunctionSpaceDefault< AgglomerationDGSpaceTraits< FunctionSpace, GridPart, polOrder > > BaseType;
 
     public:
       typedef Agglomeration< GridPart > AgglomerationType;
@@ -85,7 +85,7 @@ namespace Dune
       typedef typename BaseType::EntityType EntityType;
       typedef typename BaseType::GridPartType GridPartType;
 
-      AgglomerateDGSpace ( GridPartType &gridPart, const AgglomerationType &agglomeration )
+      AgglomerationDGSpace ( GridPartType &gridPart, const AgglomerationType &agglomeration )
         : BaseType( gridPart ),
           blockMapper_( agglomeration ),
           boundingBoxes_( boundingBoxes( agglomeration ) ),
