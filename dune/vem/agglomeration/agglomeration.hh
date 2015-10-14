@@ -32,7 +32,7 @@ namespace Dune
       Agglomeration ( const GridPartType &gridPart, std::vector< std::size_t > indices )
         : gridPart_( gridPart ), mapper_( gridPart ), indices_( std::move( indices ) ), size_( 0 )
       {
-        assert( indices_.size() == mapper.size() );
+        assert( indices_.size() == mapper_.size() );
         if( !indices_.empty() )
           size_ = *std::max_element( indices_.begin(), indices_.end() ) + 1u;
       }
@@ -49,6 +49,7 @@ namespace Dune
       std::size_t size () const { return size_; }
 
     private:
+      template< class T >
       static std::vector< std::size_t > convert ( const std::vector< T > &v )
       {
         std::vector< std::size_t > w;

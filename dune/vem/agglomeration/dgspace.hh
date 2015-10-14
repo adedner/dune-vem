@@ -7,12 +7,14 @@
 
 #include <dune/fem/space/common/commoperations.hh>
 #include <dune/fem/space/common/defaultcommhandler.hh>
+#include <dune/fem/space/common/discretefunctionspace.hh>
 #include <dune/fem/space/common/functionspace.hh>
 #include <dune/fem/space/shapefunctionset/legendre.hh>
 #include <dune/fem/space/shapefunctionset/proxy.hh>
 #include <dune/fem/space/shapefunctionset/vectorial.hh>
 
 #include <dune/vem/agglomeration/basisfunctionset.hh>
+#include <dune/vem/agglomeration/boundingbox.hh>
 #include <dune/vem/agglomeration/dgmapper.hh>
 
 namespace Dune
@@ -50,16 +52,16 @@ namespace Dune
       typedef Fem::VectorialShapeFunctionSet< Fem::ShapeFunctionSetProxy< ScalarShapeFunctionSetType >, typename FunctionSpaceType::RangeType > ShapeFunctionSetType;
 
     public:
-      typedef BoundingBoxShapeFunctionSet< EntityType, ShapeFunctionSetType > BasisFunctionSetType;
+      typedef BoundingBoxBasisFunctionSet< EntityType, ShapeFunctionSetType > BasisFunctionSetType;
 
       static const std::size_t localBlockSize = FunctionSpaceType::dimRange * StaticPower< polOrder+1, GridPartType::dimension >::power;
-      typedef AgglomerateDGMapper< GridPartType > BlockMapperType;
+      typedef AgglomerationDGMapper< GridPartType > BlockMapperType;
 
-      template< class DiscreteFunction, class Operation = DFCommunicationOperation::Copy >
+      template< class DiscreteFunction, class Operation = Fem::DFCommunicationOperation::Copy >
       struct CommDataHandle
       {
         typedef Operation OperationType;
-        typedef DefaultCommunicationHandler< DiscreteFunction, Operation > Type:
+        typedef Fem::DefaultCommunicationHandler< DiscreteFunction, Operation > Type;
       };
     };
 
@@ -70,12 +72,14 @@ namespace Dune
 
     template< class FunctionSpace, class GridPart, int polOrder >
     class AgglomerationDGSpace
-      : public DiscreteFunctionSpaceDefault< AgglomerationDGSpaceTraits< FunctionSpace, GridPart, polOrder > >
+      : public Fem::DiscreteFunctionSpaceDefault< AgglomerationDGSpaceTraits< FunctionSpace, GridPart, polOrder > >
     {
       typedef AgglomerationDGSpace< FunctionSpace, GridPart, polOrder > ThisType;
-      typedef DiscreteFunctionSpaceDefault< AgglomerationDGSpaceTraits< FunctionSpace, GridPart, polOrder > > BaseType;
+      typedef Fem::DiscreteFunctionSpaceDefault< AgglomerationDGSpaceTraits< FunctionSpace, GridPart, polOrder > > BaseType;
 
     public:
+      typedef typename BaseType::Traits Traits;
+
       typedef Agglomeration< GridPart > AgglomerationType;
 
       typedef typename BaseType::BasisFunctionSetType BasisFunctionSetType;
@@ -94,7 +98,7 @@ namespace Dune
 
       const BasisFunctionSetType basisFunctionSet ( const EntityType &entity ) const
       {
-        typename Traits::ShapeFunctionSetType shapeFunctionSet( &scalarShapeFunctionSet );
+        typename Traits::ShapeFunctionSetType shapeFunctionSet( &scalarShapeFunctionSet_ );
         return BasisFunctionSetType( entity, boundingBoxes_[ agglomeration().index( entity ) ], std::move( shapeFunctionSet ) );
       }
 
@@ -109,7 +113,7 @@ namespace Dune
       static constexpr int order ( const EntityType & ) noexcept { return polOrder; }
       static constexpr int order () { return polOrder; }
 
-      static constexpr Fem::DFSpaceIdentifier type () noexcept { return GenericSpace_id; }
+      static constexpr Fem::DFSpaceIdentifier type () noexcept { return Fem::GenericSpace_id; }
 
       // implementation-defined methods
 

@@ -53,7 +53,7 @@ namespace Dune
         : agglomeration_( agglomeration )
       {}
 
-      SizeType size () const noexcept { return agglomeration.size(); }
+      SizeType size () const noexcept { return agglomeration().size(); }
 
       static constexpr bool contains ( int codim ) noexcept { return (codim == 0); }
 
@@ -68,10 +68,9 @@ namespace Dune
       template< class Function >
       void mapEachEntityDof ( const ElementType &element, Function function ) const
       {
-        assert( Entity::codimension == 0 );
         // Hack: Report all DoFs to be attached to each element for communication
         //       As DoFs will be copied, we just do too much work, here
-        function( 0, agglomeration.index( entity ) );
+        function( 0, agglomeration().index( element ) );
       }
 
       template< class Entity, class Function >

@@ -5,6 +5,10 @@
 
 #include <dune/grid/uggrid.hh>
 
+#include <dune/fem/gridpart/leafgridpart.hh>
+
+#include <dune/vem/agglomeration/agglomeration.hh>
+#include <dune/vem/agglomeration/dgspace.hh>
 #include <dune/vem/io/gmsh.hh>
 
 namespace Gmsh
@@ -49,7 +53,7 @@ try
 
 
   typedef Dune::Fem::FunctionSpace< GridPart::ctype, double, GridPart::dimension, 1 > FunctionSpace;
-  typedef Dune::Vem::AgglomerateDGSpace< GridPart, FunctionSpace, 2 > DiscreteFunctionSpace;
+  typedef Dune::Vem::AgglomerationDGSpace< FunctionSpace, GridPart, 2 > DiscreteFunctionSpace;
   DiscreteFunctionSpace dgSpace( gridPart, agglomeration );
 
   return 0;

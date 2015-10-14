@@ -31,6 +31,9 @@ namespace Dune
 
       typedef typename ShapeFunctionSet::FunctionSpaceType FunctionSpaceType;
 
+      typedef typename FunctionSpaceType::DomainFieldType DomainFieldType;
+      typedef typename FunctionSpaceType::RangeFieldType RangeFieldType;
+
       typedef typename FunctionSpaceType::DomainType DomainType;
       typedef typename FunctionSpaceType::RangeType RangeType;
       typedef typename FunctionSpaceType::JacobianRangeType JacobianRangeType;
@@ -83,7 +86,7 @@ namespace Dune
       }
 
       template< class Point, class DofVector >
-      void axpy ( const Point &x, const JacobianRangeType &jacobianFactory, DofVector &dofs ) const
+      void axpy ( const Point &x, const JacobianRangeType &jacobianFactor, DofVector &dofs ) const
       {
         Fem::FunctionalAxpyFunctor< JacobianRangeType, DofVector > f( jacobianFactor, dofs );
         shapeFunctionSet_.jacobianEach( position( x ), f );
@@ -117,10 +120,10 @@ namespace Dune
       {
         assert( values.size() >= size() );
         Fem::AssignFunctor< Values > f( values );
-        shapeFunctionSet().evaluateEach( position( x ), f );
+        shapeFunctionSet_.evaluateEach( position( x ), f );
       }
 
-      template< class Point, class DofVector, class Jacobians >
+      template< class Quadrature, class DofVector, class Jacobians >
       void jacobianAll ( const Quadrature &quadrature, const DofVector &dofs, Jacobians &jacobians ) const
       {
         const std::size_t nop = quadrature.nop();
@@ -141,10 +144,10 @@ namespace Dune
       {
         assert( jacobians.size() >= size() );
         Fem::AssignFunctor< Jacobians > f( jacobians );
-        shapeFunctionSet().jacobianEach( position( x ), f );
+        shapeFunctionSet_.jacobianEach( position( x ), f );
       }
 
-      template< class Point, class DofVector, class Hessians >
+      template< class Quadrature, class DofVector, class Hessians >
       void hessianAll ( const Quadrature &quadrature, const DofVector &dofs, Hessians &hessians ) const
       {
         const std::size_t nop = quadrature.nop();
@@ -165,7 +168,7 @@ namespace Dune
       {
         assert( hessians.size() >= size() );
         Fem::AssignFunctor< Hessians > f( hessians );
-        shapeFunctionSet().hessianEach( position( x ), f );
+        shapeFunctionSet_.hessianEach( position( x ), f );
       }
 
       const EntityType &entity () const { assert( entity_ ); return *entity_; }

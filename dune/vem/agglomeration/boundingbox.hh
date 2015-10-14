@@ -22,7 +22,7 @@ namespace Dune
     // -----------
 
     template< class GridPart >
-    using BoudingBox = std::pair< FieldVector< typename GridPart::ctype, GridPart::dimensionWorld >, FieldVector< typename GridPart::ctype, GridPart::dimensionWorld > >;
+    using BoundingBox = std::pair< FieldVector< typename GridPart::ctype, GridPart::dimensionWorld >, FieldVector< typename GridPart::ctype, GridPart::dimensionWorld > >;
 
 
 
@@ -34,7 +34,7 @@ namespace Dune
     {
       typedef typename GridPart::template Codim< 0 >::GeometryType GeometryType;
 
-      BoundingBox emptyBox;
+      BoundingBox< GridPart > emptyBox;
       for( int k = 0; k < GridPart::dimensionworld; ++k )
       {
         emptyBox.first[ k ] = std::numeric_limits< typename GridPart::ctype >::max();
@@ -44,7 +44,7 @@ namespace Dune
       std::vector< BoundingBox< GridPart > > boundingBoxes( agglomeration.size(), emptyBox );
       for( const auto element : elements( agglomeration.gridPart(), Partitions::interiorBorder ) )
       {
-        BoundingBox &bbox = boudingBoxes[ agglomeration.index( element ) ];
+        BoundingBox< GridPart > &bbox = boundingBoxes[ agglomeration.index( element ) ];
         const GeometryType geometry = element.geometry();
         for( int i = 0; i < geometry.corners(); ++i )
         {
