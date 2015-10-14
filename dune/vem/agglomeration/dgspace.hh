@@ -44,8 +44,10 @@ namespace Dune
       typedef FunctionSpace FunctionSpaceType;
       typedef GridPart GridPartType;
 
+      static const int codimension = 0;
+
     private:
-      typedef typename GridPartType::template Codim< 0 >::EntityType EntityType;
+      typedef typename GridPartType::template Codim< codimension >::EntityType EntityType;
 
       typedef typename Fem::FunctionSpace< typename FunctionSpaceType::DomainFieldType, typename FunctionSpaceType::RangeFieldType, FunctionSpaceType::dimDomain, 1 > ScalarFunctionSpaceType;
       typedef Fem::LegendreShapeFunctionSet< ScalarFunctionSpaceType > ScalarShapeFunctionSetType;

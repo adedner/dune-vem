@@ -30,9 +30,12 @@ namespace Dune
       typedef typename GridPartType::template Codim< 0 >::EntityType ElementType;
 
       Agglomeration ( const GridPartType &gridPart, std::vector< std::size_t > indices )
-        : gridPart_( gridPart ), mapper_( gridPart ), indices_( std::move( indices ) ), size_( 0 )
+        : gridPart_( gridPart ),
+          mapper_( static_cast< typename GridPartType::GridViewType >( gridPart ) ),
+          indices_( std::move( indices ) ),
+          size_( 0 )
       {
-        assert( indices_.size() == mapper_.size() );
+        assert( indices_.size() == static_cast< std::size_t >( mapper_.size() ) );
         if( !indices_.empty() )
           size_ = *std::max_element( indices_.begin(), indices_.end() ) + 1u;
       }

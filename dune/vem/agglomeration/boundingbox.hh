@@ -22,7 +22,7 @@ namespace Dune
     // -----------
 
     template< class GridPart >
-    using BoundingBox = std::pair< FieldVector< typename GridPart::ctype, GridPart::dimensionWorld >, FieldVector< typename GridPart::ctype, GridPart::dimensionWorld > >;
+    using BoundingBox = std::pair< FieldVector< typename GridPart::ctype, GridPart::dimensionworld >, FieldVector< typename GridPart::ctype, GridPart::dimensionworld > >;
 
 
 
