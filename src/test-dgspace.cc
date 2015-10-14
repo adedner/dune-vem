@@ -1,11 +1,11 @@
 #include <config.h>
 
 #include <dune/common/exceptions.hh>
-#include <dune/common/parallel/mpihelper.hh>
 
 #include <dune/grid/uggrid.hh>
 
 #include <dune/fem/gridpart/leafgridpart.hh>
+#include <dune/fem/misc/mpimanager.hh>
 
 #include <dune/vem/agglomeration/agglomeration.hh>
 #include <dune/vem/agglomeration/dgspace.hh>
@@ -21,7 +21,7 @@ typedef Dune::UGGrid< 2 > Grid;
 int main ( int argc, char **argv )
 try
 {
-  Dune::MPIHelper::instance( argc, argv );
+  Dune::Fem::MPIManager::initialize( argc, argv );
 
   if( argc <= 1 )
   {
@@ -43,7 +43,7 @@ try
   std::unique_ptr< Grid > grid( factory.createGrid() );
 
   std::vector< std::size_t > elementIds = Gmsh::elements( grid->leafGridView(), factory, entities );
-  std::vector< int > agglomerateIndices = Gmsh::tags( elements, elementIds, 4 );
+  std::vector< int > agglomerateIndices = Gmsh::tags( elements, elementIds, 3 );
 
   typedef Dune::Fem::LeafGridPart< Grid > GridPart;
 
