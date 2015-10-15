@@ -63,7 +63,7 @@ try
   // create DG space on agglomeration
 
   typedef Dune::Fem::FunctionSpace< GridPart::ctype, double, GridPart::dimension, 1 > FunctionSpace;
-  typedef Dune::Vem::AgglomerationDGSpace< FunctionSpace, GridPart, 2 > DiscreteFunctionSpace;
+  typedef Dune::Vem::AgglomerationDGSpace< FunctionSpace, GridPart, 1 > DiscreteFunctionSpace;
   DiscreteFunctionSpace dgSpace( gridPart, agglomeration );
 
   // initialize solution
@@ -102,8 +102,8 @@ try
 
   // VTK output
 
-  Dune::Fem::VTKIO< GridPart > vtkIO( gridPart );
-  vtkIO.addCellData( solution );
+  Dune::Fem::VTKIO< GridPart > vtkIO( gridPart, Dune::VTK::nonconforming );
+  vtkIO.addVertexData( solution );
   vtkIO.write( "test-dgspace", Dune::VTK::ascii );
 
   return 0;
