@@ -4,11 +4,17 @@
 
 #include <dune/grid/uggrid.hh>
 
+#include <dune/fem/function/adaptivefunction.hh>
 #include <dune/fem/gridpart/leafgridpart.hh>
+#include <dune/fem/io/file/vtkio.hh>
 #include <dune/fem/misc/mpimanager.hh>
+#include <dune/fem/operator/linear/spoperator.hh>
+#include <dune/fem/solver/cginverseoperator.hh>
 
 #include <dune/vem/agglomeration/agglomeration.hh>
 #include <dune/vem/agglomeration/dgspace.hh>
+#include <dune/vem/function/simple.hh>
+#include <dune/vem/operator/mass.hh>
 #include <dune/vem/io/gmsh.hh>
 
 namespace Gmsh
@@ -29,6 +35,8 @@ try
     return 1;
   }
 
+  // read gmsh file
+
   const auto sectionMap = Gmsh::readFile( argv[ 1 ] );
   const auto nodes = Gmsh::parseNodes( sectionMap );
   const auto elements = Gmsh::parseElements( sectionMap );
@@ -45,16 +53,58 @@ try
   std::vector< std::size_t > elementIds = Gmsh::elements( grid->leafGridView(), factory, entities );
   std::vector< int > agglomerateIndices = Gmsh::tags( elements, elementIds, 3 );
 
-  typedef Dune::Fem::LeafGridPart< Grid > GridPart;
+  // create grid part and agglomeration
 
+  typedef Dune::Fem::LeafGridPart< Grid > GridPart;
   GridPart gridPart( *grid );
 
   Dune::Vem::Agglomeration< GridPart > agglomeration( gridPart, agglomerateIndices );
 
+  // create DG space on agglomeration
 
   typedef Dune::Fem::FunctionSpace< GridPart::ctype, double, GridPart::dimension, 1 > FunctionSpace;
   typedef Dune::Vem::AgglomerationDGSpace< FunctionSpace, GridPart, 2 > DiscreteFunctionSpace;
   DiscreteFunctionSpace dgSpace( gridPart, agglomeration );
+
+  // initialize solution
+
+  typedef Dune::Fem::AdaptiveDiscreteFunction< DiscreteFunctionSpace > DiscreteFunction;
+  DiscreteFunction solution( "solution", dgSpace );
+
+  // assemble right hand side
+
+  const auto exactSolution
+    = Dune::Vem::simpleFunction< FunctionSpace::DomainType >( [] ( const FunctionSpace::DomainType &x ) {
+      double value = 1.0;
+      for( int k = 0; k < GridPart::dimension; ++k )
+        value *= std::sin( M_PI * x[ k ] );
+      return Dune::FieldVector< double, 1 >( value );
+    } );
+
+  typedef Dune::Fem::GridFunctionAdapter< decltype( exactSolution ), GridPart > GridExactSolution;
+  GridExactSolution gridExactSolution( "exact solution", exactSolution, gridPart, dgSpace.order()+1 );
+
+  DiscreteFunction rhs( "right hand side", dgSpace );
+  Dune::Vem::applyMass( gridExactSolution, rhs );
+
+  // assemble mass matrix
+
+  typedef Dune::Fem::SparseRowLinearOperator< DiscreteFunction, DiscreteFunction > LinearOperator;
+  LinearOperator assembledMassOp( "assembled mass operator", dgSpace, dgSpace );
+
+  Dune::Vem::MassOperator< LinearOperator > massOp( dgSpace );
+  massOp.jacobian( solution, assembledMassOp );
+
+  // solve
+
+  Dune::Fem::CGInverseOperator< DiscreteFunction > invOp( assembledMassOp, 1e-8, 1e-8 );
+  invOp( rhs, solution );
+
+  // VTK output
+
+  Dune::Fem::VTKIO< GridPart > vtkIO( gridPart );
+  vtkIO.addCellData( solution );
+  vtkIO.write( "test-dgspace", Dune::VTK::ascii );
 
   return 0;
 }
