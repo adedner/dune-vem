@@ -49,6 +49,8 @@ namespace Dune
 
       typedef typename BaseType::SizeType SizeType;
 
+      typedef SizeType GlobalKeyType;
+
       explicit AgglomerationDGMapper ( const AgglomerationType &agglomeration )
         : agglomeration_( agglomeration )
       {}
@@ -62,7 +64,7 @@ namespace Dune
       template< class Function >
       void mapEach ( const ElementType &element, Function function ) const
       {
-        function( 0, agglomeration.index( element ) );
+        function( 0, agglomeration().index( element ) );
       }
 
       template< class Function >
