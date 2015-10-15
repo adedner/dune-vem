@@ -175,7 +175,7 @@ namespace Dune
 
     private:
       template< class Point >
-      DomainType position ( const Point &x )
+      DomainType position ( const Point &x ) const
       {
         DomainType y = entity().geometry().global( Fem::coordinate( x ) ) - bbox_.first;
         for( int k = 0; k < DomainType::dimension; ++k )
