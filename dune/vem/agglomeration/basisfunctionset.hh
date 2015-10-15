@@ -9,7 +9,7 @@
 
 #include <dune/geometry/referenceelements.hh>
 
-#include <dune/fem/common/coordinate.hh>
+#include <dune/fem/quadrature/quadrature.hh>
 #include <dune/fem/space/basisfunctionset/functor.hh>
 
 namespace Dune
@@ -46,9 +46,7 @@ namespace Dune
       BoundingBoxBasisFunctionSet ( const EntityType &entity, std::pair< DomainType, DomainType > bbox,
                                     ShapeFunctionSet shapeFunctionSet = ShapeFunctionSet() )
         : entity_( &entity ), shapeFunctionSet_( std::move( shapeFunctionSet ) ), bbox_( std::move( bbox ) )
-      {
-        assert( shapeFunctionSet_.type().isCube() );
-      }
+      {}
 
       int order () const { return shapeFunctionSet_.order(); }
 
@@ -179,7 +177,7 @@ namespace Dune
       {
         DomainType y = entity().geometry().global( Fem::coordinate( x ) ) - bbox_.first;
         for( int k = 0; k < DomainType::dimension; ++k )
-          y[ k ] /= (bbox_[ k ].second - bbox_[ k ].first);
+          y[ k ] /= (bbox_.second[ k ] - bbox_.first[ k ]);
         return y;
       }
 
