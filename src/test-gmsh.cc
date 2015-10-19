@@ -1,5 +1,12 @@
 #include <config.h>
 
+#include <cmath>
+#include <cstddef>
+
+#include <iostream>
+#include <memory>
+#include <vector>
+
 #include <dune/common/exceptions.hh>
 #include <dune/common/parallel/mpihelper.hh>
 
