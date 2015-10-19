@@ -10,6 +10,7 @@
 
 #include <dune/common/iteratorrange.hh>
 #include <dune/common/fvector.hh>
+#include <dune/common/std/memory.hh>
 
 #include <dune/geometry/genericgeometry/subtopologies.hh>
 #include <dune/geometry/type.hh>
@@ -58,7 +59,7 @@ namespace Dune
       {
         DuneEntity ( std::size_t id, GeometryType type )
           : id_( id ), type_( type ),
-            vertices_( std::make_unique< std::size_t[] >( size() ) )
+            vertices_( Std::make_unique< std::size_t[] >( size() ) )
         {}
 
         std::size_t id () const { return id_; }
