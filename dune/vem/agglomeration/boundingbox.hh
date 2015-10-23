@@ -42,7 +42,7 @@ namespace Dune
       }
 
       std::vector< BoundingBox< GridPart > > boundingBoxes( agglomeration.size(), emptyBox );
-      for( const auto element : elements( agglomeration.gridPart(), Partitions::interiorBorder ) )
+      for( const auto element : elements( static_cast< typename GridPart::GridViewType >( agglomeration.gridPart() ), Partitions::interiorBorder ) )
       {
         BoundingBox< GridPart > &bbox = boundingBoxes[ agglomeration.index( element ) ];
         const GeometryType geometry = element.geometry();

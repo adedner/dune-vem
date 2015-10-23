@@ -26,7 +26,7 @@ namespace Dune
       w.clear();
 
       Fem::TemporaryLocalFunction< typename DiscreteFunction::DiscreteFunctionSpaceType > wLocal( w.space() );
-      for( const auto &entity : elements( u.gridPart() ) )
+      for( const auto &entity : elements( static_cast< typename GridFunction::GridPartType::GridViewType >( u.gridPart() ) ) )
       {
         const auto geometry = entity.geometry();
 
@@ -98,7 +98,7 @@ namespace Dune
       const std::size_t maxNumLocalDofs = DiscreteFunctionSpaceType::localBlockSize * u.space().blockMapper().maxNumDofs();
       std::vector< typename DiscreteFunctionSpaceType::RangeType > values( maxNumLocalDofs );
 
-      for( const auto &entity : elements( u.gridPart() ) )
+      for( const auto &entity : elements( static_cast< typename DomainFunctionType::GridPartType::GridViewType >( u.gridPart() ) ) )
       {
         const auto geometry = entity.geometry();
 
