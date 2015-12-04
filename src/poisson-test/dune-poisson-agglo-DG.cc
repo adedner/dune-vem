@@ -9,8 +9,9 @@
 
 #include <dune/common/exceptions.hh>
 
-#include <dune/grid/uggrid.hh>
+//#include <dune/grid/uggrid.hh>
 
+#include <dune/alugrid/grid.hh>
 
 #include <dune/fem/function/adaptivefunction.hh>
 //#include <dune/fem/gridpart/leafgridpart.hh>
@@ -26,7 +27,6 @@
 #include <dune/vem/function/simple.hh>
 #include <dune/vem/operator/mass.hh>
 #include <dune/vem/io/gmsh.cc>
-
 
 // includes for solving poisson problem //
 #include <dune/fem/io/file/dataoutput.hh>
@@ -45,7 +45,8 @@ namespace Gmsh
 using namespace Dune::Vem::Gmsh;
 }
 
-typedef Dune::UGGrid< 2 > Grid;
+//typedef Dune::UGGrid< 2 > Grid;
+typedef Dune::ALUGrid< 2, 2, Dune::cube, Dune::nonconforming > Grid;
 
 
 int main ( int argc, char **argv )
@@ -61,7 +62,7 @@ try
     Dune::Fem::Parameter::append( argv[ i ] );
 
   // append default parameter file
-  Dune::Fem::Parameter::append( "/home/gcd3/codes/dune-vem/data/parameter" );
+  Dune::Fem::Parameter::append( "data/parameter" );
 
   const std::string gridkey = Dune::Fem::IOInterface::defaultGridKey( Grid::dimension );
   const std::string gridfile = Dune::Fem::Parameter::getValue< std::string >( gridkey );

@@ -13,7 +13,7 @@ istl.preconditioning.relaxation: 1.2
 fem.preconditioning: true
 
 # macro grid files 
-fem.io.macroGridFile_2d:/home/gcd3/codes/dune-vem/data/mymesh.msh
+fem.io.macroGridFile_2d: data/mymesh.msh
 
 
 # path for output  
