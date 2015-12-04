@@ -104,8 +104,10 @@ private:
   ModelType model_;
 };
 
+
+
 // DifferentiableDGEllipticOperator
-// ------------------------------
+// --------------------------------
 
 template< class JacobianOperator, class Model >
 struct DifferentiableDGEllipticOperator
@@ -165,13 +167,10 @@ protected:
   Dune::Fem::DiagonalAndNeighborStencil<DiscreteFunctionSpaceType,DiscreteFunctionSpaceType> stencil_;
 };
 
-// Implementation of DGEllipticOperator
-// ----------------------------------
-namespace Gmsh
-{
-using namespace Dune::Vem::Gmsh;
-}
 
+
+// Implementation of DGEllipticOperator
+// ------------------------------------
 
 template< class DiscreteFunction, class Model >
 void DGEllipticOperator< DiscreteFunction, Model >
@@ -670,7 +669,7 @@ void DifferentiableDGEllipticOperator< JacobianOperator, Model >
     } // for ( IntersectionIteratorType iit = gridPart.ibegin( entity );
   } // end grid traversal
 
-  jOp.matrix().print(flhs);
+  // jOp.matrix().print(flhs);
 
   jOp.communicate();
  }
