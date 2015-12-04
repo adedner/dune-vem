@@ -1,0 +1,3 @@
+#poisson-test folder
+
+Copy the files in this dir to /dune-vem/src, and replace the /dune-vem/src/dune-vem.cc with dune-poisson-agglo-DG.cc
