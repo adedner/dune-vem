@@ -4,11 +4,6 @@ fem.verboserank: 0
 # true for iteration output, false means no output
 fem.solver.verbose: false
 
-# preconditioning method: none, ssor, sor, ilu-0, ilu-n, gauss-seidel, jacobi
-istl.preconditioning.method: ilu-0
-istl.preconditioning.iterations: 1
-istl.preconditioning.relaxation: 1.2
-
 # enable simple Jacobi preconditioning
 fem.preconditioning: true
 

@@ -62,25 +62,15 @@ try
     std::cout << "Loading macro grid: " << gridfile << std::endl;
   Dune::GridPtr< Grid > grid( gridfile );
 
-  // create grid part
-  typedef Dune::Fem::LeafGridPart< Grid > GridPart;
-  GridPart gridPart( *grid );
-
-  // setup trivial agglomeration
-  const std::size_t size = gridPart.indexSet().size( 0 );
-  std::vector< std::size_t > agglomerateIndices( size );
-  for( std::size_t i = 0; i < size; ++i )
-    agglomerateIndices[ i ] = i;
-
-  Dune::Vem::Agglomeration< GridPart > agglomeration( gridPart, agglomerateIndices );
+  // initial refinement
+  const int level = Dune::Fem::Parameter::getValue< int >( "poisson.level", 0 );
+  grid->globalRefine( level );
 
   // define a function space type
-  typedef Dune::Fem::FunctionSpace< GridPart::ctype, double, GridPart::dimension, 1 > FunctionSpaceType;
+  typedef Dune::Fem::FunctionSpace< Grid::ctype, double, Grid::dimension, 1 > FunctionSpaceType;
 
   // setup poisson problem
-
-  typedef DiffusionModel< FunctionSpaceType, GridPart > Model;
-  typedef typename Model::ProblemType Problem;
+  typedef ProblemInterface< FunctionSpaceType > Problem;
   std::unique_ptr< Problem > problem;
   const std::string problemNames [] = { "cos", "sphere", "sin", "corner", "curvedridges" };
   const int problemNumber = Dune::Fem::Parameter::getEnum( "poisson.problem", problemNames, 0 );
@@ -111,47 +101,72 @@ try
   }
   assert( problem );
 
-  typedef Dune::Fem::GridFunctionAdapter< Problem, GridPart > GridExactSolutionType;
-  GridExactSolutionType gridExactSolution( "exact solution", *problem, gridPart, 5 );
+  double prevError = std::numeric_limits< double >::max();
+  const int repeats = Dune::Fem::Parameter::getValue< int >( "poisson.repeats", 0 );
+  for( int repeat = 0; repeat <= repeats; ++repeat )
+  {
+    // refine grid
+    if( repeat > 0 )
+      grid->globalRefine( Dune::DGFGridInfo< Grid >::refineStepsForHalf() );
 
-  // create discrete function space
-  typedef Dune::Vem::AgglomerationDGSpace< FunctionSpaceType, GridPart, polynomialOrder > DiscreteFunctionSpace;
-  DiscreteFunctionSpace dfSpace( gridPart, agglomeration );
+    // create grid part
+    typedef Dune::Fem::LeafGridPart< Grid > GridPart;
+    GridPart gridPart( *grid );
 
-  // create solution
-  typedef Dune::Fem::AdaptiveDiscreteFunction< DiscreteFunctionSpace > DiscreteFunction;
-  DiscreteFunction solution( "solution", dfSpace );
-  solution.clear();
+    // convert exact solution to grid function
+    typedef Dune::Fem::GridFunctionAdapter< Problem, GridPart > GridExactSolutionType;
+    GridExactSolutionType gridExactSolution( "exact solution", *problem, gridPart, 5 );
 
-  // create model
-  Model model( *problem, gridPart );
+    // setup trivial agglomeration
+    const std::size_t size = gridPart.indexSet().size( 0 );
+    std::vector< std::size_t > agglomerateIndices( size );
+    for( std::size_t i = 0; i < size; ++i )
+      agglomerateIndices[ i ] = i;
 
-  // assemble right hand side
-  DiscreteFunction rhs( "rhs", dfSpace );
-  assembleDGRHS ( model, rhs );
+    Dune::Vem::Agglomeration< GridPart > agglomeration( gridPart, agglomerateIndices );
 
-  // assemble elliptic operator
-  typedef Dune::Fem::SparseRowLinearOperator< DiscreteFunction, DiscreteFunction > LinearOperator;
-  LinearOperator linearOp( "assembled elliptic operator", dfSpace, dfSpace );
+    // create discrete function space
+    typedef Dune::Vem::AgglomerationDGSpace< FunctionSpaceType, GridPart, polynomialOrder > DiscreteFunctionSpace;
+    DiscreteFunctionSpace dfSpace( gridPart, agglomeration );
 
-  typedef DifferentiableDGEllipticOperator< LinearOperator, Model > EllipticOperator;
-  EllipticOperator ellipticOp( model, dfSpace );
-  ellipticOp.jacobian( solution, linearOp );
+    // create solution
+    typedef Dune::Fem::AdaptiveDiscreteFunction< DiscreteFunctionSpace > DiscreteFunction;
+    DiscreteFunction solution( "solution", dfSpace );
+    solution.clear();
 
-  // solve linear system
-  typedef Dune::Fem::CGInverseOperator< DiscreteFunction > LinearInverseOperator;
-  const double solverEps = Dune::Fem::Parameter::getValue< double >( "poisson.solvereps", 1e-8 );
-  LinearInverseOperator invOp( linearOp, solverEps, solverEps );
-  invOp( rhs, solution );
+    // create model
+    typedef DiffusionModel< FunctionSpaceType, GridPart > Model;
+    Model model( *problem, gridPart );
 
-  // VTK output
-  Dune::Fem::VTKIO< GridPart > vtkIO( gridPart, Dune::VTK::nonconforming );
-  vtkIO.addVertexData( solution );
-  vtkIO.write( "trivial-agglomeration", Dune::VTK::ascii );
+    // assemble right hand side
+    DiscreteFunction rhs( "rhs", dfSpace );
+    assembleDGRHS ( model, rhs );
 
-  // calculate standard error
-  Dune::Fem::L2Norm< GridPart > norm( gridPart );
-  std::cout << norm.distance( gridExactSolution, solution ) << std::endl;
+    // assemble elliptic operator
+    typedef Dune::Fem::SparseRowLinearOperator< DiscreteFunction, DiscreteFunction > LinearOperator;
+    LinearOperator linearOp( "assembled elliptic operator", dfSpace, dfSpace );
+
+    typedef DifferentiableDGEllipticOperator< LinearOperator, Model > EllipticOperator;
+    EllipticOperator ellipticOp( model, dfSpace );
+    ellipticOp.jacobian( solution, linearOp );
+
+    // solve linear system
+    typedef Dune::Fem::CGInverseOperator< DiscreteFunction > LinearInverseOperator;
+    const double solverEps = Dune::Fem::Parameter::getValue< double >( "poisson.solvereps", 1e-8 );
+    LinearInverseOperator invOp( linearOp, solverEps, solverEps );
+    invOp( rhs, solution );
+
+    // VTK output
+    Dune::Fem::VTKIO< GridPart > vtkIO( gridPart, Dune::VTK::nonconforming );
+    vtkIO.addVertexData( solution );
+    vtkIO.write( "trivial-agglomeration-" + std::to_string( repeat ), Dune::VTK::ascii );
+
+    // calculate standard error
+    Dune::Fem::L2Norm< GridPart > norm( gridPart );
+    double error = norm.distance( gridExactSolution, solution );
+    std::cout << repeat << "  " << error << "  " << (repeat > 0 ? std::to_string( std::log( prevError / error ) / std::log( 2.0 ) ) : std::string( "---" )) << std::endl;
+    prevError = error;
+  }
   return 0;
 }
 catch( const Dune::Exception &e )
