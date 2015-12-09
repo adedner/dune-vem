@@ -13,6 +13,8 @@
 #include <dune/fem/space/basisfunctionset/functor.hh>
 #include <dune/fem/space/shapefunctionset/vectorial.hh>
 
+#include <dune/vem/agglomeration/functor.hh>
+
 namespace Dune
 {
 
@@ -196,9 +198,7 @@ namespace Dune
       void jacobianAll ( const Point &x, Jacobians &jacobians ) const
       {
         assert( jacobians.size() >= size() );
-        Transformation transformation( bbox_ );
-        auto assign = [ transformation ] ( const auto &a, auto &b ) { b = transformation( a ); };
-        Fem::AssignFunctor< Jacobians, decltype( assign ) > f( jacobians, assign );
+        Fem::AssignFunctor< Jacobians, TransformedAssign< Transformation > > f( jacobians, Transformation( bbox_ ) );
         shapeFunctionSet_.jacobianEach( position( x ), f );
       }
 
@@ -223,9 +223,7 @@ namespace Dune
       void hessianAll ( const Point &x, Hessians &hessians ) const
       {
         assert( hessians.size() >= size() );
-        Transformation transformation( bbox_ );
-        auto assign = [ transformation ] ( const auto &a, auto &b ) { b = transformation( a ); };
-        Fem::AssignFunctor< Hessians, decltype( assign ) > f( hessians, assign );
+        Fem::AssignFunctor< Hessians, TransformedAssign< Transformation > > f( hessians, Transformation( bbox_ ) );
         shapeFunctionSet_.hessianEach( position( x ), f );
       }
 
