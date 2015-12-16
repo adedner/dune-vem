@@ -1,3 +1,7 @@
+#define ALUGRID_CUBE
+#define WORLDDIM 2
+#define GRIDDIM 2
+
 #include <config.h>
 
 #include <cmath>
@@ -9,7 +13,9 @@
 
 #include <dune/common/exceptions.hh>
 
+#if HAVE_UG
 #include <dune/grid/uggrid.hh>
+#endif
 
 #include <dune/fem/function/adaptivefunction.hh>
 #include <dune/fem/gridpart/leafgridpart.hh>
@@ -29,8 +35,6 @@ namespace Gmsh
   using namespace Dune::Vem::Gmsh;
 }
 
-typedef Dune::UGGrid< 2 > Grid;
-
 int main ( int argc, char **argv )
 try
 {
@@ -42,8 +46,18 @@ try
     return 1;
   }
 
-  // read gmsh file
+#if HAVE_DUNE_ALUGRID
+#warning USE ALUGrid
+  typedef Dune::GridSelector::GridType Grid;
+#elif HAVE_UG
+#warning UG
+  typedef Dune::UGGrid< GRIDDIM > Grid;
+#else
+#warning USE YaspGrid because nothing better was found
+  typedef Dune::YaspGrid< GRIDDIM > Grid;
+#endif
 
+  // read gmsh file
   const auto sectionMap = Gmsh::readFile( argv[ 1 ] );
   const auto nodes = Gmsh::parseNodes( sectionMap );
   const auto elements = Gmsh::parseElements( sectionMap );
