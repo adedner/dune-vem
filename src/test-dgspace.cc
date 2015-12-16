@@ -73,6 +73,7 @@ try
 
   std::vector< std::size_t > elementIds = Gmsh::elements( grid->leafGridView(), factory, entities );
   std::vector< int > agglomerateIndices = Gmsh::tags( elements, elementIds, 3 );
+  std::transform( agglomerateIndices.begin(), agglomerateIndices.end(), agglomerateIndices.begin(), [] ( int i ) { return i-1; } );
 
   // create grid part and agglomeration
 

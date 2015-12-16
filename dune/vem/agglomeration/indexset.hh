@@ -32,11 +32,13 @@ namespace Dune
 
       typedef Agglomeration< GridPartType > AgglomerationType;
 
-      typedef typename Allocator::rebind< std::size_t >::other AllocatorType;
+      typedef typename Allocator::template rebind< std::size_t >::other AllocatorType;
 
       static const int dimension = GridPartType::dimension;
 
       typedef FieldVector< typename GridPartType::ctype, GridPartType::dimensionworld > GlobalCoordinate;
+
+      typedef typename GridPartType::template Codim< 0 >::EntityType EntityType;
 
     private:
       struct Agglomerate;
@@ -44,7 +46,7 @@ namespace Dune
     public:
       AgglomerationIndexSet ( const AgglomerationType &agglomeration, AllocatorType allocator = AllocatorType() );
 
-      std::size_t index ( const ElementType &entity ) const { return agglomeration.index( entity ); }
+      std::size_t index ( const EntityType &entity ) const { return agglomeration_.index( entity ); }
 
       std::size_t subIndex ( const EntityType &entity, int i, int codim ) const
       {
@@ -79,8 +81,8 @@ namespace Dune
     // AgglomerationIndexSet::Agglomerate
     // ----------------------------------
 
-    template< class GridPart >
-    struct AgglomerationIndexSet::Agglomerate
+    template< class GridPart, class Allocator >
+    struct AgglomerationIndexSet< GridPart, Allocator >::Agglomerate
       : private AllocatorType
     {
       Agglomerate ( AllocatorType allocator = Allocator() )
@@ -93,14 +95,7 @@ namespace Dune
       Agglomerate ( const std::array< V, dimension > &connectivity, AllocatorType allocator )
         : AllocatorType( std::move( allocator ) )
       {
-        const std::size_t size = std::accumulate( connectivity.begin(), connectivity.end(), std::size_t( 0 ), [] ( const V &v ) { return v.size(); } );
-        connectivity_[ 0 ] = allocator().allocate( size );
-        for( int dim = 0; dim < dimension; ++dim )
-        {
-          connectivity_[ dim+1 ] = connectivity_[ dim ];
-          for( std::size_t index : connectivity[ dim ] )
-            allocator().construct( connectivity_[ dim+1 ]++, index );
-        }
+        build( connectivity );
       }
 
       Agglomerate ( const Agglomerate & ) = delete;
@@ -123,7 +118,7 @@ namespace Dune
 
       Agglomerate &operator= ( const Agglomerate & ) = delete;
 
-      Agglomerate &operator= ( Agglomerate && )
+      Agglomerate &operator= ( Agglomerate &&other )
       {
         allocator() = std::move( other.allocator() );
         connectivity_ = other.connectivity_;
@@ -134,13 +129,26 @@ namespace Dune
       std::size_t index ( std::size_t i, int dim ) const
       {
         assert( i < size( dim ) );
-        return *(connectivity[ dim ] + i);
+        return connectivity_[ dim ][ i ];
       }
 
-      std::size_t size ( int dim ) const { return (connectivity_[ dim+1 ] - connectivity[ dim ]); }
+      std::size_t size ( int dim ) const { return (connectivity_[ dim+1 ] - connectivity_[ dim ]); }
 
     private:
       AllocatorType &allocator () { return static_cast< AllocatorType & >( *this ); }
+
+      template< class V >
+      void build ( const std::array< V, dimension > &connectivity )
+      {
+        const std::size_t size = std::accumulate( connectivity.begin(), connectivity.end(), std::size_t( 0 ), [] ( std::size_t i, const V &v ) { return i + v.size(); } );
+        connectivity_[ 0 ] = allocator().allocate( size );
+        for( int dim = 0; dim < dimension; ++dim )
+        {
+          connectivity_[ dim+1 ] = connectivity_[ dim ];
+          for( std::size_t index : connectivity[ dim ] )
+            allocator().construct( connectivity_[ dim+1 ]++, index );
+        }
+      }
 
       std::array< typename AllocatorType::pointer, dimension+1 > connectivity_;
     };
@@ -156,7 +164,7 @@ namespace Dune
         allocator_( std::move( allocator ) )
     {
       const typename GridPartType::IndexSetType indexSet = agglomeration_.gridPart().indexSet();
-      std::vector< std::vector< typename GridPartType::IndexSetType::IndexType > subAgglomerates( GlobalGeometryTypeIndex::size( dimension-1 ) );
+      std::vector< std::vector< typename GridPartType::IndexSetType::IndexType > > subAgglomerates( GlobalGeometryTypeIndex::size( dimension-1 ) );
 
       // find subagglomerates
 
@@ -167,7 +175,7 @@ namespace Dune
         for( const auto intersection : intersections( agglomeration_.gridPart(), element ) )
         {
           assert( intersection.conforming() );
-          if( !intersection.neighbor() || (index( intersection.outside() ) ] != agIndex) )
+          if( !intersection.neighbor() || (index( intersection.outside() ) != agIndex) )
           {
             const int face = intersection.indexInInside();
             for( int codim = 1; codim <= dimension; ++codim )
@@ -175,7 +183,7 @@ namespace Dune
               const int numSubEntities = refElement.size( face, 1, codim );
               for( int i = 0; i < numSubEntities; ++i )
               {
-                const int k = refElement.subentity( face, 1, i, codim );
+                const int k = refElement.subEntity( face, 1, i, codim );
                 const std::size_t typeIndex = GlobalGeometryTypeIndex::index( refElement.type( k, codim ) );
                 subAgglomerates[ typeIndex ].push_back( indexSet.subIndex( element, k, codim ) );
               }
@@ -200,7 +208,7 @@ namespace Dune
         size_[ dim ] = 0;
         for( std::size_t typeIndex = GlobalGeometryTypeIndex::offset( dim ); typeIndex < GlobalGeometryTypeIndex::offset( dim+1 ); ++typeIndex )
         {
-          offset[ i ] = size_[ dim ];
+          offset[ typeIndex ] = size_[ dim ];
           size_[ dim ] += subAgglomerates[ typeIndex ].size();
         }
       }
@@ -226,7 +234,7 @@ namespace Dune
               const int numSubEntities = refElement.size( face, 1, codim );
               for( int i = 0; i < numSubEntities; ++i )
               {
-                const int k = refElement.subentity( face, 1, i, codim );
+                const int k = refElement.subEntity( face, 1, i, codim );
                 const std::size_t typeIndex = GlobalGeometryTypeIndex::index( refElement.type( k, codim ) );
                 const auto &subAgs = subAgglomerates[ typeIndex ];
                 const auto pos = std::lower_bound( subAgs.begin(), subAgs.end(), indexSet.subIndex( element, k, codim ) );
@@ -248,7 +256,7 @@ namespace Dune
           std::sort( c[ dim ].begin(), c[ dim ].end() );
           c[ dim ].erase( std::unique( c[ dim ].begin(), c[ dim ].end() ), c[ dim ].end() );
         }
-        agglomerate_.emplace_back( c, allocator_ );
+        agglomerates_.emplace_back( c, allocator_ );
       }
 
       // copy corners
