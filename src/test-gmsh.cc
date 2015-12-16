@@ -11,9 +11,9 @@
 #include <dune/common/parallel/mpihelper.hh>
 
 #include <dune/grid/io/file/vtk.hh>
-#include <dune/grid/uggrid.hh>
+//#include <dune/grid/uggrid.hh>
 
-//#include <dune/alugrid/grid.hh>
+#include <dune/alugrid/grid.hh>
 
 #include <dune/vem/io/gmsh.hh>
 
@@ -22,8 +22,9 @@ namespace Gmsh
   using namespace Dune::Vem::Gmsh;
 }
 
+typedef Dune::ALUGrid< 2, 2, Dune::cube, Dune::nonconforming > Grid;
 //typedef Dune::ALUGrid< 2, 2, Dune::simplex, Dune::nonconforming > Grid;
-typedef Dune::UGGrid< 2 > Grid;
+//typedef Dune::UGGrid< 2 > Grid;
 
 int main ( int argc, char **argv )
 try

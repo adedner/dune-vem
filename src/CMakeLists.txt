@@ -8,3 +8,7 @@ target_link_dune_default_libraries( test-gmsh )
 add_executable( test-dgspace EXCLUDE_FROM_ALL test-dgspace.cc )
 target_link_libraries( test-dgspace dunevem )
 target_link_dune_default_libraries( test-dgspace )
+
+add_executable( test-indexset EXCLUDE_FROM_ALL test-indexset.cc )
+target_link_libraries( test-indexset dunevem )
+target_link_dune_default_libraries( test-indexset )
