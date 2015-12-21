@@ -81,7 +81,7 @@ try
 
   Dune::Vem::AgglomerationIndexSet< GridPart > agIndexSet( agglomeration );
 
-  for( const auto &element : Dune::elements( gridPart, Dune::Partitions::interiorBorder ) )
+  for( const auto &element : Dune::elements( static_cast< GridPart::GridViewType >( gridPart ), Dune::Partitions::interiorBorder ) )
   {
     const auto geometry = element.geometry();
     std::cout << "element: ";

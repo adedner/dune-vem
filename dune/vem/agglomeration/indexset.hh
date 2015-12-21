@@ -168,7 +168,7 @@ namespace Dune
 
       // find subagglomerates
 
-      for( const auto element : elements( agglomeration_.gridPart(), Partitions::interiorBorder ) )
+      for( const auto element : elements( static_cast< typename GridPart::GridViewType >( agglomeration_.gridPart() ), Partitions::interiorBorder ) )
       {
         const std::size_t agIndex = index( element );
         const auto &refElement = ReferenceElements< typename GridPart::ctype, dimension >::general( element.type() );
@@ -218,7 +218,7 @@ namespace Dune
       size_[ dimension ] = agglomeration.size();
       std::vector< std::array< std::vector< std::size_t >, dimension > > connectivity( size_[ dimension ] );
 
-      for( const auto element : elements( agglomeration_.gridPart(), Partitions::interiorBorder ) )
+      for( const auto element : elements( static_cast< typename GridPart::GridViewType >( agglomeration_.gridPart() ), Partitions::interiorBorder ) )
       {
         const std::size_t agIndex = agglomeration.index( element );
         const auto &refElement = ReferenceElements< typename GridPart::ctype, dimension >::general( element.type() );
@@ -262,7 +262,7 @@ namespace Dune
       // copy corners
 
       corners_.resize( size_[ 0 ] );
-      for( const auto vertex : vertices( agglomeration_.gridPart(), Partitions::interiorBorder ) )
+      for( const auto vertex : vertices( static_cast< typename GridPart::GridViewType >( agglomeration_.gridPart() ), Partitions::interiorBorder ) )
       {
         const std::size_t typeIndex = GlobalGeometryTypeIndex::index( vertex.type() );
         const auto &subAgs = subAgglomerates[ typeIndex ];
