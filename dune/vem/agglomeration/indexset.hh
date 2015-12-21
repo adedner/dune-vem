@@ -172,7 +172,8 @@ namespace Dune
       {
         const std::size_t agIndex = index( element );
         const auto &refElement = ReferenceElements< typename GridPart::ctype, dimension >::general( element.type() );
-        for( const auto intersection : intersections( agglomeration_.gridPart(), element ) )
+        //for( const auto intersection : intersections( agglomeration_.gridPart(), element ) )
+        for( const auto intersection : intersections( static_cast< typename GridPart::GridViewType >( agglomeration_.gridPart() ), element ))
         {
           assert( intersection.conforming() );
           if( !intersection.neighbor() || (index( intersection.outside() ) != agIndex) )
@@ -222,7 +223,8 @@ namespace Dune
       {
         const std::size_t agIndex = agglomeration.index( element );
         const auto &refElement = ReferenceElements< typename GridPart::ctype, dimension >::general( element.type() );
-        for( const auto intersection : intersections( agglomeration_.gridPart(), element ) )
+        //for( const auto intersection : intersections( agglomeration_.gridPart(), element ) )
+        for( const auto intersection : intersections( static_cast< typename GridPart::GridViewType >( agglomeration_.gridPart() ), element ))
         {
           assert( intersection.conforming() );
           if( !intersection.neighbor() || (agglomeration.index( intersection.outside() ) != agIndex) )
