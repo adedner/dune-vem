@@ -9,7 +9,8 @@
 #include <dune/fem/space/common/defaultcommhandler.hh>
 #include <dune/fem/space/common/discretefunctionspace.hh>
 #include <dune/fem/space/common/functionspace.hh>
-#include <dune/fem/space/shapefunctionset/legendre.hh>
+// #include <dune/fem/space/shapefunctionset/legendre.hh>
+#include <dune/fem/space/shapefunctionset/orthonormal.hh>
 #include <dune/fem/space/shapefunctionset/proxy.hh>
 #include <dune/fem/space/shapefunctionset/vectorial.hh>
 
@@ -50,7 +51,8 @@ namespace Dune
       typedef typename GridPartType::template Codim< codimension >::EntityType EntityType;
 
       typedef typename Fem::FunctionSpace< typename FunctionSpaceType::DomainFieldType, typename FunctionSpaceType::RangeFieldType, FunctionSpaceType::dimDomain, 1 > ScalarFunctionSpaceType;
-      typedef Fem::LegendreShapeFunctionSet< ScalarFunctionSpaceType > ScalarShapeFunctionSetType;
+      // typedef Fem::LegendreShapeFunctionSet< ScalarFunctionSpaceType > ScalarShapeFunctionSetType;
+      typedef Fem::OrthonormalShapeFunctionSet< ScalarFunctionSpaceType, polOrder > ScalarShapeFunctionSetType;
       typedef Fem::VectorialShapeFunctionSet< Fem::ShapeFunctionSetProxy< ScalarShapeFunctionSetType >, typename FunctionSpaceType::RangeType > ShapeFunctionSetType;
 
     public:
@@ -95,7 +97,9 @@ namespace Dune
         : BaseType( gridPart ),
           blockMapper_( agglomeration ),
           boundingBoxes_( boundingBoxes( agglomeration ) ),
-          scalarShapeFunctionSet_( polOrder )
+          // scalarShapeFunctionSet_( polOrder )
+          scalarShapeFunctionSet_(
+              Dune::GeometryType(Dune::GeometryType::cube,GridPart::dimension) )
       {}
 
       const BasisFunctionSetType basisFunctionSet ( const EntityType &entity ) const
