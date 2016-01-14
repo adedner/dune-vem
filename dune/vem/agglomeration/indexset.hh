@@ -54,6 +54,23 @@ namespace Dune
         return (codim == 0 ? index( entity ) : agglomerate( entity ).index( i, dimension - codim ));
       }
 
+      std::size_t localIndex ( const EntityType &entity, int i, int codim ) const
+      {
+        assert( (codim >= 0) && (codim <= dimension) );
+        if (codim=0) return 0;
+        assert(codim==dim);
+        const typename GridPartType::IndexSetType indexSet = agglomeration_.gridPart().indexSet();
+        std::size_t globalIndexInPolygonalGrid = corners_[indexSet.subIndex(entity,codim,i)];
+        if (globalIndexInPolygonalGrid == -1)
+          return -1;
+        auto localAgg = agglomerate( entity );
+        for (int k=0;k<localAgg.size(dimension-codim);++k)
+          if (localAgg.index(k,dimension-codim) == globalIndexInPolygonalGrid)
+            return k;
+        assert(0);
+        return -1;
+      }
+
       std::size_t subAgglomerates ( const EntityType &entity, int codim ) const
       {
         assert( (codim >= 0) && (codim <= dimension) );
@@ -73,7 +90,7 @@ namespace Dune
       AllocatorType allocator_;
       std::vector< Agglomerate > agglomerates_;
       std::array< std::size_t, dimension+1 > size_;
-      std::vector< GlobalCoordinate > corners_;
+      std::vector< std::size_t  > corners_;
     };
 
 
@@ -263,7 +280,7 @@ namespace Dune
 
       // copy corners
 
-      corners_.resize( size_[ 0 ] );
+      corners_.resize( indexSet.size(dim), -1 );
       for( const auto vertex : vertices( static_cast< typename GridPart::GridViewType >( agglomeration_.gridPart() ), Partitions::interiorBorder ) )
       {
         const std::size_t typeIndex = GlobalGeometryTypeIndex::index( vertex.type() );
@@ -271,7 +288,8 @@ namespace Dune
         const auto vertexIndex = indexSet.index( vertex );
         const auto pos = std::lower_bound( subAgs.begin(), subAgs.end(), vertexIndex );
         if( (pos != subAgs.end()) && (*pos == vertexIndex) )
-          corners_[ offset[ typeIndex ] + static_cast< std::size_t >( pos - subAgs.begin() ) ] = vertex.geometry().center();
+          corners_[vertexIndex] =
+             offset[ typeIndex ] + static_cast< std::size_t >( pos - subAgs.begin() );
       }
     }
 
