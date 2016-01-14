@@ -231,6 +231,9 @@ namespace Dune
       std::vector< std::vector< typename GridPartType::IndexSetType::IndexType > > subAgglomerates( GlobalGeometryTypeIndex::size( dimension-1 ) );
 
       // find subagglomerates
+      //
+      // insert the index of each subentity belonging to more than one agglomerate into the
+      // subAgglomerates vector for the corresponding geometry type
 
       for( const auto element : elements( static_cast< typename GridPart::GridViewType >( agglomeration_.gridPart() ), Partitions::interiorBorder ) )
       {
@@ -257,6 +260,8 @@ namespace Dune
       }
 
       // make subagglomerates unique
+      //
+      // The position of a subentity's index in the subAgglometates vector will then give its subagglomerate index.
 
       for( auto &list : subAgglomerates )
       {
