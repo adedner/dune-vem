@@ -19,7 +19,9 @@
 
 #include <dune/vem/agglomeration/agglomeration.hh>
 #include <dune/vem/agglomeration/indexset.hh>
-#include <dune/vem/io/gmsh.hh>
+#include <dune/vem/io/gmsh.cc>
+
+#include <dune/grid/io/file/gmshwriter.hh>
 
 template< class Enumerator >
 void printSet ( std::ostream &out, std::size_t size, Enumerator enumerator )
@@ -77,6 +79,11 @@ try
 
   Dune::Vem::Agglomeration< GridPart > agglomeration( gridPart, agglomerateIndices );
 
+  // write the grid you originally imported
+  typedef Grid::LeafGridView GV;
+  Dune::GmshWriter<typename Grid::LeafGridView> writer(grid->leafGridView());
+  writer.write("../output/yourmesh.msh");
+
   // create agglomeration index set
 
   Dune::Vem::AgglomerationIndexSet< GridPart > agIndexSet( agglomeration );
@@ -88,11 +95,18 @@ try
     printSet( std::cout, geometry.corners(), [ &geometry ] ( std::size_t i ) { return geometry.corner( i ); } );
     std::cout << std::endl;
 
-    for( int codim = 0; codim <= Grid::dimension; ++codim )
+    for( int codim = Grid::dimension; codim <= Grid::dimension; ++codim )
     {
       std::cout << "codim " << codim << ": ";
-      const auto enumerator = [ &agIndexSet, &element, codim ] ( std::size_t i ) { return agIndexSet.subIndex( element, i, codim ); };
-      printSet( std::cout, agIndexSet.subAgglomerates( element, codim ), enumerator );
+      {
+        const auto enumerator = [ &agIndexSet, &element, codim ] ( std::size_t i ) { return agIndexSet.subIndex( element, i, codim ); };
+        printSet( std::cout, agIndexSet.subAgglomerates( element, codim ), enumerator );
+      }
+      std::cout << std::endl;
+      {
+        const auto enumerator = [ &agIndexSet, &element, codim ] ( std::size_t i ) { return agIndexSet.localIndex( element, i, codim ); };
+        printSet( std::cout, 4, enumerator );
+      }
       std::cout << std::endl;
     }
   }

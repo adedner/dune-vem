@@ -54,21 +54,27 @@ namespace Dune
         return (codim == 0 ? index( entity ) : agglomerate( entity ).index( i, dimension - codim ));
       }
 
-      std::size_t localIndex ( const EntityType &entity, int i, int codim ) const
+      int localIndex ( const EntityType &entity, int i, int codim ) const
       {
         assert( (codim >= 0) && (codim <= dimension) );
-        if (codim=0) return 0;
-        assert(codim==dim);
+        if (codim==0) return 0;
+        assert(codim==dimension);
         const typename GridPartType::IndexSetType indexSet = agglomeration_.gridPart().indexSet();
-        std::size_t globalIndexInPolygonalGrid = corners_[indexSet.subIndex(entity,codim,i)];
+        int globalIndexInPolygonalGrid = corners_[indexSet.subIndex(entity,i,codim)];
         if (globalIndexInPolygonalGrid == -1)
           return -1;
-        auto localAgg = agglomerate( entity );
-        for (int k=0;k<localAgg.size(dimension-codim);++k)
+        auto& localAgg = agglomerate( entity );
+        for (std::size_t k=0;k<localAgg.size(dimension-codim);++k)
           if (localAgg.index(k,dimension-codim) == globalIndexInPolygonalGrid)
             return k;
         assert(0);
         return -1;
+      }
+
+      int numPolyVertices (const EntityType &entity, int codim ) const
+      {
+    	  assert ((codim > 0) && (codim == dimension));
+          return agglomerate( entity ).size(dimension-codim);
       }
 
       std::size_t subAgglomerates ( const EntityType &entity, int codim ) const
@@ -90,7 +96,7 @@ namespace Dune
       AllocatorType allocator_;
       std::vector< Agglomerate > agglomerates_;
       std::array< std::size_t, dimension+1 > size_;
-      std::vector< std::size_t  > corners_;
+      std::vector< int > corners_;
     };
 
 
@@ -280,7 +286,7 @@ namespace Dune
 
       // copy corners
 
-      corners_.resize( indexSet.size(dim), -1 );
+      corners_.resize( indexSet.size(dimension), -1 );
       for( const auto vertex : vertices( static_cast< typename GridPart::GridViewType >( agglomeration_.gridPart() ), Partitions::interiorBorder ) )
       {
         const std::size_t typeIndex = GlobalGeometryTypeIndex::index( vertex.type() );
