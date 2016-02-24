@@ -267,40 +267,32 @@ double algorithm ( GridPart &gridPart, std::vector<int>agglomerateIndices)
 		Vector2.resize(agIndexSet.numPolyVertices(element,GridPart::dimension));
 
 
-
 		for( int codim = GridPart::dimension; codim <= GridPart::dimension; ++codim )
 		{
-			//			std::cout << "polygon = " << currentPolygon << " and conn = " << std::endl;
+
 			{
-				//				const auto enumerator = [ &agIndexSet, &element, codim ] ( std::size_t i ) { return agIndexSet.subIndex( element, i, codim ); };
-				//				printSet( std::cout, agIndexSet.subAgglomerates( element, codim ), enumerator );
-				//				std::cout << " " << std::endl;
+
 				for (int k =0; k < geometry.corners(); ++k) {
 					Vector1[k] = agIndexSet.localIndex( element, k, codim );
-					//					std::cout << " loc1 " << k << " "<< agIndexSet.localIndex( element, k, codim ) << std::endl;
+
 				}
 
 				for (int j =0; j < agIndexSet.subAgglomerates( element, codim ); ++j) {
 					Vector2[j] = agIndexSet.subIndex( element, j, codim ) ;
-					//					std::cout << " loc2 " << j << " "<< agIndexSet.subIndex( element, j, codim ) << std::endl;
+
 				}
 
 			}
 
 		}
 
-
-
-
-
-
 		if (currentPolygon!=oldPolygon) {
 
 			for (int iRow = 0; iRow < NVertexVector[currentPolygon]; ++iRow) {
 				// just storing the global vertex numbers for the polygonal mesh in PolygonalMeshVertexIDs
 				PolygonalMeshVertexIDs.push_back(agIndexSet.subIndex( element, iRow, GridPart::dimension )) ; // = agIndexSet.subIndex( element, iRow, GridPart::dimension ) ;
-				fTemp3 << currentPolygon << " " << count << " " <<  PolygonalMeshVertexIDs[ count ] << std::endl;
-				//				std::cout << "check->" << currentPolygon << " " << count << " " <<  PolygonalMeshVertexIDs[ count ] << std::endl;
+
+
 				oldPolygon = currentPolygon;
 				++count;
 			}
@@ -447,23 +439,14 @@ double algorithm ( GridPart &gridPart, std::vector<int>agglomerateIndices)
 			typedef typename ElementIterator::Entity::Geometry LeafGeometry;
 
 			const ElementPointer ep = gridPart.grid().entityPointer( *it );
-
 			++numSubElements;
-
 			const LeafGeometry geo = ep->geometry();
-
 			Dune::GeometryType gt = ep->type();
-
 			auto& ref = Dune::ReferenceElements<double,dimDomain>::general(gt);
-
 			const int LeafElementIndex = lset.index(ep); // Global element number of the current element
-
 			auto &basis = dfSpace.basisFunctionSet( ep ) ;
-
 			const int numBasisFct = basis.size();
-
 			AreaofPolygon = AreaofPolygon + geo.volume ();
-
 			int numElemVertices = geo.corners();
 
 			CenterOfMass_x = CenterOfMass_x + geo.center()[0];
@@ -492,11 +475,11 @@ double algorithm ( GridPart &gridPart, std::vector<int>agglomerateIndices)
 				const EntityPointerType InsideElement = intersection.inside(); // pointer to outside element.
 				int InsidePolygon = agglomeration.index(*InsideElement); // the polygon we are integrating
 				int refface = iit->indexInInside(); // local face number based on the reference element class
-				//				fTemp3 << " " << std::endl;
+
 				if  (!intersection.boundary() ) { // (!intersection.boundary()
 					const EntityPointerType OutsideElement = intersection.outside(); // pointer to outside element.
 					int OutsidePolygon = agglomeration.index(*OutsideElement); // the polygon we are NOt integrating
-					//					std::cout <<"gcd " <<InsidePolygon << " "  << OutsidePolygon << " " << refface << std::endl;
+
 
 
 					if (OutsidePolygon!=InsidePolygon) {
@@ -506,7 +489,6 @@ double algorithm ( GridPart &gridPart, std::vector<int>agglomerateIndices)
 
 
 							int LocalDofInPolygon = agIndexSet.localIndex( ep, localNodeNumber, GridPart::dimension );
-
 
 							fpolyFaceInfo << currentPolygon << " " << LeafElementIndex << " " << LocalPolygonalConnectivity[LocalDofInPolygon] <<  " " << refface << " " << geo.corner(localNodeNumber) << std::endl;
 							Dune::FieldVector<double, GridPart::dimension> unitOuterNormal = intersection.centerUnitOuterNormal();
@@ -525,13 +507,6 @@ double algorithm ( GridPart &gridPart, std::vector<int>agglomerateIndices)
 
 							}
 
-							if (currentPolygon==0) {
-								std::cout << " you are at " << VertexCoordinate << " globaldof = "<< LocalPolygonalConnectivity[LocalDofInPolygon]<< "Kavg = "<< MeanDiffusionCoefficient << std::endl;
-
-							}
-
-							//							fTemp3 << "poly = " << currentPolygon << ", intgn face = " << refface << ", with cntr = " << intersection.geometry().center () << \
-							//									"with local polyvtx = " << LocalDofInPolygon << ", at " << geo.corner(localNodeNumber) << std::endl;
 							for (int j=0; j<GridPart::dimension; ++j ) {
 								PI0X [j][LocalDofInPolygon] = PI0X[j][LocalDofInPolygon] + 0.5 * unitOuterNormal [j] * intersection.geometry().volume() ;
 							}
@@ -544,23 +519,15 @@ double algorithm ( GridPart &gridPart, std::vector<int>agglomerateIndices)
 
 				if  (intersection.boundary() ) { // this is always part of the polygon boundary as the intersection is on the boundary of the domain
 					for (int i = 0; i < kdis_edge; ++i) {
+
 						int localNodeNumber = ref.subEntity(refface, 1, i, GridPart::dimension); // as per reference element class
-
-
 						int LocalDofInPolygon = agIndexSet.localIndex( ep, localNodeNumber, GridPart::dimension );
-
-
 						fpolyFaceInfo << currentPolygon << " " << LeafElementIndex << " " << LocalPolygonalConnectivity[LocalDofInPolygon] <<  " " << refface << " " << geo.corner(localNodeNumber) << std::endl;
-
-
 						Dune::FieldVector<double, GridPart::dimension> unitOuterNormal = intersection.centerUnitOuterNormal();
 						//						int LocalDofInPolygon = agIndexSet.localIndex( ep, localNodeNumber, GridPart::dimension );
 
-
 						Dune::FieldVector<double, dimDomain> VertexCoordinate = geo.corner(localNodeNumber) ;
 						evalDiffCoeff (VertexCoordinate , DiffusionCoefficent) ;
-
-
 
 						for (int jdim = 0; jdim < dimDomain; ++jdim) {
 
@@ -568,15 +535,7 @@ double algorithm ( GridPart &gridPart, std::vector<int>agglomerateIndices)
 
 						}
 
-						if (currentPolygon==0) {
-							std::cout << " you are at " << VertexCoordinate << " globaldof = "<< LocalPolygonalConnectivity[LocalDofInPolygon]<< "Kavg = "<< MeanDiffusionCoefficient << std::endl;
 
-						}
-
-
-						//
-						//						fTemp3 << "poly = " << currentPolygon << ", intgn face = " << refface << ", with cntr = " << intersection.geometry().center () << \
-						//								"with local polyvtx = " << LocalDofInPolygon << ", at " << geo.corner(localNodeNumber) << std::endl;
 						for (int j=0; j<GridPart::dimension; ++j )
 						{
 							PI0X [j][LocalDofInPolygon] = PI0X[j][LocalDofInPolygon] + 0.5 * unitOuterNormal [j] * intersection.geometry().volume() ;
@@ -596,13 +555,12 @@ double algorithm ( GridPart &gridPart, std::vector<int>agglomerateIndices)
 
 			std::vector <RangeType > PhiMonomialBasis (numBasisFct);
 			std::vector< RangeType > Phi ( numBasisFct ); // another basis to be evaluated at quad points given by CachingQuadrature
-			fTemp2 << " ---  " << std::endl;
-			fTemp << "     " << std::endl;
+
+
 			for (int i=0; i< numElemVertices; ++i){
 
 				if (agIndexSet.localIndex( ep, i, GridPart::dimension )!= -1) {
-					fTemp2 << "   " << std::endl;
-					fTemp2 << " -o-  " << std::endl;
+
 					//					Dune::FieldVector<double, GridPart::dimension> GaussPoint = geo.corner(i);
 
 					DomainType GlobalPoint = geo.corner(i) ; //
@@ -615,31 +573,20 @@ double algorithm ( GridPart &gridPart, std::vector<int>agglomerateIndices)
 
 					//					evalMonomialBasis(GlobalPoint,xE,hE,PhiMonomialBasis);
 
-					fTemp2 << GlobalPoint << " " << LocalPoint << std::endl;
-					for (int idum = 0; idum<numBasisFct; ++idum) {
-						fTemp2 << "phi"<< idum << " = " <<Phi[idum] << std::endl;
-					}
-					fTemp2 << " -o-  " << std::endl;
-					fTemp2 << "  " << std::endl;
-
 					// assemble D-matrix
 					int LocalDofInPolygon = agIndexSet.localIndex( ep, i, GridPart::dimension );
 
 					int GlobalVertexIndexofPolygon = agIndexSet.subIndex( ep, LocalDofInPolygon,  GridPart::dimension );
 
-					fTemp  << LocalDofInPolygon << ", " << GlobalVertexIndexofPolygon << ", (" << geo.corner(i) <<  ")" << std::endl;
 
-					//					std::cout << " loc1 " << i << " "<< agIndexSet.localIndex( ep, i, GridPart::dimension ) << std::endl;
 					for (int jCol = 0; jCol < numBasisFct; ++jCol) {
 						Dlocal[LocalDofInPolygon][jCol] =  Phi[jCol] ;
 					}
 
 				}
 			}
-			fTemp2 << "  --- " << std::endl;
 
-
-			// the finite element integration
+			// the finite element like integration
 			// for linear case and for constant coefficient problems, we don't even need this integration provided the basis in (p-1) is a constant
 			// We are still in the subelement loop
 
@@ -716,7 +663,7 @@ double algorithm ( GridPart &gridPart, std::vector<int>agglomerateIndices)
 
 		} // finished iterating over sub-elements in a given polygon
 
-		std::cout << "area of this poly = " << dummyArea << std::endl;
+
 		CenterOfMass_x = CenterOfMass_x / numSubElements;
 		CenterOfMass_y = CenterOfMass_y / numSubElements;
 		fpolyCoM << currentPolygon << " " << CenterOfMass_x << " " << CenterOfMass_y << std::endl;
@@ -927,9 +874,6 @@ double algorithm ( GridPart &gridPart, std::vector<int>agglomerateIndices)
 		MeanDiffusionCoefficient /= numPolygonVertices;
 		MeanReactionCoefficient /= numPolygonVertices;
 
-		if (currentPolygon==0)std::cout << "final diffusion coeff = "<< MeanDiffusionCoefficient << std::endl ;
-
-
 		StabilityScalingFactor = MeanDiffusionCoefficient * ( pow ( MeshSize, GridPart::dimension - 2) );
 		StabilityScalingFactor+= MeanReactionCoefficient * ( pow (MeshSize, GridPart::dimension )) ;
 		KStbilityLocal.rightmultiply(I_minus_PI_PHI_1); // In order to do [I_minus_PI_PHI_1_Transposed]*[I_minus_PI_PHI_1], you write [I_minus_PI_PHI_1].leftmultiply[I_minus_PI_PHI_1_Transposed] i.e. leftmultiply I_minus_PI_PHI_1 by I_minus_PI_PHI_1_Transposed.
@@ -1053,7 +997,7 @@ double algorithm ( GridPart &gridPart, std::vector<int>agglomerateIndices)
 					A_lhs_global[GlobalVertexIndexofPolygon] = 0.0;
 					A_lhs_global[GlobalVertexIndexofPolygon][GlobalVertexIndexofPolygon] = 1.0;
 					b_rhs_global[GlobalVertexIndexofPolygon] = 0.0;
-					//					std::cout << "GVx " << GlobalVertexIndexofPolygon << " at " << geo.corner (localNodeNumber) << std::endl;
+
 
 				}
 
@@ -1080,13 +1024,9 @@ double algorithm ( GridPart &gridPart, std::vector<int>agglomerateIndices)
 	}
 
 
-
-
 	A_lhs_global_inverse.invert();
-	std::cout << "able to invert A!" << std::endl;
 	//	//
 	A_lhs_global.solve(x_soln_global, b_rhs_global);
-
 
 	for (int iRow = 0; iRow < numVtxPolygonalMesh; ++iRow) {
 		fXVemSoln << iRow <<" " <<PolygonalMeshVertexIDs [iRow] << " " << x_soln_global [iRow] << std::endl;
@@ -1138,10 +1078,7 @@ double algorithm ( GridPart &gridPart, std::vector<int>agglomerateIndices)
 					// the local solution vector and at corresponding local dof in the polygon
 					LocalSolutionVector[LocalDofInPolygon] = x_soln_global [GlobalDofinPolygonalMesh] ;
 				}
-
-
 			}
-
 		}
 
 		PI1 = vec_mat_PI1 [currentPolygon] ;
@@ -1179,7 +1116,6 @@ double algorithm ( GridPart &gridPart, std::vector<int>agglomerateIndices)
 			const int numBasisFct = basis.size();
 
 			int numElemVertices = geo.corners();
-
 
 			// Quadrature loop for error calculations
 
@@ -1240,11 +1176,7 @@ double algorithm ( GridPart &gridPart, std::vector<int>agglomerateIndices)
 
 		}
 
-
 		++currentPolygon ;
-		std::cout << "you have " << elementsInThisPolygon << " elements in polygon " << currentPolygon << std::endl;
-
-
 	}
 
 	VemL2error = sqrt(VemL2error);
@@ -1285,17 +1217,15 @@ try
 
 	std::unique_ptr< Grid > grid( factory.createGrid() );
 
-	std::cout << "CHECK!" << std::endl;
-
 	std::vector< std::size_t > elementIds = Gmsh::elements( grid->leafGridView(), factory, entities );
 	std::vector< int > agglomerateIndices = Gmsh::tags( elements, elementIds, 3 );
 	std::transform( agglomerateIndices.begin(), agglomerateIndices.end(), agglomerateIndices.begin(), [] ( int i ) { return i-1; } );
 
 	// create grid part and agglomeration
-	std::cout << "CHECK!" << std::endl;
+
 	typedef Dune::Fem::LeafGridPart< Grid > GridPart;
 	GridPart gridPart( *grid );
-	std::cout << "CHECK!" << std::endl;
+
 	algorithm(gridPart,agglomerateIndices);
 
 	// write the grid you originally imported
