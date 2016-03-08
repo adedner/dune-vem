@@ -377,10 +377,14 @@ double algorithm ( GridPart &gridPart, std::vector<int>agglomerateIndices)
 
 	std::vector <int> LocalPolygonalConnectivity;
 
+	std::vector <int> LocalEdgeIDs;
+
 	std::vector <int> LocalVertexDofs; // stores the vertex dofs for a given polygon
 	std::vector <int> LocalEdgeDofs; // stores the edge dofs for a given polygon
 	std::vector <int> LocalInternalDofs; // stores the internal dofs for a given polygon
 	std::vector <int> LocalDofVector; // stores the total dofs for a given polygon
+
+
 
 	std::vector<std::vector <int>> PolygonalMeshConnectivityArray;
 
@@ -406,8 +410,6 @@ double algorithm ( GridPart &gridPart, std::vector<int>agglomerateIndices)
 	KStiffGlobal = 0;
 
 
-
-
 	for(auto PolygonIterator = PolygonalMeshIDs.begin();PolygonIterator!=PolygonalMeshIDs.end();++PolygonIterator) {
 
 		std::cout << "procsing polygon " << currentPolygon  << std::endl;
@@ -416,9 +418,11 @@ double algorithm ( GridPart &gridPart, std::vector<int>agglomerateIndices)
 		int numVertexDofs = numPolygonVertices;
 		int numEdgeDofs = numPolygonVertices * ( POLORDER - 1 );
 		int numInternalDofs = numTermsin_k_minus_2;
-
 		numLocalDof = numVertexDofs + numEdgeDofs + numInternalDofs;
 		LocalDofVector.resize(numLocalDof);
+		LocalEdgeDofs.resize(numEdgeDofs);
+		LocalInternalDofs.resize(numInternalDofs);
+
 		double AreaofPolygon = 0.0;
 		double CenterOfMass_x = 0.0;
 		double CenterOfMass_y = 0.0;
@@ -471,14 +475,29 @@ double algorithm ( GridPart &gridPart, std::vector<int>agglomerateIndices)
 			CenterOfMass_x = CenterOfMass_x + geo.center()[0];
 			CenterOfMass_y = CenterOfMass_y + geo.center()[1];
 
+			for (int iRow = 0; iRow < numElemVertices; ++iRow) {
+				int LocalEdgeId = agIndexSet.localEdgeIndex(ep, iRow, GridPart::dimension-1);
+				if (LocalEdgeId!=-1 ){
+					int GlobalEdgeId = agIndexSet.subIndex( ep, LocalEdgeId,  GridPart::dimension-1 );
+					std::cout << currentPolygon << " " << LocalEdgeId <<  " "<< GlobalEdgeId << std::endl;
+
+				}
+
+			}
+
 			if (currentPolygon!=oldPolygon) {
 				// LocalPolygonalConnectivity renamed to LocalVertexDofs
 				LocalPolygonalConnectivity.resize(numPolygonVertices);
+				LocalEdgeIDs.resize(numPolygonVertices);
 				// The following will simply store the connectivity which can be accssed correctly only by element pointer and a local vertex number in reference element of Element in the underlying grid (T)
 				for (int iRow = 0; iRow < numPolygonVertices ; ++iRow) {
 					LocalPolygonalConnectivity[ iRow ] = agIndexSet.subIndex( ep, iRow, GridPart::dimension ) ;
+					LocalEdgeIDs[iRow] = agIndexSet.subIndex(ep,iRow,GridPart::dimension-1);
 				}
-				PolygonalMeshConnectivityArray.push_back(LocalPolygonalConnectivity);
+
+
+
+				PolygonalMeshConnectivityArray.push_back(LocalPolygonalConnectivity); // stores vertex connectivity only
 				oldPolygon = currentPolygon;
 			}
 
