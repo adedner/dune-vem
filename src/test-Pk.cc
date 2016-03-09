@@ -51,7 +51,7 @@
 #include <dune/geometry/quadraturerules.hh>
 
 
-#define POLORDER 1
+#define POLORDER 2
 #define GRIDDIM 2
 #define WORLDDIM 2
 #define WANT_ISTL 0
@@ -179,6 +179,7 @@ double algorithm ( GridPart &gridPart, std::vector<int>agglomerateIndices)
 	std::vector <std::vector<ElementSeed>> PolygonalMeshIDs;
 
 	std::vector <int> PolygonalMeshVertexIDs;
+	std::vector <int> PolygonalMeshEdgeIDs;
 
 	PolygonalMeshIDs.resize(agglomeration.size());
 
@@ -211,6 +212,8 @@ double algorithm ( GridPart &gridPart, std::vector<int>agglomerateIndices)
 	//	PolygonalMeshVertexIDs.resize(numVtxPolygonalMesh); //
 
 
+
+	std::ofstream fDofInfo ("../../output/dofinfo.dat");
 	std::ofstream fGaussPts ("../../output/gaussPoints.dat");
 	std::ofstream fDlocal ("../../output/Dmatrix.dat");
 	std::ofstream fClocal ("../../output/Cmatrix.dat");
@@ -234,6 +237,7 @@ double algorithm ( GridPart &gridPart, std::vector<int>agglomerateIndices)
 
 
 
+
 	std::ofstream fpolyFaceInfo("../../output/polygonal_faces.dat") ;
 	std::ofstream fpolyConn("../../output/polygonal_conn.dat");
 	std::ofstream fpolyvert("../../output/polygonal_vertices.dat");
@@ -243,6 +247,7 @@ double algorithm ( GridPart &gridPart, std::vector<int>agglomerateIndices)
 	// create agglomeration index set
 	Dune::Vem::AgglomerationIndexSet< GridPart > agIndexSet( agglomeration );
 	const int nk = (POLORDER + 1) * (POLORDER + 2) / 2;
+	const int numDofsPerEdge = POLORDER - 1;
 	const int numTermsin_k_minus_2 = (POLORDER - 1) * ( POLORDER ) / 2 ; // see pg 260, RD Cook, Fig. 7.1-2
 	int numLocalDof = 0;
 
@@ -295,7 +300,7 @@ double algorithm ( GridPart &gridPart, std::vector<int>agglomerateIndices)
 			for (int iRow = 0; iRow < NVertexVector[currentPolygon]; ++iRow) {
 				// just storing the global vertex numbers for the polygonal mesh in PolygonalMeshVertexIDs
 				PolygonalMeshVertexIDs.push_back(agIndexSet.subIndex( element, iRow, GridPart::dimension )) ; // = agIndexSet.subIndex( element, iRow, GridPart::dimension ) ;
-
+				PolygonalMeshEdgeIDs.push_back(agIndexSet.subIndex( element, iRow, GridPart::dimension - 1 )) ; // store all edge ids
 
 				oldPolygon = currentPolygon;
 				++count;
@@ -329,6 +334,14 @@ double algorithm ( GridPart &gridPart, std::vector<int>agglomerateIndices)
 	std::sort( PolygonalMeshVertexIDs.begin(), PolygonalMeshVertexIDs.end() );
 	PolygonalMeshVertexIDs.erase( unique( PolygonalMeshVertexIDs.begin(), PolygonalMeshVertexIDs.end() ), PolygonalMeshVertexIDs.end() );
 	numVtxPolygonalMesh = PolygonalMeshVertexIDs.size() ;
+
+	// sort and get the unique vertex index for the edges in polygonal mesh
+	std::sort( PolygonalMeshEdgeIDs.begin(), PolygonalMeshEdgeIDs.end() );
+	PolygonalMeshEdgeIDs.erase( unique( PolygonalMeshEdgeIDs.begin(), PolygonalMeshEdgeIDs.end() ), PolygonalMeshEdgeIDs.end() );
+	const int numEdgesPolygonalMesh = PolygonalMeshEdgeIDs.size();
+
+	const int numTotalVertexDofs = numVtxPolygonalMesh;
+	const int numTotalEdgeDofs = numEdgesPolygonalMesh * (POLORDER - 1) ;
 
 
 	//	for (int iRow = 0; iRow <
@@ -387,6 +400,7 @@ double algorithm ( GridPart &gridPart, std::vector<int>agglomerateIndices)
 
 
 	std::vector<std::vector <int>> PolygonalMeshConnectivityArray;
+	std::vector<std::vector <int>> GlobalDofArray;
 
 
 
@@ -419,9 +433,9 @@ double algorithm ( GridPart &gridPart, std::vector<int>agglomerateIndices)
 		int numEdgeDofs = numPolygonVertices * ( POLORDER - 1 );
 		int numInternalDofs = numTermsin_k_minus_2;
 		numLocalDof = numVertexDofs + numEdgeDofs + numInternalDofs;
-		LocalDofVector.resize(numLocalDof);
-		LocalEdgeDofs.resize(numEdgeDofs);
-		LocalInternalDofs.resize(numInternalDofs);
+		//LocalDofVector.resize(numLocalDof);
+		//LocalEdgeDofs.resize(numEdgeDofs);
+		//LocalInternalDofs.resize(numInternalDofs);
 
 		double AreaofPolygon = 0.0;
 		double CenterOfMass_x = 0.0;
@@ -475,9 +489,14 @@ double algorithm ( GridPart &gridPart, std::vector<int>agglomerateIndices)
 			CenterOfMass_x = CenterOfMass_x + geo.center()[0];
 			CenterOfMass_y = CenterOfMass_y + geo.center()[1];
 
+			// storing the local edge info
+			// We do: for a given element T, go to each edge of T, find if it belongs to the polygon boundary, if yes,
+			// find the local edge number in the polygon (not in T!) and then store it in an array
+			LocalEdgeIDs.resize(numPolygonVertices);
 			for (int iRow = 0; iRow < numElemVertices; ++iRow) {
 				int LocalEdgeId = agIndexSet.localEdgeIndex(ep, iRow, GridPart::dimension-1);
 				if (LocalEdgeId!=-1 ){
+
 					int GlobalEdgeId = agIndexSet.subIndex( ep, LocalEdgeId,  GridPart::dimension-1 );
 					std::cout << currentPolygon << " " << LocalEdgeId <<  " "<< GlobalEdgeId << std::endl;
 
@@ -488,14 +507,27 @@ double algorithm ( GridPart &gridPart, std::vector<int>agglomerateIndices)
 			if (currentPolygon!=oldPolygon) {
 				// LocalPolygonalConnectivity renamed to LocalVertexDofs
 				LocalPolygonalConnectivity.resize(numPolygonVertices);
-				LocalEdgeIDs.resize(numPolygonVertices);
+
 				// The following will simply store the connectivity which can be accssed correctly only by element pointer and a local vertex number in reference element of Element in the underlying grid (T)
 				for (int iRow = 0; iRow < numPolygonVertices ; ++iRow) {
+					LocalVertexDofs.push_back(agIndexSet.subIndex( ep, iRow, GridPart::dimension ) ) ;
 					LocalPolygonalConnectivity[ iRow ] = agIndexSet.subIndex( ep, iRow, GridPart::dimension ) ;
 					LocalEdgeIDs[iRow] = agIndexSet.subIndex(ep,iRow,GridPart::dimension-1);
+					for (int jCol = 0; jCol < numDofsPerEdge; ++jCol) {
+						LocalEdgeDofs.push_back (numVtxPolygonalMesh + LocalEdgeIDs[iRow]  * numDofsPerEdge + jCol );
+						fDofInfo << "poly " << currentPolygon << "edge = " << LocalEdgeIDs[iRow] << ", edgedof = " << numVtxPolygonalMesh + (LocalEdgeIDs[iRow] - 1) * numDofsPerEdge + jCol + 1 << std::endl;
+					}
+				}
+
+				for (int jCol = 0; jCol < numInternalDofs; ++jCol) {
+					LocalInternalDofs.push_back (numVtxPolygonalMesh + numTotalEdgeDofs + currentPolygon * numInternalDofs + jCol );
 				}
 
 
+				// [ LocalVertexDofs | LocalEdgeDofs | LocalInternalDofs];
+				GlobalDofArray.push_back(LocalVertexDofs); //
+				GlobalDofArray.push_back(LocalEdgeDofs) ;
+				GlobalDofArray.push_back(LocalInternalDofs);
 
 				PolygonalMeshConnectivityArray.push_back(LocalPolygonalConnectivity); // stores vertex connectivity only
 				oldPolygon = currentPolygon;
@@ -504,8 +536,11 @@ double algorithm ( GridPart &gridPart, std::vector<int>agglomerateIndices)
 			Dune::FieldVector<double, GridPart::dimension> ElmCenter = geo.center();
 
 			std::vector <RangeType > PhiMonomialBasis (numBasisFct);
-			std::vector< RangeType > Phi ( numBasisFct ); // another basis to be evaluated at quad points given by CachingQuadrature
+			std::vector< RangeType > Phi ( numBasisFct ); //
 
+			// *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *
+			// *  *  *  *  *  *  *  *  *  *  assemble D-matrix *  *  *  *  *  *  *  *  *  *  *
+			// assemble vertex dofs
 
 			for (int i=0; i< numElemVertices; ++i){
 				if (agIndexSet.localIndex( ep, i, GridPart::dimension )!= -1) {
@@ -515,17 +550,84 @@ double algorithm ( GridPart &gridPart, std::vector<int>agglomerateIndices)
 					DomainType LocalPoint = ep->geometry().local(GlobalPoint) ;
 					basis.evaluateAll( LocalPoint, Phi );
 					//					evalMonomialBasis(GlobalPoint,xE,hE,PhiMonomialBasis);
-					// assemble D-matrix
+					// assemble D-matrix for vertex dofs
 					int LocalDofInPolygon = agIndexSet.localIndex( ep, i, GridPart::dimension );//
 					int GlobalVertexIndexofPolygon = agIndexSet.subIndex( ep, LocalDofInPolygon,  GridPart::dimension );
+
+					//					int LocalVertexDofInPolygon =
+
+
 					for (int jCol = 0; jCol < numBasisFct; ++jCol) {
 						Dlocal[LocalDofInPolygon][jCol] =  Phi[jCol] ;
 					}
 				}
 			}
 
-			// for H1 projection operator
+			// assemble edge dofs
+			const IntersectionIteratorType isend = dfSpace.gridPart().iend( ep ); // get the iterator-end for the current element
+			for( IntersectionIteratorType it = dfSpace.gridPart().ibegin( ep ); it != isend; ++it ) // looping over intersections
+			{
+				const IntersectionType&  is = *it ;
+				int kdis_edge = ref.size(it->indexInInside(), 1, GridPart::dimension); // number of vertices on the edge
+				const EntityPointerType InsideElement = is.inside(); // pointer to outside element.
+				Dune::GeometryType edgegt = it->type();
+				int InsidePolygon = agglomeration.index(*InsideElement); // the polygon we are integrating
+				int refface = it->indexInInside(); // local face number based on the reference element class
+				if (agIndexSet.localEdgeIndex(ep,refface,GridPart::dimension - 1)!= -1) {
+					//std::cout << " ¬¬¬ " <<  is.geometry().center() << std::endl;
+					int GaussLobattoOrder = POLORDER + 1;
+					//					const Dune::QuadratureRule<typename GridPart::ctype, GridPart::dimension-1>& GaussLobattoRule =
+					//							Dune::QuadratureRules<typename GridPart::ctype, GridPart::dimension-1>::
+					//							rule(edgegt, GaussLobattoOrder, Dune::QuadratureType::GaussLobatto);
+					typedef Dune::QuadratureRule<typename GridPart::ctype, GridPart::dimension - 1> Quad;
+					const Quad & quad = Dune::QuadratureRules<typename GridPart::ctype, GridPart::dimension - 1>::rule(edgegt, GaussLobattoOrder, Dune::QuadratureType::GaussLobatto);
+					typedef typename Dune::QuadratureRule<typename GridPart::ctype, GridPart::dimension - 1>::iterator QuadIterator;
+					QuadIterator qp = quad.begin();
+					QuadIterator qend = quad.end();
+					int ngauss =1;
+					for (QuadIterator igauss = qp + 2; igauss!=qend; ++igauss) // this is actually your dof loop on a given edge.
+					{
+						//						std::cout << "==>> " << ngauss << " " <<igauss->position()[0] << std::endl;
 
+						Dune::FieldVector<typename GridPart::ctype,GridPart::dimension > EdgeGaussPoint = is.geometry().global(igauss->position());
+
+						/// physical location of the Gauss-Lobatto quadrature point
+						DomainType GlobalPoint = is.geometry().global(igauss->position());
+						// location in the reference bounding box for element T (note that this location is not in the reference bounding box yet!)
+						DomainType LocalPoint = ep->geometry().local(GlobalPoint) ;
+						// Evaluate the basis
+						basis.evaluateAll( LocalPoint, Phi );
+						fTemp << currentPolygon << " " << LeafElementIndex << " " << refface <<  " " << GlobalPoint << " , local = " << LocalPoint << std::endl;
+						//										std::cout << qp->weight() << std::endl;
+
+//						int LocalDofInPolygon = agIndexSet.localEdgeIndex( ep, i, GridPart::dimension );//
+//						int GlobalVertexIndexofPolygon = agIndexSet.subIndex( ep, LocalDofInPolygon,  GridPart::dimension );
+						//						volume += qp->weight();
+						++ngauss;
+					}
+					// edge integration
+
+					//
+					//					for (auto iGL =	GaussLobattoRule.begin(); iGL != GaussLobattoRule.end(); ++iGL) // Gauss-Lobattor quadrature loop
+					//					{
+					//
+					//						std::cout << "-> " << iGL->position()[0] << std::endl;
+					//						Dune::FieldVector<typename GridPart::ctype,GridPart::dimension > EdgeGaussPoint = is.geometry().global(iGL->position());
+					//						std::cout << " igauss = "<< igauss << ", xi = "<< iGL->position()[0]  << std::endl;
+					////						std::cout << igauss << std::endl;
+					//						++igauss;
+					//
+					//					}
+
+
+
+				}
+
+			}
+			// *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *
+
+			// for H1 projection operator
+			return 0;
 
 			const IntersectionIteratorType iitend = dfSpace.gridPart().iend( ep ); // get the iterator-end for the current element
 			for( IntersectionIteratorType iit = dfSpace.gridPart().ibegin( ep ); iit != iitend; ++iit ) // looping over intersections
@@ -882,7 +984,7 @@ double algorithm ( GridPart &gridPart, std::vector<int>agglomerateIndices)
 		}
 
 		for (int iRow=0; iRow < numLocalDof; ++iRow )
-		{ 
+		{
 			for (int jCol = 0; jCol < numLocalDof; ++jCol )
 			{
 				I_minus_PI_PHI_1_Transposed [iRow][jCol] = I_minus_PI_PHI_1 [jCol][iRow];
