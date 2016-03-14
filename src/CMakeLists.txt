@@ -12,3 +12,7 @@ target_link_dune_default_libraries( test-dgspace )
 add_executable( test-indexset EXCLUDE_FROM_ALL test-indexset.cc )
 target_link_libraries( test-indexset dunevem )
 target_link_dune_default_libraries( test-indexset )
+
+add_executable( test-reactiondiffusion EXCLUDE_FROM_ALL test-reactiondiffusion.cc )
+target_link_libraries( test-reactiondiffusion dunevem )
+target_link_dune_default_libraries( test-reactiondiffusion )
