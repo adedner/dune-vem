@@ -1,4 +1,4 @@
 install(
-  FILES basisfunctionset.hh
+  FILES agglomeratespace.hh basisfunctionset.hh
   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/dune/vem/space
 )
