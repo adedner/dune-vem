@@ -108,23 +108,6 @@ void evalTrueSolution ( DomainType &x, RangeType &truesolution, JacobianRangeTyp
   truesolutionGradient[ 0 ][ 1 ] = M_PI * sin( M_PI * x[ 0 ] ) * cos( M_PI * x[ 1 ] );
 }
 
-template< class DomainType, class RangeType, class T >
-void evalMonomialBasis ( DomainType &x, DomainType &xE, RangeType hE, std::vector< T > &PhiMonomialBasis )
-{
-  PhiMonomialBasis = 0;
-
-  for( int i = 0; i < PhiMonomialBasis.size(); ++i )
-  {
-    if( i == 0 )
-      PhiMonomialBasis.push_back( 1.0 );
-    else
-    {
-      double monomialValue = ( x[ i - 1 ] - xE[ i - 1 ] ) / hE;
-      PhiMonomialBasis.push_back( monomialValue );
-    }
-  }
-}
-
 
 namespace Gmsh
 {
@@ -156,7 +139,6 @@ double algorithm ( GridPart &gridPart, std::vector< int > agglomerateIndices )
   typedef typename DiscreteFunctionSpace::JacobianRangeType JacobianRangeType;
   typedef typename DiscreteFunctionSpace::IteratorType IteratorType;
   typedef typename IteratorType::Entity EntityType;
-  typedef typename EntityType::Geometry GeometryType;
 
   static const int dimDomain = GridPart::dimension;
 
@@ -165,10 +147,6 @@ double algorithm ( GridPart &gridPart, std::vector< int > agglomerateIndices )
   const LeafIndexSet &lset = gridPart.indexSet();
 
   const IteratorType end = dfSpace.end();
-
-  // from dune/fem/gridpart/test/checkseed.hh
-  // could be useful.. do not remove
-  typedef typename GridPart::template Codim< 0 >::EntitySeedType EntitySeedType;
 
   // get the iterator for elements
   //	https://github.com/bempp/dune-alugrid/blob/master/dune/alugrid/common/writeparalleldgf.hh
@@ -182,9 +160,7 @@ double algorithm ( GridPart &gridPart, std::vector< int > agglomerateIndices )
 
   PolygonalMeshIDs.resize( agglomeration.size());
 
-  int myElem = 0;
   int currentPolygon = -1;
-  double DiffusionTensorTrace = 0;
   std::vector< int > Vector1;     // Vector containing local index of the vertices of the polygon that are in element T. Remember this vector will alway be of size
   std::vector< int > Vector2;     // Vector containing Global index of the vertex of the polygon
   typedef Dune::FieldMatrix< RangeType, dimDomain, dimDomain > DiffusionTensorType;
@@ -192,22 +168,17 @@ double algorithm ( GridPart &gridPart, std::vector< int > agglomerateIndices )
 
 
 
-  typedef typename GridPart::IndexSetType IndexSetType;
   typedef typename GridPart::IndexSetType::IndexType IndexType;
-  const IndexSetType &indexSet = gridPart.indexSet();
   IndexType maxIndex = 0;
 
   typedef typename GridPart::IntersectionIteratorType IntersectionIteratorType;
   typedef typename IntersectionIteratorType::Intersection IntersectionType;
-  typedef typename IntersectionType::Geometry IntersectionGeometryType;
-
 
   typedef Dune::DynamicMatrix< double > Matrix;
   typedef Dune::DynamicVector< double > ScalarField;
   std::vector< int > NVertexVector;
   NVertexVector.resize( agglomeration.size() );
   NVertexVector = {0};
-  const int numNodesinOriginalMesh = gridPart.indexSet().size( GridPart::dimension );
   int numVtxPolygonalMesh;
   double AverageMeshSize = 0;
   //	PolygonalMeshVertexIDs.resize(numVtxPolygonalMesh); //
@@ -262,29 +233,16 @@ double algorithm ( GridPart &gridPart, std::vector< int > agglomerateIndices )
     // geometry.corners();
     Vector1.resize( geometry.corners());
 
-    Dune::GeometryType gt = geometry.type();
-    auto &refElement = Dune::ReferenceElements< double, dimDomain >::general( gt );
-    const int LeafElementIndex = lset.index( element );             // Global element number of the current element
-
-    NVertexVector[ currentPolygon ] =  agIndexSet.numPolyVertices( element, GridPart::dimension );
-    Vector2.resize( agIndexSet.numPolyVertices( element, GridPart::dimension ));
-
+    NVertexVector[ currentPolygon ] = agIndexSet.numPolyVertices( element, GridPart::dimension );
+    Vector2.resize( agIndexSet.numPolyVertices( element, GridPart::dimension ) );
 
     for( int codim = GridPart::dimension; codim <= GridPart::dimension; ++codim )
     {
+      for( int k = 0; k < geometry.corners(); ++k )
+        Vector1[ k ] = agIndexSet.localIndex( element, k, codim );
 
-      {
-
-        for( int k = 0; k < geometry.corners(); ++k )
-          Vector1[ k ] = agIndexSet.localIndex( element, k, codim );
-
-
-        for( int j = 0; j < agIndexSet.subAgglomerates( element, codim ); ++j )
-          Vector2[ j ] = agIndexSet.subIndex( element, j, codim );
-
-
-      }
-
+      for( std::size_t j = 0; j < agIndexSet.subAgglomerates( element, codim ); ++j )
+        Vector2[ j ] = agIndexSet.subIndex( element, j, codim );
     }
 
     if( currentPolygon != oldPolygon )
@@ -377,15 +335,8 @@ double algorithm ( GridPart &gridPart, std::vector< int > agglomerateIndices )
   std::vector< int > LocalPolygonalConnectivity;
   std::vector< std::vector< int > > PolygonalMeshConnectivityArray;
 
-
-
-
   // some more typedefs... these are copied from the femscheme.hh file
-  typedef Dune::Fem::AdaptiveDiscreteFunction< DiscreteFunctionSpace > DiscreteFunctionType;
-  typedef typename DiscreteFunctionType::LocalFunctionType LocalFunctionType;
   typedef typename DiscreteFunctionSpace::DomainType DomainType;
-  typedef typename DiscreteFunctionSpace::BasisFunctionSetType BasisFunctionSetType;
-
 
   // loop over number of polygons
   currentPolygon = 0;
@@ -398,15 +349,9 @@ double algorithm ( GridPart &gridPart, std::vector< int > agglomerateIndices )
   f_load_global = 0;
   KStiffGlobal = 0;
 
-
-
-
   for( auto PolygonIterator = PolygonalMeshIDs.begin(); PolygonIterator != PolygonalMeshIDs.end(); ++PolygonIterator )
   {
-
     int numPolygonVertices = NVertexVector [ currentPolygon ];
-    int numTermsin_k_minus_2 = ( POLORDER - 1 ) * ( POLORDER ) / 2;            // see pg 260, RD Cook, Fig. 7.1-2
-    int numLocalDof = POLORDER * numPolygonVertices + numTermsin_k_minus_2;
     double AreaofPolygon = 0.0;
     double CenterOfMass_x = 0.0;
     double CenterOfMass_y = 0.0;
@@ -467,8 +412,6 @@ double algorithm ( GridPart &gridPart, std::vector< int > agglomerateIndices )
         oldPolygon = currentPolygon;
       }
 
-      Dune::FieldVector< double, GridPart::dimension > ElmCenter = geo.center();
-
       // for H1 projection operator
 
 
@@ -477,112 +420,58 @@ double algorithm ( GridPart &gridPart, std::vector< int > agglomerateIndices )
       {
         const IntersectionType &intersection = *iit;
         int kdis_edge = ref.size( iit->indexInInside(), 1, GridPart::dimension );                       // number of vertices on the edge
-        int InsidePolygon = agglomeration.index( element );                         // the polygon we are integrating
+        const std::size_t InsidePolygon = agglomeration.index( element );                         // the polygon we are integrating
         int refface = intersection.indexInInside();                         // local face number based on the reference element class
 
-        if( !intersection.boundary() )
+        if( !intersection.boundary() && (agglomeration.index( Dune::Fem::make_entity( intersection.outside() ) ) == InsidePolygon) )
+          continue;
+
+        for( int i = 0; i < kdis_edge; ++i )
         {
-          const EntityType OutsideElement = Dune::Fem::make_entity( intersection.outside() );                               // pointer to outside element.
-          int OutsidePolygon = agglomeration.index( OutsideElement );                             // the polygon we are NOt integrating
+          int localNodeNumber = ref.subEntity( refface, 1, i, GridPart::dimension );                                         // as per reference element class
+          //							fpolyFaceInfo << currentPolygon << " " << LeafElementIndex << " " <<  refface << " " << geo.corner(localNodeNumber) << std::endl;
 
 
+          int LocalDofInPolygon = agIndexSet.localIndex( element, localNodeNumber, GridPart::dimension );
 
-          if( OutsidePolygon != InsidePolygon )
-            for( int i = 0; i < kdis_edge; ++i )
-            {
-              int localNodeNumber = ref.subEntity( refface, 1, i, GridPart::dimension );                                         // as per reference element class
-              //							fpolyFaceInfo << currentPolygon << " " << LeafElementIndex << " " <<  refface << " " << geo.corner(localNodeNumber) << std::endl;
+          fpolyFaceInfo << currentPolygon << " " << LeafElementIndex << " " << LocalPolygonalConnectivity[ LocalDofInPolygon ] <<  " " << refface << " " << geo.corner( localNodeNumber ) << std::endl;
+          Dune::FieldVector< double, GridPart::dimension > unitOuterNormal = intersection.centerUnitOuterNormal();
+          // Let's code the general case of obtained basis in P (k-1) later. For linear case, m0 = 1
+          //							int LocalDofInPolygon = agIndexSet.localIndex( element, localNodeNumber, GridPart::dimension );
 
+          Dune::FieldVector< double, dimDomain > VertexCoordinate = geo.corner( localNodeNumber );
 
-              int LocalDofInPolygon = agIndexSet.localIndex( element, localNodeNumber, GridPart::dimension );
-
-              fpolyFaceInfo << currentPolygon << " " << LeafElementIndex << " " << LocalPolygonalConnectivity[ LocalDofInPolygon ] <<  " " << refface << " " << geo.corner( localNodeNumber ) << std::endl;
-              Dune::FieldVector< double, GridPart::dimension > unitOuterNormal = intersection.centerUnitOuterNormal();
-              // Let's code the general case of obtained basis in P (k-1) later. For linear case, m0 = 1
-              //							int LocalDofInPolygon = agIndexSet.localIndex( element, localNodeNumber, GridPart::dimension );
-
-              Dune::FieldVector< double, dimDomain > VertexCoordinate = geo.corner( localNodeNumber );
-
-              evalDiffCoeff( VertexCoordinate, DiffusionCoefficent );
-              evalReactionCoeff( VertexCoordinate, ReactionCoefficient );
-              // I multiply by 1/2 below as we visit each vertex exactly twice while iterating over the polygon
-              MeanReactionCoefficient = MeanReactionCoefficient + 0.5  * ReactionCoefficient;
-              for( int jdim = 0; jdim < dimDomain; ++jdim )
-                //We will evalulate the diffusion coefficient at each vertex
-                MeanDiffusionCoefficient = MeanDiffusionCoefficient +  0.5 * DiffusionCoefficent [ jdim ][ jdim ] / ( dimDomain );
+          evalDiffCoeff( VertexCoordinate, DiffusionCoefficent );
+          evalReactionCoeff( VertexCoordinate, ReactionCoefficient );
+          // I multiply by 1/2 below as we visit each vertex exactly twice while iterating over the polygon
+          MeanReactionCoefficient = MeanReactionCoefficient + 0.5  * ReactionCoefficient;
+          for( int jdim = 0; jdim < dimDomain; ++jdim )
+            //We will evalulate the diffusion coefficient at each vertex
+            MeanDiffusionCoefficient = MeanDiffusionCoefficient +  0.5 * DiffusionCoefficent [ jdim ][ jdim ] / ( dimDomain );
 
 
-              for( int j = 0; j < GridPart::dimension; ++j )
-                PI0X [ j ][ LocalDofInPolygon ] = PI0X[ j ][ LocalDofInPolygon ] + 0.5 * unitOuterNormal [ j ] * intersection.geometry().volume();
-
-            }
-
-        }                         // (!intersection.boundary()
-
-
-        if( intersection.boundary() )                            // this is always part of the polygon boundary as the intersection is on the boundary of the domain
-          for( int i = 0; i < kdis_edge; ++i )
-          {
-
-            int localNodeNumber = ref.subEntity( refface, 1, i, GridPart::dimension );                                   // as per reference element class
-            int LocalDofInPolygon = agIndexSet.localIndex( element, localNodeNumber, GridPart::dimension );
-            fpolyFaceInfo << currentPolygon << " " << LeafElementIndex << " " << LocalPolygonalConnectivity[ LocalDofInPolygon ] <<  " " << refface << " " << geo.corner( localNodeNumber ) << std::endl;
-            Dune::FieldVector< double, GridPart::dimension > unitOuterNormal = intersection.centerUnitOuterNormal();
-            //						int LocalDofInPolygon = agIndexSet.localIndex( element, localNodeNumber, GridPart::dimension );
-
-            Dune::FieldVector< double, dimDomain > VertexCoordinate = geo.corner( localNodeNumber );
-            evalDiffCoeff( VertexCoordinate, DiffusionCoefficent );
-
-            for( int jdim = 0; jdim < dimDomain; ++jdim )
-
-              MeanDiffusionCoefficient = MeanDiffusionCoefficient +  0.5 * DiffusionCoefficent [ jdim ][ jdim ] / ( dimDomain );                                      // 0.5 because we will have two contributions from each vertex
-
-
-
-            for( int j = 0; j < GridPart::dimension; ++j )
-              PI0X [ j ][ LocalDofInPolygon ] = PI0X[ j ][ LocalDofInPolygon ] + 0.5 * unitOuterNormal [ j ] * intersection.geometry().volume();
-          }
-
-
-        // (!intersection.boundary()
-
-
-
-
+          for( int j = 0; j < GridPart::dimension; ++j )
+            PI0X [ j ][ LocalDofInPolygon ] += 0.5 * unitOuterNormal [ j ] * intersection.geometry().volume();
+        }
       }                   // Segment for H1 projection operator ends
 
 
-      std::vector< RangeType > PhiMonomialBasis( numBasisFct );
-      std::vector< RangeType > Phi( numBasisFct );                    // another basis to be evaluated at quad points given by CachingQuadrature
-
-
+      std::vector< RangeType > Phi( numBasisFct );
       for( int i = 0; i < numElemVertices; ++i )
+      {
+        if( agIndexSet.localIndex( element, i, GridPart::dimension ) == -1 )
+          continue;
 
-        if( agIndexSet.localIndex( element, i, GridPart::dimension ) != -1 )
-        {
+        basis.evaluateAll( ref.position( i, GridPart::dimension ), Phi );
 
-          //					Dune::FieldVector<double, GridPart::dimension> GaussPoint = geo.corner(i);
+        // assemble D-matrix
+        int LocalDofInPolygon = agIndexSet.localIndex( element, i, GridPart::dimension );
 
-          DomainType GlobalPoint = geo.corner( i );                              //
+        //int GlobalVertexIndexofPolygon = agIndexSet.subIndex( element, LocalDofInPolygon,  GridPart::dimension );
 
-
-          //					Dune::FieldVector<double,GridPart::dimension> local =  element.geometry().local(GaussPoint);
-          DomainType LocalPoint = element.geometry().local( GlobalPoint );
-
-          basis.evaluateAll( LocalPoint, Phi );
-
-          //					evalMonomialBasis(GlobalPoint,xE,hE,PhiMonomialBasis);
-
-          // assemble D-matrix
-          int LocalDofInPolygon = agIndexSet.localIndex( element, i, GridPart::dimension );
-
-          int GlobalVertexIndexofPolygon = agIndexSet.subIndex( element, LocalDofInPolygon,  GridPart::dimension );
-
-
-          for( int jCol = 0; jCol < numBasisFct; ++jCol )
-            Dlocal[ LocalDofInPolygon ][ jCol ] =  Phi[ jCol ];
-
-        }
+        for( int jCol = 0; jCol < numBasisFct; ++jCol )
+          Dlocal[ LocalDofInPolygon ][ jCol ] =  Phi[ jCol ];
+      }
 
       // the finite element like integration
       // for linear case and for constant coefficient problems, we don't even need this integration provided the basis in (p-1) is a constant
@@ -590,28 +479,22 @@ double algorithm ( GridPart &gridPart, std::vector< int > agglomerateIndices )
 
 
 
-      const Dune::QuadratureRule< double, dimDomain > &Domainrule   \
-        = Dune::QuadratureRules< double,  dimDomain >::rule( gt, 2 );
+      const auto &Domainrule = Dune::QuadratureRules< double, dimDomain >::rule( gt, 2 );
 
       int iGauss = 0;
 
-      for( typename Dune::QuadratureRule< double, dimDomain >::const_iterator r
-             = Domainrule.begin(); r != Domainrule.end(); ++r )
+      for( const auto qp : Domainrule )
       {
         ++iGauss;
         // get the weight at the current quadrature point
-        double weight = r->weight();
+        double weight = qp.weight();
 
-        double detjac = geo.integrationElement( r->position());
+        double detjac = geo.integrationElement( qp.position() );
 
         dummyArea = dummyArea + weight * detjac;
-        //				Dune::FieldVector<double, dimDomain> GaussPoint = geo.global(r->position());
-        DomainType GlobalPoint = geo.global( r->position());
+        DomainType GlobalPoint = geo.global( qp.position() );
 
-        //				Dune::FieldVector<double,GridPart::dimension> local =  element.geometry().local(GaussPoint);
-        DomainType LocalPoint = element.geometry().local( GlobalPoint );
-
-        basis.evaluateAll( LocalPoint, Phi );
+        basis.evaluateAll( qp.position(), Phi );
 
         evalDiffCoeff( GlobalPoint, DiffusionCoefficent );
         evalReactionCoeff( GlobalPoint, ReactionCoefficient );
@@ -642,14 +525,12 @@ double algorithm ( GridPart &gridPart, std::vector< int > agglomerateIndices )
 
         for( int iRow = 0; iRow < nk; ++iRow )
           for( int jCol = 0; jCol < nk; ++jCol )
-
             ReactionMatrix [ iRow ] [ jCol ] =  ReactionMatrix [ iRow ] [ jCol ]  + ReactionCoefficient * Phi[ iRow ] * Phi[ jCol ] * weight * detjac;
 
         AreaofDomain = AreaofDomain + detjac * weight;
 
-        for( int iRow = 0; iRow < Kmat.rows(); ++iRow )
-          for( int jCol = 0; jCol < Kmat.cols(); ++jCol )
-
+        for( std::size_t iRow = 0; iRow < Kmat.rows(); ++iRow )
+          for( std::size_t jCol = 0; jCol < Kmat.cols(); ++jCol )
             Kmat[ iRow ][ jCol ] = Kmat[ iRow ][ jCol ] +  weight * detjac * DiffusionCoefficent [ iRow ] [ jCol ] * Phi[ 0 ] *  Phi[ 0 ];                     // this is valid only for a linear case.
 
       }
@@ -714,9 +595,8 @@ double algorithm ( GridPart &gridPart, std::vector< int > agglomerateIndices )
 
     for( int iRow = 0; iRow < nk; iRow++ )
       for( int jCol = 0; jCol < numPolygonVertices; jCol++ )
-
         for( int k = 0; k < nk; k++ )
-          PI1[ iRow ][ jCol ] = PI1[ iRow ][ jCol ] + ( DTDinversed[ iRow ][ k ] * DlocalTranspose[ k ][ jCol ] );
+          PI1[ iRow ][ jCol ] += ( DTDinversed[ iRow ][ k ] * DlocalTranspose[ k ][ jCol ] );
 
     vec_mat_PI1.push_back( PI1 );
 
@@ -792,7 +672,7 @@ double algorithm ( GridPart &gridPart, std::vector< int > agglomerateIndices )
 
     Imatrix.resize( numPolygonVertices, numPolygonVertices );
     Imatrix = 0.0;
-    for( int iRow = 0; iRow < Imatrix.rows(); ++iRow )
+    for( std::size_t iRow = 0; iRow < Imatrix.rows(); ++iRow )
       Imatrix[ iRow ][ iRow ] = 1.0;
 
     // first store transpose of (I-PI_PHI_1) in KStbilityLocal
@@ -1062,45 +942,29 @@ double algorithm ( GridPart &gridPart, std::vector< int > agglomerateIndices )
 
       Dune::GeometryType gt = element.type();
 
-      const auto &ref = Dune::ReferenceElements< double, dimDomain >::general( gt );
-
-      const int LeafElementIndex = lset.index( element );                   // Global element number of the current element
-
       auto &basis = dfSpace.basisFunctionSet( element );
 
       const int numBasisFct = basis.size();
-
-      int numElemVertices = geo.corners();
 
       // Quadrature loop for error calculations
 
       int iGauss = 0;
 
-      std::vector< RangeType > Phi( numBasisFct );                    // basis functions
-
-      std::vector< JacobianRangeType > dPhi( numBasisFct );                  // derivatives of basis functions
-
-
-      const Dune::QuadratureRule< double, dimDomain > &Domainrule   \
-        = Dune::QuadratureRules< double,  dimDomain >::rule( gt, 8 );
-
-      for( typename Dune::QuadratureRule< double, dimDomain >::const_iterator r
-             = Domainrule.begin(); r != Domainrule.end(); ++r )
+      std::vector< RangeType > Phi( numBasisFct );
+      std::vector< JacobianRangeType > dPhi( numBasisFct );
+      for( const auto &qp : Dune::QuadratureRules< double,  dimDomain >::rule( gt, 8 ) )
       {
         ++iGauss;
 
         // get the weight at the current quadrature point
-        double weight = r->weight();
+        double weight = qp.weight();
 
-        double detjac = geo.integrationElement( r->position());
+        double detjac = geo.integrationElement( qp.position() );
 
-        DomainType GlobalPoint = geo.global( r->position());
+        DomainType GlobalPoint = geo.global( qp.position() );
 
-        //				Dune::FieldVector<double,GridPart::dimension> local =  element.geometry().local(GaussPoint);
-        DomainType LocalPoint = element.geometry().local( GlobalPoint );
-
-        basis.evaluateAll( LocalPoint, Phi );
-        basis.jacobianAll( LocalPoint, dPhi );
+        basis.evaluateAll( qp.position(), Phi );
+        basis.jacobianAll( qp.position(), dPhi );
 
         RangeType TrueSolution;
         RangeType ApproxVemSoln;
@@ -1191,7 +1055,6 @@ try
   algorithm( gridPart, agglomerateIndices );
 
   // write the grid you originally imported
-  typedef Grid::LeafGridView GV;
   Dune::GmshWriter< typename Grid::LeafGridView > writer( grid->leafGridView());
   writer.write( "../../output/yourmesh.msh" );
 
