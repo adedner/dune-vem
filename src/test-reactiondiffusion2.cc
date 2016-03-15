@@ -45,7 +45,9 @@
 #include <dune/fem/misc/mpimanager.hh>
 #include <dune/fem/misc/mpimanager.hh>
 #include <dune/fem/operator/linear/spoperator.hh>
+#include <dune/fem/quadrature/cachingquadrature.hh>
 #include <dune/fem/solver/cginverseoperator.hh>
+
 
 #include <dune/vem/agglomeration/agglomeration.hh>
 #include <dune/vem/agglomeration/dgspace.hh>
@@ -129,7 +131,10 @@ double algorithm ( GridPart &gridPart, std::vector< int > agglomerateIndices )
   DiscreteFunctionSpace dfSpace( gridPart, agglomeration );
 
   // create VEM space
-  Dune::Vem::AgglomerationVEMSpace< FunctionSpace, GridPart, POLORDER > vemSpace( gridPart, agglomeration );
+  typedef Dune::Vem::AgglomerationVEMSpace< FunctionSpace, GridPart, POLORDER > VemSpaceType;
+  VemSpaceType vemSpace( gridPart, agglomeration );
+  typedef Dune::Fem::AdaptiveDiscreteFunction< VemSpaceType > VemDFType;
+  VemDFType vemDF( vemSpace, "vemFunction" );
 
   // write some typedefs first:
   typedef typename DiscreteFunctionSpace::RangeType RangeType;
@@ -146,7 +151,7 @@ double algorithm ( GridPart &gridPart, std::vector< int > agglomerateIndices )
   const IteratorType end = dfSpace.end();
 
   // get the iterator for elements
-  //	https://github.com/bempp/dune-alugrid/blob/master/dune/alugrid/common/writeparalleldgf.hh
+  //    https://github.com/bempp/dune-alugrid/blob/master/dune/alugrid/common/writeparalleldgf.hh
   typedef typename GridPart::template Codim< 0 >::IteratorType ElementIterator;
   typedef typename ElementIterator::Entity Element;
   typedef typename Element::EntitySeed ElementSeed;
@@ -161,7 +166,7 @@ double algorithm ( GridPart &gridPart, std::vector< int > agglomerateIndices )
   std::vector< int > Vector1;     // Vector containing local index of the vertices of the polygon that are in element T. Remember this vector will alway be of size
   std::vector< int > Vector2;     // Vector containing Global index of the vertex of the polygon
   typedef Dune::FieldMatrix< RangeType, dimDomain, dimDomain > DiffusionTensorType;
-  //	typedef Dune::FieldVector<RangeType, dimDomain> IntegrationPoint;
+  //    typedef Dune::FieldVector<RangeType, dimDomain> IntegrationPoint;
 
 
 
@@ -178,7 +183,7 @@ double algorithm ( GridPart &gridPart, std::vector< int > agglomerateIndices )
   NVertexVector = {0};
   int numVtxPolygonalMesh;
   double AverageMeshSize = 0;
-  //	PolygonalMeshVertexIDs.resize(numVtxPolygonalMesh); //
+  //    PolygonalMeshVertexIDs.resize(numVtxPolygonalMesh); //
 
 
   std::ofstream fGaussPts( "../../output/gaussPoints.dat" );
@@ -284,7 +289,7 @@ double algorithm ( GridPart &gridPart, std::vector< int > agglomerateIndices )
   numVtxPolygonalMesh = PolygonalMeshVertexIDs.size();
 
 
-  //	for (int iRow = 0; iRow <
+  //    for (int iRow = 0; iRow <
 
   // matrix calculation step
   Matrix Dlocal;
@@ -381,6 +386,9 @@ double algorithm ( GridPart &gridPart, std::vector< int > agglomerateIndices )
     int numSubElements = 0;
     double dummyArea = 0;
     // iterate over sub-elements within each polygon
+
+    std::vector<double> tmpRhs(numPolygonVertices,0.);
+
     for( const auto &entitySeed : *PolygonIterator )
     {
       typedef typename ElementIterator::Entity::Geometry LeafGeometry;
@@ -426,7 +434,7 @@ double algorithm ( GridPart &gridPart, std::vector< int > agglomerateIndices )
         for( int i = 0; i < kdis_edge; ++i )
         {
           int localNodeNumber = ref.subEntity( refface, 1, i, GridPart::dimension );                                         // as per reference element class
-          //							fpolyFaceInfo << currentPolygon << " " << LeafElementIndex << " " <<  refface << " " << geo.corner(localNodeNumber) << std::endl;
+          //                            fpolyFaceInfo << currentPolygon << " " << LeafElementIndex << " " <<  refface << " " << geo.corner(localNodeNumber) << std::endl;
 
 
           int LocalDofInPolygon = agIndexSet.localIndex( element, localNodeNumber, GridPart::dimension );
@@ -434,7 +442,7 @@ double algorithm ( GridPart &gridPart, std::vector< int > agglomerateIndices )
           fpolyFaceInfo << currentPolygon << " " << LeafElementIndex << " " << LocalPolygonalConnectivity[ LocalDofInPolygon ] <<  " " << refface << " " << geo.corner( localNodeNumber ) << std::endl;
           Dune::FieldVector< double, GridPart::dimension > unitOuterNormal = intersection.centerUnitOuterNormal();
           // Let's code the general case of obtained basis in P (k-1) later. For linear case, m0 = 1
-          //							int LocalDofInPolygon = agIndexSet.localIndex( element, localNodeNumber, GridPart::dimension );
+          //                            int LocalDofInPolygon = agIndexSet.localIndex( element, localNodeNumber, GridPart::dimension );
 
           Dune::FieldVector< double, dimDomain > VertexCoordinate = geo.corner( localNodeNumber );
 
@@ -501,7 +509,7 @@ double algorithm ( GridPart &gridPart, std::vector< int > agglomerateIndices )
 
 
         // Problem 1 - Poisson problem
-        //				forcingfunction = M_PI * M_PI * sin(M_PI * GlobalPoint[0]) * GlobalPoint[1] * (1.0 - GlobalPoint[1]) + 2.0 * sin(M_PI * GlobalPoint[0]) ;
+        //                forcingfunction = M_PI * M_PI * sin(M_PI * GlobalPoint[0]) * GlobalPoint[1] * (1.0 - GlobalPoint[1]) + 2.0 * sin(M_PI * GlobalPoint[0]) ;
         // Problem 2 - Poisson problem
         // double forcingfunction = 2.0 * M_PI * M_PI * sin ( M_PI * GlobalPoint[0]) * sin ( M_PI * GlobalPoint [1]) ;
         // Problem 3 - Reaction-Diffusion equation
@@ -517,7 +525,6 @@ double algorithm ( GridPart &gridPart, std::vector< int > agglomerateIndices )
         fGaussPts << currentPolygon << " " << LeafElementIndex << " " << GlobalPoint << std::endl;
 
 
-
         // reaction matrix
 
         for( int iRow = 0; iRow < nk; ++iRow )
@@ -531,6 +538,41 @@ double algorithm ( GridPart &gridPart, std::vector< int > agglomerateIndices )
             Kmat[ iRow ][ jCol ] = Kmat[ iRow ][ jCol ] +  weight * detjac * DiffusionCoefficent [ iRow ] [ jCol ] * Phi[ 0 ] *  Phi[ 0 ];                     // this is valid only for a linear case.
 
       }
+
+      // test the localfunction for the rhs... copied from dune-femhowto, 03.poisson-1 example's rhs.hh
+        typedef Dune::Fem::CachingQuadrature< GridPart, 0 > QuadratureType;
+        // get the quadr order
+        const int quadOrder = 2*dfSpace.order()+1;
+        // set the temporary localfunction (as we don't yet have the dof mapper for k>1)
+        auto rhsLocalVem = vemDF.localFunction( element );
+         Dune::Fem::TemporaryLocalFunction< VemSpaceType> rhsLocal( vemSpace );
+
+        // init the rhsLocal for element T
+        rhsLocal.init( element );
+        rhsLocal.clear();
+        QuadratureType quadrature( element, quadOrder );
+        const size_t numQuadraturePoints = quadrature.nop();
+        for( size_t pt = 0; pt < numQuadraturePoints; ++pt ) {
+             // obtain quadrature point
+            DomainType localPoint = quadrature.point( pt );
+            DomainType globalPoint = element.geometry().global( localPoint );
+            evalDiffCoeff( globalPoint, DiffusionCoefficent );
+            evalReactionCoeff( globalPoint, ReactionCoefficient );
+            evalTrueSolution( globalPoint, TrueSolution, TrueSolutionGradient );
+            evalForcingFunction( globalPoint, TrueSolution, TrueSolutionGradient, ReactionCoefficient, forcingfunction );
+
+            // multiply by quadrature weight
+            forcingfunction *= quadrature.weight( pt ) * geo.integrationElement( localPoint);
+
+            // add f * phi_i to rhsLocal[ i ]
+            rhsLocal.axpy( quadrature[ pt ], forcingfunction );
+            rhsLocalVem.axpy( quadrature[ pt ], forcingFunction );
+        }
+        std::cout << tmpRhs.size() << " " << rhsLocal.size() << std::endl;
+        assert( tmpRhs.size() == rhsLocal.size() );
+        for (int i=0;i<tmpRhs.size();++i) tmpRhs[i] += rhsLocal[i];
+
+
 
     }             // finished iterating over sub-elements in a given polygon
 
@@ -641,7 +683,7 @@ double algorithm ( GridPart &gridPart, std::vector< int > agglomerateIndices )
         PI0XTransposed[ jCol ][ iRow ] = PI0X[ iRow ][ jCol ];
 
 
-    //	Do PI0X^T times Kmat
+    //    Do PI0X^T times Kmat
     for( int iRow = 0; iRow < numPolygonVertices; ++iRow )
       for( int jCol = 0; jCol < dimDomain; ++jCol )
 
@@ -673,11 +715,11 @@ double algorithm ( GridPart &gridPart, std::vector< int > agglomerateIndices )
       Imatrix[ iRow ][ iRow ] = 1.0;
 
     // first store transpose of (I-PI_PHI_1) in KStbilityLocal
-    //	for (int iRow = 0; iRow < numPolygonVertices; ++iRow) {
-    //		for (int jCol = 0; jCol < numPolygonVertices; ++jCol) {
-    //			KStbilityLocal [iRow][jCol] = Imatrix [jCol][iRow] - PI_PHI_1[jCol][iRow];
-    //		}
-    //	}
+    //    for (int iRow = 0; iRow < numPolygonVertices; ++iRow) {
+    //        for (int jCol = 0; jCol < numPolygonVertices; ++jCol) {
+    //            KStbilityLocal [iRow][jCol] = Imatrix [jCol][iRow] - PI_PHI_1[jCol][iRow];
+    //        }
+    //    }
 
 
     I_minus_PI_PHI_1.resize( numPolygonVertices, numPolygonVertices );
@@ -723,13 +765,19 @@ double algorithm ( GridPart &gridPart, std::vector< int > agglomerateIndices )
 
     f_load_local = 0;
     for( int iRow = 0; iRow < numPolygonVertices; iRow++ )
-
+    {
       for( int k = 0; k < nk; ++k )
-        f_load_local[ iRow ] = f_load_local[ iRow ]
-                               + ( PI1T[ iRow ][ k ] * F_mAlpha_local[ k ] );
+      {
+        f_load_local[ iRow ] += ( PI1T[ iRow ][ k ] * F_mAlpha_local[ k ] );
+      }
+    }
 
-
-
+    for (int iRow = 0; iRow < numPolygonVertices; ++iRow )
+    {
+     //if (std::abs( tmpRhs[iRow] - f_load_local[iRow] ) > 1e-14)
+        std::cout << "error in load vector: " << iRow << " " << tmpRhs[iRow] - f_load_local[iRow] << " " << tmpRhs[iRow] << " " << f_load_local[iRow]
+                   << std::endl;
+    }
     // reaction terms
     PI1T_x_ReactionMatrix.resize( numPolygonVertices, nk );
     PI1T_x_ReactionMatrix = 0;
@@ -766,17 +814,20 @@ double algorithm ( GridPart &gridPart, std::vector< int > agglomerateIndices )
         KStiffGlobal [ iGlobalRow ][ jGlobalCol ] += KStiffLocal [ iRow ][ jCol ] + MassLocal [ iRow ][ jCol ];
       }
       f_load_global[ iGlobalRow ] += f_load_local [ iRow ];
-    }
-
-
-
-
-
-    //		AreaofDomain = AreaofDomain + AreaofPolygon ;
+     }
+    //        AreaofDomain = AreaofDomain + AreaofPolygon ;
     ++currentPolygon;
 
   }       // Polygon Loop
 
+  for (int i=0;i<vemDF.size();++i)
+  {
+     if ( std::abs( f_load_global[ i ] - vemDF.leakPointer()[ i ] ) > 1e-10)
+        std::cout << "Error in global load vector: "
+         <<  f_load_global[ i ] - vemDF.leakPointer()[ i ] << " "
+         << f_load_global[ i ] << " "<< vemDF.leakPointer()[ i ]
+         << std::endl;
+  }
 
   // solution proc
   b_rhs_global.resize( numVtxPolygonalMesh );
@@ -857,7 +908,7 @@ double algorithm ( GridPart &gridPart, std::vector< int > agglomerateIndices )
 
 
 
-  //	//
+  //    //
   A_lhs_global.solve( x_soln_global, b_rhs_global );
 
   for( int iRow = 0; iRow < numVtxPolygonalMesh; ++iRow )
@@ -1004,7 +1055,7 @@ double algorithm ( GridPart &gridPart, std::vector< int > agglomerateIndices )
   std::cout << "L2 error = " << VemL2error << std::endl;
   std::cout << "H1 error = " << VemH1error << std::endl;
   std::cout << VemL2error << " " << VemH1error << std::endl;
-//	fOut << "NDof " << "h " << "L2 error " << "H1 error " <<  "cond. no. " << std::endl;
+//    fOut << "NDof " << "h " << "L2 error " << "H1 error " <<  "cond. no. " << std::endl;
   fOut << numVtxPolygonalMesh << " " << AverageMeshSize << " " << VemL2error << " " << VemH1error << " " << cond_A << std::endl;
   return error;
 } // double algorithm function
@@ -1025,7 +1076,7 @@ try
   // read gmsh file
 
   const auto sectionMap = Gmsh::readFile( argv[ 1 ] );
-//	const auto sectionMap = Gmsh::readFile( "../../data/partitioned-mesh.msh" );
+//    const auto sectionMap = Gmsh::readFile( "../../data/partitioned-mesh.msh" );
   const auto nodes = Gmsh::parseNodes( sectionMap );
   const auto elements = Gmsh::parseElements( sectionMap );
 
