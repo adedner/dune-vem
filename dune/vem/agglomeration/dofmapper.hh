@@ -4,6 +4,7 @@
 #include <cassert>
 
 #include <array>
+#include <initializer_list>
 #include <type_traits>
 #include <vector>
 
@@ -28,6 +29,9 @@ namespace Dune
     public:
       typedef std::size_t SizeType;
 
+      typedef Agglomeration< GridPart > AgglomerationType;
+      typedef AgglomerationIndexSet< GridPart > IndexSetType;
+
     protected:
       struct SubEntityInfo
       {
@@ -46,7 +50,11 @@ namespace Dune
       typedef typename GridPartType::template Codim< 0 >::EntityType ElementType;
 
       template< class Iterator >
-      AgglomerationDofMapper ( const AgglomerationIndexSet< GridPart > &agIndexSet, Iterator begin, Iterator end );
+      AgglomerationDofMapper ( const IndexSetType &indexSet, Iterator begin, Iterator end );
+
+      AgglomerationDofMapper ( const IndexSetType &indexSet, std::initializer_list< std::pair< int, unsigned int > > dofsPerCodim )
+        : AgglomerationDofMapper( indexSet, dofsPerCodim.begin(), dofsPerCodim.end() )
+      {}
 
       template< class Functor >
       void mapEach ( const ElementType &element, Functor f ) const;
@@ -86,9 +94,9 @@ namespace Dune
 
       // global information
 
-      bool contains ( int codim ) const
+      bool contains ( unsigned int codim ) const
       {
-        const auto isCodim = [] ( const SubEntityInfo &info ) { return (info.codim == codim); };
+        const auto isCodim = [ codim ] ( const SubEntityInfo &info ) { return (info.codim == codim); };
         return (std::find( subEntityInfo_.begin(), subEntityInfo_.end(), isCodim ) != subEntityInfo_.end());
       }
 
@@ -119,8 +127,11 @@ namespace Dune
       SizeType oldOffSet ( int ) const { DUNE_THROW( NotImplemented, "Method oldOffSet() called on non-adaptive block mapper" ); }
       SizeType offSet ( int ) const { DUNE_THROW( NotImplemented, "Method offSet() called on non-adaptive block mapper" ); }
 
+      const IndexSetType &indexSet () const { return indexSet_; }
+      const AgglomerationType &agglomeration () const { return indexSet().agglomeration(); }
+
     protected:
-      const AgglomerationIndexSet< GridPart > &agIndexSet_;
+      const IndexSetType &indexSet_;
       unsigned int maxNumDofs_ = 0;
       SizeType size_;
       std::vector< SubEntityInfo > subEntityInfo_;
@@ -137,13 +148,14 @@ namespace Dune
 
     template< class GridPart >
     template< class Iterator >
-    inline AgglomerationDofMapper< GridPart >::AgglomerationDofMapper ( const AgglomerationIndexSet< GridPart > &agIndexSet, Iterator begin, Iterator end )
-      : agIndexSet_( agIndexSet ),
-        subEntityInfo_( end - begin )
+    inline AgglomerationDofMapper< GridPart >::AgglomerationDofMapper ( const IndexSetType &indexSet, Iterator begin, Iterator end )
+      : indexSet_( indexSet ), subEntityInfo_( std::distance( begin, end ) )
     {
-      std::transform( begin, end, subEntityInfo_.begin(), [] ( std::pair< int, unsigned int > codimDofs, SubEntityInfo &info ) {
+      std::transform( begin, end, subEntityInfo_.begin(), [] ( std::pair< int, unsigned int > codimDofs ) {
+          SubEntityInfo info;
           info.codim = codimDofs.first;
           info.numDofs = codimDofs.second;
+          return info;
         } );
 
       update();
@@ -154,8 +166,8 @@ namespace Dune
     inline unsigned int AgglomerationDofMapper< GridPart >::numDofs ( const ElementType &element ) const
     {
       unsigned int numDofs = 0;
-      for( const subEntityInfo &info : subEntityInfo_ )
-        numDofs += info.numDofs * agIndexSet_.subAgglomerates( element, info.codim );
+      for( const SubEntityInfo &info : subEntityInfo_ )
+        numDofs += info.numDofs * indexSet().subAgglomerates( element, info.codim );
       return numDofs;
     }
 
@@ -165,17 +177,17 @@ namespace Dune
     inline void AgglomerationDofMapper< GridPart >::mapEach ( const ElementType &element, Functor f ) const
     {
       unsigned int local = 0;
-      for( const subEntityInfo &info : subEntityInfo_ )
+      for( const SubEntityInfo &info : subEntityInfo_ )
       {
-        const std::size_t numSubAgglomerates = agIndexSet_.subAgglomerates( element, info.codim );
+        const std::size_t numSubAgglomerates = indexSet().subAgglomerates( element, info.codim );
         for( std::size_t subAgglomerate = 0; subAgglomerate < numSubAgglomerates; ++subAgglomerate )
         {
-          const SizeType subIndex = agIndexSet_.subIndex( element, subAgglomerate, codim );
+          const SizeType subIndex = indexSet().subIndex( element, subAgglomerate, info.codim );
           SizeType index = info.offset + SizeType( info.numDofs ) * subIndex;
 
           const SizeType end = index + info.numDofs;
           while( index < end )
-            functor( local++, index++ );
+            f( local++, index++ );
         }
       }
     }
@@ -194,11 +206,11 @@ namespace Dune
     {
       size_ = 0;
       maxNumDofs_ = 0;
-      for( const subEntityInfo &info : subEntityInfo_ )
+      for( SubEntityInfo &info : subEntityInfo_ )
       {
         info.offset = size_;
-        size_ += SizeType( info.numDofs ) * SizeType( agIndexSet_.size( info.codim ) );
-        maxNumDofs_ += SizeType( info.numDofs ) * SizeType( agIndexSet_.maxSubAgglomerates( info.codim ) );
+        size_ += SizeType( info.numDofs ) * SizeType( indexSet().size( info.codim ) );
+        maxNumDofs_ += SizeType( info.numDofs ) * SizeType( indexSet().maxSubAgglomerates( info.codim ) );
       }
     }
 

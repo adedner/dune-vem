@@ -132,6 +132,9 @@ namespace Dune
         return size_[ dimension-codim ];
       }
 
+      const AgglomerationType &agglomeration () const { return agglomeration_; }
+      const GridPartType &gridPart () const { return agglomeration().gridPart(); }
+
     private:
       const Agglomerate &agglomerate ( std::size_t agglomerateIndex ) const { return agglomerates_[ agglomerateIndex ]; }
       const Agglomerate &agglomerate ( const EntityType &entity ) const { return agglomerate( index( entity ) ); }
@@ -286,7 +289,7 @@ namespace Dune
         for( std::size_t typeIndex = GlobalGeometryTypeIndex::offset( dim ); typeIndex < GlobalGeometryTypeIndex::offset( dim+1 ); ++typeIndex )
         {
           offset[ typeIndex ] = size_[ dim ];
-          const std::size_t numSubAgglomerages = subAgglomerates[ typeIndex ].size();
+          const std::size_t numSubAgglomerates = subAgglomerates[ typeIndex ].size();
           size_[ dim ] += numSubAgglomerates;
           maxSubAgglomerates_[ dim ] = std::max( maxSubAgglomerates_[ dim ], numSubAgglomerates );
         }

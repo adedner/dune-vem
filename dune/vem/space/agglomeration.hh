@@ -5,8 +5,6 @@
 
 #include <utility>
 
-#include <dune/common/power.hh>
-
 #include <dune/fem/quadrature/elementquadrature.hh>
 #include <dune/fem/space/common/commoperations.hh>
 #include <dune/fem/space/common/defaultcommhandler.hh>
@@ -17,7 +15,7 @@
 #include <dune/fem/space/shapefunctionset/vectorial.hh>
 
 #include <dune/vem/agglomeration/boundingbox.hh>
-#include <dune/vem/agglomeration/dgmapper.hh>
+#include <dune/vem/agglomeration/dofmapper.hh>
 #include <dune/vem/space/basisfunctionset.hh>
 
 namespace Dune
@@ -59,8 +57,8 @@ namespace Dune
     public:
       typedef VEMBasisFunctionSet< EntityType, ShapeFunctionSetType > BasisFunctionSetType;
 
-      static const std::size_t localBlockSize = FunctionSpaceType::dimRange * StaticPower< polOrder+1, GridPartType::dimension >::power;
-      typedef AgglomerationDGMapper< GridPartType > BlockMapperType;
+      static const std::size_t localBlockSize = FunctionSpaceType::dimRange;
+      typedef AgglomerationDofMapper< GridPartType > BlockMapperType;
 
       template< class DiscreteFunction, class Operation = Fem::DFCommunicationOperation::Copy >
       struct CommDataHandle
@@ -86,6 +84,7 @@ namespace Dune
       typedef typename BaseType::Traits Traits;
 
       typedef Agglomeration< GridPart > AgglomerationType;
+      typedef AgglomerationIndexSet< GridPart > AgglomerationIndexSetType;
 
       typedef typename BaseType::BasisFunctionSetType BasisFunctionSetType;
 
@@ -96,11 +95,10 @@ namespace Dune
 
       using BaseType::gridPart;
 
-      AgglomerationVEMSpace ( GridPartType &gridPart, const AgglomerationType &agglomeration )
+      explicit AgglomerationVEMSpace ( GridPartType &gridPart, const AgglomerationIndexSetType &agIndexSet )
         : BaseType( gridPart ),
-          agIndexSet_( agglomeration ),
-          blockMapper_( agglomeration ),
-          boundingBoxes_( boundingBoxes( agglomeration ) ),
+          blockMapper_( agIndexSet, { std::make_pair( GridPart::dimension, 1u ) } ),
+          boundingBoxes_( boundingBoxes( agIndexSet.agglomeration() ) ),
           scalarShapeFunctionSet_( Dune::GeometryType( Dune::GeometryType::cube, GridPart::dimension ) )
       {
         buildProjections();
@@ -136,7 +134,6 @@ namespace Dune
     private:
       void buildProjections ();
 
-      AgglomerationIndexSet< GridPart > agIndexSet_;
       mutable BlockMapperType blockMapper_;
       std::vector< BoundingBox< GridPart > > boundingBoxes_;
       std::vector< typename BasisFunctionSetType::ValueProjection > valueProjections_;
@@ -169,7 +166,7 @@ namespace Dune
       {
         const auto &bbox = boundingBoxes_[ agglomerate ];
 
-        const std::size_t numSubAgglomerates = agIndexSet_.subAgglomerates( agglomerate, GridPart::dimension );
+        const std::size_t numSubAgglomerates = blockMapper().indexSet().subAgglomerates( agglomerate, GridPart::dimension );
         for( auto &row : DT )
           row.resize( numSubAgglomerates );
         pi0XT.resize( numSubAgglomerates );
@@ -198,7 +195,7 @@ namespace Dune
 
           for( int i = 0; i < refElement.size( GridPart::dimension ); ++i )
           {
-            const int k = agIndexSet_.localIndex( element, i, GridPart::dimension );
+            const int k = blockMapper().indexSet().localIndex( element, i, GridPart::dimension );
             if( k == -1 )
               continue;
 
@@ -224,7 +221,7 @@ namespace Dune
             for( int i = 0; i < numEdgeVertices; ++i )
             {
               const int j = refElement.subEntity( faceIndex, 1, i, GridPart::dimension );
-              const int k = agIndexSet_.localIndex( element, j, GridPart::dimension );
+              const int k = blockMapper().indexSet().localIndex( element, j, GridPart::dimension );
               pi0XT[ k ].axpy( 0.5*iVolume, outerNormal );
             }
           }
