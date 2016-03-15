@@ -154,7 +154,7 @@ namespace Dune
       typedef typename GridPart::template Codim< 0 >::EntitySeedType EntitySeed;
 
       std::vector< std::vector< EntitySeed > > entitySeeds( agglomeration().size() );
-      for( const auto &element : elements( static_cast< typename GridPart::GridViewType >( gridPart ), Dune::Partitions::interiorBorder ) )
+      for( const auto &element : elements( static_cast< typename GridPart::GridViewType >( gridPart() ), Partitions::interiorBorder ) )
         entitySeeds[ agglomeration().index( element ) ].push_back( element.seed() );
 
       const std::size_t numShapeFunctions = scalarShapeFunctionSet_.size();
@@ -162,7 +162,7 @@ namespace Dune
       DynamicMatrix< DomainFieldType > DTD( numShapeFunctions, numShapeFunctions );
       std::vector< DomainType > pi0XT;
 
-      for( std::size_t agglomerate = 0; agglomerate < agglomeration.size(); ++agglomerate )
+      for( std::size_t agglomerate = 0; agglomerate < agglomeration().size(); ++agglomerate )
       {
         const auto &bbox = boundingBoxes_[ agglomerate ];
 
@@ -174,7 +174,7 @@ namespace Dune
         DomainFieldType H0 = 0;
         for( const EntitySeed &entitySeed : entitySeeds[ agglomerate ] )
         {
-          const auto &element = gridPart.entity( entitySeed );
+          const auto &element = gridPart().entity( entitySeed );
           const auto geometry = element.geometry();
 
           for( const auto &qp : Fem::ElementQuadrature< GridPart, 0 >( element, 0 ) )
@@ -207,13 +207,13 @@ namespace Dune
               } );
           }
 
-          for( const auto &intersection : intersections( static_cast< typename GridPart::GridViewType >( gridPart ), element ) )
+          for( const auto &intersection : intersections( static_cast< typename GridPart::GridViewType >( gridPart() ), element ) )
           {
             if( !intersection.boundary() && (agglomeration().index( Dune::Fem::make_entity( intersection.outside() ) ) == agglomerate) )
               continue;
             assert( intersection.conforming() );
 
-            const int faceIndex = intersection.indexInInside;
+            const int faceIndex = intersection.indexInInside();
             const int numEdgeVertices = refElement.size( faceIndex, 1, GridPart::dimension );
             const DomainFieldType iVolume = intersection.geometry().volume();
             const DomainType outerNormal = intersection.centerUnitOuterNormal();

@@ -122,13 +122,14 @@ double algorithm ( GridPart &gridPart, std::vector< int > agglomerateIndices )
 
   Dune::Vem::Agglomeration< GridPart > agglomeration( gridPart, agglomerateIndices );
 
-
   // create DG space on agglomeration //
   // define a function space type
   typedef Dune::Fem::FunctionSpace< typename GridPart::ctype, double, GridPart::dimension, 1 > FunctionSpace;
   typedef Dune::Vem::AgglomerationDGSpace< FunctionSpace, GridPart, POLORDER > DiscreteFunctionSpace;
   DiscreteFunctionSpace dfSpace( gridPart, agglomeration );
 
+  // create VEM space
+  Dune::Vem::AgglomerationVEMSpace< FunctionSpace, GridPart, POLORDER > vemSpace( gridPart, agglomeration );
 
   // write some typedefs first:
   typedef typename DiscreteFunctionSpace::RangeType RangeType;
