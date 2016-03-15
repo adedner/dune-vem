@@ -67,7 +67,7 @@ namespace Dune
 
       int order () const { return shapeFunctionSet_.order(); }
 
-      std::size_t size () const { return shapeFunctionSet_.size(); }
+      std::size_t size () const { return valueProjection_[0].size(); }
 
       const ReferenceElementType &referenceElement () const
       {
