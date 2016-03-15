@@ -135,7 +135,7 @@ double algorithm ( GridPart &gridPart, std::vector< int > agglomerateIndices )
   typedef Dune::Vem::AgglomerationVEMSpace< FunctionSpace, GridPart, POLORDER > VemSpaceType;
   VemSpaceType vemSpace( gridPart, agIndexSet );
   typedef Dune::Fem::AdaptiveDiscreteFunction< VemSpaceType > VemDFType;
-  VemDFType vemDF( vemSpace, "vemFunction" );
+  VemDFType vemDF( "vemFunction", vemSpace );
 
   // write some typedefs first:
   typedef typename DiscreteFunctionSpace::RangeType RangeType;
@@ -565,7 +565,7 @@ double algorithm ( GridPart &gridPart, std::vector< int > agglomerateIndices )
 
             // add f * phi_i to rhsLocal[ i ]
             rhsLocal.axpy( quadrature[ pt ], forcingfunction );
-            rhsLocalVem.axpy( quadrature[ pt ], forcingFunction );
+            rhsLocalVem.axpy( quadrature[ pt ], forcingfunction );
         }
         std::cout << tmpRhs.size() << " " << rhsLocal.size() << std::endl;
         assert( tmpRhs.size() == rhsLocal.size() );
