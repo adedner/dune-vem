@@ -131,8 +131,9 @@ double algorithm ( GridPart &gridPart, std::vector< int > agglomerateIndices )
   DiscreteFunctionSpace dfSpace( gridPart, agglomeration );
 
   // create VEM space
+  Dune::Vem::AgglomerationIndexSet< GridPart > agIndexSet( agglomeration );
   typedef Dune::Vem::AgglomerationVEMSpace< FunctionSpace, GridPart, POLORDER > VemSpaceType;
-  VemSpaceType vemSpace( gridPart, agglomeration );
+  VemSpaceType vemSpace( gridPart, agIndexSet );
   typedef Dune::Fem::AdaptiveDiscreteFunction< VemSpaceType > VemDFType;
   VemDFType vemDF( vemSpace, "vemFunction" );
 
@@ -214,8 +215,6 @@ double algorithm ( GridPart &gridPart, std::vector< int > agglomerateIndices )
   std::ofstream fpolyCoM( "../../output/polygonal_CoM" );
   std::ofstream fOut;
   fOut.open( "../../output/out.dat", std::ofstream::out | std::ofstream::app );
-  // create agglomeration index set
-  Dune::Vem::AgglomerationIndexSet< GridPart > agIndexSet( agglomeration );
   const int nk = ( POLORDER + 1 ) * ( POLORDER + 2 ) / 2;
 
 

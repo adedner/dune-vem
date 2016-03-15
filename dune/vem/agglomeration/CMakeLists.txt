@@ -4,6 +4,7 @@ set( HEADERS
   boundingbox.hh
   dgmapper.hh
   dgspace.hh
+  dofmapper.hh
   functor.hh
   indexset.hh
 )
