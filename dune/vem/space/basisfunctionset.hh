@@ -96,21 +96,21 @@ namespace Dune
       template< class Point, class DofVector >
       void axpy ( const Point &x, const RangeType &valueFactor, DofVector &dofs ) const
       {
-        shapeFunctionSet_.evaluateEach( position( x ), [ this, &valueFactor, &dofs ] ( std::size_t j, RangeType phi_j ) {
-            for( std::size_t i = 0; i < size(); ++i )
-              dofs[ i ] += valueProjection_[ i ][ j ] * (valueFactor * phi_j);
+        shapeFunctionSet_.evaluateEach( position( x ), [ this, &valueFactor, &dofs ] ( std::size_t alpha, RangeType phi_alpha ) {
+            for( std::size_t j = 0; j < size(); ++j )
+              dofs[ j ] += valueProjection_[ alpha ][ j ] * (valueFactor * phi_alpha);
           } );
       }
 
       template< class Point, class DofVector >
       void axpy ( const Point &x, const JacobianRangeType &jacobianFactor, DofVector &dofs ) const
       {
-        shapeFunctionSet_.jacobianEach( position( x ), [ this, &jacobianFactor, &dofs ] ( std::size_t j, RangeType phi_j ) {
-            for( std::size_t i = 0; i < size(); ++i )
+        shapeFunctionSet_.jacobianEach( position( x ), [ this, &jacobianFactor, &dofs ] ( std::size_t alpha, RangeType phi_alpha ) {
+            for( std::size_t j = 0; j < size(); ++j )
               for( int k = 0; k < dimDomain; ++k )
               {
                 FieldMatrixColumn< const JacobianRangeType > jacobianFactor_k( jacobianFactor, k );
-                dofs[ i ] += jabobianProjection_[ i ][ j ][ k ] * (jacobianFactor_k * phi_j);
+                dofs[ j ] += jacobianProjection_[ alpha ][ j ][ k ] * (jacobianFactor_k * phi_alpha);
               }
           } );
       }
@@ -134,9 +134,9 @@ namespace Dune
       void evaluateAll ( const Point &x, const DofVector &dofs, RangeType &value ) const
       {
         value = RangeType( 0 );
-        shapeFunctionSet_.evaluateEach( position( x ), [ this, &dofs, &value ] ( std::size_t j, RangeType phi_j ) {
-            for( std::size_t i = 0; i < size(); ++i )
-              value.axpy( valueProjection_[ i ][ j ]*dofs[ i ], phi_j )
+        shapeFunctionSet_.evaluateEach( position( x ), [ this, &dofs, &value ] ( std::size_t alpha, RangeType phi_alpha ) {
+            for( std::size_t j = 0; j < size(); ++j )
+              value.axpy( valueProjection_[ alpha ][ j ]*dofs[ j ], phi_alpha );
           } );
       }
 
@@ -145,9 +145,9 @@ namespace Dune
       {
         assert( values.size() >= size() );
         std::fill( values.begin(), values.end(), RangeType( 0 ) );
-        shapeFunctionSet_.evaluateEach( position( x ), [ this, &values ] ( std::size_t j, RangeType phi_j ) {
-            for( std::size_t i = 0; i < size(); ++i )
-              values[ i ].axpy( valueProjection_[ i ][ j ], phi_j );
+        shapeFunctionSet_.evaluateEach( position( x ), [ this, &values ] ( std::size_t alpha, RangeType phi_alpha ) {
+            for( std::size_t j = 0; j < size(); ++j )
+              values[ j ].axpy( valueProjection_[ alpha ][ j ], phi_alpha );
           } );
       }
 
@@ -165,12 +165,12 @@ namespace Dune
       void jacobianAll ( const Point &x, const DofVector &dofs, JacobianRangeType &jacobian ) const
       {
         jacobian = JacobianRangeType( 0 );
-        shapeFunctionSet_.evaluateEach( position( x ), [ this, &dofs, &jacobian ] ( std::size_t j, RangeType phi_j ) {
-            for( std::size_t i = 0; i < size(); ++i )
+        shapeFunctionSet_.evaluateEach( position( x ), [ this, &dofs, &jacobian ] ( std::size_t alpha, RangeType phi_alpha ) {
+            for( std::size_t j = 0; j < size(); ++j )
               for( int k = 0; k < dimDomain; ++k )
               {
                 FieldMatrixColumn< JacobianRangeType > jacobian_k( jacobian, k );
-                jacobian_k.axpy( jacobianProjection_[ i ][ j ][ k ]*dofs[ i ], phi_j )
+                jacobian_k.axpy( jacobianProjection_[ alpha ][ j ][ k ]*dofs[ j ], phi_alpha );
               }
           } );
       }
@@ -178,14 +178,14 @@ namespace Dune
       template< class Point, class Jacobians > const
       void jacobianAll ( const Point &x, Jacobians &jacobians ) const
       {
-        assert( values.size() >= size() );
-        std::fill( values.begin(), values.end(), JacobianRangeType( 0 ) );
-        shapeFunctionSet_.jacobianEach( position( x ), [ this, &jacobians ] ( std::size_t j, JacobianRangeType phi_j ) {
-            for( std::size_t i = 0; i < size(); ++i )
+        assert( jacobians.size() >= size() );
+        std::fill( jacobians.begin(), jacobians.end(), JacobianRangeType( 0 ) );
+        shapeFunctionSet_.jacobianEach( position( x ), [ this, &jacobians ] ( std::size_t alpha, JacobianRangeType phi_alpha ) {
+            for( std::size_t j = 0; j < size(); ++j )
               for( int k = 0; k < dimDomain; ++k )
               {
-                FieldMatrixColumn< JacobianRangeType > jacobian_ik( jacobians[ i ], k );
-                jacobian_ik.axpy( jacobianProjection_[ i ][ j ][ k ], phi_j );
+                FieldMatrixColumn< JacobianRangeType > jacobian_jk( jacobians[ j ], k );
+                jacobian_jk.axpy( jacobianProjection_[ alpha ][ j ][ k ], phi_alpha );
               }
         } );
       }

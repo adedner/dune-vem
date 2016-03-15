@@ -97,10 +97,27 @@ namespace Dune
         return agglomerate( entity ).size( dimension-codim );
       }
 
-      std::size_t subAgglomerates ( const EntityType &entity, int codim ) const
+      /**
+       * obtain number of subagglomerates
+       *
+       * \param[in]  index  index of the agglomerate
+       * \param[in]  codim  codimension of the subagglomerates
+       */
+      std::size_t subAgglomerates ( std::size_t index, int codim ) const
       {
         assert( ( codim >= 0 ) && ( codim <= dimension ) );
-        return ( codim == 0 ? 1u : agglomerate( entity ).size( dimension - codim ));
+        return ( codim == 0 ? 1u : agglomerate( index ).size( dimension - codim ));
+      }
+
+      /**
+       * obtain number of subagglomerates
+       *
+       * \param[in]  entity  any entity belonging to the agglomerate
+       * \param[in]  codim   codimension of the subagglomerates
+       */
+      std::size_t subAgglomerates ( const EntityType &entity, int codim ) const
+      {
+        return subAgglomerates( index( entity ), codim );
       }
 
       std::size_t size ( int codim ) const
@@ -110,7 +127,8 @@ namespace Dune
       }
 
     private:
-      const Agglomerate &agglomerate ( const EntityType &entity ) const { return agglomerates_[ index( entity ) ]; }
+      const Agglomerate &agglomerate ( std::size_t agglomerateIndex ) const { return agglomerates_[ agglomerateIndex ]; }
+      const Agglomerate &agglomerate ( const EntityType &entity ) const { return agglomerate( index( entity ) ); }
 
       const AgglomerationType &agglomeration_;
       AllocatorType allocator_;

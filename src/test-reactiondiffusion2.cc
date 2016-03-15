@@ -51,6 +51,7 @@
 #include <dune/vem/agglomeration/dgspace.hh>
 #include <dune/vem/agglomeration/indexset.hh>
 #include <dune/vem/io/gmsh.cc>
+#include <dune/vem/space/agglomeration.hh>
 
 
 template< class Enumerator >
