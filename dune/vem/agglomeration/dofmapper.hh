@@ -3,7 +3,9 @@
 
 #include <cassert>
 
+#include <array>
 #include <type_traits>
+#include <vector>
 
 #include <dune/common/iteratorrange.hh>
 
@@ -172,7 +174,7 @@ namespace Dune
       SizeType size_;
       std::vector< SubEntityInfo > subEntityInfo_;
       BlockMapType blockMap_;
-      CodimType codimType_[ dimension+1 ];
+      stsd::array< CodimType, dimension+1 > codimType_;
     };
 
 
@@ -392,9 +394,7 @@ namespace Dune
         code( BuildFunctor( subEntityInfo_ ) );
       }
 
-      for( int codim = 0; codim <= dimension; ++codim )
-        codimType_[ codim ] = CodimType::Empty;
-
+      std::fill( codimType_.begin(), codimType_.end(), CodimType::Empty );
       unsigned int codimDofs[ dimension+1 ];
       for( unsigned int i = 0; i < subEntityInfo_.size(); ++i )
       {
