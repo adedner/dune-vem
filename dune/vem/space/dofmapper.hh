@@ -1,5 +1,5 @@
-#ifndef DUNE_VEM_AGGLOMERATION_DOFMAPPER_HH
-#define DUNE_VEM_AGGLOMERATION_DOFMAPPER_HH
+#ifndef DUNE_VEM_SPACE_DOFMAPPER_HH
+#define DUNE_VEM_SPACE_DOFMAPPER_HH
 
 #include <cassert>
 
@@ -577,4 +577,4 @@ namespace Dune
 
 } // namespace Dune
 
-#endif // #ifndef DUNE_VEM_AGGLOMERATION_DOFMAPPER_HH
+#endif // #ifndef DUNE_VEM_SPACE_DOFMAPPER_HH
