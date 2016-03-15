@@ -120,9 +120,15 @@ namespace Dune
         return subAgglomerates( index( entity ), codim );
       }
 
+      std::size_t maxSubAgglomerates ( int codim ) const
+      {
+        assert( (codim >= 0) && (codim <= dimension) );
+        return maxSubAgglomerates_[ dimension-codim ];
+      }
+
       std::size_t size ( int codim ) const
       {
-        assert( ( codim >= 0 ) && ( codim <= dimension ) );
+        assert( (codim >= 0) && (codim <= dimension) );
         return size_[ dimension-codim ];
       }
 
@@ -134,6 +140,7 @@ namespace Dune
       AllocatorType allocator_;
       std::vector< Agglomerate > agglomerates_;
       std::array< std::size_t, dimension+1 > size_;
+      std::array< std::size_t, dimension+1 > maxSubAgglomerates_;
       std::vector< int > corners_;
       std::vector< int > edges_;
     };
@@ -274,16 +281,20 @@ namespace Dune
       std::vector< std::size_t > offset( GlobalGeometryTypeIndex::size( dimension ) );
       for( int dim = 0; dim < dimension; ++dim )
       {
+        maxSubAgglomerates_[ dim ] = 0;
         size_[ dim ] = 0;
         for( std::size_t typeIndex = GlobalGeometryTypeIndex::offset( dim ); typeIndex < GlobalGeometryTypeIndex::offset( dim+1 ); ++typeIndex )
         {
           offset[ typeIndex ] = size_[ dim ];
-          size_[ dim ] += subAgglomerates[ typeIndex ].size();
+          const std::size_t numSubAgglomerages = subAgglomerates[ typeIndex ].size();
+          size_[ dim ] += numSubAgglomerates;
+          maxSubAgglomerates_[ dim ] = std::max( maxSubAgglomerates_[ dim ], numSubAgglomerates );
         }
       }
 
       // build connectivity
 
+      maxSubAgglomerates_[ dimension ] = 1;
       size_[ dimension ] = agglomeration.size();
       std::vector< std::array< std::vector< std::size_t >, dimension > > connectivity( size_[ dimension ] );
 
