@@ -162,6 +162,9 @@ namespace Dune
       DynamicMatrix< DomainFieldType > DTD( numShapeFunctions, numShapeFunctions );
       std::vector< DomainType > pi0XT;
 
+      valueProjections_.resize( agglomeration().size() );
+      jacobianProjections_.resize( agglomeration().size() );
+
       for( std::size_t agglomerate = 0; agglomerate < agglomeration().size(); ++agglomerate )
       {
         const auto &bbox = boundingBoxes_[ agglomerate ];
