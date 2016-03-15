@@ -177,13 +177,14 @@ namespace Dune
           const auto &element = gridPart().entity( entitySeed );
           const auto geometry = element.geometry();
 
-          for( const auto &qp : Fem::ElementQuadrature< GridPart, 0 >( element, 0 ) )
+          Fem::ElementQuadrature< GridPart, 0 > quadrature( element, 0 );
+          for( std::size_t qp = 0; qp < quadrature.nop(); ++qp )
           {
-            DomainType x = geometry.global( qp.position() ) - bbox.first;
+            DomainType x = geometry.global( quadrature.point( qp ) ) - bbox.first;
             for( int k = 0; k < GridPartType::dimensionworld; ++k )
               x[ k ] /= (bbox.second[ k ] - bbox.first[ k ]);
 
-            const DomainFieldType weight = geometry.integrationElement( qp.position() ) * qp.weight();
+            const DomainFieldType weight = geometry.integrationElement( quadrature.point( qp ) ) * quadrature.weight( qp );
             scalarShapeFunctionSet_.evaluateEach( x, [ &H0, weight ] ( std::size_t alpha, FieldVector< DomainFieldType, 1 > phi ) {
                 if( alpha == 0 )
                   H0 += weight * phi[ 0 ];
