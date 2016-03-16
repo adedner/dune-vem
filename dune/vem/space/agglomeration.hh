@@ -93,6 +93,8 @@ namespace Dune
       typedef typename BaseType::EntityType EntityType;
       typedef typename BaseType::GridPartType GridPartType;
 
+      typedef DynamicMatrix< typename BasisFunctionSet::DomainFieldType > > Stabilization;
+
       using BaseType::gridPart;
 
       explicit AgglomerationVEMSpace ( GridPartType &gridPart, const AgglomerationIndexSetType &agIndexSet )
@@ -131,6 +133,8 @@ namespace Dune
 
       const AgglomerationType &agglomeration () const { return blockMapper_.agglomeration(); }
 
+      const Stabilization &stabilization ( const EntityType &entity ) const { return stablizations_[ agglomeration().index( entity ) ]; }
+
     private:
       void buildProjections ();
 
@@ -138,6 +142,7 @@ namespace Dune
       std::vector< BoundingBox< GridPart > > boundingBoxes_;
       std::vector< typename BasisFunctionSetType::ValueProjection > valueProjections_;
       std::vector< typename BasisFunctionSetType::JacobianProjection > jacobianProjections_;
+      std::vector< Stabilization > stabilizations_;
       typename Traits::ScalarShapeFunctionSetType scalarShapeFunctionSet_;
     };
 
@@ -245,6 +250,20 @@ namespace Dune
             for( std::size_t j = 0; j < numSubAgglomerates; ++j )
               valueProjection[ alpha ][ j ] += DTD[ alpha ][ beta ] * DT[ beta ][ j ];
         }
+
+        Stabilization S( numSubAgglomerates, numSubAgglomerates, 0 );
+        for( std::size_t i = 0; i < numSubAgglomerates; ++i )
+          S[ i ][ i ] = DomainFieldType( 1 );
+        for( std::size_t i = 0; i < numSubAgglomerates; ++i )
+          for( std::size_t alpha = 0; alpha < numShapeFunctions; ++alpha )
+            for( std::size_t j = 0; j < numSubAgglomerates; ++j )
+              S[ i ][ j ] -= DT[ alpha ][ i ] * valueProjection[ alpha ][ j ];
+        Stabilization &stabilization = stabilizations_[ agglomerate ];
+        stabilization.resize( numSubAgglomerates, numSubAgglomerates, 0 );
+        for( std::size_t k = 0; k < numSubAgglomerates; ++k )
+          for( std::size_t i = 0; i < numSubAgglomerates; ++i )
+            for( std::size_t j = 0; j < numSubAgglomerates; ++j )
+              stabilization[ i ][ j ] += S[ k ][ i ] * S[ k ][ j ];
 
         // Warning: This is a dirty hack
         auto &jacobianProjection = jacobianProjections_[ agglomerate ];
