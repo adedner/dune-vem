@@ -40,11 +40,12 @@
 
 #include <dune/common/fmatrix.hh>
 
-#include <dune/fem/quadrature/cachingquadrature.hh>
-#include <dune/fem/operator/common/operator.hh>
-
+#include <dune/fem/misc/compatibility.hh>
 #include <dune/fem/operator/common/differentiableoperator.hh>
+#include <dune/fem/operator/common/operator.hh>
 #include <dune/fem/operator/common/stencil.hh>
+#include <dune/fem/quadrature/cachingquadrature.hh>
+
 
 // EllipticOperator
 // ----------------
@@ -236,8 +237,7 @@ void DGEllipticOperator< DiscreteFunction, Model >
         const IntersectionType &intersection = *iit;
         if ( intersection.neighbor() )
         {
-          const EntityPointerType pOutside = intersection.outside(); // pointer to outside element.
-          const EntityType &outside = *pOutside;
+          const EntityType outside = Dune::Fem::make_entity( intersection.outside() );
 
           typedef typename IntersectionType::Geometry  IntersectionGeometryType;
           const IntersectionGeometryType &intersectionGeometry = intersection.geometry();
@@ -483,8 +483,7 @@ void DifferentiableDGEllipticOperator< JacobianOperator, Model >
 
       if( intersection.neighbor()  )
       {
-        EntityPointerType ep = intersection.outside();
-        const EntityType& neighbor = *ep ;
+        EntityType neighbor = Dune::Fem::make_entity( intersection.outside() );
         const int neighborPolygon = agglomeration.index(neighbor);
         typedef typename IntersectionType::Geometry  IntersectionGeometryType;
         const IntersectionGeometryType &intersectionGeometry = intersection.geometry();
