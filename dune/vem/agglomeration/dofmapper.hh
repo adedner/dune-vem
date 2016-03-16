@@ -89,7 +89,7 @@ namespace Dune
       template< class Entity >
       unsigned int numEntityDofs ( const Entity &entity ) const
       {
-        return subEntityInfo( entity ).numDofs;
+        DUNE_THROW( NotImplemented, "numEntityDofs not implemented, yet" );
       }
 
       // global information
@@ -97,7 +97,7 @@ namespace Dune
       bool contains ( unsigned int codim ) const
       {
         const auto isCodim = [ codim ] ( const SubEntityInfo &info ) { return (info.codim == codim); };
-        return (std::find( subEntityInfo_.begin(), subEntityInfo_.end(), isCodim ) != subEntityInfo_.end());
+        return (std::find_if( subEntityInfo_.begin(), subEntityInfo_.end(), isCodim ) != subEntityInfo_.end());
       }
 
       bool fixedDataSize ( int codim ) const { return false; }
