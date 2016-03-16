@@ -44,7 +44,7 @@ namespace Dune
       struct Agglomerate;
 
     public:
-      AgglomerationIndexSet ( const AgglomerationType &agglomeration, AllocatorType allocator = AllocatorType() );
+      explicit AgglomerationIndexSet ( const AgglomerationType &agglomeration, AllocatorType allocator = AllocatorType() );
 
       std::size_t index ( const EntityType &entity ) const { return agglomeration_.index( entity ); }
 
