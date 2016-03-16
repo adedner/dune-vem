@@ -178,6 +178,7 @@ namespace Dune
         pi0XT.resize( numSubAgglomerates );
 
         DomainFieldType H0 = 0;
+        std::fill( pi0XT.begin(), pi0XT.end(), DomainType( 0 ) );
         for( const EntitySeed &entitySeed : entitySeeds[ agglomerate ] )
         {
           const auto &element = gridPart().entity( entitySeed );
@@ -228,6 +229,7 @@ namespace Dune
             {
               const int j = refElement.subEntity( faceIndex, 1, i, GridPart::dimension );
               const int k = blockMapper().indexSet().localIndex( element, j, GridPart::dimension );
+              assert( k >= 0 );
               pi0XT[ k ].axpy( 0.5*iVolume, outerNormal );
             }
           }
