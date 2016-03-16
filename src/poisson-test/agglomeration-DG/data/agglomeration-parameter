@@ -14,7 +14,7 @@ fem.preconditioning: true
 
 # macro grid files 
 #fem.io.macroGridFile_2d:/home/gcd3/codes/grids/pmesh.msh
-fem.io.macroGridFile_2d:./partitioned-mesh.msh
+fem.io.macroGridFile_2d: data/partitioned-mesh.msh
 
 # path for output  
 fem.prefix: ../output
@@ -34,6 +34,5 @@ poisson.repeats: 4
 poisson.solvereps: 1e-12
 
 # valid are: cos | corner | curvedridges | sphere
-poisson.problem: sin
-
+poisson.problem: cos
 dg.penalty: 20
