@@ -180,7 +180,7 @@ namespace Dune
       {
         assert( jacobians.size() >= size() );
         std::fill( jacobians.begin(), jacobians.end(), JacobianRangeType( 0 ) );
-        shapeFunctionSet_.jacobianEach( position( x ), [ this, &jacobians ] ( std::size_t alpha, JacobianRangeType phi_alpha ) {
+        shapeFunctionSet_.evaluateEach( position( x ), [ this, &jacobians ] ( std::size_t alpha, RangeType phi_alpha ) {
             for( std::size_t j = 0; j < size(); ++j )
               for( int k = 0; k < dimDomain; ++k )
               {
