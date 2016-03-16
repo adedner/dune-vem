@@ -41,6 +41,7 @@
 #define WANT_ISTL 0
 
 #include "femscheme.hh"
+#include "vemscheme.hh"
 #include "poisson.hh"
 
 
@@ -145,7 +146,8 @@ try
   ModelType implicitModel( problem, gridPart );
 
   std::cout << "going in femscheme" << std::endl;
-  typedef FemScheme< ModelType > SchemeType;
+  //typedef FemScheme< ModelType > SchemeType;
+  typedef VemScheme< ModelType > SchemeType;
   SchemeType scheme( gridPart, implicitModel, agglomeration );
 
   typedef Dune::Fem::GridFunctionAdapter< ProblemType, GridPart > GridExactSolutionType;

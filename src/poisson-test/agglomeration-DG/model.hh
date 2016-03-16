@@ -90,6 +90,7 @@ public:
   void source ( const Entity &entity,
                 const Point &x,
                 const RangeType &value,
+                const JacobianRangeType &jac,
                 RangeType &flux ) const
   {
     linSource( value, entity, x, value, flux );
@@ -98,9 +99,11 @@ public:
   // the linearization of the source function
   template< class Entity, class Point >
   void linSource ( const RangeType& uBar,
+                   const JacobianRangeType &jacBar,
                    const Entity &entity,
                    const Point &x,
                    const RangeType &value,
+                   const JacobianRangeType &jac,
                    RangeType &flux ) const
   {
     const DomainType xGlobal = entity.geometry().global( Dune::Fem::coordinate( x ) );

@@ -136,6 +136,7 @@ double algorithm ( GridPart &gridPart, std::vector< int > agglomerateIndices )
   VemSpaceType vemSpace( gridPart, agIndexSet );
   typedef Dune::Fem::AdaptiveDiscreteFunction< VemSpaceType > VemDFType;
   VemDFType vemDF( "vemFunction", vemSpace );
+  vemDF.clear();
 
   // write some typedefs first:
   typedef typename DiscreteFunctionSpace::RangeType RangeType;
@@ -821,7 +822,7 @@ double algorithm ( GridPart &gridPart, std::vector< int > agglomerateIndices )
 
   for (int i=0;i<vemDF.size();++i)
   {
-     if ( std::abs( f_load_global[ i ] - vemDF.leakPointer()[ i ] ) > 1e-10)
+    // if ( std::abs( f_load_global[ i ] - vemDF.leakPointer()[ i ] ) > 1e-10)
         std::cout << "Error in global load vector: "
          <<  f_load_global[ i ] - vemDF.leakPointer()[ i ] << " "
          << f_load_global[ i ] << " "<< vemDF.leakPointer()[ i ]
