@@ -166,6 +166,7 @@ namespace Dune
 
       valueProjections_.resize( agglomeration().size() );
       jacobianProjections_.resize( agglomeration().size() );
+      stabilizations_.resize( agglomeration().size() );
 
       for( std::size_t agglomerate = 0; agglomerate < agglomeration().size(); ++agglomerate )
       {
