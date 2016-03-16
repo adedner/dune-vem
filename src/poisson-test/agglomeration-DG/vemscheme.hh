@@ -118,6 +118,7 @@ public:
 
     //! choose type of discrete function space
     typedef Dune::Vem::Agglomeration <GridPartType>  AgglomerationType;
+    typedef Dune::Vem::AgglomerationIndexSet< GridPartType > AgglomerationIndexSetType;
 //    typedef Dune::Fem::DiscontinuousGalerkinSpace< FunctionSpaceType, GridPartType, POLORDER > DiscreteFunctionSpaceType;
 
     typedef Dune::Vem::AgglomerationVEMSpace< FunctionSpaceType, GridPartType, POLORDER > VemSpaceType;
@@ -141,11 +142,11 @@ public:
     //! define Laplace operator
     typedef DifferentiableVEMEllipticOperator < LinearOperatorType, ModelType > EllipticOperatorType;
 
-    VemScheme ( GridPartType &gridPart, const ModelType& implicitModel, AgglomerationType& agglomeration )
+    VemScheme ( GridPartType &gridPart, const ModelType& implicitModel, const AgglomerationType& agglomeration )
     : implicitModel_( implicitModel ),
       gridPart_( gridPart ),
-      agglomeration_(agglomeration),
-      discreteSpace_( gridPart_, agglomeration),
+      indexSet_( agglomeration ),
+      discreteSpace_( gridPart_, indexSet_ ),
       solution_( "solution", discreteSpace_ ),
       rhs_( "rhs", discreteSpace_ ),
       // the elliptic operator (implicit)
@@ -192,8 +193,7 @@ protected:
     const ModelType& implicitModel_;   // the mathematical model
 
     GridPartType  &gridPart_;         // grid part(view), e.g. here the leaf grid the discrete space is build with
-
-    AgglomerationType agglomeration_;
+    AgglomerationIndexSetType indexSet_;
 
     VemSpaceType discreteSpace_; // discrete function space
     DiscreteFunctionType solution_;   // the unknown

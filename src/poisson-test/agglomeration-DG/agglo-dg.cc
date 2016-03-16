@@ -14,8 +14,8 @@
 #include <dune/alugrid/grid.hh>
 
 #include <dune/fem/function/adaptivefunction.hh>
-//#include <dune/fem/gridpart/leafgridpart.hh>
-#include <dune/fem/gridpart/adaptiveleafgridpart.hh>
+#include <dune/fem/gridpart/leafgridpart.hh>
+//#include <dune/fem/gridpart/adaptiveleafgridpart.hh>
 
 #include <dune/fem/io/file/vtkio.hh>
 #include <dune/fem/misc/mpimanager.hh>
@@ -99,7 +99,8 @@ try
       [] ( int i ) { return i-1; } ); // This will give you correct number of agglomerations!
   // create grid part and agglomeration
 
-  typedef Dune::Fem::AdaptiveLeafGridPart< Grid > GridPart;
+  //typedef Dune::Fem::AdaptiveLeafGridPart< Grid > GridPart;
+  typedef Dune::Fem::LeafGridPart< Grid > GridPart;
   GridPart gridPart( *grid );
 
   Dune::Vem::Agglomeration< GridPart > agglomeration( gridPart, agglomerateIndices );
