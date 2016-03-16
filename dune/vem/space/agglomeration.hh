@@ -93,7 +93,7 @@ namespace Dune
       typedef typename BaseType::EntityType EntityType;
       typedef typename BaseType::GridPartType GridPartType;
 
-      typedef DynamicMatrix< typename BasisFunctionSet::DomainFieldType > > Stabilization;
+      typedef DynamicMatrix< typename BasisFunctionSetType::DomainFieldType > Stabilization;
 
       using BaseType::gridPart;
 
@@ -133,7 +133,7 @@ namespace Dune
 
       const AgglomerationType &agglomeration () const { return blockMapper_.agglomeration(); }
 
-      const Stabilization &stabilization ( const EntityType &entity ) const { return stablizations_[ agglomeration().index( entity ) ]; }
+      const Stabilization &stabilization ( const EntityType &entity ) const { return stabilizations_[ agglomeration().index( entity ) ]; }
 
     private:
       void buildProjections ();
