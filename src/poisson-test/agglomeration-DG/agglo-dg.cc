@@ -153,11 +153,12 @@ try
   typedef Dune::Fem::GridFunctionAdapter< ProblemType, GridPart > GridExactSolutionType;
   GridExactSolutionType gridExactSolution("exact solution", problem, gridPart, 5 );
 
+#if 0
   //! input/output tuple and setup datawritter
   typedef Dune::tuple<const typename SchemeType::DiscreteFunctionType *, GridExactSolutionType * > IOTupleType;
   typedef Dune::Fem::DataOutput< Grid, IOTupleType > DataOutputType;
   IOTupleType ioTuple( &(scheme.solution()), &gridExactSolution) ; // tuple with pointers
-
+#endif
 
 
   // setup the right hand side

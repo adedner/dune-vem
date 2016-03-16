@@ -141,9 +141,7 @@ public:
     //! define Laplace operator
     typedef DifferentiableVEMEllipticOperator < LinearOperatorType, ModelType > EllipticOperatorType;
 
-    VemScheme( GridPartType &gridPart,
-            const ModelType& implicitModel,
-            AgglomerationType& agglomeration)
+    VemScheme ( GridPartType &gridPart, const ModelType& implicitModel, AgglomerationType& agglomeration )
     : implicitModel_( implicitModel ),
       gridPart_( gridPart ),
       agglomeration_(agglomeration),
@@ -195,6 +193,8 @@ protected:
 
     GridPartType  &gridPart_;         // grid part(view), e.g. here the leaf grid the discrete space is build with
 
+    AgglomerationType agglomeration_;
+
     VemSpaceType discreteSpace_; // discrete function space
     DiscreteFunctionType solution_;   // the unknown
     DiscreteFunctionType rhs_;        // the right hand side
@@ -202,8 +202,6 @@ protected:
     EllipticOperatorType implicitOperator_; // the implicit operator
 
     LinearOperatorType linearOperator_;  // the linear operator (i.e. jacobian of the implicit)
-
-    AgglomerationType agglomeration_;
 
     const double solverEps_ ; // eps for linear solver
 };
