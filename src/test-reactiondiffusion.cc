@@ -110,8 +110,8 @@ namespace Gmsh
 }
 
 //typedef Dune::UGGrid< 2 > Grid;
-//typedef Dune::ALUGrid< 2, 2, Dune::simplex, Dune::nonconforming > Grid;
-typedef Dune::ALUGrid< 2, 2, Dune::cube, Dune::nonconforming > Grid;
+typedef Dune::ALUGrid< 2, 2, Dune::simplex, Dune::nonconforming > Grid;
+//typedef Dune::ALUGrid< 2, 2, Dune::cube, Dune::nonconforming > Grid;
 
 
 template< class GridPart >
@@ -206,7 +206,7 @@ double algorithm ( GridPart &gridPart, std::vector< int > agglomerateIndices )
   std::ofstream fpolyvert( "../../output/polygonal_vertices.dat" );
   std::ofstream fpolyCoM( "../../output/polygonal_CoM" );
   std::ofstream fOut;
-  fOut.open( "../../output/out.dat", std::ofstream::out | std::ofstream::app );
+  fOut.open( "../../output/eoc.dat", std::ofstream::out | std::ofstream::app );
   // create agglomeration index set
   Dune::Vem::AgglomerationIndexSet< GridPart > agIndexSet( agglomeration );
   const int nk = ( POLORDER + 1 ) * ( POLORDER + 2 ) / 2;
@@ -706,7 +706,7 @@ double algorithm ( GridPart &gridPart, std::vector< int > agglomerateIndices )
     StabilityScalingFactor = MeanDiffusionCoefficient * ( pow( LocalMeshSize, GridPart::dimension - 2 ) );
     StabilityScalingFactor += MeanReactionCoefficient * ( pow( LocalMeshSize, GridPart::dimension ));
     KStbilityLocal.rightmultiply( I_minus_PI_PHI_1 );           // In order to do [I_minus_PI_PHI_1_Transposed]*[I_minus_PI_PHI_1], you write [I_minus_PI_PHI_1].leftmultiply[I_minus_PI_PHI_1_Transposed] i.e. leftmultiply I_minus_PI_PHI_1 by I_minus_PI_PHI_1_Transposed.
-    KStbilityLocal *= StabilityScalingFactor;
+    //KStbilityLocal *= StabilityScalingFactor;
 
     KStiffLocal.resize( numPolygonVertices, numPolygonVertices );
     KStiffLocal += KConsistencyLocal;
