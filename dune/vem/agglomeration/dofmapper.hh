@@ -85,7 +85,8 @@ namespace Dune
       template< class Entity >
       unsigned int numEntityDofs ( const Entity &entity ) const
       {
-        return (indexSet().globalIndex( entity ) ? subEntityInfo_[ Entity::codimension ]::numDofs : 0u);
+        const int codimIndex = codimIndex_[ Entity::codimension ];
+        return ((codimIndex >= 0) && indexSet().globalIndex( entity ).second ? subEntityInfo_[ codimIndex ].numDofs : 0u);
       }
 
       // global information
