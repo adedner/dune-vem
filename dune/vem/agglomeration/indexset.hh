@@ -54,24 +54,35 @@ namespace Dune
         return ( codim == 0 ? index( element ) : agglomerate( element ).index( i, dimension - codim ));
       }
 
+      std::pair< std::size_t, bool > globalIndex ( const ElementType &element, int i, int codim ) const
+      {
+        assert( ( codim >= 0 ) && ( codim <= dimension ) );
+        if( codim == 0 )
+          return std::make_pair( index( element ), true );
+
+        const typename GridPartType::IndexSetType indexSet = agglomeration_.gridPart().indexSet();
+        int globalIndex = -1;
+        if( codim == dimension-1 )
+          globalIndex = edges_[ indexSet.subIndex( element, i, codim ) ];
+        else if( codim == dimension )
+          globalIndex = corners_[ indexSet.subIndex( element, i, codim ) ];
+        else
+          DUNE_THROW( NotImplemented, "localIndex not implemented for codim " << codim );
+        return std::make_pair( static_cast< std::size_t >( globalIndex ), globalIndex != -1 );
+      }
+
       int localIndex ( const ElementType &element, int i, int codim ) const
       {
         assert( ( codim >= 0 ) && ( codim <= dimension ) );
         if( codim == 0 )
           return 0;
-        assert( codim == dimension );
-        const typename GridPartType::IndexSetType indexSet = agglomeration_.gridPart().indexSet();
-        if( codim == dimension-1 )
-          const int globalEdgeIndexInPolygonalGrid = edges_[ indexSet.subIndex( element, i, codim ) ];
-        else if( codim == dimension )
-          const int globalIndexInPolygonalGrid = corners_[ indexSet.subIndex( element, i, codim ) ];
-        else
-          DUNE_THROW( NotImplemented, "localIndex not implemented for codim " << codim );
-        if( globalIndexInPolygonalGrid == -1 )
+
+        const auto result = globalIndex( element, i, codim );
+        if( !result.second )
           return -1;
         auto &localAgg = agglomerate( element );
         for( std::size_t k = 0; k < localAgg.size( dimension-codim ); ++k )
-          if( localAgg.index( k, dimension-codim ) == static_cast< std::size_t >( globalIndexInPolygonalGrid ) )
+          if( localAgg.index( k, dimension-codim ) == result.first )
             return k;
         assert( false );
         return -1;
