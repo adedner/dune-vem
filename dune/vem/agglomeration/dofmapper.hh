@@ -85,15 +85,15 @@ namespace Dune
       template< class Entity >
       unsigned int numEntityDofs ( const Entity &entity ) const
       {
-        DUNE_THROW( NotImplemented, "numEntityDofs not implemented, yet" );
+        return (indexSet().globalIndex( entity ) ? subEntityInfo_[ Entity::codimension ]::numDofs : 0u);
       }
 
       // global information
 
       bool contains ( unsigned int codim ) const
       {
-        const auto isCodim = [ codim ] ( const SubEntityInfo &info ) { return (info.codim == codim); };
-        return (std::find_if( subEntityInfo_.begin(), subEntityInfo_.end(), isCodim ) != subEntityInfo_.end());
+        assert( codim <= static_cast< unsigned int >( dimension ) );
+        return (codimIndex_[ codim ] >= 0);
       }
 
       bool fixedDataSize ( int codim ) const { return false; }
@@ -131,6 +131,7 @@ namespace Dune
       unsigned int maxNumDofs_ = 0;
       SizeType size_;
       std::vector< SubEntityInfo > subEntityInfo_;
+      std::array< int, dimension+1 > codimIndex_;
     };
 
 
@@ -153,6 +154,15 @@ namespace Dune
           info.numDofs = codimDofs.second;
           return info;
         } );
+
+      const int numCodims = subEntityInfo_.size();
+      for( int i = 0; i < numCodims; ++i )
+      {
+        const int codim = subEntityInfo_[ i ].codim;
+        if( codimIndex_[ codim ] >= 0 )
+          DUNE_THROW( InvalidStateException, "Codimension inserted twice into AgglomerationDofMapper" );
+        codimIndexIndex_[ codim ] == i;
+      }
 
       update();
     }
@@ -213,7 +223,17 @@ namespace Dune
     template< class Entity, class Functor >
     inline void AgglomerationDofMapper< GridPart >::mapEachEntityDof ( const Entity &entity, Functor f ) const
     {
-      DUNE_THROW( NotImplemented, "mapEachEntityDof not implemented, yet" );
+      const SubEntityInfo &info = subEntityInfo_[ codimIndex_[ Entity::codimension ] ];
+      if( info.numDofs == 0u )
+        return;
+
+      const auto result = indexSet().globalIndex( entity );
+      if( !result.second )
+        return;
+
+      SizeType index = info.offset + SizeType( info.numDofs ) * result.first;
+      for( unsigned int i = 0; i < info.numDofs; ++i )
+        f( i, index++ );
     }
 
 

@@ -71,6 +71,23 @@ namespace Dune
         return std::make_pair( static_cast< std::size_t >( globalIndex ), globalIndex != -1 );
       }
 
+      template< class Entity >
+      std::pair< std::size_t, bool > globalIndex ( const Entity &entity ) const
+      {
+        if( Entity::codimension == 0 )
+          return std::make_pair( index( entity ), true );
+
+        const typename GridPartType::IndexSetType indexSet = agglomeration_.gridPart().indexSet();
+        int globalIndex = -1;
+        if( codim == dimension-1 )
+          globalIndex = edges_[ indexSet.index( entity ) ];
+        else if( codim == dimension )
+          globalIndex = corners_[ indexSet.index( entity ) ];
+        else
+          DUNE_THROW( NotImplemented, "localIndex not implemented for codim " << codim );
+        return std::make_pair( static_cast< std::size_t >( globalIndex ), globalIndex != -1 );
+      }
+
       int localIndex ( const ElementType &element, int i, int codim ) const
       {
         assert( ( codim >= 0 ) && ( codim <= dimension ) );
