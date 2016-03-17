@@ -297,8 +297,8 @@ void DifferentiableVEMEllipticOperator< JacobianOperator, Model, Constraints >
     const unsigned int domainNumBasisFunctions = domainBaseSet.size();
 
     QuadratureType quadrature( entity, domainSpace.order()+rangeSpace.order() );
-    const size_t numQuadraturePoints = quadrature.nop();
-    for( size_t pt = 0; pt < numQuadraturePoints; ++pt )
+    const std::size_t numQuadraturePoints = quadrature.nop();
+    for( std::size_t pt = 0; pt < numQuadraturePoints; ++pt )
     {
       //! [Assembling the local matrix]
       const typename QuadratureType::CoordinateType &x = quadrature.point( pt );
@@ -333,24 +333,20 @@ void DifferentiableVEMEllipticOperator< JacobianOperator, Model, Constraints >
       }
       //! [Assembling the local matrix]
     }
-#if 0
-    if( model().hasNeumanBoundary())
-    {
-      if( !entity.hasBoundaryIntersections() )
-        continue;
 
-      const IntersectionIteratorType iitend = rangeSpace.gridPart().iend( entity );
-      for( IntersectionIteratorType iit = rangeSpace.gridPart().ibegin( entity ); iit != iitend; ++iit ) // looping over intersections
+    if( model().hasNeumanBoundary() && entity.hasBoundaryIntersections() )
+    {
+      for( const IntersectionType &intersection : intersections( static_cast< typename GridPartType::GridViewType >( rangeSpace.gridPart() ), entity ) )
       {
-        const IntersectionType &intersection = *iit;
         if( !intersection.boundary() )
           continue;
+
         Dune::FieldVector< bool, RangeRangeType::dimension > components( true );
         bool hasDirichletComponent = model().isDirichletIntersection( intersection, components );
 
         const typename IntersectionType::Geometry &intersectionGeometry = intersection.geometry();
         FaceQuadratureType quadInside( rangeSpace.gridPart(), intersection, domainSpace.order()+rangeSpace.order(), FaceQuadratureType::INSIDE );
-        const size_t numQuadraturePoints = quadInside.nop();
+        const std::size_t numQuadraturePoints = quadInside.nop();
         for( size_t pt = 0; pt < numQuadraturePoints; ++pt )
         {
           const typename FaceQuadratureType::LocalCoordinateType &x = quadInside.localPoint( pt );
@@ -363,16 +359,16 @@ void DifferentiableVEMEllipticOperator< JacobianOperator, Model, Constraints >
             RangeRangeType alpha( 0 );
             model().linAlpha( u0, entity, quadInside[ pt ], phi[ localCol ], alpha );
             for( int k = 0; k < RangeRangeType::dimension; ++k )
+            {
               if( hasDirichletComponent && components[ k ] )
                 alpha[ k ] = 0;
+            }
             jLocal.column( localCol ).axpy( phi, alpha, weight );
           }
         }
       }
     }
-    #endif
-  } // end grid traversal
-
+  }
 
   // apply constraints to matrix operator
   constraints().applyToOperator( jOp );

@@ -122,29 +122,39 @@ try
 
   typedef DiffusionModel< FunctionSpaceType, GridPart > ModelType;
   typedef typename ModelType::ProblemType ProblemType ;
-  ProblemType* problemPtr = 0 ;
-  const std::string problemNames [] = { "cos", "sphere", "sin", "corner", "curvedridges" };
-  const int problemNumber = Dune::Fem::Parameter::getEnum("poisson.problem", problemNames, 0 );
+  std::unique_ptr< ProblemType > problemPtr;
+  const std::string problemNames [] = { "cos", "sphere", "sin",  "mixedcos", "corner", "curvedridges" };
+  const int problemNumber = Dune::Fem::Parameter::getEnum( "poisson.problem", problemNames );
 
-  switch ( problemNumber )
+  switch( problemNumber )
   {
   case 0:
-    problemPtr = new CosinusProduct< FunctionSpaceType > ();
-    break ;
+    problemPtr.reset( new CosinusProduct< FunctionSpaceType >() );
+    break;
+
   case 1:
-    problemPtr = new SphereProblem< FunctionSpaceType > ();
-    break ;
+    problemPtr.reset( new SphereProblem< FunctionSpaceType >() );
+    break;
+
   case 2:
-    problemPtr = new SinusProduct< FunctionSpaceType > ();
-    break ;
+    problemPtr.reset( new SinusProduct< FunctionSpaceType >() );
+    break;
+
   case 3:
-    problemPtr = new ReentrantCorner< FunctionSpaceType > ();
-    break ;
+    problemPtr.reset( new CosinusProductMixedBC< FunctionSpaceType >() );
+    break;
+
   case 4:
-    problemPtr = new CurvedRidges< FunctionSpaceType > ();
-    break ;
+    problemPtr.reset( new ReentrantCorner< FunctionSpaceType >() );
+    break;
+
+  case 5:
+    problemPtr.reset( new CurvedRidges< FunctionSpaceType >() );
+    break;
+
   default:
-    problemPtr = new CosinusProduct< FunctionSpaceType > ();
+    std::cerr << "Error: No problem selected. Set parameter 'poisson.problem'." << std::endl;
+    return 1;
   }
   assert( problemPtr );
   ProblemType& problem = *problemPtr ;
