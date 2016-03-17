@@ -247,7 +247,7 @@ void VEMEllipticOperator< DomainDiscreteFunction, RangeDiscreteFunction, Model, 
 }
 
 // Implementation of DifferentiableVEMEllipticOperator
-// ------------------------------------------------
+// ---------------------------------------------------
 
 template< class JacobianOperator, class Model, class Constraints >
 void DifferentiableVEMEllipticOperator< JacobianOperator, Model, Constraints >
@@ -274,10 +274,9 @@ void DifferentiableVEMEllipticOperator< JacobianOperator, Model, Constraints >
 
   std::vector< bool > stabilization( rangeSpace.agglomeration().size(), false );
 
-  const IteratorType end = rangeSpace.end();
-  for( IteratorType it = rangeSpace.begin(); it != end; ++it )
+  const GridPartType &gridPart = rangeSpace.gridPart();
+  for( const auto &entity : Dune::elements( static_cast< typename GridPartType::GridViewType >( gridPart ), Dune::Partitions::interiorBorder ) )
   {
-    const EntityType &entity = *it;
     const GeometryType &geometry = entity.geometry();
 
     const DomainLocalFunctionType uLocal = u.localFunction( entity );
@@ -288,7 +287,7 @@ void DifferentiableVEMEllipticOperator< JacobianOperator, Model, Constraints >
       const auto &stabMatrix = rangeSpace.stabilization( entity );
       for( std::size_t r = 0; r < stabMatrix.rows(); ++r )
         for( std::size_t c = 0; c < stabMatrix.cols(); ++c )
-          jLocal.add( r, c, 10*stabMatrix[ r ][ c ] );
+          jLocal.add( r, c, 1*stabMatrix[ r ][ c ] );
       stabilization[ rangeSpace.agglomeration().index( entity ) ] = true;
     }
 
@@ -336,7 +335,7 @@ void DifferentiableVEMEllipticOperator< JacobianOperator, Model, Constraints >
 
     if( model().hasNeumanBoundary() && entity.hasBoundaryIntersections() )
     {
-      for( const IntersectionType &intersection : intersections( static_cast< typename GridPartType::GridViewType >( rangeSpace.gridPart() ), entity ) )
+      for( const IntersectionType &intersection : intersections( static_cast< typename GridPartType::GridViewType >( gridPart ), entity ) )
       {
         if( !intersection.boundary() )
           continue;
@@ -345,7 +344,7 @@ void DifferentiableVEMEllipticOperator< JacobianOperator, Model, Constraints >
         bool hasDirichletComponent = model().isDirichletIntersection( intersection, components );
 
         const typename IntersectionType::Geometry &intersectionGeometry = intersection.geometry();
-        FaceQuadratureType quadInside( rangeSpace.gridPart(), intersection, domainSpace.order()+rangeSpace.order(), FaceQuadratureType::INSIDE );
+        FaceQuadratureType quadInside( gridPart, intersection, domainSpace.order()+rangeSpace.order(), FaceQuadratureType::INSIDE );
         const std::size_t numQuadraturePoints = quadInside.nop();
         for( size_t pt = 0; pt < numQuadraturePoints; ++pt )
         {

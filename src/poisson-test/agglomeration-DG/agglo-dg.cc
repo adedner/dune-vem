@@ -52,13 +52,11 @@
 #include "problems/curvedridges.hh"
 
 
-namespace Gmsh
-{
-using namespace Dune::Vem::Gmsh;
-}
+namespace Gmsh = Dune::Vem::Gmsh;
 
 //typedef Dune::UGGrid< 2 > Grid;
-typedef Dune::ALUGrid< 2, 2, Dune::cube, Dune::nonconforming > Grid;
+//typedef Dune::ALUGrid< 2, 2, Dune::cube, Dune::nonconforming > Grid;
+typedef Dune::ALUGrid< 2, 2, Dune::simplex, Dune::nonconforming > Grid;
 
 
 int main ( int argc, char **argv )
@@ -173,15 +171,7 @@ try
   SchemeType scheme( gridPart, implicitModel, agglomeration );
 
   typedef Dune::Fem::GridFunctionAdapter< ProblemType, GridPart > GridExactSolutionType;
-  GridExactSolutionType gridExactSolution("exact solution", problem, gridPart, 5 );
-
-#if 0
-  //! input/output tuple and setup datawritter
-  typedef Dune::tuple<const typename SchemeType::DiscreteFunctionType *, GridExactSolutionType * > IOTupleType;
-  typedef Dune::Fem::DataOutput< Grid, IOTupleType > DataOutputType;
-  IOTupleType ioTuple( &(scheme.solution()), &gridExactSolution) ; // tuple with pointers
-#endif
-
+  GridExactSolutionType gridExactSolution("exact solution", problem, gridPart, 4 );
 
   // setup the right hand side
   scheme.prepare();
@@ -197,18 +187,20 @@ try
 
   // calculate standard error
   // select norm for error computation
-  typedef Dune::Fem::L2Norm < GridPart > L2NormType;
+  Dune::Fem::L2Norm< GridPart > normL2( gridPart );
+  Dune::Fem::H1Norm< GridPart > normH1( gridPart );
 
+  const double errorL2 = normL2.distance( gridExactSolution, scheme.solution() );
+  const double errorH1 = normH1.distance( gridExactSolution, scheme.solution() );
 
-  L2NormType normL2( gridPart );
+  std::cout << "L2Norm error = " << errorL2 << std::endl;
+  std::cout << "H1Norm error = " << errorH1 << std::endl;
 
-  std::cout << "L2Norm error = " << normL2.distance( gridExactSolution, scheme.solution() ) << std::endl;
+  std::ofstream errorOut( "error.dat", std::ios_base::app );
+  errorOut << agglomeration.size() << "    " << errorL2 << "    " << errorH1 << std::endl;
 
   std::cout << "Finished!" << std::endl;
   return 0;
-
-
-
 }
 catch( const Dune::Exception &e )
 {

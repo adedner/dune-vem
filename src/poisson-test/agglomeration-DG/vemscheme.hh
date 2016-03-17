@@ -59,6 +59,7 @@
 #include <dune/fem/operator/linear/istloperator.hh>
 #include <dune/fem/solver/istlsolver.hh>
 #include <dune/fem/solver/cginverseoperator.hh>
+#include <dune/fem/solver/umfpacksolver.hh>
 
 /*********************************************************/
 
@@ -134,7 +135,8 @@ public:
 #else
     typedef Dune::Fem::AdaptiveDiscreteFunction< VemSpaceType > DiscreteFunctionType;
     typedef Dune::Fem::SparseRowLinearOperator< DiscreteFunctionType, DiscreteFunctionType > LinearOperatorType;
-    typedef Dune::Fem::CGInverseOperator< DiscreteFunctionType > LinearInverseOperatorType;
+    //typedef Dune::Fem::CGInverseOperator< DiscreteFunctionType > LinearInverseOperatorType;
+    typedef Dune::Fem::UMFPACKOp< DiscreteFunctionType, LinearOperatorType > LinearInverseOperatorType;
 #endif
 
     /*********************************************************/
