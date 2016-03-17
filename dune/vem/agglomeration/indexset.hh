@@ -71,12 +71,15 @@ namespace Dune
         return std::make_pair( static_cast< std::size_t >( globalIndex ), globalIndex != -1 );
       }
 
+      std::pair< std::size_t, bool > globalIndex ( const ElementType &entity ) const
+      {
+        return std::make_pair( index( entity ), true );
+      }
+
       template< class Entity >
       std::pair< std::size_t, bool > globalIndex ( const Entity &entity ) const
       {
-        if( Entity::codimension == 0 )
-          return std::make_pair( index( entity ), true );
-
+        assert( Entity::codimension > 0 );
         const typename GridPartType::IndexSetType indexSet = agglomeration_.gridPart().indexSet();
         int globalIndex = -1;
         if( Entity::codimension == dimension-1 )
