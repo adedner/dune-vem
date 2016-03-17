@@ -272,6 +272,8 @@ void DifferentiableVEMEllipticOperator< JacobianOperator, Model, Constraints >
   std::vector< typename RangeLocalFunctionType::RangeType >         rphi( rangeSpace.blockMapper().maxNumDofs()*rangeBlockSize );
   std::vector< typename RangeLocalFunctionType::JacobianRangeType > rdphi( rangeSpace.blockMapper().maxNumDofs()*rangeBlockSize );
 
+  std::vector< bool > stabilization( rangeSpace.agglomeration().size() , false);
+
   const IteratorType end = rangeSpace.end();
   for( IteratorType it = rangeSpace.begin(); it != end; ++it )
   {
@@ -280,6 +282,15 @@ void DifferentiableVEMEllipticOperator< JacobianOperator, Model, Constraints >
 
     const DomainLocalFunctionType uLocal = u.localFunction( entity );
     LocalMatrixType jLocal = jOp.localMatrix( entity, entity );
+
+    if ( !stabilization[rangeSpace.agglomeration().index(entity)] )
+    {
+        const auto& stabMatrix = rangeSpace.stabilization(entity);
+        for (int r=0;r<stabMatrix.rows();++r)
+          for (int c=0;c<stabMatrix.cols();++c)
+            jLocal.add(r,c, stabMatrix[r][c]);
+        stabilization[rangeSpace.agglomeration().index(entity)] = true;
+    }
 
     const DomainBasisFunctionSetType &domainBaseSet = jLocal.domainBasisFunctionSet();
     const RangeBasisFunctionSetType &rangeBaseSet  = jLocal.rangeBasisFunctionSet();
@@ -361,6 +372,7 @@ void DifferentiableVEMEllipticOperator< JacobianOperator, Model, Constraints >
     }
     #endif
   } // end grid traversal
+
 
   // apply constraints to matrix operator
   constraints().applyToOperator( jOp );
