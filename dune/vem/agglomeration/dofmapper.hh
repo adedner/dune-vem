@@ -65,11 +65,7 @@ namespace Dune
         mapEach( element, [ &indices ] ( std::size_t i, GlobalKeyType k ) { indices[ i ] = k; } );
       }
 
-      void onSubEntity ( const ElementType &element, int i, int c, std::vector< bool > &indices ) const
-      {
-        indices.resize( numDofs( element ) );
-        DUNE_THROW( NotImplemented, "AgglomerateDofMapepr::onSubEntity not implemented, yet" );
-      }
+      void onSubEntity ( const ElementType &element, int i, int c, std::vector< bool > &filter ) const;
 
       unsigned int maxNumDofs () const { return maxNumDofs_; }
 
@@ -169,6 +165,26 @@ namespace Dune
       for( const SubEntityInfo &info : subEntityInfo_ )
         numDofs += info.numDofs * indexSet().subAgglomerates( element, info.codim );
       return numDofs;
+    }
+
+
+    template< class GridPart >
+    inline void AgglomerationDofMapper< GridPart >::onSubEntity ( const ElementType &element, int i, int c, std::vector< bool > &filter ) const
+    {
+      filter.resize( numDofs( element ) );
+      std::fill( filter.begin(), filter.end(), false );
+      const auto &refElement = Dune::ReferenceElements< typename GridPart::ctype, dimension >::general( element.type() );
+      for( const SubEntityInfo &info : subEntityInfo_ )
+      {
+        const int size = refElement.size( i, c, info.codim );
+        for( int k = 0; k < size; ++k )
+        {
+          int idx = indexSet().localIndex( element, refElement.subEntity( i, c, k, info.codim ), info.codim );
+          if( idx >= 0 )
+            filter[ idx ] = true;
+        }
+      }
+      DUNE_THROW( NotImplemented, "AgglomerateDofMapepr::onSubEntity not implemented, yet" );
     }
 
 
