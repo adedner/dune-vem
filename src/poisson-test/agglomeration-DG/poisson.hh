@@ -136,7 +136,7 @@ public:
     phi = 1;
     for( int i = 0; i < dimDomain; ++i )
       phi *= std::sin( 2*M_PI*x[ i ] );
-    phi[0] += x[0]*x[0]-x[1]*x[1]+x[0]*x[1];
+    //phi[0] += x[0]*x[0]-x[1]*x[1]+x[0]*x[1];
     // phi[0] += x[0]*x[1];
     // phi[0] += 0.5;
   }
@@ -154,8 +154,8 @@ public:
           ret[ r ][ i ] *= std::sin( 2*M_PI*x[ (i+j)%dimDomain ] );
       }
     }
-    ret[0][0] +=  2.*x[0]+x[1];
-    ret[0][1] += -2.*x[1]+x[0];
+    //ret[0][0] +=  2.*x[0]+x[1];
+    //ret[0][1] += -2.*x[1]+x[0];
     // ret[0][0] += x[1];
     // ret[0][1] += x[0];
   }
