@@ -79,12 +79,12 @@ namespace Dune
 
         const typename GridPartType::IndexSetType indexSet = agglomeration_.gridPart().indexSet();
         int globalIndex = -1;
-        if( codim == dimension-1 )
+        if( Entity::codimension == dimension-1 )
           globalIndex = edges_[ indexSet.index( entity ) ];
-        else if( codim == dimension )
+        else if( Entity::codimension == dimension )
           globalIndex = corners_[ indexSet.index( entity ) ];
         else
-          DUNE_THROW( NotImplemented, "localIndex not implemented for codim " << codim );
+          DUNE_THROW( NotImplemented, "localIndex not implemented for codim " << Entity::codimension );
         return std::make_pair( static_cast< std::size_t >( globalIndex ), globalIndex != -1 );
       }
 
