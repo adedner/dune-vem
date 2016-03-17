@@ -156,6 +156,7 @@ namespace Dune
           return info;
         } );
 
+      std::fill( codimIndex_.begin(),codimIndex_.end(), -1 );
       const int numCodims = subEntityInfo_.size();
       for( int i = 0; i < numCodims; ++i )
       {
@@ -185,6 +186,7 @@ namespace Dune
       filter.resize( numDofs( element ) );
       std::fill( filter.begin(), filter.end(), false );
       const auto &refElement = Dune::ReferenceElements< typename GridPart::ctype, dimension >::general( element.type() );
+      unsigned int localOfs = 0;
       for( const SubEntityInfo &info : subEntityInfo_ )
       {
         const int size = refElement.size( i, c, info.codim );
@@ -192,10 +194,10 @@ namespace Dune
         {
           int idx = indexSet().localIndex( element, refElement.subEntity( i, c, k, info.codim ), info.codim );
           if( idx >= 0 )
-            filter[ idx ] = true;
+            filter[ localOfs + idx ] = true;
         }
+        localOfs += info.numDofs * indexSet().subAgglomerates( element, info.codim );
       }
-      DUNE_THROW( NotImplemented, "AgglomerateDofMapepr::onSubEntity not implemented, yet" );
     }
 
 

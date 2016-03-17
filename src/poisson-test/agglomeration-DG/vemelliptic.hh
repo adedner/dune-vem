@@ -3,13 +3,13 @@
 
 #include <dune/common/fmatrix.hh>
 
-#include <dune/fem/quadrature/cachingquadrature.hh>
 #include <dune/fem/operator/common/operator.hh>
 #include <dune/fem/operator/common/stencil.hh>
+#include <dune/fem/quadrature/cachingquadrature.hh>
 
 #include <dune/fem/operator/common/differentiableoperator.hh>
 
-//#include "dirichletconstraints.hh"
+#include "dirichletconstraints.hh"
 
 // EllipticOperator
 // ----------------
@@ -17,47 +17,47 @@
 //! [Class for elliptic operator]
 struct NoConstraints
 {
-  template <class ModelType, class DiscreteFunctionSpaceType>
-  NoConstraints( const ModelType&, const DiscreteFunctionSpaceType& )
+  template< class ModelType, class DiscreteFunctionSpaceType >
+  NoConstraints ( const ModelType &, const DiscreteFunctionSpaceType & )
   {}
-  template < class DiscreteFunctionType >
-  void operator ()( const DiscreteFunctionType& u, DiscreteFunctionType& w ) const
+  template< class DiscreteFunctionType >
+  void operator() ( const DiscreteFunctionType &u, DiscreteFunctionType &w ) const
   {}
-  template < class GridFunctionType, class DiscreteFunctionType >
-  void operator ()( const GridFunctionType& u, DiscreteFunctionType& w ) const
+  template< class GridFunctionType, class DiscreteFunctionType >
+  void operator() ( const GridFunctionType &u, DiscreteFunctionType &w ) const
   {}
-  template <class LinearOperator>
-  void applyToOperator( LinearOperator& linearOperator ) const
+  template< class LinearOperator >
+  void applyToOperator ( LinearOperator &linearOperator ) const
   {}
 };
 
 template< class DomainDiscreteFunction, class RangeDiscreteFunction, class Model,
-          class Constraints = NoConstraints>
+          class Constraints = Dune::DirichletConstraints< Model, typename RangeDiscreteFunction::DiscreteFunctionSpaceType > >
 struct VEMEllipticOperator
-: public virtual Dune::Fem::Operator< DomainDiscreteFunction, RangeDiscreteFunction >
+  : public virtual Dune::Fem::Operator< DomainDiscreteFunction, RangeDiscreteFunction >
 //! [Class for elliptic operator]
 {
 protected:
   typedef DomainDiscreteFunction DomainDiscreteFunctionType;
-  typedef RangeDiscreteFunction  RangeDiscreteFunctionType;
-  typedef Model                  ModelType;
-  typedef Constraints      ConstraintsType;           // the class taking care of boundary constraints e.g. dirichlet bc
+  typedef RangeDiscreteFunction RangeDiscreteFunctionType;
+  typedef Model ModelType;
+  typedef Constraints ConstraintsType;                // the class taking care of boundary constraints e.g. dirichlet bc
 
   typedef typename DomainDiscreteFunctionType::DiscreteFunctionSpaceType DomainDiscreteFunctionSpaceType;
-  typedef typename DomainDiscreteFunctionType::LocalFunctionType         DomainLocalFunctionType;
-  typedef typename DomainLocalFunctionType::RangeType                    DomainRangeType;
-  typedef typename DomainLocalFunctionType::JacobianRangeType            DomainJacobianRangeType;
+  typedef typename DomainDiscreteFunctionType::LocalFunctionType DomainLocalFunctionType;
+  typedef typename DomainLocalFunctionType::RangeType DomainRangeType;
+  typedef typename DomainLocalFunctionType::JacobianRangeType DomainJacobianRangeType;
   typedef typename RangeDiscreteFunctionType::DiscreteFunctionSpaceType RangeDiscreteFunctionSpaceType;
-  typedef typename RangeDiscreteFunctionType::LocalFunctionType         RangeLocalFunctionType;
-  typedef typename RangeLocalFunctionType::RangeType                    RangeRangeType;
-  typedef typename RangeLocalFunctionType::JacobianRangeType            RangeJacobianRangeType;
+  typedef typename RangeDiscreteFunctionType::LocalFunctionType RangeLocalFunctionType;
+  typedef typename RangeLocalFunctionType::RangeType RangeRangeType;
+  typedef typename RangeLocalFunctionType::JacobianRangeType RangeJacobianRangeType;
 
   // the following types must be identical for domain and range
   typedef typename RangeDiscreteFunctionSpaceType::IteratorType IteratorType;
-  typedef typename IteratorType::Entity       EntityType;
-  typedef typename EntityType::Geometry       GeometryType;
+  typedef typename IteratorType::Entity EntityType;
+  typedef typename EntityType::Geometry GeometryType;
   typedef typename RangeDiscreteFunctionSpaceType::DomainType DomainType;
-  typedef typename RangeDiscreteFunctionSpaceType::GridPartType  GridPartType;
+  typedef typename RangeDiscreteFunctionSpaceType::GridPartType GridPartType;
   typedef typename GridPartType::IntersectionIteratorType IntersectionIteratorType;
   typedef typename IntersectionIteratorType::Intersection IntersectionType;
 
@@ -67,14 +67,14 @@ protected:
 public:
   //! contructor
   VEMEllipticOperator ( const ModelType &model,
-                     const RangeDiscreteFunctionSpaceType &rangeSpace )
-  : model_( model )
-  , constraints_( model, rangeSpace )
+                        const RangeDiscreteFunctionSpaceType &rangeSpace )
+    : model_( model ),
+    constraints_( model, rangeSpace )
   {}
 
   // prepare the solution vector
-  template <class Function>
-  void prepare( const Function &func, RangeDiscreteFunctionType &u )
+  template< class Function >
+  void prepare ( const Function &func, RangeDiscreteFunctionType &u )
   {
     // set boundary values for solution
     constraints()( func, u );
@@ -97,10 +97,10 @@ private:
 // ------------------------------
 //! [Class for linearizable elliptic operator]
 template< class JacobianOperator, class Model,
-          class Constraints = NoConstraints >
+          class Constraints = Dune::DirichletConstraints< Model, typename JacobianOperator::RangeFunctionType::DiscreteFunctionSpaceType > >
 struct DifferentiableVEMEllipticOperator
-: public VEMEllipticOperator< typename JacobianOperator::DomainFunctionType, typename JacobianOperator::RangeFunctionType, Model, Constraints >,
-  public Dune::Fem::DifferentiableOperator< JacobianOperator >
+  : public VEMEllipticOperator< typename JacobianOperator::DomainFunctionType, typename JacobianOperator::RangeFunctionType, Model, Constraints >,
+    public Dune::Fem::DifferentiableOperator< JacobianOperator >
 //! [Class for linearizable VEMelliptic operator]
 {
   typedef VEMEllipticOperator< typename JacobianOperator::DomainFunctionType, typename JacobianOperator::RangeFunctionType, Model, Constraints > BaseType;
@@ -108,25 +108,25 @@ struct DifferentiableVEMEllipticOperator
   typedef JacobianOperator JacobianOperatorType;
 
   typedef typename BaseType::DomainDiscreteFunctionType DomainDiscreteFunctionType;
-  typedef typename BaseType::RangeDiscreteFunctionType  RangeDiscreteFunctionType;
+  typedef typename BaseType::RangeDiscreteFunctionType RangeDiscreteFunctionType;
   typedef typename BaseType::ModelType ModelType;
 
 protected:
   typedef typename DomainDiscreteFunctionType::DiscreteFunctionSpaceType DomainDiscreteFunctionSpaceType;
-  typedef typename DomainDiscreteFunctionType::LocalFunctionType         DomainLocalFunctionType;
-  typedef typename DomainLocalFunctionType::RangeType                    DomainRangeType;
-  typedef typename DomainLocalFunctionType::JacobianRangeType            DomainJacobianRangeType;
+  typedef typename DomainDiscreteFunctionType::LocalFunctionType DomainLocalFunctionType;
+  typedef typename DomainLocalFunctionType::RangeType DomainRangeType;
+  typedef typename DomainLocalFunctionType::JacobianRangeType DomainJacobianRangeType;
   typedef typename RangeDiscreteFunctionType::DiscreteFunctionSpaceType RangeDiscreteFunctionSpaceType;
-  typedef typename RangeDiscreteFunctionType::LocalFunctionType         RangeLocalFunctionType;
-  typedef typename RangeLocalFunctionType::RangeType                    RangeRangeType;
-  typedef typename RangeLocalFunctionType::JacobianRangeType            RangeJacobianRangeType;
+  typedef typename RangeDiscreteFunctionType::LocalFunctionType RangeLocalFunctionType;
+  typedef typename RangeLocalFunctionType::RangeType RangeRangeType;
+  typedef typename RangeLocalFunctionType::JacobianRangeType RangeJacobianRangeType;
 
   // the following types must be identical for domain and range
   typedef typename RangeDiscreteFunctionSpaceType::IteratorType IteratorType;
-  typedef typename IteratorType::Entity       EntityType;
-  typedef typename EntityType::Geometry       GeometryType;
+  typedef typename IteratorType::Entity EntityType;
+  typedef typename EntityType::Geometry GeometryType;
   typedef typename RangeDiscreteFunctionSpaceType::DomainType DomainType;
-  typedef typename RangeDiscreteFunctionSpaceType::GridPartType  GridPartType;
+  typedef typename RangeDiscreteFunctionSpaceType::GridPartType GridPartType;
   typedef typename GridPartType::IntersectionIteratorType IntersectionIteratorType;
   typedef typename IntersectionIteratorType::Intersection IntersectionType;
 
@@ -137,7 +137,7 @@ protected:
 public:
   //! contructor
   DifferentiableVEMEllipticOperator ( const ModelType &model, const RangeDiscreteFunctionSpaceType &space )
-  : BaseType( model, space )
+    : BaseType( model, space )
   {}
 
   //! method to setup the jacobian of the operator for storage in a matrix
@@ -153,7 +153,7 @@ protected:
 
 template< class DomainDiscreteFunction, class RangeDiscreteFunction, class Model, class Constraints >
 void VEMEllipticOperator< DomainDiscreteFunction, RangeDiscreteFunction, Model, Constraints >
-  ::operator() ( const DomainDiscreteFunctionType &u, RangeDiscreteFunctionType &w ) const
+::operator() ( const DomainDiscreteFunctionType &u, RangeDiscreteFunctionType &w ) const
 {
   w.clear();
   #if 0
@@ -206,19 +206,19 @@ void VEMEllipticOperator< DomainDiscreteFunction, RangeDiscreteFunction, Model, 
         //! [Compute local contribution of operator]
       }
     }
-    if (model().hasNeumanBoundary())
+    if( model().hasNeumanBoundary())
     {
-      if ( !entity.hasBoundaryIntersections() )
+      if( !entity.hasBoundaryIntersections() )
         continue;
 
       const IntersectionIteratorType iitend = dfSpace.gridPart().iend( entity );
       for( IntersectionIteratorType iit = dfSpace.gridPart().ibegin( entity ); iit != iitend; ++iit ) // looping over intersections
       {
         const IntersectionType &intersection = *iit;
-        if ( ! intersection.boundary() )
+        if( !intersection.boundary() )
           continue;
-        Dune::FieldVector<bool,RangeRangeType::dimension> components(true);
-        bool hasDirichletComponent = model().isDirichletIntersection( intersection, components);
+        Dune::FieldVector< bool, RangeRangeType::dimension > components( true );
+        bool hasDirichletComponent = model().isDirichletIntersection( intersection, components );
 
         const typename IntersectionType::Geometry &intersectionGeometry = intersection.geometry();
         FaceQuadratureType quadInside( dfSpace.gridPart(), intersection, quadOrder, FaceQuadratureType::INSIDE );
@@ -232,9 +232,9 @@ void VEMEllipticOperator< DomainDiscreteFunction, RangeDiscreteFunction, Model, 
           RangeRangeType alpha( 0 );
           model().alpha( entity, quadInside[ pt ], vu, alpha );
           alpha *= weight;
-          for(int k = 0; k < RangeRangeType::dimension; ++k)
-            if ( hasDirichletComponent && components[k] )
-              alpha[k] = 0;
+          for( int k = 0; k < RangeRangeType::dimension; ++k )
+            if( hasDirichletComponent && components[ k ] )
+              alpha[ k ] = 0;
           wLocal.axpy( quadInside[ pt ], alpha );
         }
       }
@@ -251,18 +251,18 @@ void VEMEllipticOperator< DomainDiscreteFunction, RangeDiscreteFunction, Model, 
 
 template< class JacobianOperator, class Model, class Constraints >
 void DifferentiableVEMEllipticOperator< JacobianOperator, Model, Constraints >
-  ::jacobian ( const DomainDiscreteFunctionType &u, JacobianOperator &jOp ) const
+::jacobian ( const DomainDiscreteFunctionType &u, JacobianOperator &jOp ) const
 {
   typedef typename JacobianOperator::LocalMatrixType LocalMatrixType;
   typedef typename DomainDiscreteFunctionSpaceType::BasisFunctionSetType DomainBasisFunctionSetType;
-  typedef typename RangeDiscreteFunctionSpaceType::BasisFunctionSetType  RangeBasisFunctionSetType;
+  typedef typename RangeDiscreteFunctionSpaceType::BasisFunctionSetType RangeBasisFunctionSetType;
 
   const DomainDiscreteFunctionSpaceType &domainSpace = jOp.domainSpace();
   const RangeDiscreteFunctionSpaceType  &rangeSpace = jOp.rangeSpace();
 
-  Dune::Fem::DiagonalStencil<DomainDiscreteFunctionSpaceType,RangeDiscreteFunctionSpaceType>
-    stencil( domainSpace, rangeSpace );
-  jOp.reserve(stencil);
+  Dune::Fem::DiagonalStencil< DomainDiscreteFunctionSpaceType, RangeDiscreteFunctionSpaceType >
+  stencil( domainSpace, rangeSpace );
+  jOp.reserve( stencil );
   jOp.clear();
 
   const int domainBlockSize = domainSpace.localBlockSize; // is equal to 1 for scalar functions
@@ -272,7 +272,7 @@ void DifferentiableVEMEllipticOperator< JacobianOperator, Model, Constraints >
   std::vector< typename RangeLocalFunctionType::RangeType >         rphi( rangeSpace.blockMapper().maxNumDofs()*rangeBlockSize );
   std::vector< typename RangeLocalFunctionType::JacobianRangeType > rdphi( rangeSpace.blockMapper().maxNumDofs()*rangeBlockSize );
 
-  std::vector< bool > stabilization( rangeSpace.agglomeration().size() , false);
+  std::vector< bool > stabilization( rangeSpace.agglomeration().size(), false );
 
   const IteratorType end = rangeSpace.end();
   for( IteratorType it = rangeSpace.begin(); it != end; ++it )
@@ -283,13 +283,13 @@ void DifferentiableVEMEllipticOperator< JacobianOperator, Model, Constraints >
     const DomainLocalFunctionType uLocal = u.localFunction( entity );
     LocalMatrixType jLocal = jOp.localMatrix( entity, entity );
 
-    if ( !stabilization[rangeSpace.agglomeration().index(entity)] )
+    if( !stabilization[ rangeSpace.agglomeration().index( entity ) ] )
     {
-        const auto& stabMatrix = rangeSpace.stabilization(entity);
-        for (int r=0;r<stabMatrix.rows();++r)
-          for (int c=0;c<stabMatrix.cols();++c)
-            jLocal.add(r,c, stabMatrix[r][c]);
-        stabilization[rangeSpace.agglomeration().index(entity)] = true;
+      const auto &stabMatrix = rangeSpace.stabilization( entity );
+      for( std::size_t r = 0; r < stabMatrix.rows(); ++r )
+        for( std::size_t c = 0; c < stabMatrix.cols(); ++c )
+          jLocal.add( r, c, 10*stabMatrix[ r ][ c ] );
+      stabilization[ rangeSpace.agglomeration().index( entity ) ] = true;
     }
 
     const DomainBasisFunctionSetType &domainBaseSet = jLocal.domainBasisFunctionSet();
@@ -323,7 +323,7 @@ void DifferentiableVEMEllipticOperator< JacobianOperator, Model, Constraints >
       for( unsigned int localCol = 0; localCol < domainNumBasisFunctions; ++localCol )
       {
         // if mass terms or right hand side is present
-        model().linSource( u0, jacU0, entity, quadrature[ pt ], phi[ localCol ], dphi[localCol], aphi );
+        model().linSource( u0, jacU0, entity, quadrature[ pt ], phi[ localCol ], dphi[ localCol ], aphi );
 
         // if gradient term is present
         model().linDiffusiveFlux( u0, jacU0, entity, quadrature[ pt ], phi[ localCol ], dphi[ localCol ], adphi );
@@ -334,19 +334,19 @@ void DifferentiableVEMEllipticOperator< JacobianOperator, Model, Constraints >
       //! [Assembling the local matrix]
     }
 #if 0
-    if (model().hasNeumanBoundary())
+    if( model().hasNeumanBoundary())
     {
-      if ( !entity.hasBoundaryIntersections() )
+      if( !entity.hasBoundaryIntersections() )
         continue;
 
       const IntersectionIteratorType iitend = rangeSpace.gridPart().iend( entity );
       for( IntersectionIteratorType iit = rangeSpace.gridPart().ibegin( entity ); iit != iitend; ++iit ) // looping over intersections
       {
         const IntersectionType &intersection = *iit;
-        if ( ! intersection.boundary() )
+        if( !intersection.boundary() )
           continue;
-        Dune::FieldVector<bool,RangeRangeType::dimension> components(true);
-        bool hasDirichletComponent = model().isDirichletIntersection( intersection, components);
+        Dune::FieldVector< bool, RangeRangeType::dimension > components( true );
+        bool hasDirichletComponent = model().isDirichletIntersection( intersection, components );
 
         const typename IntersectionType::Geometry &intersectionGeometry = intersection.geometry();
         FaceQuadratureType quadInside( rangeSpace.gridPart(), intersection, domainSpace.order()+rangeSpace.order(), FaceQuadratureType::INSIDE );
@@ -362,9 +362,9 @@ void DifferentiableVEMEllipticOperator< JacobianOperator, Model, Constraints >
           {
             RangeRangeType alpha( 0 );
             model().linAlpha( u0, entity, quadInside[ pt ], phi[ localCol ], alpha );
-            for(int k = 0; k < RangeRangeType::dimension; ++k)
-              if ( hasDirichletComponent && components[k] )
-                alpha[k] = 0;
+            for( int k = 0; k < RangeRangeType::dimension; ++k )
+              if( hasDirichletComponent && components[ k ] )
+                alpha[ k ] = 0;
             jLocal.column( localCol ).axpy( phi, alpha, weight );
           }
         }
