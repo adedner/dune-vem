@@ -43,6 +43,7 @@
 #include "femscheme.hh"
 #include "vemscheme.hh"
 
+#include "problems/anisotropic.hh"
 #include "problems/cosinusproduct.hh"
 #include "problems/sinusproduct.hh"
 #include "problems/cosinusproductmixedbc.hh"
@@ -123,7 +124,7 @@ try
   typedef DiffusionModel< FunctionSpaceType, GridPart > ModelType;
   typedef typename ModelType::ProblemType ProblemType ;
   std::unique_ptr< ProblemType > problemPtr;
-  const std::string problemNames [] = { "cos", "sphere", "sin",  "mixedcos", "corner", "curvedridges" };
+  const std::string problemNames [] = { "cos", "sphere", "sin", "mixedcos", "corner", "curvedridges", "anisotropic" };
   const int problemNumber = Dune::Fem::Parameter::getEnum( "poisson.problem", problemNames );
 
   switch( problemNumber )
@@ -150,6 +151,10 @@ try
 
   case 5:
     problemPtr.reset( new CurvedRidges< FunctionSpaceType >() );
+    break;
+
+  case 6:
+    problemPtr.reset( new AnisotropicProblem< FunctionSpaceType >() );
     break;
 
   default:

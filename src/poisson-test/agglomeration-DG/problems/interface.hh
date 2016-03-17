@@ -48,12 +48,13 @@ struct ProblemInterface
   virtual void uJacobian ( const DomainType &x, JacobianRangeType &value ) const { value = 0; }
 
   //! diffusion coefficient (default = Id)
-  virtual void D ( const DomainType &x, DiffusionTensorType &D ) const
+  virtual DiffusionTensorType diffusionTensor ( const DomainType &x ) const
   {
     // set to identity by default
-    D = 0;
+    DiffusionTensorType D( 0 );
     for( int i = 0; i < D.rows; ++i )
       D[ i ][ i ] = 1;
+    return D;
   }
 
   //! return true if Dirichlet boundary is present (default is false)

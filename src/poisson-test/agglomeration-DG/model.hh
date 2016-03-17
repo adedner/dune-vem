@@ -100,8 +100,9 @@ public:
                           const JacobianRangeType &gradient,
                           JacobianRangeType &flux ) const
   {
-    // the flux is simply the identity
-    flux = gradient;
+    const DomainType xGlobal = entity.geometry().global( coordinate( x ) );
+    for( std::size_t i = 0; i < flux.rows; ++i )
+      problem_.diffusionTensor( xGlobal ).mv( gradient[ i ], flux[ i ] );
   }
 
   template< class Entity, class Point >
