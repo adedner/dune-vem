@@ -8,7 +8,8 @@
 #include <dune/fem/io/parameter.hh>
 #include <dune/fem/quadrature/quadrature.hh>
 
-#include "probleminterface.hh"
+#include "problems/interface.hh"
+
 
 // DiffusionModel
 // --------------

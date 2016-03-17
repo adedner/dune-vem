@@ -42,7 +42,13 @@
 
 #include "femscheme.hh"
 #include "vemscheme.hh"
-#include "poisson.hh"
+
+#include "problems/cosinusproduct.hh"
+#include "problems/sinusproduct.hh"
+#include "problems/cosinusproductmixedbc.hh"
+#include "problems/reentrantcorner.hh"
+#include "problems/sphereproblem.hh"
+#include "problems/curvedridges.hh"
 
 
 namespace Gmsh

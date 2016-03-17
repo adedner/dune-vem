@@ -70,7 +70,7 @@
 #include <dune/fem/io/parameter.hh>
 
 // local includes
-#include "probleminterface.hh"
+#include "problems/interface.hh"
 
 #include "model.hh"
 
