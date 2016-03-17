@@ -38,7 +38,7 @@ namespace Dune
 
       typedef FieldVector< typename GridPartType::ctype, GridPartType::dimensionworld > GlobalCoordinate;
 
-      typedef typename GridPartType::template Codim< 0 >::EntityType EntityType;
+      typedef typename GridPartType::template Codim< 0 >::EntityType ElementType;
 
     private:
       struct Agglomerate;
@@ -46,25 +46,25 @@ namespace Dune
     public:
       explicit AgglomerationIndexSet ( const AgglomerationType &agglomeration, AllocatorType allocator = AllocatorType() );
 
-      std::size_t index ( const EntityType &entity ) const { return agglomeration_.index( entity ); }
+      std::size_t index ( const ElementType &element ) const { return agglomeration_.index( element ); }
 
-      std::size_t subIndex ( const EntityType &entity, int i, int codim ) const
+      std::size_t subIndex ( const ElementType &element, int i, int codim ) const
       {
         assert( ( codim >= 0 ) && ( codim <= dimension ) );
-        return ( codim == 0 ? index( entity ) : agglomerate( entity ).index( i, dimension - codim ));
+        return ( codim == 0 ? index( element ) : agglomerate( element ).index( i, dimension - codim ));
       }
 
-      int localIndex ( const EntityType &entity, int i, int codim ) const
+      int localIndex ( const ElementType &element, int i, int codim ) const
       {
         assert( ( codim >= 0 ) && ( codim <= dimension ) );
         if( codim == 0 )
           return 0;
         assert( codim == dimension );
         const typename GridPartType::IndexSetType indexSet = agglomeration_.gridPart().indexSet();
-        const int globalIndexInPolygonalGrid = corners_[ indexSet.subIndex( entity, i, codim ) ];
+        const int globalIndexInPolygonalGrid = corners_[ indexSet.subIndex( element, i, codim ) ];
         if( globalIndexInPolygonalGrid == -1 )
           return -1;
-        auto &localAgg = agglomerate( entity );
+        auto &localAgg = agglomerate( element );
         for( std::size_t k = 0; k < localAgg.size( dimension-codim ); ++k )
           if( localAgg.index( k, dimension-codim ) == static_cast< std::size_t >( globalIndexInPolygonalGrid ) )
             return k;
@@ -72,17 +72,17 @@ namespace Dune
         return -1;
       }
 
-      int localEdgeIndex ( const EntityType &entity, int i, int codim ) const
+      int localEdgeIndex ( const ElementType &element, int i, int codim ) const
       {
         assert( ( codim >= 0 ) && ( codim <= dimension ) );
         if( codim == 0 )
           return 0;
         assert( codim == dimension-1 );     // for edges
         const typename GridPartType::IndexSetType indexSet = agglomeration_.gridPart().indexSet();
-        int globalEdgeIndexInPolygonalGrid = edges_[ indexSet.subIndex( entity, i, codim ) ];
+        int globalEdgeIndexInPolygonalGrid = edges_[ indexSet.subIndex( element, i, codim ) ];
         if( globalEdgeIndexInPolygonalGrid == -1 )
           return -1;
-        auto &localAgg = agglomerate( entity );
+        auto &localAgg = agglomerate( element );
         for( std::size_t k = 0; k < localAgg.size( dimension-codim ); ++k )
           if( localAgg.index( k, dimension-codim ) == static_cast< std::size_t >( globalEdgeIndexInPolygonalGrid ) )
             return k;
@@ -91,10 +91,10 @@ namespace Dune
       }
 
 
-      int numPolyVertices ( const EntityType &entity, int codim ) const
+      int numPolyVertices ( const ElementType &element, int codim ) const
       {
         assert(( codim > 0 ) && ( codim == dimension ));
-        return agglomerate( entity ).size( dimension-codim );
+        return agglomerate( element ).size( dimension-codim );
       }
 
       /**
@@ -112,12 +112,12 @@ namespace Dune
       /**
        * obtain number of subagglomerates
        *
-       * \param[in]  entity  any entity belonging to the agglomerate
+       * \param[in]  element  any element belonging to the agglomerate
        * \param[in]  codim   codimension of the subagglomerates
        */
-      std::size_t subAgglomerates ( const EntityType &entity, int codim ) const
+      std::size_t subAgglomerates ( const ElementType &element, int codim ) const
       {
-        return subAgglomerates( index( entity ), codim );
+        return subAgglomerates( index( element ), codim );
       }
 
       std::size_t maxSubAgglomerates ( int codim ) const
@@ -137,7 +137,7 @@ namespace Dune
 
     private:
       const Agglomerate &agglomerate ( std::size_t agglomerateIndex ) const { return agglomerates_[ agglomerateIndex ]; }
-      const Agglomerate &agglomerate ( const EntityType &entity ) const { return agglomerate( index( entity ) ); }
+      const Agglomerate &agglomerate ( const ElementType &element ) const { return agglomerate( index( element ) ); }
 
       const AgglomerationType &agglomeration_;
       AllocatorType allocator_;
