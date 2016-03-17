@@ -61,7 +61,12 @@ namespace Dune
           return 0;
         assert( codim == dimension );
         const typename GridPartType::IndexSetType indexSet = agglomeration_.gridPart().indexSet();
-        const int globalIndexInPolygonalGrid = corners_[ indexSet.subIndex( element, i, codim ) ];
+        if( codim == dimension-1 )
+          const int globalEdgeIndexInPolygonalGrid = edges_[ indexSet.subIndex( element, i, codim ) ];
+        else if( codim == dimension )
+          const int globalIndexInPolygonalGrid = corners_[ indexSet.subIndex( element, i, codim ) ];
+        else
+          DUNE_THROW( NotImplemented, "localIndex not implemented for codim " << codim );
         if( globalIndexInPolygonalGrid == -1 )
           return -1;
         auto &localAgg = agglomerate( element );
@@ -71,25 +76,6 @@ namespace Dune
         assert( false );
         return -1;
       }
-
-      int localEdgeIndex ( const ElementType &element, int i, int codim ) const
-      {
-        assert( ( codim >= 0 ) && ( codim <= dimension ) );
-        if( codim == 0 )
-          return 0;
-        assert( codim == dimension-1 );     // for edges
-        const typename GridPartType::IndexSetType indexSet = agglomeration_.gridPart().indexSet();
-        int globalEdgeIndexInPolygonalGrid = edges_[ indexSet.subIndex( element, i, codim ) ];
-        if( globalEdgeIndexInPolygonalGrid == -1 )
-          return -1;
-        auto &localAgg = agglomerate( element );
-        for( std::size_t k = 0; k < localAgg.size( dimension-codim ); ++k )
-          if( localAgg.index( k, dimension-codim ) == static_cast< std::size_t >( globalEdgeIndexInPolygonalGrid ) )
-            return k;
-        assert( false );
-        return -1;
-      }
-
 
       int numPolyVertices ( const ElementType &element, int codim ) const
       {
