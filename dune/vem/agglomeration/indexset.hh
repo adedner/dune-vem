@@ -60,14 +60,9 @@ namespace Dune
         if( codim == 0 )
           return std::make_pair( index( element ), true );
 
+        const auto &refElement = ReferenceElements< typename GridPart::ctype, dimension >::general( element.type() );
         const typename GridPartType::IndexSetType indexSet = agglomeration_.gridPart().indexSet();
-        int globalIndex = -1;
-        if( codim == dimension-1 )
-          globalIndex = edges_[ indexSet.subIndex( element, i, codim ) ];
-        else if( codim == dimension )
-          globalIndex = corners_[ indexSet.subIndex( element, i, codim ) ];
-        else
-          DUNE_THROW( NotImplemented, "localIndex not implemented for codim " << codim );
+        const int globalIndex = globalIndex_[ GlobalGeometryTypeIndex::index( refElement.type( i, codim ) ) ][ indexSet.subIndex( element, i, codim ) ];
         return std::make_pair( static_cast< std::size_t >( globalIndex ), globalIndex != -1 );
       }
 
@@ -81,13 +76,7 @@ namespace Dune
       {
         assert( Entity::codimension > 0 );
         const typename GridPartType::IndexSetType indexSet = agglomeration_.gridPart().indexSet();
-        int globalIndex = -1;
-        if( Entity::codimension == dimension-1 )
-          globalIndex = edges_[ indexSet.index( entity ) ];
-        else if( Entity::codimension == dimension )
-          globalIndex = corners_[ indexSet.index( entity ) ];
-        else
-          DUNE_THROW( NotImplemented, "localIndex not implemented for codim " << Entity::codimension );
+        const int globalIndex = globalIndex_[ GlobalGeometryTypeIndex::index( entity.type() ) ][ indexSet.index( entity ) ];
         return std::make_pair( static_cast< std::size_t >( globalIndex ), globalIndex != -1 );
       }
 
@@ -161,8 +150,7 @@ namespace Dune
       std::vector< Agglomerate > agglomerates_;
       std::array< std::size_t, dimension+1 > size_;
       std::array< std::size_t, dimension+1 > maxSubAgglomerates_;
-      std::vector< int > corners_;
-      std::vector< int > edges_;
+      std::vector< std::vector< int > > globalIndex_;
     };
 
 
@@ -360,31 +348,32 @@ namespace Dune
         agglomerates_.emplace_back( c, allocator_ );
       }
 
-      // copy corners
+      // copy subentities
 
-      corners_.resize( indexSet.size( dimension ), -1 );
-      for( const auto vertex : vertices( static_cast< typename GridPart::GridViewType >( agglomeration_.gridPart() ), Partitions::interiorBorder ) )
+      globalIndex_.resize( GlobalGeometryTypeIndex::size( dimension-1 ) );
+      for( int codim = 1; codim <= dimension; ++codim )
       {
-        const std::size_t typeIndex = GlobalGeometryTypeIndex::index( vertex.type() );
-        const auto &subAgs = subAgglomerates[ typeIndex ];
-        const auto vertexIndex = indexSet.index( vertex );
-        const auto pos = std::lower_bound( subAgs.begin(), subAgs.end(), vertexIndex );
-        if( ( pos != subAgs.end()) && ( *pos == vertexIndex ) )
-          corners_[ vertexIndex ]
-            = offset[ typeIndex ] + static_cast< std::size_t >( pos - subAgs.begin() );
+        for( const GeometryType type : indexSet.types( codim ) )
+          globalIndex_[ GlobalGeometryTypeIndex::index( type ) ].resize( indexSet.size( type ), -1 );
       }
 
-      // copy edges
-      edges_.resize( indexSet.size( dimension-1 ), -1 );
-      for( const auto edge : edges( static_cast< typename GridPart::GridViewType >( agglomeration_.gridPart() ), Partitions::interiorBorder ) )
+      for( const auto element : elements( static_cast< typename GridPart::GridViewType >( agglomeration_.gridPart() ), Partitions::interiorBorder ) )
       {
-        const std::size_t typeIndex = GlobalGeometryTypeIndex::index( edge.type() );
-        const auto &subAgs = subAgglomerates[ typeIndex ];
-        const auto edgeIndex = indexSet.index( edge );
-        const auto pos = std::lower_bound( subAgs.begin(), subAgs.end(), edgeIndex );
-        if( ( pos != subAgs.end()) && ( *pos == edgeIndex ) )
-          edges_[ edgeIndex ]
-            = offset[ typeIndex ] + static_cast< std::size_t >( pos - subAgs.begin() );
+        const auto &refElement = ReferenceElements< typename GridPart::ctype, dimension >::general( element.type() );
+
+        for( int codim = 1; codim <= dimension; ++codim )
+        {
+          const int numSubEntities = refElement.size( codim );
+          for( int i = 0; i < numSubEntities; ++i )
+          {
+            const std::size_t typeIndex = GlobalGeometryTypeIndex::index( refElement.type( i, codim ) );
+            const auto &subAgs = subAgglomerates[ typeIndex ];
+            const auto index = indexSet.subIndex( element, i, codim );
+            const auto pos = std::lower_bound( subAgs.begin(), subAgs.end(), index );
+            if( ( pos != subAgs.end()) && ( *pos == index ) )
+              globalIndex_[ typeIndex ][ index ] = offset[ typeIndex ] + static_cast< std::size_t >( pos - subAgs.begin() );
+          }
+        }
       }
     }
 
