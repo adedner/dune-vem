@@ -7,6 +7,7 @@ set( HEADERS
   dofmapper.hh
   functor.hh
   indexset.hh
+  shapefunctionset.hh
 )
 
 install( FILES ${HEADERS} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/dune/vem/agglomeration )

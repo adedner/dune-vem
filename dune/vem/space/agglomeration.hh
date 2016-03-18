@@ -172,10 +172,10 @@ namespace Dune
       {
         const auto &bbox = boundingBoxes_[ agglomerate ];
 
-        const std::size_t numSubAgglomerates = blockMapper().indexSet().subAgglomerates( agglomerate, GridPart::dimension );
+        const std::size_t numDofs = blockMapper().numDofs( agglomerate );
         for( auto &row : DT )
-          row.resize( numSubAgglomerates );
-        pi0XT.resize( numSubAgglomerates );
+          row.resize( numDofs );
+        pi0XT.resize( numDofs );
 
         DomainFieldType H0 = 0;
         std::fill( pi0XT.begin(), pi0XT.end(), DomainType( 0 ) );
@@ -215,6 +215,46 @@ namespace Dune
               } );
           }
 
+#if 0
+          if( polOrder > 1 )
+          {
+            const auto &idSet = agglomeration().gridPart().grid().globalIdSet();
+            for( int i = 0; i < refElement.size( GridPart::dimension-1 ); ++i )
+            {
+              const int k = blockMapper().indexSet().localIndex( element, i, 1 );
+              if( k == -1 )
+                continue;
+
+              const auto left = idSet.subId( element, refElement.subEntity( i, dimension-1, 0, dimension ), dimension );
+              const auto right = idSet.subId( element, refElement.subEntity( i, dimension-1, 1, dimension ), dimension );
+
+              const auto subEntity = element.template subEntity< GridPart::dimension-1 >( i );
+              const auto geometry = subEntity.geometry();
+
+              for( std::size_t alpha = 0; alpha < numShapeFunctions; ++alpha )
+                DT[ alpha ][ k ] = 0;
+
+              typedef Dune::QuadratureRules< typename GridPart::ctype, 1 > QuadratureRules;
+              for( const auto &qp : QuadratureRules::rule( refElement.type( i, GridPart::dimension-1 ) ), order )
+              {
+                typedef typename decltype( geometry )::LocalCoordinate LocalCoordinate;
+                LocalCoordinate z = (left < right ? qp.position() : LocalCoordinate{ 1 } - qp.position());
+                DomainType x = geometry.global( z ) - bbox.first;
+                for( int k = 0; k < GridPartType::dimensionworld; ++k )
+                  x[ k ] /= (bbox.second[ k ] - bbox.first[ k ]);
+
+                DomainFieldType weight = qp.weight() * geometry.integrationElement( z );
+                scalarShapeFunctionSet_.evaluateEach( x, [ &DT, k, weight ] ( std::size_t alpha, FieldVector< DomainFieldType, 1 > phi ) {
+                    DT[ alpha ][ k ] += weight * phi[ 0 ];
+                  } );
+              }
+
+              for( std::size_t alpha = 0; alpha < numShapeFunctions; ++alpha )
+                DT[ alpha ][ k ] *= DomainFieldType( 1 ) / geometry.volume();
+            }
+          }
+  #endif
+
           for( const auto &intersection : intersections( static_cast< typename GridPart::GridViewType >( gridPart() ), element ) )
           {
             if( !intersection.boundary() && (agglomeration().index( Dune::Fem::make_entity( intersection.outside() ) ) == agglomerate) )
@@ -239,7 +279,7 @@ namespace Dune
           for( std::size_t j = 0; j < numShapeFunctions; ++j )
           {
             DTD[ i ][ j ] = 0;
-            for( std::size_t k = 0; k < numSubAgglomerates; ++k )
+            for( std::size_t k = 0; k < numDofs; ++k )
               DTD[ i ][ j ] += DT[ i ][ k ] * DT[ j ][ k ];
           }
         DTD.invert();
@@ -248,24 +288,24 @@ namespace Dune
         valueProjection.resize( numShapeFunctions );
         for( std::size_t alpha = 0; alpha < numShapeFunctions; ++alpha )
         {
-          valueProjection[ alpha ].resize( numSubAgglomerates, 0 );
+          valueProjection[ alpha ].resize( numDofs, 0 );
           for( std::size_t beta = 0; beta < numShapeFunctions; ++beta )
-            for( std::size_t j = 0; j < numSubAgglomerates; ++j )
+            for( std::size_t j = 0; j < numDofs; ++j )
               valueProjection[ alpha ][ j ] += DTD[ alpha ][ beta ] * DT[ beta ][ j ];
         }
 
-        Stabilization S( numSubAgglomerates, numSubAgglomerates, 0 );
-        for( std::size_t i = 0; i < numSubAgglomerates; ++i )
+        Stabilization S( numDofs, numDofs, 0 );
+        for( std::size_t i = 0; i < numDofs; ++i )
           S[ i ][ i ] = DomainFieldType( 1 );
-        for( std::size_t i = 0; i < numSubAgglomerates; ++i )
+        for( std::size_t i = 0; i < numDofs; ++i )
           for( std::size_t alpha = 0; alpha < numShapeFunctions; ++alpha )
-            for( std::size_t j = 0; j < numSubAgglomerates; ++j )
+            for( std::size_t j = 0; j < numDofs; ++j )
               S[ i ][ j ] -= DT[ alpha ][ i ] * valueProjection[ alpha ][ j ];
         Stabilization &stabilization = stabilizations_[ agglomerate ];
-        stabilization.resize( numSubAgglomerates, numSubAgglomerates, 0 );
-        for( std::size_t k = 0; k < numSubAgglomerates; ++k )
-          for( std::size_t i = 0; i < numSubAgglomerates; ++i )
-            for( std::size_t j = 0; j < numSubAgglomerates; ++j )
+        stabilization.resize( numDofs, numDofs, 0 );
+        for( std::size_t k = 0; k < numDofs; ++k )
+          for( std::size_t i = 0; i < numDofs; ++i )
+            for( std::size_t j = 0; j < numDofs; ++j )
               stabilization[ i ][ j ] += S[ k ][ i ] * S[ k ][ j ];
 
         // Warning: This is a dirty hack
@@ -275,7 +315,7 @@ namespace Dune
         std::transform( jacobianProjection[ 0 ].begin(), jacobianProjection[ 0 ].end(), jacobianProjection[ 0 ].begin(),
                         [ H0 ] ( DomainType x ) { return x *= (1 / H0); } );
         for( std::size_t alpha = 1; alpha < numShapeFunctions; ++alpha )
-          jacobianProjection[ alpha ].resize( numSubAgglomerates, DomainType( 0 ) );
+          jacobianProjection[ alpha ].resize( numDofs, DomainType( 0 ) );
       }
     }
 
