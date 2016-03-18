@@ -111,6 +111,20 @@ namespace Dune
           DUNE_THROW( NotImplemented, "Method twist not implemented for codimension " << codim );
       }
 
+      template< class Entity >
+      int twist ( const Entity &entity ) const
+      {
+        if( Entity::codimension == dimension-1 )
+        {
+          const typename GridPartType::IndexSetType indexSet = agglomeration_.gridPart().indexSet();
+          return edgeTwist_[ indexSet.subIndex( entity ) ];
+        }
+        else if( Entity::codimension == dimension )
+          return 0;
+        else
+          DUNE_THROW( NotImplemented, "Method twist not implemented for codimension " << Entity::codimension );
+      }
+
       int numPolyVertices ( const ElementType &element, int codim ) const
       {
         assert(( codim > 0 ) && ( codim == dimension ));
