@@ -53,6 +53,7 @@
 #include <dune/fem/function/blockvectorfunction.hh>
 
 // include linear operators
+#include <dune/fem/operator/linear/denserow.hh>
 #include <dune/fem/operator/linear/spoperator.hh>
 #include <dune/fem/solver/diagonalpreconditioner.hh>
 
@@ -134,9 +135,10 @@ public:
     typedef Dune::Fem::ISTLCGOp< DiscreteFunctionType, LinearOperatorType > LinearInverseOperatorType;
 #else
     typedef Dune::Fem::AdaptiveDiscreteFunction< VemSpaceType > DiscreteFunctionType;
-    typedef Dune::Fem::SparseRowLinearOperator< DiscreteFunctionType, DiscreteFunctionType > LinearOperatorType;
-    //typedef Dune::Fem::CGInverseOperator< DiscreteFunctionType > LinearInverseOperatorType;
-    typedef Dune::Fem::UMFPACKOp< DiscreteFunctionType, LinearOperatorType > LinearInverseOperatorType;
+    typedef Dune::Fem::DenseRowLinearOperator< DiscreteFunctionType, DiscreteFunctionType > LinearOperatorType;
+    //typedef Dune::Fem::SparseRowLinearOperator< DiscreteFunctionType, DiscreteFunctionType > LinearOperatorType;
+    typedef Dune::Fem::CGInverseOperator< DiscreteFunctionType > LinearInverseOperatorType;
+    //typedef Dune::Fem::UMFPACKOp< DiscreteFunctionType, LinearOperatorType > LinearInverseOperatorType;
 #endif
 
     /*********************************************************/
@@ -172,6 +174,8 @@ public:
     {
         // assemble rhs
         assembleRHS ( implicitModel_.rightHandSide(), rhs_ );
+        // set boundary values to the rhs
+        implicitOperator_.prepare( implicitModel_.dirichletBoundary(), rhs_ );
     }
 
     //! solve the system - bool parameter
@@ -184,6 +188,27 @@ public:
             // assemble linear operator (i.e. setup matrix)
             implicitOperator_.jacobian( solution_ , linearOperator_ );
         }
+
+        // set up initial condition to satify dirichlet b.c. which is needed for iterative solvers
+        implicitOperator_.prepare( rhs_, solution_ );
+
+#if 0
+        const auto &matrix = linearOperator_.matrix();
+        for( std::size_t i = 0; i < matrix.rows(); ++i )
+          for( std::size_t j = 0; j < matrix.cols(); ++j )
+            if( matrix( i, j ) - matrix( j, i ) > 1e-10 )
+              std::cout << "Unsymmetric: " << i << ", " << j << ": " << matrix( i, j ) << " != " << matrix( j, i ) << std::endl;
+#endif
+
+#if 0
+        const auto eigenValues = matrix.eigenValues();
+        std::cout << "lambda_min: " << eigenValues.front() << ", lambda_max: " << eigenValues.back() << std::endl;
+        std::cout << "Condition: " << std::abs( eigenValues.back() ) / std::abs( eigenValues.front() ) << std::endl;
+        std::vector< double > absEV( eigenValues.size() );
+        std::transform( eigenValues.begin(), eigenValues.end(), absEV.begin(), [] ( std::complex< double > z ) { return std::abs( z ); } );
+        std::cout << "lambda_min: " << absEV.front() << ", lambda_max: " << absEV.back() << std::endl;
+        std::cout << "Condition: " << absEV.back() / absEV.front() << std::endl;
+#endif
 
         // inverse operator using linear operator
         LinearInverseOperatorType invOp( linearOperator_, solverEps_, solverEps_ );

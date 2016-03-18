@@ -153,8 +153,7 @@ namespace Dune
      *   \param[in]  entity  entity to perform Dirichlet treatment on
      */
     template< class LinearOperator, class EntityType >
-    void dirichletDofsCorrectOnEntity ( LinearOperator &linearOperator,
-                                        const EntityType &entity ) const
+    void dirichletDofsCorrectOnEntity ( LinearOperator &linearOperator, const EntityType &entity ) const
     {
       // get slave dof structure (for parallel runs)   /*@LST0S@*/
       SlaveDofsType &slaveDofs = this->slaveDofs();
@@ -193,8 +192,7 @@ namespace Dune
 
     //! set the dirichlet points to exact values
     template< class GridLocalFunctionType, class LocalFunctionType >
-    void dirichletDofTreatment ( const GridLocalFunctionType &uLocal,
-                                 LocalFunctionType &wLocal ) const
+    void dirichletDofTreatment ( const GridLocalFunctionType &uLocal, LocalFunctionType &wLocal ) const
     {
       // get entity
       const typename LocalFunctionType::EntityType &entity = wLocal.entity();
