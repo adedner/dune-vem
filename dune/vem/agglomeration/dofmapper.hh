@@ -133,6 +133,7 @@ namespace Dune
       SizeType size_;
       std::vector< SubEntityInfo > subEntityInfo_;
       std::array< int, dimension+1 > codimIndex_;
+      std::vector< bool > edgeTwist_;
     };
 
 
@@ -214,9 +215,18 @@ namespace Dune
           const SizeType subIndex = indexSet().subIndex( element, subAgglomerate, info.codim );
           SizeType index = info.offset + SizeType( info.numDofs ) * subIndex;
 
-          const SizeType end = index + info.numDofs;
-          while( index < end )
-            f( local++, index++ );
+          if( (info.codim == 1) && (edgeTwist_[ subIndex ] == 1) )
+          {
+            const SizeType begin = index;
+            for( index += info.numDofs; index > begin; )
+              f( local++, --index );
+          }
+          else
+          {
+            const SizeType end = index + info.numDofs;
+            for( ; index < end; )
+              f( local++, index++ );
+          }
         }
       }
     }
@@ -235,8 +245,16 @@ namespace Dune
         return;
 
       SizeType index = info.offset + SizeType( info.numDofs ) * result.first;
-      for( unsigned int i = 0; i < info.numDofs; ++i )
-        f( i, index++ );
+      if( (Entity::codimension == 1) && (edgeTwist_[ result.first ]) )
+      {
+        for( unsigned int i = info.numDofs; i > 0; )
+          f( --i, index++ );
+      }
+      else
+      {
+        for( unsigned int i = 0; i < info.numDofs; )
+          f( i++, index++ );
+      }
     }
 
 
@@ -250,6 +268,25 @@ namespace Dune
         info.offset = size_;
         size_ += SizeType( info.numDofs ) * SizeType( indexSet().size( info.codim ) );
         maxNumDofs_ += SizeType( info.numDofs ) * SizeType( indexSet().maxSubAgglomerates( info.codim ) );
+      }
+
+      if( dimension > 1 )
+      {
+        const auto &idSet = agglomeration().gridPart().grid().globalIdSet();
+
+        edgeTwist_.resize( indexSet().size( dimension-1 ) );
+        for( const auto element : elements( static_cast< typename GridPart::GridViewType >( agglomeration().gridPart() ), Partitions::interiorBorder ) )
+        {
+          const auto &refElement = ReferenceElements< typename GridPart::ctype, dimension >::general( element.type() );
+
+          const int numEdges = refElement.size( dimension-1 );
+          for( int i = 0; i < numEdges; ++i )
+          {
+            const auto left = idSet.subId( element, refElement.subEntity( i, dimension-1, 0, dimension ), dimension );
+            const auto right = idSet.subId( element, refElement.subEntity( i, dimension-1, 1, dimension ), dimension );
+            edgeTwist_[ indexSet().subIndex( element, i, dimension-1 ) ] = (right < left);
+          }
+        }
       }
     }
 

@@ -97,34 +97,6 @@ namespace Dune
         return -1;
       }
 
-      int twist ( const ElementType &element, int i, int codim ) const
-      {
-        assert( (codim >= 0) && (codim <= dimension) );
-        if( codim == dimension-1 )
-        {
-          const typename GridPartType::IndexSetType indexSet = agglomeration_.gridPart().indexSet();
-          return edgeTwist_[ indexSet.subIndex( element, i, codim ) ];
-        }
-        else if( codim == dimension )
-          return 0;
-        else
-          DUNE_THROW( NotImplemented, "Method twist not implemented for codimension " << codim );
-      }
-
-      template< class Entity >
-      int twist ( const Entity &entity ) const
-      {
-        if( Entity::codimension == dimension-1 )
-        {
-          const typename GridPartType::IndexSetType indexSet = agglomeration_.gridPart().indexSet();
-          return edgeTwist_[ indexSet.subIndex( entity ) ];
-        }
-        else if( Entity::codimension == dimension )
-          return 0;
-        else
-          DUNE_THROW( NotImplemented, "Method twist not implemented for codimension " << Entity::codimension );
-      }
-
       int numPolyVertices ( const ElementType &element, int codim ) const
       {
         assert(( codim > 0 ) && ( codim == dimension ));
@@ -179,7 +151,6 @@ namespace Dune
       std::array< std::size_t, dimension+1 > size_;
       std::array< std::size_t, dimension+1 > maxSubAgglomerates_;
       std::vector< std::vector< int > > globalIndex_;
-      std::vector< char > edgeTwist_;
     };
 
 
@@ -377,7 +348,7 @@ namespace Dune
         agglomerates_.emplace_back( c, allocator_ );
       }
 
-      // copy subentities and generate edge twists
+      // copy subentities
 
       globalIndex_.resize( GlobalGeometryTypeIndex::size( dimension-1 ) );
       for( int codim = 1; codim <= dimension; ++codim )
@@ -401,17 +372,6 @@ namespace Dune
             const auto pos = std::lower_bound( subAgs.begin(), subAgs.end(), index );
             if( ( pos != subAgs.end()) && ( *pos == index ) )
               globalIndex_[ typeIndex ][ index ] = offset[ typeIndex ] + static_cast< std::size_t >( pos - subAgs.begin() );
-          }
-        }
-
-        if( dimension > 1 )
-        {
-          const int numEdges = refElement.size( dimension-1 );
-          for( int i = 0; i < numEdges; ++i )
-          {
-            const auto left = indexSet.subIndex( element, refElement.subEntity( i, dimension-1, 0, dimension ), dimension );
-            const auto right = indexSet.subIndex( element, refElement.subEntity( i, dimension-1, 1, dimension ), dimension );
-            edgeTwist_[ indexSet.subIndex( element, i, dimension-1 ) ] = (left < right ? 0 : 1);
           }
         }
       }
