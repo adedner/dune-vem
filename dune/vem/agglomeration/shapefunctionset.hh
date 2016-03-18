@@ -36,72 +36,6 @@ namespace Dune
 
       static constexpr int dimDomain = DomainType::dimension;
 
-    private:
-      template< class Functor >
-      struct JacobianFunctor
-      {
-        explicit JacobianFunctor ( const std::pair< DomainType, DomainType > &bbox, Functor functor )
-          : extent( bbox.second - bbox.first ), functor_( functor )
-        {}
-
-        void operator() ( std::size_t i, JacobianRangeType jacobian )
-        {
-          for( int i = 0; i < RangeType::dimension; ++i )
-            applyScalar( jacobian[ i ] );
-          functor_( i, jacobian );
-        }
-
-        template< class ScalarJacobian >
-        void operator() ( std::size_t i, Fem::MakeVectorialExpression< ScalarJacobian, JacobianRangeType > jacobian )
-        {
-          applyScalar( jacobian.scalar()[ 0 ] );
-          functor_( i, jacobian );
-        }
-
-      private:
-        void applyScalar ( FieldVector< RangeFieldType, dimDomain > &jacobian ) const
-        {
-          for( int j = 0; j < dimDomain; ++j )
-            jacobian[ j ] /= extent[ j ]_;
-        }
-
-        DomainType extent_;
-        Functor functor_;
-      };
-
-      template< class Functor >
-      struct HessianFunctor
-      {
-        explicit HessianFunctor ( const std::pair< DomainType, DomainType > &bbox, Functor functor )
-          : extent( bbox.second - bbox.first ), functor_( functor )
-        {}
-
-        void operator() ( std::size_t i, HessianRangeType hessian )
-        {
-          for( int i = 0; i < RangeType::dimension; ++i )
-            applyScalar( hessian[ i ] );
-          functor_( i, hessian );
-        }
-
-        template< class ScalarHessian >
-        void operator() ( std::size_t i, Fem::MakeVectorialExpression< ScalarHessian, HessianRangeType > hessian )
-        {
-          applyScalar( hessian.scalar()[ 0 ] );
-          functor_( i, hessian );
-        }
-
-      private:
-        void applyScalar ( FieldMatrix< RangeFieldType, dimDomain, dimDomain > &hessian ) const
-        {
-          for( int j = 0; j < dimDomain; ++j )
-            for( int k = 0; k < dimDomain; ++k )
-              hessian[ j ][ k ] /= (extent_[ j ] * extent_[ k ]);
-        }
-
-        DomainType extent_;
-      };
-
-    public:
       BoundingBoxShapeFunctionSet () = default;
 
       BoundingBoxShapeFunctionSet ( const EntityType &entity, std::pair< DomainType, DomainType > bbox,
@@ -122,13 +56,13 @@ namespace Dune
       template< class Point, class Functor >
       void jacobianEach ( const Point &x, Functor functor ) const
       {
-        shapeFunctionSet_.jacobianEach( position( x ), JacobianFunctor< Functor >( bbox_, functor ) );
+        shapeFunctionSet_.jacobianEach( position( x ), functor );
       }
 
       template< class Point, class Functor >
       void hessianEach ( const Point &x, Functor functor ) const
       {
-        shapeFunctionSet_.hessianEach( position( x ), HessianFunctor< Functor >( bbox_, functor ) );
+        shapeFunctionSet_.hessianEach( position( x ), functor );
       }
 
       const EntityType &entity () const { assert( entity_ ); return *entity_; }
