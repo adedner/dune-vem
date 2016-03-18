@@ -135,8 +135,8 @@ public:
     typedef Dune::Fem::ISTLCGOp< DiscreteFunctionType, LinearOperatorType > LinearInverseOperatorType;
 #else
     typedef Dune::Fem::AdaptiveDiscreteFunction< VemSpaceType > DiscreteFunctionType;
-    typedef Dune::Fem::DenseRowLinearOperator< DiscreteFunctionType, DiscreteFunctionType > LinearOperatorType;
-    //typedef Dune::Fem::SparseRowLinearOperator< DiscreteFunctionType, DiscreteFunctionType > LinearOperatorType;
+    //typedef Dune::Fem::DenseRowLinearOperator< DiscreteFunctionType, DiscreteFunctionType > LinearOperatorType;
+    typedef Dune::Fem::SparseRowLinearOperator< DiscreteFunctionType, DiscreteFunctionType > LinearOperatorType;
     typedef Dune::Fem::CGInverseOperator< DiscreteFunctionType > LinearInverseOperatorType;
     //typedef Dune::Fem::UMFPACKOp< DiscreteFunctionType, LinearOperatorType > LinearInverseOperatorType;
 #endif

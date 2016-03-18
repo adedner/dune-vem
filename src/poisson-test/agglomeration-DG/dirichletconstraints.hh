@@ -193,7 +193,8 @@ namespace Dune
       std::vector< std::size_t > globalBlockDofs( localBlocks );
       space_.blockMapper().map( entity, globalBlockDofs );
       std::vector< double > values( localBlocks*localBlockSize );
-      space_.interpolation( entity )( uLocal, values );
+      //space_.interpolation( entity )( uLocal, values );
+      std::fill( values.begin(), values.end(), 0 );
 
       int localDof = 0;
 
