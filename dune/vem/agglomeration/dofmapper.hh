@@ -69,6 +69,7 @@ namespace Dune
 
       unsigned int maxNumDofs () const { return maxNumDofs_; }
 
+      unsigned int numDofs ( std::size_t agglomerate ) const;
       unsigned int numDofs ( const ElementType &element ) const;
 
       // assignment of DoFs to entities
@@ -168,6 +169,16 @@ namespace Dune
       }
 
       update();
+    }
+
+
+    template< class GridPart >
+    inline unsigned int AgglomerationDofMapper< GridPart >::numDofs ( std::size_t agglomerate ) const
+    {
+      unsigned int numDofs = 0;
+      for( const SubEntityInfo &info : subEntityInfo_ )
+        numDofs += info.numDofs * indexSet().subAgglomerates( agglomerate, info.codim );
+      return numDofs;
     }
 
 
