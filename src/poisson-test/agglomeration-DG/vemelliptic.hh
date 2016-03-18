@@ -11,8 +11,6 @@
 
 #include "dirichletconstraints.hh"
 
-// EllipticOperator
-// ----------------
 
 //! [Class for elliptic operator]
 struct NoConstraints
@@ -20,16 +18,24 @@ struct NoConstraints
   template< class ModelType, class DiscreteFunctionSpaceType >
   NoConstraints ( const ModelType &, const DiscreteFunctionSpaceType & )
   {}
+
   template< class DiscreteFunctionType >
   void operator() ( const DiscreteFunctionType &u, DiscreteFunctionType &w ) const
   {}
+
   template< class GridFunctionType, class DiscreteFunctionType >
   void operator() ( const GridFunctionType &u, DiscreteFunctionType &w ) const
   {}
+
   template< class LinearOperator >
   void applyToOperator ( LinearOperator &linearOperator ) const
   {}
 };
+
+
+
+// VEMEllipticOperator
+// -------------------
 
 template< class DomainDiscreteFunction, class RangeDiscreteFunction, class Model,
           class Constraints = Dune::DirichletConstraints< Model, typename RangeDiscreteFunction::DiscreteFunctionSpaceType > >
@@ -66,10 +72,8 @@ protected:
 
 public:
   //! contructor
-  VEMEllipticOperator ( const ModelType &model,
-                        const RangeDiscreteFunctionSpaceType &rangeSpace )
-    : model_( model ),
-    constraints_( model, rangeSpace )
+  VEMEllipticOperator ( const ModelType &model, const RangeDiscreteFunctionSpaceType &rangeSpace )
+    : model_( model ), constraints_( model, rangeSpace )
   {}
 
   // prepare the solution vector
@@ -148,8 +152,10 @@ protected:
   using BaseType::constraints;
 };
 
+
+
 // Implementation of VEMEllipticOperator
-// ----------------------------------
+// -------------------------------------
 
 template< class DomainDiscreteFunction, class RangeDiscreteFunction, class Model, class Constraints >
 void VEMEllipticOperator< DomainDiscreteFunction, RangeDiscreteFunction, Model, Constraints >

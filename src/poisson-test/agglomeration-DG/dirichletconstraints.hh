@@ -6,6 +6,9 @@
 namespace Dune
 {
 
+  // DirichletConstraints
+  // --------------------
+
   template< class Model, class DiscreteFunctionSpace >
   class DirichletConstraints
   {
@@ -19,7 +22,7 @@ namespace Dune
     typedef typename DiscreteFunctionSpaceType::GridType GridType;
 
     // types for boundary treatment
-    // ----------------------------
+
     typedef typename DiscreteFunctionSpaceType::BlockMapperType BlockMapperType;
 
     typedef Fem::SlaveDofs< DiscreteFunctionSpaceType, BlockMapperType > SlaveDofsType;
@@ -36,13 +39,7 @@ namespace Dune
                    "local block size of the space must be less or equahl to the dimension of the range of the model." );
 
     DirichletConstraints ( const ModelType &model, const DiscreteFunctionSpaceType &space )
-      : model_( model ),
-      space_( space ),
-      slaveDofs_( getSlaveDofs( space_ ) ),
-      dirichletBlocks_(),
-      // mark DoFs on the Dirichlet boundary
-      hasDirichletDofs_( false ),
-      sequence_( -1 )
+      : model_( model ), space_( space ), slaveDofs_( getSlaveDofs( space_ ) )
     {}
 
     /*! treatment of Dirichlet-DoFs for given discrete function
@@ -113,37 +110,29 @@ namespace Dune
       }
     }
 
-    /*! treatment of Dirichlet-DoFs for solution and right-hand-side
+    /**
+     * treatment of Dirichlet-DoFs for solution and right-hand-side
      *
-     *   delete rows for dirichlet-DoFs, setting diagonal element to 1.
+     * delete rows for dirichlet-DoFs, setting diagonal element to 1.
      *
-     *   \note A LagrangeDiscreteFunctionSpace is implicitly assumed.
+     * \note A LagrangeDiscreteFunctionSpace is implicitly assumed.
      *
-     *   \param[out] linearOperator  linear operator to be adjusted
+     * \param[out] linearOperator  linear operator to be adjusted
      */
     template< class LinearOperator >
     void applyToOperator ( LinearOperator &linearOperator ) const
     {
       updateDirichletDofs();
 
-      typedef typename DiscreteFunctionSpaceType::IteratorType IteratorType;
-      typedef typename IteratorType::Entity EntityType;
-
-      // if Dirichlet Dofs have been found, treat them
       if( hasDirichletDofs_ )
       {
-        const IteratorType end = space_.end();
-        for( IteratorType it = space_.begin(); it != end; ++it )
-        {
-          const EntityType &entity = *it;
-          // adjust linear operator
+        const GridPartType &gridPart = space_.gridPart();
+        for( const auto &entity : Dune::elements( static_cast< typename GridPartType::GridViewType >( gridPart ), Dune::Partitions::interiorBorder ) )
           dirichletDofsCorrectOnEntity( linearOperator, entity );
-        }
       }
     }
 
   protected:
-
     /*! treatment of Dirichlet-DoFs for one entity
      *
      *   delete rows for dirichlet-DoFs, setting diagonal element to 1.
@@ -208,7 +197,6 @@ namespace Dune
 
       int localDof = 0;
 
-      // iterate over face dofs and set unit row
       for( int localBlock = 0; localBlock < localBlocks; ++localBlock )
       {
         // store result to dof vector
@@ -335,14 +323,6 @@ namespace Dune
       return hasDirichletBoundary;
     }
 
-    //! pointer to slave dofs
-    const ModelType &model_;
-    const DiscreteFunctionSpaceType &space_;
-    SlaveDofsType *const slaveDofs_;
-    mutable std::vector< DirichletBlock > dirichletBlocks_;
-    mutable bool hasDirichletDofs_;
-    mutable int sequence_;
-
     // return slave dofs
     static SlaveDofsType *getSlaveDofs ( const DiscreteFunctionSpaceType &space )
     {
@@ -357,7 +337,21 @@ namespace Dune
       return *slaveDofs_;
     }
     class DirichletBuilder;
+
+    //! pointer to slave dofs
+    const ModelType &model_;
+    const DiscreteFunctionSpaceType &space_;
+    SlaveDofsType *const slaveDofs_;
+    mutable std::vector< DirichletBlock > dirichletBlocks_;
+    mutable bool hasDirichletDofs_ = false;
+    mutable int sequence_ = -1;
+
   };
+
+
+
+  // DirichletConstraints::DirichletBuilder
+  // --------------------------------------
 
   template< class Model, class Space >
   class DirichletConstraints< Model, Space >::DirichletBuilder
