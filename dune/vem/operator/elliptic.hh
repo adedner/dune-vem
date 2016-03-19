@@ -1,5 +1,5 @@
-#ifndef VEMELLIPTIC_HH
-#define VEMELLIPTIC_HH
+#ifndef DUNE_VEM_OPERATOR_ELLIPTIC_HH
+#define DUNE_VEM_OPERATOR_ELLIPTIC_HH
 
 #include <dune/common/fmatrix.hh>
 
@@ -365,4 +365,4 @@ void DifferentiableVEMEllipticOperator< JacobianOperator, Model, Constraints >
   jOp.communicate();
 }
 
-#endif // #ifndef VEMELLIPTIC_HH
+#endif // #ifndef DUNE_VEM_OPERATOR_ELLIPTIC_HH

@@ -71,12 +71,13 @@
 // include parameter handling
 #include <dune/fem/io/parameter.hh>
 
+#include <dune/vem/operator/elliptic.hh>
+
 // local includes
 #include "problems/interface.hh"
 
 #include "model.hh"
 
-#include "vemelliptic.hh"
 #include "rhs.hh"
 
 
