@@ -105,7 +105,7 @@ namespace Dune
       template< class Point, class DofVector >
       void axpy ( const Point &x, const JacobianRangeType &jacobianFactor, DofVector &dofs ) const
       {
-        shapeFunctionSet_.jacobianEach( position( x ), [ this, &jacobianFactor, &dofs ] ( std::size_t alpha, RangeType phi_alpha ) {
+        shapeFunctionSet_.evaluateEach( position( x ), [ this, &jacobianFactor, &dofs ] ( std::size_t alpha, RangeType phi_alpha ) {
             for( std::size_t j = 0; j < size(); ++j )
               for( int k = 0; k < dimDomain; ++k )
               {
