@@ -43,9 +43,6 @@ namespace Dune
       typedef typename RangeLocalFunctionType::RangeType RangeRangeType;
       typedef typename RangeLocalFunctionType::JacobianRangeType RangeJacobianRangeType;
 
-      typedef typename RangeDiscreteFunctionSpaceType::IteratorType IteratorType;
-      typedef typename IteratorType::Entity EntityType;
-      typedef typename EntityType::Geometry GeometryType;
       typedef typename RangeDiscreteFunctionSpaceType::DomainType DomainType;
       typedef typename RangeDiscreteFunctionSpaceType::GridPartType GridPartType;
 
@@ -96,9 +93,6 @@ namespace Dune
       typedef typename RangeLocalFunctionType::RangeType RangeRangeType;
       typedef typename RangeLocalFunctionType::JacobianRangeType RangeJacobianRangeType;
 
-      typedef typename RangeDiscreteFunctionSpaceType::IteratorType IteratorType;
-      typedef typename IteratorType::Entity EntityType;
-      typedef typename EntityType::Geometry GeometryType;
       typedef typename RangeDiscreteFunctionSpaceType::DomainType DomainType;
       typedef typename RangeDiscreteFunctionSpaceType::GridPartType GridPartType;
 
@@ -134,7 +128,7 @@ namespace Dune
       const GridPartType &gridPart = w.gridPart();
       for( const auto &entity : Dune::elements( static_cast< typename GridPartType::GridViewType >( gridPart ), Dune::Partitions::interiorBorder ) )
       {
-        const GeometryType &geometry = entity.geometry();
+        const auto geometry = entity.geometry();
 
         const DomainLocalFunctionType uLocal = u.localFunction( entity );
         RangeLocalFunctionType wLocal = w.localFunction( entity );
@@ -244,7 +238,7 @@ namespace Dune
       const GridPartType &gridPart = rangeSpace.gridPart();
       for( const auto &entity : Dune::elements( static_cast< typename GridPartType::GridViewType >( gridPart ), Dune::Partitions::interiorBorder ) )
       {
-        const GeometryType &geometry = entity.geometry();
+        const auto geometry = entity.geometry();
 
         const DomainLocalFunctionType uLocal = u.localFunction( entity );
         LocalMatrixType jLocal = jOp.localMatrix( entity, entity );
