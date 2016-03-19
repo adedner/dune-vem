@@ -191,7 +191,7 @@ public:
         }
 
         // set up initial condition to satify dirichlet b.c. which is needed for iterative solvers
-        implicitOperator_.prepare( rhs_, solution_ );
+        implicitOperator_.constraints()( rhs_, solution_ );
 
 #if 0
         const auto &matrix = linearOperator_.matrix();

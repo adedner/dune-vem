@@ -57,12 +57,6 @@ namespace Dune
         : model_( model ), constraints_( model, rangeSpace )
       {}
 
-      template< class Function >
-      void prepare ( const Function &func, RangeDiscreteFunctionType &u )
-      {
-        constraints()( func, u );
-      }
-
       virtual void operator() ( const DomainDiscreteFunctionType &u, RangeDiscreteFunctionType &w ) const;
 
       const ModelType &model () const { return model_; }
