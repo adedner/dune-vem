@@ -145,7 +145,7 @@ public:
     /*********************************************************/
 
     //! define Laplace operator
-    typedef DifferentiableVEMEllipticOperator < LinearOperatorType, ModelType > EllipticOperatorType;
+    typedef Dune::Vem::DifferentiableEllipticOperator < LinearOperatorType, ModelType > EllipticOperatorType;
 
     VemScheme ( GridPartType &gridPart, const ModelType& implicitModel, const AgglomerationType& agglomeration )
     : implicitModel_( implicitModel ),
