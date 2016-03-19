@@ -167,7 +167,7 @@ namespace Dune
       typedef typename GridPart::template Codim< 0 >::EntitySeedType ElementSeedType;
 
       std::vector< std::vector< ElementSeedType > > entitySeeds( agglomeration().size() );
-      for( const auto &element : elements( static_cast< typename GridPart::GridViewType >( gridPart() ), Partitions::interiorBorder ) )
+      for( const ElementType &element : elements( static_cast< typename GridPart::GridViewType >( gridPart() ), Partitions::interiorBorder ) )
         entitySeeds[ agglomeration().index( element ) ].push_back( element.seed() );
 
       const std::size_t numShapeFunctions = scalarShapeFunctionSet_.size();

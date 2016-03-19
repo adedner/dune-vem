@@ -28,7 +28,9 @@ namespace Dune
       typedef typename ElementType::Geometry::ctype ctype;
 
     public:
-      AgglomerationVEMInterpolation ( const AgglomerationIndexSet &indexSet ) : indexSet_( indexSet ) {}
+      explicit AgglomerationVEMInterpolation ( const AgglomerationIndexSet &indexSet ) noexcept
+        : indexSet_( indexSet )
+      {}
 
       template< class LocalFunction, class LocalDofVector >
       void operator() ( const LocalFunction &localFunction, LocalDofVector &localDofVector ) const
@@ -76,6 +78,18 @@ namespace Dune
     private:
       const AgglomerationIndexSet &indexSet_;
     };
+
+
+
+    // agglomerationVEMInterpolation
+    // -----------------------------
+
+    template< class AgglomerationIndexSet >
+    inline static AgglomerationVEMInterpolation< AgglomerationIndexSet >
+    agglomerationVEMInterpolation ( const AgglomerationIndexSet &indexSet ) noexcept
+    {
+      return AgglomerationVEMInterpolation< AgglomerationIndexSet >( indexSet );
+    }
 
   } // namespace Vem
 
