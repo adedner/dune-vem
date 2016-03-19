@@ -1,6 +1,8 @@
 #ifndef DUNE_VEM_OPERATOR_ELLIPTIC_HH
 #define DUNE_VEM_OPERATOR_ELLIPTIC_HH
 
+#include <cstddef>
+
 #include <dune/common/fmatrix.hh>
 
 #include <dune/fem/operator/common/operator.hh>
@@ -46,8 +48,6 @@ namespace Dune
       typedef typename EntityType::Geometry GeometryType;
       typedef typename RangeDiscreteFunctionSpaceType::DomainType DomainType;
       typedef typename RangeDiscreteFunctionSpaceType::GridPartType GridPartType;
-      typedef typename GridPartType::IntersectionIteratorType IntersectionIteratorType;
-      typedef typename IntersectionIteratorType::Intersection IntersectionType;
 
       typedef Dune::Fem::CachingQuadrature< GridPartType, 0 > QuadratureType;
       typedef Dune::Fem::ElementQuadrature< GridPartType, 1 > FaceQuadratureType;
@@ -101,8 +101,6 @@ namespace Dune
       typedef typename EntityType::Geometry GeometryType;
       typedef typename RangeDiscreteFunctionSpaceType::DomainType DomainType;
       typedef typename RangeDiscreteFunctionSpaceType::GridPartType GridPartType;
-      typedef typename GridPartType::IntersectionIteratorType IntersectionIteratorType;
-      typedef typename IntersectionIteratorType::Intersection IntersectionType;
 
       typedef typename BaseType::QuadratureType QuadratureType;
       typedef typename BaseType::FaceQuadratureType FaceQuadratureType;
@@ -154,8 +152,8 @@ namespace Dune
 
         {
           QuadratureType quadrature( entity, quadOrder );
-          const size_t numQuadraturePoints = quadrature.nop();
-          for( size_t pt = 0; pt < numQuadraturePoints; ++pt )
+          const std::size_t numQuadraturePoints = quadrature.nop();
+          for( std::size_t pt = 0; pt < numQuadraturePoints; ++pt )
           {
             const typename QuadratureType::CoordinateType &x = quadrature.point( pt );
             const double weight = quadrature.weight( pt ) * geometry.integrationElement( x );
@@ -177,24 +175,20 @@ namespace Dune
           }
         }
 
-        if( model().hasNeumanBoundary() )
+        if( model().hasNeumanBoundary() && entity.hasBoundaryIntersections() )
         {
-          if( !entity.hasBoundaryIntersections() )
-            continue;
-
-          const IntersectionIteratorType iitend = dfSpace.gridPart().iend( entity );
-          for( IntersectionIteratorType iit = dfSpace.gridPart().ibegin( entity ); iit != iitend; ++iit )
+          for( const auto &intersection : Dune::intersections( static_cast< typename GridPartType::GridViewType >( gridPart ), entity ) )
           {
-            const IntersectionType &intersection = *iit;
             if( !intersection.boundary() )
               continue;
+
             Dune::FieldVector< bool, RangeRangeType::dimension > components( true );
             bool hasDirichletComponent = model().isDirichletIntersection( intersection, components );
 
-            const typename IntersectionType::Geometry &intersectionGeometry = intersection.geometry();
+            const auto intersectionGeometry = intersection.geometry();
             FaceQuadratureType quadInside( dfSpace.gridPart(), intersection, quadOrder, FaceQuadratureType::INSIDE );
-            const size_t numQuadraturePoints = quadInside.nop();
-            for( size_t pt = 0; pt < numQuadraturePoints; ++pt )
+            const std::size_t numQuadraturePoints = quadInside.nop();
+            for( std::size_t pt = 0; pt < numQuadraturePoints; ++pt )
             {
               const typename FaceQuadratureType::LocalCoordinateType &x = quadInside.localPoint( pt );
               double weight = quadInside.weight( pt ) * intersectionGeometry.integrationElement( x );
@@ -297,7 +291,8 @@ namespace Dune
         }
 
         if( model().hasNeumanBoundary() && entity.hasBoundaryIntersections() )
-          for( const IntersectionType &intersection : intersections( static_cast< typename GridPartType::GridViewType >( gridPart ), entity ) )
+        {
+          for( const auto &intersection : Dune::intersections( static_cast< typename GridPartType::GridViewType >( gridPart ), entity ) )
           {
             if( !intersection.boundary() )
               continue;
@@ -305,10 +300,10 @@ namespace Dune
             Dune::FieldVector< bool, RangeRangeType::dimension > components( true );
             bool hasDirichletComponent = model().isDirichletIntersection( intersection, components );
 
-            const typename IntersectionType::Geometry &intersectionGeometry = intersection.geometry();
+            const auto intersectionGeometry = intersection.geometry();
             FaceQuadratureType quadInside( gridPart, intersection, domainSpace.order()+rangeSpace.order(), FaceQuadratureType::INSIDE );
             const std::size_t numQuadraturePoints = quadInside.nop();
-            for( size_t pt = 0; pt < numQuadraturePoints; ++pt )
+            for( std::size_t pt = 0; pt < numQuadraturePoints; ++pt )
             {
               const typename FaceQuadratureType::LocalCoordinateType &x = quadInside.localPoint( pt );
               double weight = quadInside.weight( pt ) * intersectionGeometry.integrationElement( x );
@@ -326,6 +321,7 @@ namespace Dune
               }
             }
           }
+        }
       }
 
       constraints().applyToOperator( jOp );
