@@ -19,7 +19,7 @@ namespace Dune
     // ---------------------------
 
     template< class Entity, class ShapeFunctionSet >
-    class BoundingBoxBasisFunctionSet
+    class BoundingBoxShapeFunctionSet
     {
       typedef BoundingBoxShapeFunctionSet< Entity, ShapeFunctionSet > ThisType;
 
@@ -38,7 +38,7 @@ namespace Dune
 
       BoundingBoxShapeFunctionSet () = default;
 
-      BoundingBoxShapeFunctionSet ( const EntityType &entity, std::pair< DomainType, DomainType > bbox,
+      BoundingBoxShapeFunctionSet ( const Entity &entity, std::pair< DomainType, DomainType > bbox,
                                     ShapeFunctionSet shapeFunctionSet = ShapeFunctionSet() )
         : entity_( &entity ), shapeFunctionSet_( std::move( shapeFunctionSet ) ), bbox_( std::move( bbox ) )
       {}
@@ -65,7 +65,9 @@ namespace Dune
         shapeFunctionSet_.hessianEach( position( x ), functor );
       }
 
-      const EntityType &entity () const { assert( entity_ ); return *entity_; }
+      // implementation-defined methods
+
+      const Entity &entity () const { assert( entity_ ); return *entity_; }
 
     private:
       template< class Point >
@@ -77,7 +79,7 @@ namespace Dune
         return y;
       }
 
-      const EntityType *entity_ = nullptr;
+      const Entity *entity_ = nullptr;
       ShapeFunctionSet shapeFunctionSet_;
       std::pair< DomainType, DomainType > bbox_;
     };

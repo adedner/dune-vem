@@ -16,7 +16,9 @@
 
 #include <dune/vem/agglomeration/boundingbox.hh>
 #include <dune/vem/agglomeration/dofmapper.hh>
+#include <dune/vem/agglomeration/shapefunctionset.hh>
 #include <dune/vem/space/basisfunctionset.hh>
+#include <dune/vem/space/interpolation.hh>
 
 namespace Dune
 {
@@ -86,6 +88,11 @@ namespace Dune
       typedef Agglomeration< GridPart > AgglomerationType;
       typedef AgglomerationIndexSet< GridPart > AgglomerationIndexSetType;
 
+    private:
+      typedef AgglomerationVEMInterpolation< AgglomerationIndexSetType > AgglomerationInterpolationType;
+      typedef typename Traits::ScalarShapeFunctionSetType ScalarShapeFunctionSetType;
+
+    public:
       typedef typename BaseType::BasisFunctionSetType BasisFunctionSetType;
 
       typedef typename BaseType::BlockMapperType BlockMapperType;
@@ -99,7 +106,7 @@ namespace Dune
 
       explicit AgglomerationVEMSpace ( GridPartType &gridPart, const AgglomerationIndexSetType &agIndexSet )
         : BaseType( gridPart ),
-          blockMapper_( agIndexSet, { std::make_pair( GridPart::dimension, 1u ) } ),
+          blockMapper_( agIndexSet, AgglomerationInterpolationType::dofsPerCodim() ),
           boundingBoxes_( boundingBoxes( agIndexSet.agglomeration() ) ),
           scalarShapeFunctionSet_( Dune::GeometryType( Dune::GeometryType::cube, GridPart::dimension ) )
       {
@@ -143,24 +150,28 @@ namespace Dune
       std::vector< typename BasisFunctionSetType::ValueProjection > valueProjections_;
       std::vector< typename BasisFunctionSetType::JacobianProjection > jacobianProjections_;
       std::vector< Stabilization > stabilizations_;
-      typename Traits::ScalarShapeFunctionSetType scalarShapeFunctionSet_;
+      ScalarShapeFunctionSetType scalarShapeFunctionSet_;
     };
 
 
+
+    // Implementation of AgglomerationVEMSpace
+    // ---------------------------------------
 
     template< class FunctionSpace, class GridPart, int polOrder >
     inline void AgglomerationVEMSpace< FunctionSpace, GridPart, polOrder >::buildProjections ()
     {
       typedef typename BasisFunctionSetType::DomainFieldType DomainFieldType;
       typedef typename BasisFunctionSetType::DomainType DomainType;
-      typedef typename GridPart::template Codim< 0 >::EntitySeedType EntitySeed;
+      typedef typename GridPart::template Codim< 0 >::EntityType ElementType;
+      typedef typename GridPart::template Codim< 0 >::EntitySeedType ElementSeedType;
 
-      std::vector< std::vector< EntitySeed > > entitySeeds( agglomeration().size() );
+      std::vector< std::vector< ElementSeedType > > entitySeeds( agglomeration().size() );
       for( const auto &element : elements( static_cast< typename GridPart::GridViewType >( gridPart() ), Partitions::interiorBorder ) )
         entitySeeds[ agglomeration().index( element ) ].push_back( element.seed() );
 
       const std::size_t numShapeFunctions = scalarShapeFunctionSet_.size();
-      typename BasisFunctionSetType::ValueProjection DT( numShapeFunctions );
+      DynamicMatrix< DomainFieldType > D;
       DynamicMatrix< DomainFieldType > DTD( numShapeFunctions, numShapeFunctions );
       std::vector< DomainType > pi0XT;
 
@@ -168,52 +179,35 @@ namespace Dune
       jacobianProjections_.resize( agglomeration().size() );
       stabilizations_.resize( agglomeration().size() );
 
+      AgglomerationInterpolationType interpolation( blockMapper().indexSet() );
       for( std::size_t agglomerate = 0; agglomerate < agglomeration().size(); ++agglomerate )
       {
         const auto &bbox = boundingBoxes_[ agglomerate ];
 
         const std::size_t numDofs = blockMapper().numDofs( agglomerate );
-        for( auto &row : DT )
-          row.resize( numDofs );
+        D.resize( numDofs, numShapeFunctions );
         pi0XT.resize( numDofs );
 
         DomainFieldType H0 = 0;
         std::fill( pi0XT.begin(), pi0XT.end(), DomainType( 0 ) );
-        for( const EntitySeed &entitySeed : entitySeeds[ agglomerate ] )
+        for( const ElementSeedType &entitySeed : entitySeeds[ agglomerate ] )
         {
-          const auto &element = gridPart().entity( entitySeed );
+          const ElementType &element = gridPart().entity( entitySeed );
           const auto geometry = element.geometry();
+
+          BoundingBoxShapeFunctionSet< ElementType, ScalarShapeFunctionSetType > shapeFunctionSet( element, bbox, scalarShapeFunctionSet_ );
 
           Fem::ElementQuadrature< GridPart, 0 > quadrature( element, 0 );
           for( std::size_t qp = 0; qp < quadrature.nop(); ++qp )
           {
-            DomainType x = geometry.global( quadrature.point( qp ) ) - bbox.first;
-            for( int k = 0; k < GridPartType::dimensionworld; ++k )
-              x[ k ] /= (bbox.second[ k ] - bbox.first[ k ]);
-
             const DomainFieldType weight = geometry.integrationElement( quadrature.point( qp ) ) * quadrature.weight( qp );
-            scalarShapeFunctionSet_.evaluateEach( x, [ &H0, weight ] ( std::size_t alpha, FieldVector< DomainFieldType, 1 > phi ) {
+            shapeFunctionSet.evaluateEach( quadrature[ qp ], [ &H0, weight ] ( std::size_t alpha, FieldVector< DomainFieldType, 1 > phi ) {
                 if( alpha == 0 )
                   H0 += weight * phi[ 0 ];
               } );
           }
 
-          const auto &refElement = ReferenceElements< typename GridPart::ctype, GridPart::dimension >::general( element.type() );
-
-          for( int i = 0; i < refElement.size( GridPart::dimension ); ++i )
-          {
-            const int k = blockMapper().indexSet().localIndex( element, i, GridPart::dimension );
-            if( k == -1 )
-              continue;
-
-            DomainType x = geometry.corner( i ) - bbox.first;
-            for( int k = 0; k < GridPartType::dimensionworld; ++k )
-              x[ k ] /= (bbox.second[ k ] - bbox.first[ k ]);
-
-            scalarShapeFunctionSet_.evaluateEach( x, [ &DT, k ] ( std::size_t alpha, FieldVector< DomainFieldType, 1 > phi ) {
-                DT[ alpha ][ k ] = phi[ 0 ];
-              } );
-          }
+          interpolation( shapeFunctionSet, D );
 
 #if 0
           if( polOrder > 1 )
@@ -255,6 +249,7 @@ namespace Dune
           }
   #endif
 
+          const auto &refElement = ReferenceElements< typename GridPart::ctype, GridPart::dimension >::general( element.type() );
           for( const auto &intersection : intersections( static_cast< typename GridPart::GridViewType >( gridPart() ), element ) )
           {
             if( !intersection.boundary() && (agglomeration().index( Dune::Fem::make_entity( intersection.outside() ) ) == agglomerate) )
@@ -275,13 +270,14 @@ namespace Dune
           }
         }
 
-        for( std::size_t i = 0; i < numShapeFunctions; ++i )
-          for( std::size_t j = 0; j < numShapeFunctions; ++j )
-          {
-            DTD[ i ][ j ] = 0;
-            for( std::size_t k = 0; k < numDofs; ++k )
-              DTD[ i ][ j ] += DT[ i ][ k ] * DT[ j ][ k ];
-          }
+        for( std::size_t alpha = 0; alpha < numShapeFunctions; ++alpha )
+        {
+          for( std::size_t beta = 0; beta < numShapeFunctions; ++beta )
+            DTD[ alpha ][ beta ] = 0;
+          for( std::size_t k = 0; k < numDofs; ++k )
+            for( std::size_t beta = 0; beta < numShapeFunctions; ++beta )
+              DTD[ alpha ][ beta ] += D[ k ][ alpha ] * D[ k ][ beta ];
+        }
         DTD.invert();
 
         auto &valueProjection = valueProjections_[ agglomerate ];
@@ -291,7 +287,7 @@ namespace Dune
           valueProjection[ alpha ].resize( numDofs, 0 );
           for( std::size_t beta = 0; beta < numShapeFunctions; ++beta )
             for( std::size_t j = 0; j < numDofs; ++j )
-              valueProjection[ alpha ][ j ] += DTD[ alpha ][ beta ] * DT[ beta ][ j ];
+              valueProjection[ alpha ][ j ] += DTD[ alpha ][ beta ] * D[ j ][ beta ];
         }
 
         Stabilization S( numDofs, numDofs, 0 );
@@ -300,7 +296,7 @@ namespace Dune
         for( std::size_t i = 0; i < numDofs; ++i )
           for( std::size_t alpha = 0; alpha < numShapeFunctions; ++alpha )
             for( std::size_t j = 0; j < numDofs; ++j )
-              S[ i ][ j ] -= DT[ alpha ][ i ] * valueProjection[ alpha ][ j ];
+              S[ i ][ j ] -= D[ i ][ alpha ] * valueProjection[ alpha ][ j ];
         Stabilization &stabilization = stabilizations_[ agglomerate ];
         stabilization.resize( numDofs, numDofs, 0 );
         for( std::size_t k = 0; k < numDofs; ++k )
