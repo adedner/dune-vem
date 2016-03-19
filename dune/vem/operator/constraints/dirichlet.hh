@@ -1,5 +1,5 @@
-#ifndef DUNE_DIRICHLETCONSTRAINTS_HH
-#define DUNE_DIRICHLETCONSTRAINTS_HH
+#ifndef DUNE_VEM_OPERATOR_CONSTRAINTS_DIRICHLET_HH
+#define DUNE_VEM_OPERATOR_CONSTRAINTS_DIRICHLET_HH
 
 #include <dune/fem/function/common/scalarproducts.hh>
 
@@ -454,5 +454,6 @@ namespace Dune
     }
   };
 
-} // end namespace Dune
-#endif
+} // namespace Dune
+
+#endif // #ifndef DUNE_VEM_OPERATOR_CONSTRAINTS_DIRICHLET_HH

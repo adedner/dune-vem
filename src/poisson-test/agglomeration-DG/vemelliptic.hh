@@ -9,7 +9,7 @@
 
 #include <dune/fem/operator/common/differentiableoperator.hh>
 
-#include "dirichletconstraints.hh"
+#include <dune/vem/operator/constraints/dirichlet.hh>
 
 
 //! [Class for elliptic operator]
