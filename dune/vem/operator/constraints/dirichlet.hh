@@ -2,7 +2,7 @@
 #define DUNE_VEM_OPERATOR_CONSTRAINTS_DIRICHLET_HH
 
 #include <cstdlib>
-#include <ctype>
+#include <cstddef>
 
 #include <iostream>
 #include <vector>

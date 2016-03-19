@@ -25,9 +25,11 @@ namespace Dune
 
     template< class DomainDiscreteFunction, class RangeDiscreteFunction, class Model,
               class Constraints = Dune::Vem::DirichletConstraints< Model, typename RangeDiscreteFunction::DiscreteFunctionSpaceType > >
-    struct VEMEllipticOperator
+    class EllipticOperator
       : public virtual Dune::Fem::Operator< DomainDiscreteFunction, RangeDiscreteFunction >
     {
+      typedef EllipticOperator< DomainDiscreteFunction, RangeDiscreteFunction, Model, Constraints > ThisType;
+
     protected:
       typedef DomainDiscreteFunction DomainDiscreteFunctionType;
       typedef RangeDiscreteFunction RangeDiscreteFunctionType;
@@ -50,7 +52,7 @@ namespace Dune
       typedef Dune::Fem::ElementQuadrature< GridPartType, 1 > FaceQuadratureType;
 
     public:
-      VEMEllipticOperator ( const ModelType &model, const RangeDiscreteFunctionSpaceType &rangeSpace )
+      EllipticOperator ( const ModelType &model, const RangeDiscreteFunctionSpaceType &rangeSpace )
         : model_( model ), constraints_( model, rangeSpace )
       {}
 
@@ -71,12 +73,14 @@ namespace Dune
 
     template< class JacobianOperator, class Model,
               class Constraints = Dune::Vem::DirichletConstraints< Model, typename JacobianOperator::RangeFunctionType::DiscreteFunctionSpaceType > >
-    struct DifferentiableVEMEllipticOperator
-      : public VEMEllipticOperator< typename JacobianOperator::DomainFunctionType, typename JacobianOperator::RangeFunctionType, Model, Constraints >,
+    class DifferentiableEllipticOperator
+      : public EllipticOperator< typename JacobianOperator::DomainFunctionType, typename JacobianOperator::RangeFunctionType, Model, Constraints >,
         public Dune::Fem::DifferentiableOperator< JacobianOperator >
     {
-      typedef VEMEllipticOperator< typename JacobianOperator::DomainFunctionType, typename JacobianOperator::RangeFunctionType, Model, Constraints > BaseType;
+      typedef DifferentiableEllipticOperator< JacobianOperator, Model, Constraints > ThisType;
+      typedef EllipticOperator< typename JacobianOperator::DomainFunctionType, typename JacobianOperator::RangeFunctionType, Model, Constraints > BaseType;
 
+    public:
       typedef JacobianOperator JacobianOperatorType;
 
       typedef typename BaseType::DomainDiscreteFunctionType DomainDiscreteFunctionType;
@@ -100,13 +104,12 @@ namespace Dune
       typedef typename BaseType::FaceQuadratureType FaceQuadratureType;
 
     public:
-      DifferentiableVEMEllipticOperator ( const ModelType &model, const RangeDiscreteFunctionSpaceType &space )
+      DifferentiableEllipticOperator ( const ModelType &model, const RangeDiscreteFunctionSpaceType &space )
         : BaseType( model, space )
       {}
 
       void jacobian ( const DomainDiscreteFunctionType &u, JacobianOperatorType &jOp ) const;
 
-    protected:
       using BaseType::model;
       using BaseType::constraints;
     };
@@ -117,8 +120,7 @@ namespace Dune
     // ----------------------------------
 
     template< class DomainDiscreteFunction, class RangeDiscreteFunction, class Model, class Constraints >
-    void VEMEllipticOperator< DomainDiscreteFunction, RangeDiscreteFunction, Model, Constraints >
-    ::operator() ( const DomainDiscreteFunctionType &u, RangeDiscreteFunctionType &w ) const
+    void EllipticOperator< DomainDiscreteFunction, RangeDiscreteFunction, Model, Constraints >::operator() ( const DomainDiscreteFunctionType &u, RangeDiscreteFunctionType &w ) const
     {
       w.clear();
       const RangeDiscreteFunctionSpaceType &dfSpace = w.space();
@@ -150,7 +152,7 @@ namespace Dune
           for( std::size_t pt = 0; pt < numQuadraturePoints; ++pt )
           {
             const typename QuadratureType::CoordinateType &x = quadrature.point( pt );
-            const double weight = quadrature.weight( pt ) * geometry.integrationElement( x );
+            const auto weight = quadrature.weight( pt ) * geometry.integrationElement( x );
 
             DomainRangeType vu;
             uLocal.evaluate( quadrature[ pt ], vu );
@@ -211,8 +213,7 @@ namespace Dune
     // ------------------------------------------------
 
     template< class JacobianOperator, class Model, class Constraints >
-    void DifferentiableVEMEllipticOperator< JacobianOperator, Model, Constraints >
-    ::jacobian ( const DomainDiscreteFunctionType &u, JacobianOperator &jOp ) const
+    void DifferentiableEllipticOperator< JacobianOperator, Model, Constraints >::jacobian ( const DomainDiscreteFunctionType &u, JacobianOperator &jOp ) const
     {
       typedef typename JacobianOperator::LocalMatrixType LocalMatrixType;
       typedef typename DomainDiscreteFunctionSpaceType::BasisFunctionSetType DomainBasisFunctionSetType;
@@ -226,10 +227,10 @@ namespace Dune
       jOp.reserve( stencil );
       jOp.clear();
 
-      const int domainBlockSize = domainSpace.localBlockSize; // is equal to 1 for scalar functions
+      const int domainBlockSize = domainSpace.localBlockSize;
       std::vector< typename DomainLocalFunctionType::RangeType >         phi( domainSpace.blockMapper().maxNumDofs()*domainBlockSize );
       std::vector< typename DomainLocalFunctionType::JacobianRangeType > dphi( domainSpace.blockMapper().maxNumDofs()*domainBlockSize );
-      const int rangeBlockSize = rangeSpace.localBlockSize; // is equal to 1 for scalar functions
+      const int rangeBlockSize = rangeSpace.localBlockSize;
       std::vector< typename RangeLocalFunctionType::RangeType >         rphi( rangeSpace.blockMapper().maxNumDofs()*rangeBlockSize );
       std::vector< typename RangeLocalFunctionType::JacobianRangeType > rdphi( rangeSpace.blockMapper().maxNumDofs()*rangeBlockSize );
 

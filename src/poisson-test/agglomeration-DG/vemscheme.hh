@@ -171,12 +171,10 @@ public:
     }
 
     //! sotup the right hand side
-    void prepare()
+    void prepare ()
     {
-        // assemble rhs
-        assembleRHS ( implicitModel_.rightHandSide(), rhs_ );
-        // set boundary values to the rhs
-        implicitOperator_.prepare( implicitModel_.dirichletBoundary(), rhs_ );
+        assembleRHS( implicitModel_.rightHandSide(), rhs_ );
+        implicitOperator_.constraints()( implicitModel_.dirichletBoundary(), rhs_ );
     }
 
     //! solve the system - bool parameter
