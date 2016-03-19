@@ -3,7 +3,12 @@
 
 #include <cstddef>
 
+#include <initializer_list>
 #include <utility>
+
+#include <dune/geometry/referenceelements.hh>
+
+#include <dune/vem/agglomeration/shapefunctionset.hh>
 
 namespace Dune
 {
