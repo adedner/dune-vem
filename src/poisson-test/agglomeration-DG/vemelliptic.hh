@@ -12,28 +12,6 @@
 #include <dune/vem/operator/constraints/dirichlet.hh>
 
 
-//! [Class for elliptic operator]
-struct NoConstraints
-{
-  template< class ModelType, class DiscreteFunctionSpaceType >
-  NoConstraints ( const ModelType &, const DiscreteFunctionSpaceType & )
-  {}
-
-  template< class DiscreteFunctionType >
-  void operator() ( const DiscreteFunctionType &u, DiscreteFunctionType &w ) const
-  {}
-
-  template< class GridFunctionType, class DiscreteFunctionType >
-  void operator() ( const GridFunctionType &u, DiscreteFunctionType &w ) const
-  {}
-
-  template< class LinearOperator >
-  void applyToOperator ( LinearOperator &linearOperator ) const
-  {}
-};
-
-
-
 // VEMEllipticOperator
 // -------------------
 
