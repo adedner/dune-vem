@@ -162,22 +162,30 @@ void VEMEllipticOperator< DomainDiscreteFunction, RangeDiscreteFunction, Model, 
 ::operator() ( const DomainDiscreteFunctionType &u, RangeDiscreteFunctionType &w ) const
 {
   w.clear();
-  #if 0
   // get discrete function space
   const RangeDiscreteFunctionSpaceType &dfSpace = w.space();
 
+  std::vector< bool > stabilization( dfSpace.agglomeration().size(), false );
+
   // iterate over grid
-  const IteratorType end = dfSpace.end();
-  for( IteratorType it = dfSpace.begin(); it != end; ++it )
+  const GridPartType &gridPart = w.gridPart();
+  for( const auto &entity : Dune::elements( static_cast< typename GridPartType::GridViewType >( gridPart ), Dune::Partitions::interiorBorder ) )
   {
-    // get entity (here element)
-    const EntityType &entity = *it;
     // get elements geometry
     const GeometryType &geometry = entity.geometry();
 
     // get local representation of the discrete functions
     const DomainLocalFunctionType uLocal = u.localFunction( entity );
     RangeLocalFunctionType wLocal = w.localFunction( entity );
+
+    if( !stabilization[ dfSpace.agglomeration().index( entity ) ] )
+    {
+      const auto &stabMatrix = dfSpace.stabilization( entity );
+      for( std::size_t r = 0; r < stabMatrix.rows(); ++r )
+        for( std::size_t c = 0; c < stabMatrix.cols(); ++c )
+          wLocal[ r ] += stabMatrix[ r ][ c ] * uLocal[ c ];
+      stabilization[ dfSpace.agglomeration().index( entity ) ] = true;
+    }
 
     // obtain quadrature order
     const int quadOrder = uLocal.order() + wLocal.order();
@@ -212,7 +220,7 @@ void VEMEllipticOperator< DomainDiscreteFunction, RangeDiscreteFunction, Model, 
         //! [Compute local contribution of operator]
       }
     }
-    if( model().hasNeumanBoundary())
+    if( model().hasNeumanBoundary() )
     {
       if( !entity.hasBoundaryIntersections() )
         continue;
@@ -246,7 +254,6 @@ void VEMEllipticOperator< DomainDiscreteFunction, RangeDiscreteFunction, Model, 
       }
     }
   }
-  #endif
   w.communicate();
   // apply constraints, e.g. Dirichlet contraints, to the result
   constraints()( u, w );
