@@ -3,6 +3,8 @@
 
 #include <dune/fem/function/common/scalarproducts.hh>
 
+#include <dune/vem/space/interpolation.hh>
+
 namespace Dune
 {
 
@@ -193,8 +195,8 @@ namespace Dune
       std::vector< std::size_t > globalBlockDofs( localBlocks );
       space_.blockMapper().map( entity, globalBlockDofs );
       std::vector< double > values( localBlocks*localBlockSize );
-      //space_.interpolation( entity )( uLocal, values );
-      std::fill( values.begin(), values.end(), 0 );
+
+      agglomerationVEMInterpolation( space_.blockMapper().indexSet() )( uLocal, values );
 
       int localDof = 0;
 
