@@ -1,0 +1,6 @@
+configure_file( circle.dgf ${CMAKE_CURRENT_BINARY_DIR}/circle.dgf COPYONLY )
+configure_file( sphere.dgf ${CMAKE_CURRENT_BINARY_DIR}/sphere.dgf COPYONLY )
+configure_file( spiral-2d.dgf ${CMAKE_CURRENT_BINARY_DIR}/spiral-2d.dgf COPYONLY )
+configure_file( unitcube-1d.dgf ${CMAKE_CURRENT_BINARY_DIR}/unitcube-1d.dgf COPYONLY )
+configure_file( unitcube-2d.dgf ${CMAKE_CURRENT_BINARY_DIR}/unitcube-2d.dgf COPYONLY )
+configure_file( parameter ${CMAKE_CURRENT_BINARY_DIR}/parameter COPYONLY )
