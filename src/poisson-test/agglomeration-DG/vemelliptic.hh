@@ -38,7 +38,7 @@ struct NoConstraints
 // -------------------
 
 template< class DomainDiscreteFunction, class RangeDiscreteFunction, class Model,
-          class Constraints = Dune::DirichletConstraints< Model, typename RangeDiscreteFunction::DiscreteFunctionSpaceType > >
+          class Constraints = Dune::Vem::DirichletConstraints< Model, typename RangeDiscreteFunction::DiscreteFunctionSpaceType > >
 struct VEMEllipticOperator
   : public virtual Dune::Fem::Operator< DomainDiscreteFunction, RangeDiscreteFunction >
 //! [Class for elliptic operator]
@@ -101,7 +101,7 @@ private:
 // ------------------------------
 //! [Class for linearizable elliptic operator]
 template< class JacobianOperator, class Model,
-          class Constraints = Dune::DirichletConstraints< Model, typename JacobianOperator::RangeFunctionType::DiscreteFunctionSpaceType > >
+          class Constraints = Dune::Vem::DirichletConstraints< Model, typename JacobianOperator::RangeFunctionType::DiscreteFunctionSpaceType > >
 struct DifferentiableVEMEllipticOperator
   : public VEMEllipticOperator< typename JacobianOperator::DomainFunctionType, typename JacobianOperator::RangeFunctionType, Model, Constraints >,
     public Dune::Fem::DifferentiableOperator< JacobianOperator >
