@@ -71,12 +71,13 @@
 // include parameter handling
 #include <dune/fem/io/parameter.hh>
 
+#include <dune/vem/operator/elliptic.hh>
+
 // local includes
 #include "problems/interface.hh"
 
 #include "model.hh"
 
-#include "vemelliptic.hh"
 #include "rhs.hh"
 
 
@@ -144,7 +145,7 @@ public:
     /*********************************************************/
 
     //! define Laplace operator
-    typedef DifferentiableVEMEllipticOperator < LinearOperatorType, ModelType > EllipticOperatorType;
+    typedef Dune::Vem::DifferentiableEllipticOperator < LinearOperatorType, ModelType > EllipticOperatorType;
 
     VemScheme ( GridPartType &gridPart, const ModelType& implicitModel, const AgglomerationType& agglomeration )
     : implicitModel_( implicitModel ),
@@ -170,12 +171,10 @@ public:
     }
 
     //! sotup the right hand side
-    void prepare()
+    void prepare ()
     {
-        // assemble rhs
-        assembleRHS ( implicitModel_.rightHandSide(), rhs_ );
-        // set boundary values to the rhs
-        implicitOperator_.prepare( implicitModel_.dirichletBoundary(), rhs_ );
+        assembleRHS( implicitModel_.rightHandSide(), rhs_ );
+        implicitOperator_.constraints()( implicitModel_.dirichletBoundary(), rhs_ );
     }
 
     //! solve the system - bool parameter
@@ -190,7 +189,7 @@ public:
         }
 
         // set up initial condition to satify dirichlet b.c. which is needed for iterative solvers
-        implicitOperator_.prepare( rhs_, solution_ );
+        implicitOperator_.constraints()( rhs_, solution_ );
 
 #if 0
         const auto &matrix = linearOperator_.matrix();
