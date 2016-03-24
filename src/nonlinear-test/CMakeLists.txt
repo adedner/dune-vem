@@ -1,0 +1,5 @@
+add_subdirectory( data )
+add_executable( fem-nonlinear EXCLUDE_FROM_ALL fem-nonlinear.cc )
+target_link_libraries(fem-nonlinear )
+add_executable( vem-nonlinear EXCLUDE_FROM_ALL vem-nonlinear.cc )
+target_link_libraries( vem-nonlinear )
