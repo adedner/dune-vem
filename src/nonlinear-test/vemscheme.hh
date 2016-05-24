@@ -106,7 +106,7 @@ public:
 
   // choose type of discrete function, Matrix implementation and solver implementation
 #if HAVE_DUNE_ISTL && WANT_ISTL
-  typedef Dune::Fem::ISTLBlockVectorDiscreteFunction< DiscreteFunctionSpaceType > DiscreteFunctionType;
+  typedef Dune::Fem::ISTLBlockVectorDiscreteFunction< VemSpaceType > DiscreteFunctionType;
   typedef Dune::Fem::ISTLLinearOperator< DiscreteFunctionType, DiscreteFunctionType > LinearOperatorType;
   typedef Dune::Fem::ISTLBICGSTABOp< DiscreteFunctionType, LinearOperatorType > LinearInverseOperatorType;
 #else

@@ -1,7 +1,6 @@
 #define POLORDER 1
 #define GRIDDIM 2
 #define WORLDDIM 2
-#define WANT_ISTL 0
 
 #include <config.h>
 #include <cmath>
