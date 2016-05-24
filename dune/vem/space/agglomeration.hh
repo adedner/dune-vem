@@ -17,6 +17,7 @@
 #include <dune/vem/agglomeration/boundingbox.hh>
 #include <dune/vem/agglomeration/dofmapper.hh>
 #include <dune/vem/agglomeration/shapefunctionset.hh>
+#include <dune/vem/misc/compatibility.hh>
 #include <dune/vem/space/basisfunctionset.hh>
 #include <dune/vem/space/interpolation.hh>
 
@@ -252,7 +253,7 @@ namespace Dune
           const auto &refElement = ReferenceElements< typename GridPart::ctype, GridPart::dimension >::general( element.type() );
           for( const auto &intersection : intersections( static_cast< typename GridPart::GridViewType >( gridPart() ), element ) )
           {
-            if( !intersection.boundary() && (agglomeration().index( Dune::Fem::make_entity( intersection.outside() ) ) == agglomerate) )
+            if( !intersection.boundary() && (agglomeration().index( make_entity( intersection.outside() ) ) == agglomerate) )
               continue;
             assert( intersection.conforming() );
 

@@ -1,5 +1,6 @@
 add_subdirectory( agglomeration )
 add_subdirectory( function )
+add_subdirectory( misc )
 add_subdirectory( operator )
 add_subdirectory( io )
 add_subdirectory( space )
