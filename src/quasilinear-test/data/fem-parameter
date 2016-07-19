@@ -1,0 +1,52 @@
+##### Verbosity #####
+# number of process that prints output (-1 no output)
+fem.verboserank: 0
+# true for iteration output, false means no output
+fem.solver.verbose: false
+fem.solver.newton.verbose: true
+fem.solver.newton.tolerance: 1e-6
+fem.solver.newton.linabstol: 1e-12
+fem.solver.newton.linreduction: 1e-12
+
+##### Parameters for preconditioned linear solver
+# preconditioning method: none, ssor, sor, ilu-0, ilu-n, gauss-seidel, jacobi, amg-ilu-0
+istl.preconditioning.method: ilu-0
+istl.preconditioning.iterations: 1
+istl.preconditioning.relaxation: 1.2
+# enable simple Jacobi preconditioning (for non istl inverse operators)
+fem.preconditioning: true
+
+#### Parameters for input ######
+# macro grid files
+fem.io.macroGridFile_1d: ../data/circle.dgf
+fem.io.macroGridFile_2d: /home/gcdiwan/Project/dune-vem/data/partitioned-mesh.msh
+# fem.io.macroGridFile_2d: ../data/corner.dgf
+# fem.io.macroGridFile_2d: ../data/sphere.dgf
+fem.io.macroGridFile_3d: ../data/unitcube-3d.dgf
+
+#### Parameters for output ######
+# path for output
+fem.prefix: ./fem-output
+# time interval for data output
+fem.io.savestep: 0.1
+# number of calls to write() after which a file is produced
+fem.io.savecount: 1
+# output format (vtk-cell, vtk-vertex, sub-vtk-cell, sub-vtk-vertex, gnuplot)
+fem.io.outputformat: vtk-cell
+# print partitioning for parallel runs: none, rank, rank+thread, rank/thread
+fem.io.partitioning: rank
+
+##### Problem setup parameters #####
+# level of initial global refinement
+poisson.level: 0
+# number of EOC steps to be performed
+poisson.repeats: 5
+# valid are: cos | corner | curvedridges | sphere
+poisson.problem: cos
+
+##### parameters used for afem example #####
+# valid are: none | maximum | equidistribution | uniform
+adaptation.strategy: maximum
+# tolerance for error estimator
+adaptation.tolerance: 0.01
+

@@ -1,0 +1,8 @@
+add_subdirectory( data )
+add_executable( fem-quasilinear EXCLUDE_FROM_ALL fem-quasilinear.cc )
+target_link_libraries(fem-quasilinear dunevem )
+add_executable( vem-quasilinear EXCLUDE_FROM_ALL vem-quasilinear.cc )
+target_link_libraries( vem-quasilinear dunevem )
+add_executable( vem-quasilinear-istl EXCLUDE_FROM_ALL vem-quasilinear.cc )
+target_compile_definitions( vem-quasilinear-istl PUBLIC WANT_ISTL=1 )
+target_link_libraries( vem-quasilinear-istl dunevem )
