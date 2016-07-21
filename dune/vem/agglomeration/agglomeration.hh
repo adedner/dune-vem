@@ -68,6 +68,43 @@ namespace Dune
       std::size_t size_;
     };
 
+
+
+    // LocalAgglomerationFunction
+    // --------------------------
+
+    template< class GridPart >
+    struct LocalAgglomerationFunction
+    {
+      typedef typename Agglomeration< GridPart >::ElementType Entity;
+
+      explicit LocalAgglomerationFunction ( const Agglomeration< GridPart > &agglomeration ) : agglomeration_( agglomeration ) {}
+
+      std::size_t operator() ( const typename Entity::Geometry::LocalCoordinate & ) const
+      {
+        assert( entity_ );
+        return agglomeration_.index( *entity_ );
+      }
+
+      void bind ( const Entity &entity ) { entity_ = &entity; }
+      void unbind () { entity_ = nullptr; }
+
+    private:
+      const Agglomeration< GridPart > &agglomeration_;
+      const Entity *entity_ = nullptr;
+    };
+
+
+
+    // localFunction for Agglomeration
+    // -------------------------------
+
+    template< class GridPart >
+    inline static LocalAgglomerationFunction< GridPart > localFunction ( const Agglomeration< GridPart > &agglomeration )
+    {
+      return LocalAgglomerationFunction< GridPart >( agglomeration );
+    }
+
   } // namespace Vem
 
 } // namespace Dune

@@ -12,6 +12,7 @@
 #include <vector>
 
 #include <dune/common/exceptions.hh>
+
 #include <dune/alugrid/grid.hh>
 
 #include <dune/fem/function/adaptivefunction.hh>
@@ -89,6 +90,10 @@ double algorithm ( Grid &grid, AgglomerationType &agglomeration )
   Dune::Fem::VTKIO< GridPartType > vtkIO( gridPart, Dune::VTK::nonconforming );
   vtkIO.addVertexData( vemscheme.solution() );
   vtkIO.write( "./vem-output/vemvtk", Dune::VTK::ascii );
+
+  Dune::VTKWriter< typename GridPartType::GridViewType > vtkWriter( static_cast< typename GridPartType::GridViewType >( gridPart ) );
+  vtkWriter.addCellData( agglomeration, Dune::VTK::FieldInfo( "agglomeration", Dune::VTK::FieldInfo::Type::scalar, 1 ) );
+  vtkWriter.write( "./vem-output/vem" );
 
   // write initial solve
   dataOutput.write();
