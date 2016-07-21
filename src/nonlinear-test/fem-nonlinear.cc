@@ -133,7 +133,7 @@ try
   typedef Dune::Fem::LeafGridPart< Grid > GridPart;
   GridPart gridPart( *grid );
   // calculate first step
-  double oldError = algorithm( *grid );
+  algorithm( *grid );
   return 0;
 }
 catch( const Dune::Exception &exception )
