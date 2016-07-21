@@ -25,18 +25,19 @@ we obtain
 The matrix $(\Pi^0_{i, \alpha})_{i, \alpha}$ is stored as \texttt{valueProjection}
 in the VEM basis function set.
 
-...
 
-Assume
+Now we turn to the computation of $\Pi_{p-1} \nabla \varphi_i$.
+For $\alpha = 1, \ldots, N_{p-1}$, we have
 \begin{equation*}
-  \partial_{x_l} m_\alpha = \sum_{\beta=1}^{N_{p-2}} \bigl( d_l \bigr)_\alpha^\beta
+  \int_E \Pi_{p-1} \nabla \Phi_i\,m_\alpha
+    = \int_E \nabla \Phi_i\,m_\alpha
+    = \int_{\partial E} \Phi_i\,m_\alpha\,\nu - \int_E \Phi_i\,\nabla m_\alpha.
 \end{equation*}
-Then, the following equation holds:
+Since $\nabla m_\alpha \in \mathcal{P}_p( E )^d$, the following identity holds:
 \begin{equation*}
-  \int_E \Phi_i\,\partial_{x_l} m_\alpha
-    = \sum_{\beta=1}^{N_{p-2}} \bigl( d_l \bigr)_\alpha^\beta\,\int_E \Phi_i\,m_\beta
-    = \sum_{\beta=1}^{N_{p-2}} \bigl( d_l \bigr)_\alpha^\beta\,\int_E \Pi_p^0 \Phi_i\,m_\beta
-    = \sum_{\beta=1}^{N_{p-2}} \bigl( d_l \bigr)_\alpha^\beta\,\sum_{\gamma=1}^{N_p} M_{\beta,\gamma}\,\Pi^0_{i, \gamma}
+  \int_E \Phi_i\,\nabla m_\alpha
+    = \int_E \Pi_p \Phi_i\,\nabla m_\alpha
+    = \sum_{\alpha=1}^{N_p} \Pi^0_{i, \alpha}\,\int_E \varphi_\alpha\,\nabla m_\alpha.
 \end{equation*}
 
 \end{document}
