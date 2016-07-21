@@ -18,6 +18,7 @@
 #include <dune/vem/agglomeration/dofmapper.hh>
 #include <dune/vem/agglomeration/shapefunctionset.hh>
 #include <dune/vem/misc/compatibility.hh>
+#include <dune/vem/misc/pseudoinverse.hh>
 #include <dune/vem/space/basisfunctionset.hh>
 #include <dune/vem/space/interpolation.hh>
 
@@ -173,7 +174,7 @@ namespace Dune
 
       const std::size_t numShapeFunctions = scalarShapeFunctionSet_.size();
       DynamicMatrix< DomainFieldType > D;
-      DynamicMatrix< DomainFieldType > DTD( numShapeFunctions, numShapeFunctions );
+      LeftPseudoInverse< DomainFieldType > pseudoInverse( numShapeFunctions );
       std::vector< DomainType > pi0XT;
 
       valueProjections_.resize( agglomeration().size() );
@@ -271,25 +272,8 @@ namespace Dune
           }
         }
 
-        for( std::size_t alpha = 0; alpha < numShapeFunctions; ++alpha )
-        {
-          for( std::size_t beta = 0; beta < numShapeFunctions; ++beta )
-            DTD[ alpha ][ beta ] = 0;
-          for( std::size_t k = 0; k < numDofs; ++k )
-            for( std::size_t beta = 0; beta < numShapeFunctions; ++beta )
-              DTD[ alpha ][ beta ] += D[ k ][ alpha ] * D[ k ][ beta ];
-        }
-        DTD.invert();
-
         auto &valueProjection = valueProjections_[ agglomerate ];
-        valueProjection.resize( numShapeFunctions );
-        for( std::size_t alpha = 0; alpha < numShapeFunctions; ++alpha )
-        {
-          valueProjection[ alpha ].resize( numDofs, 0 );
-          for( std::size_t beta = 0; beta < numShapeFunctions; ++beta )
-            for( std::size_t j = 0; j < numDofs; ++j )
-              valueProjection[ alpha ][ j ] += DTD[ alpha ][ beta ] * D[ j ][ beta ];
-        }
+        pseudoInverse( D, valueProjection );
 
         Stabilization S( numDofs, numDofs, 0 );
         for( std::size_t i = 0; i < numDofs; ++i )
