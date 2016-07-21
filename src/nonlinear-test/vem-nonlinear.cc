@@ -148,7 +148,7 @@ try
   std::cout << "going in nonlinear problem solver.." << std::endl;
   // calculate first step
   Dune::Vem::Agglomeration< GridPart > agglomeration( gridPart, agglomerateIndices );
-  double oldError = algorithm( *grid, agglomeration );
+  algorithm( *grid, agglomeration );
 
   return 0;
 }
