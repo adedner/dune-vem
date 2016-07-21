@@ -1,0 +1,42 @@
+\documentclass{article}
+
+\usepackage{amsmath}
+
+\begin{document}
+
+We first compute the $L^2$-Projection $\Pi_p \Phi_i \in \mathcal{P}_p( E )$
+\begin{equation*}
+  \int_E \Pi_p \Phi_i\,\varphi = \int_E \Phi\,\varphi
+  \qquad\text{for all $\varphi \in \mathcal{P}_p( E )$.}
+\end{equation*}
+
+Using a basis $\phi_1, \ldots, \phi_{N_p}$ of $\mathcal{P}_p( E )$ and using
+the representation
+\begin{equation*}
+  \Pi_p \Phi_i = \sum_{\alpha=1}^{N_p} \Pi^0_{i,\alpha}\,\varphi_\alpha
+\end{equation*}
+we obtain
+\begin{equation*}
+  \sum_{\alpha=1}^{N_p} \Pi^0_{i, \alpha}\,\underbrace{\int_E \varphi_\alpha\,\varphi_\beta}_{=: M_{\alpha,\beta}}
+  = \int_E \Pi_p \Phi_i\,\varphi
+  = \int_E \Phi\,\varphi
+  \qquad\text{for $\beta = 1, \ldots, N_p$.}
+\end{equation*}
+The matrix $(\Pi^0_{i, \alpha})_{i, \alpha}$ is stored as \texttt{valueProjection}
+in the VEM basis function set.
+
+...
+
+Assume
+\begin{equation*}
+  \partial_{x_l} m_\alpha = \sum_{\beta=1}^{N_{p-2}} \bigl( d_l \bigr)_\alpha^\beta
+\end{equation*}
+Then, the following equation holds:
+\begin{equation*}
+  \int_E \Phi_i\,\partial_{x_l} m_\alpha
+    = \sum_{\beta=1}^{N_{p-2}} \bigl( d_l \bigr)_\alpha^\beta\,\int_E \Phi_i\,m_\beta
+    = \sum_{\beta=1}^{N_{p-2}} \bigl( d_l \bigr)_\alpha^\beta\,\int_E \Pi_p^0 \Phi_i\,m_\beta
+    = \sum_{\beta=1}^{N_{p-2}} \bigl( d_l \bigr)_\alpha^\beta\,\sum_{\gamma=1}^{N_p} M_{\beta,\gamma}\,\Pi^0_{i, \gamma}
+\end{equation*}
+
+\end{document}
