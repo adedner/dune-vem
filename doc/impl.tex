@@ -10,7 +10,7 @@ We first compute the $L^2$-Projection $\Pi_p \Phi_i \in \mathcal{P}_p( E )$
   \qquad\text{for all $\varphi \in \mathcal{P}_p( E )$.}
 \end{equation*}
 
-Using a basis $\phi_1, \ldots, \phi_{N_p}$ of $\mathcal{P}_p( E )$ and using
+Using a basis $\varphi_1, \ldots, \varphi_{N_p}$ of $\mathcal{P}_p( E )$ and using
 the representation
 \begin{equation*}
   \Pi_p \Phi_i = \sum_{\alpha=1}^{N_p} \Pi^0_{i,\alpha}\,\varphi_\alpha
@@ -26,18 +26,18 @@ The matrix $(\Pi^0_{i, \alpha})_{i, \alpha}$ is stored as \texttt{valueProjectio
 in the VEM basis function set.
 
 
-Now we turn to the computation of $\Pi_{p-1} \nabla \varphi_i$.
+Now we turn to the computation of $\Pi_{p-1} \nabla \Phi_i$.
 For $\alpha = 1, \ldots, N_{p-1}$, we have
 \begin{equation*}
-  \int_E \Pi_{p-1} \nabla \Phi_i\,m_\alpha
-    = \int_E \nabla \Phi_i\,m_\alpha
-    = \int_{\partial E} \Phi_i\,m_\alpha\,\nu - \int_E \Phi_i\,\nabla m_\alpha.
+  \int_E \Pi_{p-1} \nabla \Phi_i\,\varphi_\alpha
+    = \int_E \nabla \Phi_i\,\varphi_\alpha
+    = \int_{\partial E} \Phi_i\,\varphi_\alpha\,\nu - \int_E \Phi_i\,\nabla \varphi_\alpha.
 \end{equation*}
 Since $\nabla m_\alpha \in \mathcal{P}_p( E )^d$, the following identity holds:
 \begin{equation*}
-  \int_E \Phi_i\,\nabla m_\alpha
-    = \int_E \Pi_p \Phi_i\,\nabla m_\alpha
-    = \sum_{\alpha=1}^{N_p} \Pi^0_{i, \alpha}\,\int_E \varphi_\alpha\,\nabla m_\alpha.
+  \int_E \Phi_i\,\nabla \varphi_\alpha
+    = \int_E \Pi_p \Phi_i\,\nabla \varphi_\alpha
+    = \sum_{\beta=1}^{N_p} \Pi^0_{i, \beta}\,\int_E \varphi_\beta\,\nabla \varphi_\alpha.
 \end{equation*}
 
 \end{document}
