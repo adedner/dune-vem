@@ -106,10 +106,11 @@ namespace Dune
 
       using BaseType::gridPart;
 
-      explicit AgglomerationVEMSpace ( GridPartType &gridPart, const AgglomerationIndexSetType &agIndexSet )
+      explicit AgglomerationVEMSpace ( GridPartType &gridPart, const AgglomerationType &agglomeration )
         : BaseType( gridPart ),
-          blockMapper_( agIndexSet, AgglomerationInterpolationType::dofsPerCodim() ),
-          boundingBoxes_( boundingBoxes( agIndexSet.agglomeration() ) ),
+          agIndexSet_( agglomeration ),
+          blockMapper_( agIndexSet_, AgglomerationInterpolationType::dofsPerCodim() ),
+          boundingBoxes_( boundingBoxes( agIndexSet_.agglomeration() ) ),
           scalarShapeFunctionSet_( Dune::GeometryType( Dune::GeometryType::cube, GridPart::dimension ) )
       {
         buildProjections();
@@ -147,6 +148,7 @@ namespace Dune
     private:
       void buildProjections ();
 
+      AgglomerationIndexSetType agIndexSet_;
       mutable BlockMapperType blockMapper_;
       std::vector< BoundingBox< GridPart > > boundingBoxes_;
       std::vector< typename BasisFunctionSetType::ValueProjection > valueProjections_;
