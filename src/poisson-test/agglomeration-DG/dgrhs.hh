@@ -49,135 +49,136 @@
 template< class Model, class DiscreteFunction >
 void assembleDGRHS ( const Model &model, DiscreteFunction &rhs )
 {
-	assembleRHS( model.rightHandSide(), rhs );
-	if ( ! model.hasDirichletBoundary() )
-		return;
+  assembleRHS( model.rightHandSide(), rhs );
+  if ( ! model.hasDirichletBoundary() )
+    return;
 
-	typedef typename DiscreteFunction::DiscreteFunctionSpaceType DiscreteFunctionSpaceType;
-	typedef typename DiscreteFunction::LocalFunctionType LocalFunctionType;
+  typedef typename DiscreteFunction::DiscreteFunctionSpaceType DiscreteFunctionSpaceType;
+  typedef typename DiscreteFunction::LocalFunctionType LocalFunctionType;
 
-	typedef typename DiscreteFunctionSpaceType::IteratorType IteratorType;
-	typedef typename IteratorType::Entity EntityType;
-	typedef typename EntityType::Geometry GeometryType;
-	typedef typename LocalFunctionType::RangeType RangeType;
-	typedef typename LocalFunctionType::JacobianRangeType JacobianRangeType;
-	typedef typename DiscreteFunctionSpaceType::DomainType DomainType;
-	static const int dimDomain = LocalFunctionType::dimDomain;
-	static const int dimRange = LocalFunctionType::dimRange;
+  typedef typename DiscreteFunctionSpaceType::IteratorType IteratorType;
+  typedef typename IteratorType::Entity EntityType;
+  typedef typename EntityType::Geometry GeometryType;
+  typedef typename LocalFunctionType::RangeType RangeType;
+  typedef typename LocalFunctionType::JacobianRangeType JacobianRangeType;
+  typedef typename DiscreteFunctionSpaceType::DomainType DomainType;
+  static const int dimDomain = LocalFunctionType::dimDomain;
+  static const int dimRange = LocalFunctionType::dimRange;
 
-	typedef typename DiscreteFunctionSpaceType::GridPartType GridPartType;
-	typedef typename GridPartType::IntersectionIteratorType IntersectionIteratorType;
-	typedef typename IntersectionIteratorType::Intersection IntersectionType;
+  typedef typename DiscreteFunctionSpaceType::GridPartType GridPartType;
+  typedef typename GridPartType::IntersectionIteratorType IntersectionIteratorType;
+  typedef typename IntersectionIteratorType::Intersection IntersectionType;
 
-	typedef Dune::Fem::ElementQuadrature< GridPartType, 1 > FaceQuadratureType;
+  typedef Dune::Fem::ElementQuadrature< GridPartType, 1 > FaceQuadratureType;
 
-	const DiscreteFunctionSpaceType &dfSpace = rhs.space();
-	const int quadOrder = 2*dfSpace.order()+1;
+  const DiscreteFunctionSpaceType &dfSpace = rhs.space();
+  const int quadOrder = 2*dfSpace.order()+1;
 
-	std::ofstream frhs ("rhs-agglo.dat");
-	std::ofstream fdump1 ("boundaryIntegrals-agglo.dat");
+  std::ofstream frhs ("rhs-agglo.dat");
+  std::ofstream fdump1 ("boundaryIntegrals-agglo.dat");
 
-	const IteratorType end = dfSpace.end();
-	for( IteratorType it = dfSpace.begin(); it != end; ++it ) // looping over the elements in the underlying grid, not polygons!!!
-	{
-
-
-		const EntityType &entity = *it;
-		if ( !entity.hasBoundaryIntersections() ) // if the element does not have a boundary intersection, skip it
-			continue;
+  const IteratorType end = dfSpace.end();
+  for( IteratorType it = dfSpace.begin(); it != end; ++it ) // looping over the elements in the underlying grid, not polygons!!!
+  {
 
 
-		// visiting only the elements which are on the boundary of the domain:
-		const GeometryType &geometry = entity.geometry();
-		Dune::GeometryType gt = it->type();
-		double area = geometry.volume();
+    const EntityType &entity = *it;
+    if ( !entity.hasBoundaryIntersections() ) // if the element does not have a boundary intersection, skip it
+      continue;
 
 
-		std::cout << "visiting elm c(.) = " << geometry.center() << std::endl;
-
-		auto& ref = Dune::ReferenceElements<double,2>::general(gt);
-
-		typedef typename GridPartType::IndexSetType LeafIndexSet;
-		const LeafIndexSet& set = dfSpace.gridPart().indexSet();
-
-		LocalFunctionType rhsLocal = rhs.localFunction( entity );
+    // visiting only the elements which are on the boundary of the domain:
+    const GeometryType &geometry = entity.geometry();
+    Dune::GeometryType gt = it->type();
+    double area = geometry.volume();
 
 
+    std::cout << "visiting elm c(.) = " << geometry.center() << std::endl;
 
-		const IntersectionIteratorType iitend = dfSpace.gridPart().iend( entity );
-		for( IntersectionIteratorType iit = dfSpace.gridPart().ibegin( entity ); iit != iitend; ++iit ) // looping over intersections
-		{
+    auto& ref = Dune::ReferenceElements<double,2>::general(gt);
+
+    typedef typename GridPartType::IndexSetType LeafIndexSet;
+    const LeafIndexSet& set = dfSpace.gridPart().indexSet();
+
+    LocalFunctionType rhsLocal = rhs.localFunction( entity );
 
 
-			// gcd3
-			//			if ((iit->boundary()) || ( iit->neighbor() && iit->inside().partitionType() == Dune::InteriorEntity && iit->outside().partitionType() == Dune::GhostEntity))
-			{
-				{
-					for (int i = 0; i < ref.size(iit->indexInInside(),1,dimDomain); ++i)
-					{
-						// get the vertex index now:*****
-						int local_vertex_index = ref.subEntity(iit->indexInInside(),1,i,dimDomain);
-						//						std::cout << "ec " << it->geometry().global( ref.position(i,1) ) << std::endl;
-						int indexi = set.subIndex(*it,
-								ref.subEntity(iit->indexInInside(), 1, i, dimDomain), dimDomain);
-						//						std::cout << "polygon vertex = " << local_vertex_index << " " << geometry.corner(local_vertex_index) << std::endl;
-						//						std::cout << "i: " << indexi << std::endl;
-						//						std::cout << "pb = " << geometry.corner(local_vertex_index) << std::endl;
-					}
-				}
-			}  // gcd3
 
-			const IntersectionType &intersection = *iit;
-			if ( ! intersection.boundary() ) // i.e. if intersection is on boundary: nothing to be done for Neumann zero b.c.
-				continue;                      // since [u] = 0  and grad u.n = 0
-			if ( ! model.isDirichletIntersection( intersection ) )
-				continue;
+    const IntersectionIteratorType iitend = dfSpace.gridPart().iend( entity );
+    for( IntersectionIteratorType iit = dfSpace.gridPart().ibegin( entity ); iit != iitend; ++iit ) // looping over intersections
+    {
 
-			typedef typename IntersectionType::Geometry  IntersectionGeometryType;
-			const IntersectionGeometryType &intersectionGeometry = intersection.geometry();
 
-			const double intersectionArea = intersectionGeometry.volume();
-			const double beta = model.penalty() * intersectionArea / area;
-			//			std::cout << model.penalty() <<" " << intersectionArea << " " << area << std::endl;
+      // gcd3
+      //      if ((iit->boundary()) || ( iit->neighbor() && iit->inside().partitionType() == Dune::InteriorEntity && iit->outside().partitionType() == Dune::GhostEntity))
+      {
+        {
+          for (int i = 0; i < ref.size(iit->indexInInside(),1,dimDomain); ++i)
+          {
+            // get the vertex index now:*****
+            int local_vertex_index = ref.subEntity(iit->indexInInside(),1,i,dimDomain);
+            //            std::cout << "ec " << it->geometry().global( ref.position(i,1) ) << std::endl;
+            int indexi = set.subIndex(*it,
+                ref.subEntity(iit->indexInInside(), 1, i, dimDomain), dimDomain);
+            //            std::cout << "polygon vertex = " << local_vertex_index << " " << geometry.corner(local_vertex_index) << std::endl;
+            //            std::cout << "i: " << indexi << std::endl;
+            //            std::cout << "pb = " << geometry.corner(local_vertex_index) << std::endl;
+          }
+        }
+      }  // gcd3
 
-			FaceQuadratureType quadInside( dfSpace.gridPart(), intersection, quadOrder, FaceQuadratureType::INSIDE );
-			const size_t numQuadraturePoints = quadInside.nop();
-			for( size_t pt = 0; pt < numQuadraturePoints; ++pt )
-			{
-				const typename FaceQuadratureType::LocalCoordinateType &x = quadInside.localPoint( pt );
-				const DomainType normal = intersection.integrationOuterNormal( x );
-				fdump1 << geometry.center() << " " << intersectionGeometry.center() << " " << x << " " << normal << std::endl;
-				std::cout << geometry.center() << " " << intersectionGeometry.center() << " " << x << " " << normal << std::endl;
-				const double weight = quadInside.weight( pt );
+      Dune::FieldVector< bool, RangeType::dimension > components( true );
+      const IntersectionType &intersection = *iit;
+      if ( ! intersection.boundary() ) // i.e. if intersection is on boundary: nothing to be done for Neumann zero b.c.
+        continue;                      // since [u] = 0  and grad u.n = 0
+      if ( ! model.isDirichletIntersection( intersection, components ) )
+        continue;
 
-				RangeType value;
-				JacobianRangeType dvalue,advalue;
+      typedef typename IntersectionType::Geometry  IntersectionGeometryType;
+      const IntersectionGeometryType &intersectionGeometry = intersection.geometry();
 
-				RangeType vuOut;
-				model.g( RangeType(0), entity, quadInside.point(pt), vuOut );
-				//				std::cout << "g = " << vuOut << std::endl;
+      const double intersectionArea = intersectionGeometry.volume();
+      const double beta = model.penalty() * intersectionArea / area;
+      //      std::cout << model.penalty() <<" " << intersectionArea << " " << area << std::endl;
 
-				value = vuOut;
-				//				std::cout << "val = " << value << std::endl;
-				value *= beta * intersectionGeometry.integrationElement( x );
-				//				std::cout << "intersectionGeometry.integrationElement( x ) " << intersectionGeometry.integrationElement( x ) << std::endl;
-				//				std::cout << "beta =  " << beta  << std::endl;
-				//  [ u ] * { grad phi_en } = -normal(u+ - u-) * 0.5 grad phi_en
-				// here we need a diadic product of u x n
-				for (int r=0;r<dimRange;++r)
-					for (int d=0;d<dimDomain;++d)
-						dvalue[r][d] = -0.5 * normal[d] * vuOut[r];
+      FaceQuadratureType quadInside( dfSpace.gridPart(), intersection, quadOrder, FaceQuadratureType::INSIDE );
+      const size_t numQuadraturePoints = quadInside.nop();
+      for( size_t pt = 0; pt < numQuadraturePoints; ++pt )
+      {
+        const typename FaceQuadratureType::LocalCoordinateType &x = quadInside.localPoint( pt );
+        const DomainType normal = intersection.integrationOuterNormal( x );
+        fdump1 << geometry.center() << " " << intersectionGeometry.center() << " " << x << " " << normal << std::endl;
+        std::cout << geometry.center() << " " << intersectionGeometry.center() << " " << x << " " << normal << std::endl;
+        const double weight = quadInside.weight( pt );
 
-				model.diffusiveFlux( entity, quadInside[ pt ], vuOut, dvalue, advalue );
+        RangeType value;
+        JacobianRangeType dvalue,advalue;
 
-				value *= weight;
-				advalue *= weight;
-				rhsLocal.axpy( quadInside[ pt ], value, advalue );
-			}
-		}
-	}
-	rhs.print(frhs);
-	rhs.communicate();
+        RangeType vuOut;
+        model.g( RangeType(0), entity, quadInside.point(pt), vuOut );
+        //        std::cout << "g = " << vuOut << std::endl;
+
+        value = vuOut;
+        //        std::cout << "val = " << value << std::endl;
+        value *= beta * intersectionGeometry.integrationElement( x );
+        //        std::cout << "intersectionGeometry.integrationElement( x ) " << intersectionGeometry.integrationElement( x ) << std::endl;
+        //        std::cout << "beta =  " << beta  << std::endl;
+        //  [ u ] * { grad phi_en } = -normal(u+ - u-) * 0.5 grad phi_en
+        // here we need a diadic product of u x n
+        for (int r=0;r<dimRange;++r)
+          for (int d=0;d<dimDomain;++d)
+            dvalue[r][d] = -0.5 * normal[d] * vuOut[r];
+
+        model.diffusiveFlux( entity, quadInside[ pt ], vuOut, dvalue, advalue );
+
+        value *= weight;
+        advalue *= weight;
+        rhsLocal.axpy( quadInside[ pt ], value, advalue );
+      }
+    }
+  }
+  rhs.print(frhs);
+  rhs.communicate();
 }
 
 #endif // #ifndef DGRHS_HH

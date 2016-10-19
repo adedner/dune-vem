@@ -152,6 +152,15 @@ public:
     return NeumanBoundaryType( "boundary function", bndN_, gridPart_, 5 );
   }
 
+  template< class Entity, class Point >
+  void g( const RangeType& uBar,
+          const Entity &entity,
+          const Point &x,
+          RangeType &u ) const
+  {
+    const DomainType xGlobal = entity.geometry().global( Dune::Fem::coordinate( x ) );
+    problem_.g( xGlobal, u );
+  }
   // return Fem :: Function for right hand side
   RightHandSideType rightHandSide(  ) const
   {

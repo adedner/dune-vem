@@ -118,7 +118,7 @@ namespace Dune
             localMatrix.column( i ).axpy( values, values[ i ], weight );
         }
       }
-      jOp.matrix().print(fMassGlobal);	
+      jOp.matrix().print(fMassGlobal);
       jOp.communicate();
     }
 

@@ -1,12 +1,12 @@
 /**************************************************************************
- 
+
   The dune-fem module is a module of DUNE (see www.dune-project.org).
-  It is based on the dune-grid interface library 
+  It is based on the dune-grid interface library
   extending the grid interface by a number of discretization algorithms
   for solving non-linear systems of partial differential equations.
 
   Copyright (C) 2003 - 2014 Robert Kloefkorn
-  Copyright (C) 2003 - 2010 Mario Ohlberger 
+  Copyright (C) 2003 - 2010 Mario Ohlberger
   Copyright (C) 2004 - 2014 Andreas Dedner
   Copyright (C) 2005        Adrian Burri
   Copyright (C) 2005 - 2014 Mirko Kraenkel
@@ -20,12 +20,12 @@
   Copyright (C) 2013        Tom Ranner
 
 
-  The dune-fem module is free software; you can redistribute it and/or 
-  modify it under the terms of the GNU General Public License as 
-  published by the Free Software Foundation; either version 2 of 
+  The dune-fem module is free software; you can redistribute it and/or
+  modify it under the terms of the GNU General Public License as
+  published by the Free Software Foundation; either version 2 of
   the License, or (at your option) any later version.
 
-  The dune-fem module is distributed in the hope that it will be useful, 
+  The dune-fem module is distributed in the hope that it will be useful,
   but WITHOUT ANY WARRANTY; without even the implied warranty of
   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
   GNU General Public License for more details.
@@ -33,7 +33,7 @@
   You should have received a copy of the GNU General Public License along
   with this program; if not, write to the Free Software Foundation, Inc.,
   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
- 
+
 **************************************************************************/
 #ifndef POISSON_PROBLEMS_HH
 #define POISSON_PROBLEMS_HH
@@ -45,11 +45,11 @@
 
 // -laplace u + u = f with Neumann boundary conditions on domain [0,1]^d
 // Exsct solution is u(x_1,...,x_d) = cos(2*pi*x_1)...cos(2*pi*x_d)
-template <class FunctionSpace> 
+template <class FunctionSpace>
 class CosinusProduct : public ProblemInterface < FunctionSpace >
 {
   typedef ProblemInterface < FunctionSpace >  BaseType;
-public:  
+public:
   typedef typename BaseType :: RangeType            RangeType;
   typedef typename BaseType :: DomainType           DomainType;
   typedef typename BaseType :: JacobianRangeType    JacobianRangeType;
@@ -83,7 +83,7 @@ public:
   virtual void uJacobian(const DomainType& x,
                          JacobianRangeType& ret) const
   {
-    for( int r = 0; r < dimRange; ++ r ) 
+    for( int r = 0; r < dimRange; ++ r )
     {
       for( int i = 0; i < dimDomain; ++i )
       {
@@ -99,19 +99,19 @@ public:
     m = RangeType(1);
   }
   //! the Dirichlet boundary data (default calls u)
-  virtual void g(const DomainType& x, 
-                 RangeType& value) const 
+  virtual void g(const DomainType& x,
+                 RangeType& value) const
   {
     value = RangeType( 0 );
   }
 };
 // -laplace u = f with zero Dirichlet boundary conditions on domain [0,1]^d
 // Exsct solution is u(x_1,...,x_d) = sin(2*pi*x_1)...sin(2*pi*x_d)
-template <class FunctionSpace> 
+template <class FunctionSpace>
 class SinusProduct : public ProblemInterface < FunctionSpace >
 {
   typedef ProblemInterface < FunctionSpace >  BaseType;
-public:  
+public:
   typedef typename BaseType :: RangeType            RangeType;
   typedef typename BaseType :: DomainType           DomainType;
   typedef typename BaseType :: JacobianRangeType    JacobianRangeType;
@@ -138,14 +138,14 @@ public:
       phi *= std::sin( 2*M_PI*x[ i ] );
     phi[0] += x[0]*x[0]-x[1]*x[1]+x[0]*x[1];
     // phi[0] += x[0]*x[1];
-    // phi[0] += 0.5; 
+    // phi[0] += 0.5;
   }
 
   //! the jacobian of the exact solution
   virtual void uJacobian(const DomainType& x,
                          JacobianRangeType& ret) const
   {
-    for( int r = 0; r < dimRange; ++ r ) 
+    for( int r = 0; r < dimRange; ++ r )
     {
       for( int i = 0; i < dimDomain; ++i )
       {
@@ -166,22 +166,22 @@ public:
   }
 
   //! return true if given point belongs to the Dirichlet boundary (default is true)
-  virtual bool isDirichletPoint( const DomainType& x ) const 
+  virtual bool isDirichletPoint( const DomainType& x ) const
   {
     return true;
   }
-  virtual bool hasDirichletBoundary () const 
+  virtual bool hasDirichletBoundary () const
   {
     return true ;
   }
 };
 
 // A problem on a unit sphere
-template <class FunctionSpace> 
+template <class FunctionSpace>
 class SphereProblem : public ProblemInterface < FunctionSpace >
 {
   typedef ProblemInterface < FunctionSpace >  BaseType;
-public:  
+public:
   typedef typename BaseType :: RangeType            RangeType;
   typedef typename BaseType :: DomainType           DomainType;
   typedef typename BaseType :: JacobianRangeType    JacobianRangeType;
@@ -224,8 +224,8 @@ public:
     ret += uVal;
   }
 
-  //! exact solution 
-  virtual void u(const DomainType& x, 
+  //! exact solution
+  virtual void u(const DomainType& x,
                  RangeType& phi) const
   {
     assert( dimRange == 1 );
@@ -282,14 +282,14 @@ private:
 };
 
 // a reentrant corner problem with a 270 degree corner
-template <class FunctionSpace> 
+template <class FunctionSpace>
 class ReentrantCorner : public ProblemInterface < FunctionSpace >
 {
   typedef ProblemInterface < FunctionSpace >  BaseType;
 
   const double lambda_;
 
-public:  
+public:
   typedef typename BaseType :: RangeType            RangeType;
   typedef typename BaseType :: DomainType           DomainType;
   typedef typename BaseType :: JacobianRangeType    JacobianRangeType;
@@ -345,13 +345,13 @@ public:
   }
 
   //! return true if Dirichlet boundary is present (default is true)
-  virtual bool hasDirichletBoundary () const 
+  virtual bool hasDirichletBoundary () const
   {
     return true ;
   }
 
   //! return true if given point belongs to the Dirichlet boundary (default is true)
-  virtual bool isDirichletPoint( const DomainType& x ) const 
+  virtual bool isDirichletPoint( const DomainType& x ) const
   {
     return true ;
   }
@@ -367,11 +367,11 @@ protected:
 
 };
 
-template <class FunctionSpace> 
+template <class FunctionSpace>
 class CurvedRidges : public ProblemInterface < FunctionSpace >
 {
   typedef ProblemInterface < FunctionSpace >  BaseType;
-public:  
+public:
   typedef typename BaseType :: RangeType            RangeType;
   typedef typename BaseType :: DomainType           DomainType;
   typedef typename BaseType :: JacobianRangeType    JacobianRangeType;
@@ -425,13 +425,13 @@ public:
   }
 
   //! return true if Dirichlet boundary is present (default is true)
-  virtual bool hasDirichletBoundary () const 
+  virtual bool hasDirichletBoundary () const
   {
     return true ;
   }
 
   //! return true if given point belongs to the Dirichlet boundary (default is true)
-  virtual bool isDirichletPoint( const DomainType& x ) const 
+  virtual bool isDirichletPoint( const DomainType& x ) const
   {
     return true ;
   }

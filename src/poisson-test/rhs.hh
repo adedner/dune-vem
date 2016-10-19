@@ -47,56 +47,56 @@
 template< class Function, class DiscreteFunction >
 void assembleRHS ( const Function &function, DiscreteFunction &rhs )
 {
-	typedef typename DiscreteFunction::DiscreteFunctionSpaceType DiscreteFunctionSpaceType;
-	typedef typename DiscreteFunction::LocalFunctionType LocalFunctionType;
+  typedef typename DiscreteFunction::DiscreteFunctionSpaceType DiscreteFunctionSpaceType;
+  typedef typename DiscreteFunction::LocalFunctionType LocalFunctionType;
 
-	typedef typename DiscreteFunctionSpaceType::IteratorType IteratorType;
-	typedef typename IteratorType::Entity EntityType;
-	typedef typename EntityType::Geometry GeometryType;
+  typedef typename DiscreteFunctionSpaceType::IteratorType IteratorType;
+  typedef typename IteratorType::Entity EntityType;
+  typedef typename EntityType::Geometry GeometryType;
 
-	typedef typename DiscreteFunctionSpaceType::GridPartType GridPartType;
-	typedef Dune::Fem::CachingQuadrature< GridPartType, 0 > QuadratureType;
+  typedef typename DiscreteFunctionSpaceType::GridPartType GridPartType;
+  typedef Dune::Fem::CachingQuadrature< GridPartType, 0 > QuadratureType;
 
-	rhs.clear();
-	std::ofstream fForcing ("forceintegral-agglo.dat");
-	std::ofstream fFtest ("F-test-agglo.dat");
-	const DiscreteFunctionSpaceType &dfSpace = rhs.space();
+  rhs.clear();
+  std::ofstream fForcing ("forceintegral-agglo.dat");
+  std::ofstream fFtest ("F-test-agglo.dat");
+  const DiscreteFunctionSpaceType &dfSpace = rhs.space();
 
-	const IteratorType end = dfSpace.end();
-	for( IteratorType it = dfSpace.begin(); it != end; ++it )
-	{
-		const EntityType &entity = *it;
-		const GeometryType &geometry = entity.geometry();
+  const IteratorType end = dfSpace.end();
+  for( IteratorType it = dfSpace.begin(); it != end; ++it )
+  {
+    const EntityType &entity = *it;
+    const GeometryType &geometry = entity.geometry();
 
-		typename Function::LocalFunctionType localFunction =
-				function.localFunction( entity);
-		LocalFunctionType rhsLocal = rhs.localFunction( entity );
+    typename Function::LocalFunctionType localFunction =
+        function.localFunction( entity);
+    LocalFunctionType rhsLocal = rhs.localFunction( entity );
 
-		std::ofstream fForcing ("forceintegral-orig.dat");
-		QuadratureType quadrature( entity, 2*dfSpace.order()+1 );
-		const size_t numQuadraturePoints = quadrature.nop();
-		for( size_t pt = 0; pt < numQuadraturePoints; ++pt )
-		{
-			// obtain quadrature point
-			const typename QuadratureType::CoordinateType &x = quadrature.point( pt );
+    std::ofstream fForcing ("forceintegral-orig.dat");
+    QuadratureType quadrature( entity, 2*dfSpace.order()+1 );
+    const size_t numQuadraturePoints = quadrature.nop();
+    for( size_t pt = 0; pt < numQuadraturePoints; ++pt )
+    {
+      // obtain quadrature point
+      const typename QuadratureType::CoordinateType &x = quadrature.point( pt );
 
-			// evaluate f
-			typename Function::RangeType f;
-			localFunction.evaluate( quadrature[ pt ], f );
-			fFtest << geometry.center() << " " << x << " " << f << std::endl;
+      // evaluate f
+      typename Function::RangeType f;
+      localFunction.evaluate( quadrature[ pt ], f );
+      fFtest << geometry.center() << " " << x << " " << f << std::endl;
 
-			//			std::cout << "f = " << f << std::endl;
+      //      std::cout << "f = " << f << std::endl;
 
 
-			// multiply by quadrature weight
-			f *= quadrature.weight( pt ) * geometry.integrationElement( x );
+      // multiply by quadrature weight
+      f *= quadrature.weight( pt ) * geometry.integrationElement( x );
 
-			// add f * phi_i to rhsLocal[ i ]
-			rhsLocal.axpy( quadrature[ pt ], f );
-		}
-	}
-	rhs.print(fForcing);
-	rhs.communicate();
+      // add f * phi_i to rhsLocal[ i ]
+      rhsLocal.axpy( quadrature[ pt ], f );
+    }
+  }
+  rhs.print(fForcing);
+  rhs.communicate();
 }
 
 #endif // #ifndef RHS_HH

@@ -65,7 +65,6 @@ protected:
 
   typedef typename DiscreteFunctionSpaceType::IteratorType IteratorType;
   typedef typename IteratorType::Entity       EntityType;
-  typedef typename EntityType::EntityPointer  EntityPointerType;
   typedef typename EntityType::Geometry       GeometryType;
 
   typedef typename DiscreteFunctionSpaceType::DomainType DomainType;
@@ -131,7 +130,6 @@ protected:
 
   typedef typename DiscreteFunctionSpaceType::IteratorType IteratorType;
   typedef typename IteratorType::Entity       EntityType;
-  typedef typename EntityType::EntityPointer  EntityPointerType;
   typedef typename EntityType::Geometry       GeometryType;
 
   typedef typename DiscreteFunctionSpaceType::DomainType DomainType;
@@ -214,7 +212,7 @@ void DGEllipticOperator< DiscreteFunction, Model >
 
         // compute mass contribution (studying linear case so linearizing around zero)
         RangeType avu( 0 );
-        model().source( entity, quadrature[ pt ], vu, avu );
+        model().source( entity, quadrature[ pt ], vu, du, avu );
         avu *= weight;
         // add to local functional wLocal.axpy( quadrature[ pt ], avu );
 
@@ -301,7 +299,8 @@ void DGEllipticOperator< DiscreteFunction, Model >
         }
         else if( intersection.boundary() )
         {
-          if ( ! model().isDirichletIntersection( intersection ) )
+          Dune::FieldVector< bool, RangeType::dimension > components( true );
+          if ( ! model().isDirichletIntersection( intersection, components ) )
             continue;
 
           typedef typename IntersectionType::Geometry  IntersectionGeometryType;
@@ -460,7 +459,7 @@ void DifferentiableDGEllipticOperator< JacobianOperator, Model >
       for( unsigned int localCol = 0; localCol < numBaseFunctions; ++localCol )
       {
         // if mass terms or right hand side is present
-        model().linSource( u0, entity, quadrature[ pt ], phi[ localCol ], aphi );
+        model().linSource( u0, jacU0, entity, quadrature[ pt ], phi[ localCol ], dphi[ localCol ], aphi );
 
         // if gradient term is present
         model().linDiffusiveFlux( u0, jacU0, entity, quadrature[ pt ], phi[ localCol ], dphi[ localCol ], adphi );
@@ -594,7 +593,8 @@ void DifferentiableDGEllipticOperator< JacobianOperator, Model >
       }
       else if( intersection.boundary() )
       {
-        if ( ! model().isDirichletIntersection( intersection ) )
+        Dune::FieldVector< bool, RangeType::dimension > components( true );
+        if ( ! model().isDirichletIntersection( intersection, components ) )
           continue;
 
         typedef typename IntersectionType::Geometry  IntersectionGeometryType;
@@ -674,4 +674,3 @@ void DifferentiableDGEllipticOperator< JacobianOperator, Model >
  }
 
 #endif // ELLIPTIC_HH
-

@@ -89,25 +89,25 @@
 // --------------------
 
 struct DataOutputParameters
-		: public Dune::Fem::LocalParameter< Dune::Fem::DataOutputParameters, DataOutputParameters >
+    : public Dune::Fem::LocalParameter< Dune::Fem::DataOutputParameters, DataOutputParameters >
 {
-	DataOutputParameters ( const int step )
-												  : step_( step )
-													{}
+  DataOutputParameters ( const int step )
+                          : step_( step )
+                          {}
 
-	DataOutputParameters ( const DataOutputParameters &other )
-	: step_( other.step_ )
-	{}
+  DataOutputParameters ( const DataOutputParameters &other )
+  : step_( other.step_ )
+  {}
 
-	std::string prefix () const
-	{
-		std::stringstream s;
-		s << "poisson-" << step_ << "-";
-		return s.str();
-	}
+  std::string prefix () const
+  {
+    std::stringstream s;
+    s << "poisson-" << step_ << "-";
+    return s.str();
+  }
 
 private:
-	int step_;
+  int step_;
 };
 
 // FemScheme
@@ -126,112 +126,112 @@ template < class Model >
 class FemScheme
 {
 public:
-	//! type of the mathematical model
-	typedef Model ModelType ;
+  //! type of the mathematical model
+  typedef Model ModelType ;
 
-	//! grid view (e.g. leaf grid view) provided in the template argument list
-	typedef typename ModelType::GridPartType GridPartType;
+  //! grid view (e.g. leaf grid view) provided in the template argument list
+  typedef typename ModelType::GridPartType GridPartType;
 
-	//! type of underyling hierarchical grid needed for data output
-	typedef typename GridPartType::GridType GridType;
-
-
-
-
-	//! type of function space (scalar functions, \f$ f: \Omega -> R \f$)
-	typedef typename ModelType :: FunctionSpaceType   FunctionSpaceType;
-
-	//! choose type of discrete function space
-	typedef Dune::Vem::Agglomeration <GridPartType>  AgglomerationType;
-//	typedef Dune::Fem::DiscontinuousGalerkinSpace< FunctionSpaceType, GridPartType, POLORDER > DiscreteFunctionSpaceType;
-	typedef Dune::Vem::AgglomerationDGSpace < FunctionSpaceType, GridPartType, POLORDER > DiscreteFunctionSpaceType;
+  //! type of underyling hierarchical grid needed for data output
+  typedef typename GridPartType::GridType GridType;
 
 
 
-	// choose type of discrete function, Matrix implementation and solver implementation
+
+  //! type of function space (scalar functions, \f$ f: \Omega -> R \f$)
+  typedef typename ModelType :: FunctionSpaceType   FunctionSpaceType;
+
+  //! choose type of discrete function space
+  typedef Dune::Vem::Agglomeration <GridPartType>  AgglomerationType;
+//  typedef Dune::Fem::DiscontinuousGalerkinSpace< FunctionSpaceType, GridPartType, POLORDER > DiscreteFunctionSpaceType;
+  typedef Dune::Vem::AgglomerationDGSpace < FunctionSpaceType, GridPartType, POLORDER > DiscreteFunctionSpaceType;
+
+
+
+  // choose type of discrete function, Matrix implementation and solver implementation
 #if USE_ISTL
-	typedef Dune::Fem::ISTLBlockVectorDiscreteFunction< DiscreteFunctionSpaceType > DiscreteFunctionType;
-	typedef Dune::Fem::ISTLLinearOperator< DiscreteFunctionType, DiscreteFunctionType > LinearOperatorType;
-	typedef Dune::Fem::ISTLCGOp< DiscreteFunctionType, LinearOperatorType > LinearInverseOperatorType;
+  typedef Dune::Fem::ISTLBlockVectorDiscreteFunction< DiscreteFunctionSpaceType > DiscreteFunctionType;
+  typedef Dune::Fem::ISTLLinearOperator< DiscreteFunctionType, DiscreteFunctionType > LinearOperatorType;
+  typedef Dune::Fem::ISTLCGOp< DiscreteFunctionType, LinearOperatorType > LinearInverseOperatorType;
 #else
-	typedef Dune::Fem::AdaptiveDiscreteFunction< DiscreteFunctionSpaceType > DiscreteFunctionType;
-	typedef Dune::Fem::SparseRowLinearOperator< DiscreteFunctionType, DiscreteFunctionType > LinearOperatorType;
-	typedef Dune::Fem::CGInverseOperator< DiscreteFunctionType > LinearInverseOperatorType;
+  typedef Dune::Fem::AdaptiveDiscreteFunction< DiscreteFunctionSpaceType > DiscreteFunctionType;
+  typedef Dune::Fem::SparseRowLinearOperator< DiscreteFunctionType, DiscreteFunctionType > LinearOperatorType;
+  typedef Dune::Fem::CGInverseOperator< DiscreteFunctionType > LinearInverseOperatorType;
 #endif
 
-	/*********************************************************/
+  /*********************************************************/
 
-	//! define Laplace operator
-	typedef DifferentiableDGEllipticOperator< LinearOperatorType, ModelType > EllipticOperatorType;
-
-
+  //! define Laplace operator
+  typedef DifferentiableDGEllipticOperator< LinearOperatorType, ModelType > EllipticOperatorType;
 
 
-	FemScheme( GridPartType &gridPart,
-			const ModelType& implicitModel,
-			AgglomerationType& agglomeration)
-	: implicitModel_( implicitModel ),
-	  gridPart_( gridPart ),
-	  agglomeration_(agglomeration),
-	  discreteSpace_( gridPart_, agglomeration),
-	  solution_( "solution", discreteSpace_ ),
-	  rhs_( "rhs", discreteSpace_ ),
-	  // the elliptic operator (implicit)
-	  implicitOperator_( implicitModel_, discreteSpace_ ),
-	  // create linear operator (domainSpace,rangeSpace)
-	  linearOperator_( "assempled elliptic operator", discreteSpace_, discreteSpace_ ),
-	  // exact solution
-	  solverEps_( Dune::Fem::Parameter::getValue< double >( "poisson.solvereps", 1e-8 ) )
-	{
-		// set all DoF to zero
-		solution_.clear();
-	}
 
-	const DiscreteFunctionType &solution() const
-	{
-		return solution_;
-	}
 
-	//! sotup the right hand side
-	void prepare()
-	{
-		// assemble rhs
-		assembleDGRHS ( implicitModel_, rhs_ );
-	}
+  FemScheme( GridPartType &gridPart,
+      const ModelType& implicitModel,
+      AgglomerationType& agglomeration)
+  : implicitModel_( implicitModel ),
+    gridPart_( gridPart ),
+    agglomeration_(agglomeration),
+    discreteSpace_( gridPart_, agglomeration),
+    solution_( "solution", discreteSpace_ ),
+    rhs_( "rhs", discreteSpace_ ),
+    // the elliptic operator (implicit)
+    implicitOperator_( implicitModel_, discreteSpace_ ),
+    // create linear operator (domainSpace,rangeSpace)
+    linearOperator_( "assempled elliptic operator", discreteSpace_, discreteSpace_ ),
+    // exact solution
+    solverEps_( Dune::Fem::Parameter::getValue< double >( "poisson.solvereps", 1e-8 ) )
+  {
+    // set all DoF to zero
+    solution_.clear();
+  }
 
-	//! solve the system - bool parameter
-	//! false: only assemble if grid has changed
-	//! true:  assemble in any case
-	void solve ( bool assemble )
-	{
-		if( assemble )
-		{
-			// assemble linear operator (i.e. setup matrix)
-			implicitOperator_.jacobian( solution_ , linearOperator_ );
-		}
+  const DiscreteFunctionType &solution() const
+  {
+    return solution_;
+  }
 
-		// inverse operator using linear operator
-		LinearInverseOperatorType invOp( linearOperator_, solverEps_, solverEps_ );
-		// solve system
-		invOp( rhs_, solution_ );
-	}
+  //! sotup the right hand side
+  void prepare()
+  {
+    // assemble rhs
+    assembleDGRHS ( implicitModel_, rhs_ );
+  }
+
+  //! solve the system - bool parameter
+  //! false: only assemble if grid has changed
+  //! true:  assemble in any case
+  void solve ( bool assemble )
+  {
+    if( assemble )
+    {
+      // assemble linear operator (i.e. setup matrix)
+      implicitOperator_.jacobian( solution_ , linearOperator_ );
+    }
+
+    // inverse operator using linear operator
+    LinearInverseOperatorType invOp( linearOperator_, solverEps_, solverEps_ );
+    // solve system
+    invOp( rhs_, solution_ );
+  }
 
 protected:
-	const ModelType& implicitModel_;   // the mathematical model
+  const ModelType& implicitModel_;   // the mathematical model
 
-	GridPartType  &gridPart_;         // grid part(view), e.g. here the leaf grid the discrete space is build with
+  GridPartType  &gridPart_;         // grid part(view), e.g. here the leaf grid the discrete space is build with
 
-	DiscreteFunctionSpaceType discreteSpace_; // discrete function space
-	DiscreteFunctionType solution_;   // the unknown
-	DiscreteFunctionType rhs_;        // the right hand side
+  DiscreteFunctionSpaceType discreteSpace_; // discrete function space
+  DiscreteFunctionType solution_;   // the unknown
+  DiscreteFunctionType rhs_;        // the right hand side
 
-	EllipticOperatorType implicitOperator_; // the implicit operator
+  EllipticOperatorType implicitOperator_; // the implicit operator
 
-	LinearOperatorType linearOperator_;  // the linear operator (i.e. jacobian of the implicit)
+  LinearOperatorType linearOperator_;  // the linear operator (i.e. jacobian of the implicit)
 
-	AgglomerationType agglomeration_;
+  AgglomerationType agglomeration_;
 
-	const double solverEps_ ; // eps for linear solver
+  const double solverEps_ ; // eps for linear solver
 };
 
 #endif // end #if ELLIPT_FEMSCHEME_HH
