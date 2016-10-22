@@ -58,7 +58,9 @@ namespace Dune
     public:
       typedef BoundingBoxBasisFunctionSet< EntityType, ShapeFunctionSetType > BasisFunctionSetType;
 
-      static const std::size_t localBlockSize = FunctionSpaceType::dimRange * StaticPower< polOrder+1, GridPartType::dimension >::power;
+      // static const std::size_t localBlockSize = FunctionSpaceType::dimRange * StaticPower< polOrder+1, GridPartType::dimension >::power;
+      static const int localBlockSize
+        = FunctionSpaceType::dimRange*Fem::OrthonormalShapeFunctionSetSize< ScalarFunctionSpaceType, polOrder >::v;
       typedef AgglomerationDGMapper< GridPartType > BlockMapperType;
 
       template< class DiscreteFunction, class Operation = Fem::DFCommunicationOperation::Copy >
