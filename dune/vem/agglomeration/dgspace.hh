@@ -93,8 +93,8 @@ namespace Dune
       typedef typename BaseType::EntityType EntityType;
       typedef typename BaseType::GridPartType GridPartType;
 
-      AgglomerationDGSpace ( GridPartType &gridPart, const AgglomerationType &agglomeration )
-        : BaseType( gridPart ),
+      AgglomerationDGSpace ( AgglomerationType &agglomeration )
+        : BaseType( agglomeration.gridPart() ),
           blockMapper_( agglomeration ),
           boundingBoxes_( boundingBoxes( agglomeration ) ),
           // scalarShapeFunctionSet_( polOrder )
