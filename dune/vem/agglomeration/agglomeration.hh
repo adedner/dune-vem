@@ -29,7 +29,7 @@ namespace Dune
 
       typedef typename GridPartType::template Codim< 0 >::EntityType ElementType;
 
-      Agglomeration ( const GridPartType &gridPart, std::vector< std::size_t > indices )
+      Agglomeration ( GridPartType &gridPart, std::vector< std::size_t > indices )
         : gridPart_( gridPart ),
           mapper_( static_cast< typename GridPartType::GridViewType >( gridPart ) ),
           indices_( std::move( indices ) ),
@@ -58,7 +58,7 @@ namespace Dune
       }
 
       template< class T >
-      Agglomeration ( const GridPartType &gridPart, const std::vector< T > &indices )
+      Agglomeration ( GridPartType &gridPart, const std::vector< T > &indices )
         : Agglomeration( gridPart, convert( indices ) )
       {}
 

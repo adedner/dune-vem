@@ -21,6 +21,7 @@
 #include <dune/vem/misc/pseudoinverse.hh>
 #include <dune/vem/space/basisfunctionset.hh>
 #include <dune/vem/space/interpolation.hh>
+#include <dune/vem/space/interpolate.hh>
 
 namespace Dune
 {
@@ -106,8 +107,8 @@ namespace Dune
 
       using BaseType::gridPart;
 
-      explicit AgglomerationVEMSpace ( GridPartType &gridPart, const AgglomerationType &agglomeration )
-        : BaseType( gridPart ),
+      explicit AgglomerationVEMSpace ( AgglomerationType &agglomeration )
+        : BaseType( agglomeration.gridPart() ),
           agIndexSet_( agglomeration ),
           blockMapper_( agIndexSet_, AgglomerationInterpolationType::dofsPerCodim() ),
           boundingBoxes_( boundingBoxes( agIndexSet_.agglomeration() ) ),
@@ -144,6 +145,12 @@ namespace Dune
       const AgglomerationType &agglomeration () const { return blockMapper_.agglomeration(); }
 
       const Stabilization &stabilization ( const EntityType &entity ) const { return stabilizations_[ agglomeration().index( entity ) ]; }
+
+      template< class GridFunction, class DiscreteFunction, unsigned int partitions >
+      void interpolate ( const GridFunction &u, DiscreteFunction &v, PartitionSet< partitions > ps) const
+      {
+        interpolate ( u, v, ps );
+      }
 
     private:
       void buildProjections ();

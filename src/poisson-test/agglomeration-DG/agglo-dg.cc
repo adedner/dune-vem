@@ -173,7 +173,7 @@ try
   typedef Dune::Vem::AgglomerationVEMSpace< FunctionSpaceType, GridPart, POLORDER > DiscreteFunctionSpaceType;
   typedef VemScheme< DiscreteFunctionSpaceType, ModelType > SchemeType;
 #endif
-  DiscreteFunctionSpaceType space( gridPart, agglomeration );
+  DiscreteFunctionSpaceType space( agglomeration );
   SchemeType scheme( space, implicitModel );
 
   typedef Dune::Fem::GridFunctionAdapter< ProblemType, GridPart > GridExactSolutionType;
