@@ -13,10 +13,13 @@
 #include <dune/fem/space/shapefunctionset/orthonormal.hh>
 #include <dune/fem/space/shapefunctionset/proxy.hh>
 #include <dune/fem/space/shapefunctionset/vectorial.hh>
+#include <dune/fem/solver/cginverseoperator.hh>
+#include <dune/fem/operator/linear/spoperator.hh>
 
 #include <dune/vem/agglomeration/basisfunctionset.hh>
 #include <dune/vem/agglomeration/boundingbox.hh>
 #include <dune/vem/agglomeration/dgmapper.hh>
+#include <dune/vem/operator/mass.hh>
 
 namespace Dune
 {
@@ -95,6 +98,8 @@ namespace Dune
       typedef typename BaseType::EntityType EntityType;
       typedef typename BaseType::GridPartType GridPartType;
 
+      enum { hasLocalInterpolate = false };
+
       AgglomerationDGSpace ( AgglomerationType &agglomeration )
         : BaseType( agglomeration.gridPart() ),
           blockMapper_( agglomeration ),
@@ -127,6 +132,21 @@ namespace Dune
 
       const AgglomerationType &agglomeration () const { return blockMapper_.agglomeration(); }
 
+      template< class GridFunction, class DiscreteFunction, unsigned int partitions >
+      void interpolate ( const GridFunction &u, DiscreteFunction &v, PartitionSet< partitions > ps) const
+      {
+        static_assert( std::is_same<ThisType, typename DiscreteFunction::DiscreteFunctionSpaceType>::value,
+            "calling global interpolation on space with a non matching discrete function" );
+        // !!! a very crude implementation - should be done locally on each polygon
+        DiscreteFunction rhs( v );
+        Dune::Vem::applyMass( u, rhs );
+        typedef Dune::Fem::SparseRowLinearOperator< DiscreteFunction, DiscreteFunction > LinearOperator;
+        LinearOperator assembledMassOp( "assembled mass operator", v.space(), v.space() );
+        Dune::Vem::MassOperator< LinearOperator > massOp( v.space() );
+        massOp.jacobian( v, assembledMassOp );
+        Dune::Fem::CGInverseOperator< DiscreteFunction > invOp( assembledMassOp, 1e-8, 1e-8 );
+        invOp( rhs, v );
+      }
     private:
       mutable BlockMapperType blockMapper_;
       std::vector< BoundingBox< GridPart > > boundingBoxes_;
