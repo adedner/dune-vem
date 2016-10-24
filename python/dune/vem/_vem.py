@@ -49,6 +49,12 @@ def agglomerateddg(view, agglomerate, order=1, dimrange=1, field="double", stora
                    '    auto agglo = new Dune::Vem::Agglomeration<' + gridPartName + '>',
                    '         (Dune::FemPy::gridPart<' + viewType + '>(gridView), [agglomerate](const auto& e) { return agglomerate(e).template cast<unsigned int>(); } ); ',
                    '    new (&self) ' + typeName + '( *agglo );',
+                   '    pybind11::cpp_function remove_agglo( [ agglo ] ( pybind11::handle weakref ) {',
+                   '        delete agglo;',
+                   '        werkref.dec_ref();',
+                   '      } );',
+                   '    pybind11::handle nurse = pybind11::detail::get_object_handle( &self, pybind11::detail::get_type_info( typeid( ' + typeName + ' ) ) );',
+                   '    pybind11::weakref( nurse, remove_agglo ).release();',
                    '  }, "gridView"_a, "agglomerate"_a, pybind11::keep_alive< 1, 2 >()']
 
     return module(field, storage, includes, typeName, [constructor]).Space(view, agglomerate)
