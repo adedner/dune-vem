@@ -33,6 +33,18 @@ namespace Dune
     template< class FunctionSpace, class GridPart, int polOrder >
     class AgglomerationDGSpace;
 
+    // IsAgglomerationDGSpace
+    // ------------------------------
+
+    template< class DiscreteFunctionSpace >
+    struct IsAgglomerationDGSpace
+      : std::integral_constant< bool, false >
+    {};
+
+    template< class FunctionSpace, class GridPart, int order >
+    struct IsAgglomerationDGSpace< AgglomerationDGSpace< FunctionSpace, GridPart, order > >
+      : std::integral_constant< bool, true >
+    {};
 
 
     // AgglomerationDGSpaceTraits
@@ -132,21 +144,6 @@ namespace Dune
 
       const AgglomerationType &agglomeration () const { return blockMapper_.agglomeration(); }
 
-      template< class GridFunction, class DiscreteFunction, unsigned int partitions >
-      void interpolate ( const GridFunction &u, DiscreteFunction &v, PartitionSet< partitions > ps) const
-      {
-        static_assert( std::is_same<ThisType, typename DiscreteFunction::DiscreteFunctionSpaceType>::value,
-            "calling global interpolation on space with a non matching discrete function" );
-        // !!! a very crude implementation - should be done locally on each polygon
-        DiscreteFunction rhs( v );
-        Dune::Vem::applyMass( u, rhs );
-        typedef Dune::Fem::SparseRowLinearOperator< DiscreteFunction, DiscreteFunction > LinearOperator;
-        LinearOperator assembledMassOp( "assembled mass operator", v.space(), v.space() );
-        Dune::Vem::MassOperator< LinearOperator > massOp( v.space() );
-        massOp.jacobian( v, assembledMassOp );
-        Dune::Fem::CGInverseOperator< DiscreteFunction > invOp( assembledMassOp, 1e-8, 1e-8 );
-        invOp( rhs, v );
-      }
     private:
       mutable BlockMapperType blockMapper_;
       std::vector< BoundingBox< GridPart > > boundingBoxes_;
@@ -154,6 +151,24 @@ namespace Dune
     };
 
   } // namespace Vem
+
+  namespace Fem
+  {
+    template< class GridFunction, class DiscreteFunction, unsigned int partitions >
+    static inline std::enable_if_t< std::is_convertible< GridFunction, HasLocalFunction >::value && Dune::Vem::IsAgglomerationDGSpace< typename DiscreteFunction::DiscreteFunctionSpaceType >::value >
+    interpolate ( const GridFunction &u, DiscreteFunction &v, PartitionSet< partitions > ps )
+    {
+      // !!! a very crude implementation - should be done locally on each polygon
+      DiscreteFunction rhs( v );
+      Dune::Vem::applyMass( u, rhs );
+      typedef Dune::Fem::SparseRowLinearOperator< DiscreteFunction, DiscreteFunction > LinearOperator;
+      LinearOperator assembledMassOp( "assembled mass operator", v.space(), v.space() );
+      Dune::Vem::MassOperator< LinearOperator > massOp( v.space() );
+      massOp.jacobian( v, assembledMassOp );
+      Dune::Fem::CGInverseOperator< DiscreteFunction > invOp( assembledMassOp, 1e-8, 1e-8 );
+      invOp( rhs, v );
+    }
+  } // namespace Fem
 
 } // namespace Dune
 

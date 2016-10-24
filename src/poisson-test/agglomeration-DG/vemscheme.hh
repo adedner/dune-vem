@@ -122,7 +122,7 @@ public:
 //    typedef Dune::Fem::DiscontinuousGalerkinSpace< FunctionSpaceType, GridPartType, POLORDER > DiscreteFunctionSpaceType;
 
 //    typedef Dune::Vem::AgglomerationVEMSpace< FunctionSpaceType, GridPartType, POLORDER > VemSpaceType;
-   typedef Space VemSpaceType;
+    typedef Space VemSpaceType;
 
 
 

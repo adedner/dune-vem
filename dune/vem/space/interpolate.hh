@@ -6,19 +6,19 @@
 #include <dune/grid/common/partitionset.hh>
 #include <dune/grid/common/rangegenerators.hh>
 
+#include <dune/fem/function/common/discretefunction.hh>
 #include <dune/vem/space/interpolation.hh>
+#include <dune/vem/space/declaration.hh>
 
 namespace Dune
 {
 
-  namespace Vem
+  namespace Fem
   {
 
-    // interpolate
-    // -----------
-
     template< class GridFunction, class DiscreteFunction, unsigned int partitions >
-    static inline void interpolate ( const GridFunction &u, DiscreteFunction &v, PartitionSet< partitions > ps )
+    static inline std::enable_if_t< std::is_convertible< GridFunction, HasLocalFunction >::value && Dune::Vem::IsAgglomerationVEMSpace< typename DiscreteFunction::DiscreteFunctionSpaceType >::value >
+    interpolate ( const GridFunction &u, DiscreteFunction &v, PartitionSet< partitions > ps )
     {
       const auto &mapper = v.space().blockMapper();
       const auto &agglomeration = mapper.agglomeration();
@@ -41,15 +41,12 @@ namespace Dune
 
         ldv.resize( mapper.numDofs( agglomerate ) );
         for( const ElementSeedType &entitySeed : entitySeeds[ agglomerate ] )
-          interpolation( u.localFunction( v.gridPart().entity( entitySeed ) ), ldv );
+        {
+          const auto &element = v.gridPart().entity( entitySeed );
+          interpolation( u.localFunction( element ), ldv );
+        }
         v.setLocalDofs( v.gridPart().entity( entitySeeds[ agglomerate ].front() ), ldv );
       }
-    }
-
-    template< class GridFunction, class DiscreteFunction >
-    static inline void interpolate ( const GridFunction &u, DiscreteFunction &v )
-    {
-      interpolate( u, v, Partitions::all );
     }
 
   } // namespace Fem

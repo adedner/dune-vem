@@ -107,6 +107,8 @@ namespace Dune
 
       using BaseType::gridPart;
 
+      enum { hasLocalInterpolate = false };
+
       explicit AgglomerationVEMSpace ( AgglomerationType &agglomeration )
         : BaseType( agglomeration.gridPart() ),
           agIndexSet_( agglomeration ),
@@ -145,12 +147,6 @@ namespace Dune
       const AgglomerationType &agglomeration () const { return blockMapper_.agglomeration(); }
 
       const Stabilization &stabilization ( const EntityType &entity ) const { return stabilizations_[ agglomeration().index( entity ) ]; }
-
-      template< class GridFunction, class DiscreteFunction, unsigned int partitions >
-      void interpolate ( const GridFunction &u, DiscreteFunction &v, PartitionSet< partitions > ps) const
-      {
-        interpolate ( u, v, ps );
-      }
 
     private:
       void buildProjections ();

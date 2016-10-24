@@ -44,7 +44,7 @@ struct HeatScheme : public VemScheme<ImplicitModel>
   {
     typedef Dune::Fem::GridFunctionAdapter< typename ExplicitModelType::InitialFunctionType, GridPartType > GridInitialFunction;
     GridInitialFunction gridInitialFunction( "initial data", explicitModel_.initialFunction(), solution_.gridPart() );
-    Dune::Vem::interpolate( gridInitialFunction, solution_ );
+    Dune::Fem::interpolate( gridInitialFunction, solution_ );
   }
 
 private:
