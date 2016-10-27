@@ -38,9 +38,11 @@ namespace Dune
       {}
 
       template< class LocalFunction, class LocalDofVector >
-      void operator() ( const LocalFunction &localFunction, LocalDofVector &localDofVector ) const
+      void operator() ( const ElementType &element, const LocalFunction &localFunction, LocalDofVector &localDofVector ) const
       {
-        const ElementType &element = localFunction.entity();
+      // void operator() ( const LocalFunction &localFunction, LocalDofVector &localDofVector ) const
+      // {
+        // const ElementType &element = localFunction.entity();
         const auto &refElement = ReferenceElements< ctype, dimension >::general( element.type() );
 
         for( int i = 0; i < refElement.size( dimension ); ++i )

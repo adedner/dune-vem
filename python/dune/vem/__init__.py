@@ -4,3 +4,6 @@ registry["space"] = {
         "AgglomeratedDG" : agglomerateddg,
         "AgglomeratedVEM" : agglomeratedvem
     }
+registry["scheme"] = {
+         "vem"         : vem
+    }

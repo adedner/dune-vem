@@ -43,7 +43,8 @@ namespace Dune
         for( const ElementSeedType &entitySeed : entitySeeds[ agglomerate ] )
         {
           const auto &element = v.gridPart().entity( entitySeed );
-          interpolation( u.localFunction( element ), ldv );
+          interpolation( element, u.localFunction( element ), ldv );
+          // interpolation( u.localFunction( element ), ldv );
         }
         v.setLocalDofs( v.gridPart().entity( entitySeeds[ agglomerate ].front() ), ldv );
       }
