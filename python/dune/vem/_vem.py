@@ -127,9 +127,11 @@ def vem(space, model, parameters={}):
     Returns:
         Scheme: the constructed scheme
     """
-    from dune.fem.scheme import module, storageToSolver
-    from dune.fem.scheme._schemes import femscheme
+    from . import module
     includes = [ "dune/vem/operator/elliptic.hh" ]
-    includes, typeName = femscheme(includes, space, "Dune::Vem::DifferentiableEllipticOperator")
+
+    operator = lambda linOp,model: "Dune::Vem::DifferentiableEllipticOperator< " +\
+                                   ",".join([linOp,model]) + ">"
+    includes, typeName = femscheme(includes, space, operator)
 
     return module(includes, typeName).Scheme(space,model,parameters)
