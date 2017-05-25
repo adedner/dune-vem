@@ -235,7 +235,7 @@ void DGEllipticOperator< DiscreteFunction, Model >
         const IntersectionType &intersection = *iit;
         if ( intersection.neighbor() )
         {
-          const EntityType outside = Dune::Fem::make_entity( intersection.outside() );
+          const EntityType outside = intersection.outside();
 
           typedef typename IntersectionType::Geometry  IntersectionGeometryType;
           const IntersectionGeometryType &intersectionGeometry = intersection.geometry();
@@ -482,7 +482,7 @@ void DifferentiableDGEllipticOperator< JacobianOperator, Model >
 
       if( intersection.neighbor()  )
       {
-        EntityType neighbor = Dune::Fem::make_entity( intersection.outside() );
+        EntityType neighbor = intersection.outside();
         const int neighborPolygon = agglomeration.index(neighbor);
         typedef typename IntersectionType::Geometry  IntersectionGeometryType;
         const IntersectionGeometryType &intersectionGeometry = intersection.geometry();

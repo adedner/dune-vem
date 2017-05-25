@@ -112,7 +112,7 @@ def agglomeratedvem(view, agglomerate, order=1, dimrange=1, field="double", stor
 
     return module(field, storage, includes, typeName, [constructor]).Space(view, agglomerate)
 
-def vem(space, model, parameters={}):
+def vem(space, model, solver=None, parameters={}):
     """create a scheme for solving second order pdes with the virtual element method
 
     Args:
@@ -127,11 +127,14 @@ def vem(space, model, parameters={}):
     Returns:
         Scheme: the constructed scheme
     """
-    from . import module
+    # from dune.fem.space import module
+    from dune.fem.scheme import module
+    from dune.fem.scheme import femscheme
+    # from . import module
     includes = [ "dune/vem/operator/elliptic.hh" ]
 
     operator = lambda linOp,model: "Dune::Vem::DifferentiableEllipticOperator< " +\
                                    ",".join([linOp,model]) + ">"
-    includes, typeName = femscheme(includes, space, operator)
+    includes, typeName = femscheme(includes, space, solver, operator)
 
     return module(includes, typeName).Scheme(space,model,parameters)

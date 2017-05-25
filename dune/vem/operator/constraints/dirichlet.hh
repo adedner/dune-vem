@@ -155,7 +155,7 @@ namespace Dune
       void dirichletDofsCorrectOnEntity ( LinearOperator &linearOperator, const EntityType &entity ) const
       {
         // get slave dof structure (for parallel runs)   /*@LST0S@*/
-        SlaveDofsType &slaveDofs = this->slaveDofs();
+        const SlaveDofsType &slaveDofs = this->slaveDofs();
 
         typedef typename LinearOperator::LocalMatrixType LocalMatrixType;
 
@@ -334,14 +334,15 @@ namespace Dune
       }
 
       // return slave dofs
-      static SlaveDofsType *getSlaveDofs ( const DiscreteFunctionSpaceType &space )
+      static const SlaveDofsType *getSlaveDofs ( const DiscreteFunctionSpaceType &space )
       {
-        SlaveDofsKeyType key( space, space.blockMapper() );
-        return &( SlaveDofsProviderType::getObject( key ));
+        return &space.slaveDofs();
+        // SlaveDofsKeyType key( space, space.blockMapper() );
+        // return &( SlaveDofsProviderType::getObject( key ));
       }
 
       // return reference to slave dofs
-      SlaveDofsType &slaveDofs () const
+      const SlaveDofsType &slaveDofs () const
       {
         slaveDofs_->rebuild();
         return *slaveDofs_;
@@ -351,7 +352,7 @@ namespace Dune
       //! pointer to slave dofs
       const ModelType &model_;
       const DiscreteFunctionSpaceType &space_;
-      SlaveDofsType *const slaveDofs_;
+      const SlaveDofsType *const slaveDofs_;
       mutable std::vector< DirichletBlock > dirichletBlocks_;
       mutable bool hasDirichletDofs_ = false;
       mutable int sequence_ = -1;

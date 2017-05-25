@@ -4,7 +4,7 @@
 #include <utility>
 
 #include <dune/grid/common/entity.hh>
-#include <dune/grid/common/entitypointer.hh>
+// #include <dune/grid/common/entitypointer.hh>
 
 namespace Dune
 {
@@ -15,6 +15,7 @@ namespace Dune
     // make_entity
     // -----------
 
+#if 0
     template< class Grid, class Implementation >
     typename Dune::EntityPointer< Grid, Implementation >::Entity
     make_entity ( const Dune::EntityPointer< Grid, Implementation > &entityPointer )
@@ -28,7 +29,7 @@ namespace Dune
     {
       return std::move( entity );
     }
-
+#endif
   } // namespace Vem
 
 } // namespace Dune
