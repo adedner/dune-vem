@@ -135,4 +135,3 @@ public:
 };
 
 #endif // #ifndef ELLIPTC_PROBLEMINTERFACE_HH
-

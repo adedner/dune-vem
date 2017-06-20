@@ -100,7 +100,7 @@
  *     Model::ProblemType boundary data, exact solution,
  *                        and the type of the function space
  *******************************************************************************/
-template < class Model >
+template < class Space, class Model >
 class VemScheme
 {
 public:
@@ -119,13 +119,10 @@ public:
     //! type of function space (scalar functions, \f$ f: \Omega -> R \f$)
     typedef typename ModelType :: FunctionSpaceType   FunctionSpaceType;
 
-    //! choose type of discrete function space
-    typedef Dune::Vem::Agglomeration <GridPartType>  AgglomerationType;
-    typedef Dune::Vem::AgglomerationIndexSet< GridPartType > AgglomerationIndexSetType;
 //    typedef Dune::Fem::DiscontinuousGalerkinSpace< FunctionSpaceType, GridPartType, POLORDER > DiscreteFunctionSpaceType;
 
-    typedef Dune::Vem::AgglomerationVEMSpace< FunctionSpaceType, GridPartType, POLORDER > VemSpaceType;
-
+//    typedef Dune::Vem::AgglomerationVEMSpace< FunctionSpaceType, GridPartType, POLORDER > VemSpaceType;
+    typedef Space VemSpaceType;
 
 
 
@@ -147,11 +144,9 @@ public:
     //! define Laplace operator
     typedef Dune::Vem::DifferentiableEllipticOperator < LinearOperatorType, ModelType > EllipticOperatorType;
 
-    VemScheme ( GridPartType &gridPart, const ModelType& implicitModel, const AgglomerationType& agglomeration )
+    VemScheme ( const VemSpaceType& space, const ModelType& implicitModel )
     : implicitModel_( implicitModel ),
-      gridPart_( gridPart ),
-      indexSet_( agglomeration ),
-      discreteSpace_( gridPart_, indexSet_ ),
+      discreteSpace_( space ),
       solution_( "solution", discreteSpace_ ),
       rhs_( "rhs", discreteSpace_ ),
       // the elliptic operator (implicit)
@@ -218,10 +213,7 @@ public:
 protected:
     const ModelType& implicitModel_;   // the mathematical model
 
-    GridPartType  &gridPart_;         // grid part(view), e.g. here the leaf grid the discrete space is build with
-    AgglomerationIndexSetType indexSet_;
-
-    VemSpaceType discreteSpace_; // discrete function space
+    const VemSpaceType &discreteSpace_; // discrete function space
     DiscreteFunctionType solution_;   // the unknown
     DiscreteFunctionType rhs_;        // the right hand side
 

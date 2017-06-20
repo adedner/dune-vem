@@ -64,7 +64,6 @@ protected:
 
   typedef typename DiscreteFunctionSpaceType::IteratorType IteratorType;
   typedef typename IteratorType::Entity       EntityType;
-  typedef typename EntityType::EntityPointer  EntityPointerType;
   typedef typename EntityType::Geometry       GeometryType;
 
   typedef typename DiscreteFunctionSpaceType::DomainType DomainType;
@@ -130,7 +129,6 @@ protected:
 
   typedef typename DiscreteFunctionSpaceType::IteratorType IteratorType;
   typedef typename IteratorType::Entity       EntityType;
-  typedef typename EntityType::EntityPointer  EntityPointerType;
   typedef typename EntityType::Geometry       GeometryType;
 
   typedef typename DiscreteFunctionSpaceType::DomainType DomainType;
@@ -236,8 +234,7 @@ void DGEllipticOperator< DiscreteFunction, Model >
         const IntersectionType &intersection = *iit;
         if ( intersection.neighbor() )
         {
-          const EntityPointerType pOutside = intersection.outside(); // pointer to outside element.
-          const EntityType &outside = *pOutside;
+          const EntityType &outside = intersection.outside(); // pointer to outside element.
 
           typedef typename IntersectionType::Geometry  IntersectionGeometryType;
           const IntersectionGeometryType &intersectionGeometry = intersection.geometry();
@@ -483,8 +480,7 @@ void DifferentiableDGEllipticOperator< JacobianOperator, Model >
 
       if( intersection.neighbor()  )
       {
-        EntityPointerType ep = intersection.outside();
-        const EntityType& neighbor = *ep ;
+        const EntityType& neighbor = intersection.outside();
         const int neighborPolygon = agglomeration.index(neighbor);
         typedef typename IntersectionType::Geometry  IntersectionGeometryType;
         const IntersectionGeometryType &intersectionGeometry = intersection.geometry();
@@ -675,4 +671,3 @@ void DifferentiableDGEllipticOperator< JacobianOperator, Model >
  }
 
 #endif // ELLIPTIC_HH
-

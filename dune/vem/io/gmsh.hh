@@ -12,8 +12,8 @@
 #include <dune/common/fvector.hh>
 #include <dune/common/std/memory.hh>
 
-#include <dune/geometry/genericgeometry/subtopologies.hh>
 #include <dune/geometry/type.hh>
+#include <dune/geometry/referenceelements.hh>
 
 #include <dune/grid/common/gridfactory.hh>
 #include <dune/grid/common/mcmgmapper.hh>
@@ -64,7 +64,7 @@ namespace Dune
 
         std::size_t id () const { return id_; }
 
-        std::size_t size () const { return GenericGeometry::size( type().id(), type().dim(), type().dim() ); }
+        std::size_t size () const { return Impl::size( type().id(), type().dim(), type().dim() ); }
 
         GeometryType type () const { return type_; }
 

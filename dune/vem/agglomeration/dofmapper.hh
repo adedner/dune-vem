@@ -165,7 +165,7 @@ namespace Dune
         const int codim = subEntityInfo_[ i ].codim;
         if( codimIndex_[ codim ] >= 0 )
           DUNE_THROW( InvalidStateException, "Codimension inserted twice into AgglomerationDofMapper" );
-        codimIndex_[ codim ] == i;
+        codimIndex_[ codim ] = i;
       }
 
       update();

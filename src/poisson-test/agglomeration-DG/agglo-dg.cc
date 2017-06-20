@@ -55,8 +55,8 @@
 namespace Gmsh = Dune::Vem::Gmsh;
 
 //typedef Dune::UGGrid< 2 > Grid;
-//typedef Dune::ALUGrid< 2, 2, Dune::cube, Dune::nonconforming > Grid;
-typedef Dune::ALUGrid< 2, 2, Dune::simplex, Dune::nonconforming > Grid;
+typedef Dune::ALUGrid< 2, 2, Dune::cube, Dune::nonconforming > Grid;
+// typedef Dune::ALUGrid< 2, 2, Dune::simplex, Dune::nonconforming > Grid;
 
 
 int main ( int argc, char **argv )
@@ -166,9 +166,15 @@ try
   ModelType implicitModel( problem, gridPart );
 
   std::cout << "going in femscheme" << std::endl;
-  //typedef FemScheme< ModelType > SchemeType;
-  typedef VemScheme< ModelType > SchemeType;
-  SchemeType scheme( gridPart, implicitModel, agglomeration );
+#if 0
+  typedef Dune::Vem::AgglomerationDGSpace < FunctionSpaceType, GridPart, POLORDER > DiscreteFunctionSpaceType;
+  typedef FemScheme< DiscreteFunctionSpaceType, ModelType > SchemeType;
+#else
+  typedef Dune::Vem::AgglomerationVEMSpace< FunctionSpaceType, GridPart, POLORDER > DiscreteFunctionSpaceType;
+  typedef VemScheme< DiscreteFunctionSpaceType, ModelType > SchemeType;
+#endif
+  DiscreteFunctionSpaceType space( agglomeration );
+  SchemeType scheme( space, implicitModel );
 
   typedef Dune::Fem::GridFunctionAdapter< ProblemType, GridPart > GridExactSolutionType;
   GridExactSolutionType gridExactSolution("exact solution", problem, gridPart, 4 );
