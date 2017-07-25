@@ -5,6 +5,10 @@
 
 #include <dune/common/power.hh>
 
+#if DUNE_VERSION_NEWER(DUNE_FEM, 2, 6)
+#include <dune/fem/common/hybrid.hh>
+#endif // #if DUNE_VERSION_NEWER(DUNE_FEM, 2, 6)
+
 #include <dune/fem/space/common/commoperations.hh>
 #include <dune/fem/space/common/defaultcommhandler.hh>
 #include <dune/fem/space/common/discretefunctionspace.hh>
@@ -74,8 +78,11 @@ namespace Dune
       typedef BoundingBoxBasisFunctionSet< EntityType, ShapeFunctionSetType > BasisFunctionSetType;
 
       // static const std::size_t localBlockSize = FunctionSpaceType::dimRange * StaticPower< polOrder+1, GridPartType::dimension >::power;
-      static const int localBlockSize
-        = FunctionSpaceType::dimRange*Fem::OrthonormalShapeFunctionSetSize< ScalarFunctionSpaceType, polOrder >::v;
+#if DUNE_VERSION_NEWER(DUNE_FEM, 2, 6)
+      typedef Hybrid::IndexRange< int, FunctionSpaceType::dimRange * Fem::OrthonormalShapeFunctionSetSize< ScalarFunctionSpaceType, polOrder >::v > LocalBlockIndices;
+#else // #if DUNE_VERSION_NEWER(DUNE_FEM, 2, 6)
+      static const int localBlockSize = FunctionSpaceType::dimRange * Fem::OrthonormalShapeFunctionSetSize< ScalarFunctionSpaceType, polOrder >::v;
+#endif // #else // #if DUNE_VERSION_NEWER(DUNE_FEM, 2, 6)
       typedef AgglomerationDGMapper< GridPartType > BlockMapperType;
 
       template< class DiscreteFunction, class Operation = Fem::DFCommunicationOperation::Copy >

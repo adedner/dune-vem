@@ -5,6 +5,10 @@
 
 #include <utility>
 
+#if DUNE_VERSION_NEWER(DUNE_FEM, 2, 6)
+#include <dune/fem/common/hybrid.hh>
+#endif // #if DUNE_VERSION_NEWER(DUNE_FEM, 2, 6)
+
 #include <dune/fem/quadrature/elementquadrature.hh>
 #include <dune/fem/space/common/commoperations.hh>
 #include <dune/fem/space/common/defaultcommhandler.hh>
@@ -37,6 +41,21 @@ namespace Dune
 
 
 
+    // IsAgglomerationVEMSpace
+    // -----------------------
+
+    template< class DiscreteFunctionSpace >
+    struct IsAgglomerationVEMSpace
+      : std::integral_constant< bool, false >
+    {};
+
+    template< class FunctionSpace, class GridPart, int order >
+    struct IsAgglomerationVEMSpace< AgglomerationVEMSpace< FunctionSpace, GridPart, order > >
+      : std::integral_constant< bool, true >
+    {};
+
+
+
     // AgglomerationVEMSpaceTraits
     // ---------------------------
 
@@ -62,7 +81,11 @@ namespace Dune
     public:
       typedef VEMBasisFunctionSet< EntityType, ShapeFunctionSetType > BasisFunctionSetType;
 
+#if DUNE_VERSION_NEWER(DUNE_FEM, 2, 6)
+      typedef Hybrid::IndexRange< int, FunctionSpaceType::dimRange > LocalBlockIndices;
+#else // #if DUNE_VERSION_NEWER(DUNE_FEM, 2, 6)
       static const std::size_t localBlockSize = FunctionSpaceType::dimRange;
+#endif // #else // #if DUNE_VERSION_NEWER(DUNE_FEM, 2, 6)
       typedef AgglomerationDofMapper< GridPartType > BlockMapperType;
 
       template< class DiscreteFunction, class Operation = Fem::DFCommunicationOperation::Copy >
