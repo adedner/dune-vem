@@ -1,5 +1,6 @@
 add_subdirectory( data )
 add_subdirectory( agglomeration-DG )
+add_subdirectory( vem-test )
 
 add_executable( dune-poisson-agglo-DG EXCLUDE_FROM_ALL dune-poisson-agglo-DG.cc )
 target_link_libraries( dune-poisson-agglo-DG dunevem )

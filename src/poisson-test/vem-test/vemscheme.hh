@@ -24,9 +24,6 @@
 #include <dune/fem/solver/istlsolver.hh>
 #include <dune/fem/solver/cginverseoperator.hh>
 
-// lagrange interpolation
-#include <dune/fem/operator/lagrangeinterpolation.hh>
-
 /*********************************************************/
 
 // include norms
@@ -120,34 +117,25 @@ class VemScheme
     //! define Laplace operator
     typedef DifferentiableVEMEllipticOperator< LinearOperatorType, ModelType > EllipticOperatorType;
 
-    VemScheme( GridPartType &gridPart,
-        const ModelType& implicitModel,
-        const AgglomerationType& agglomeration  )
+    VemScheme ( GridPartType &gridPart, const ModelType& implicitModel, AgglomerationType &agglomeration )
       : implicitModel_( implicitModel ),
-      gridPart_( gridPart ),
-      indexSet_( agglomeration ),
-      discreteSpace_( gridPart_, indexSet_ ),
-      solution_( "solution", discreteSpace_ ),
-      rhs_( "rhs", discreteSpace_ ),
-      // the elliptic operator (implicit)
-      implicitOperator_( implicitModel_, discreteSpace_ ),
-      // create linear operator (domainSpace,rangeSpace)
-      linearOperator_( "assembled elliptic operator", discreteSpace_, discreteSpace_ ),
-      // tolerance for iterative solver
-      solverEps_( Dune::Fem::Parameter::getValue< double >( "poisson.solvereps", 1e-8 ) )
-  {
-    // set all DoF to zero
-    solution_.clear();
-  }
+        gridPart_( gridPart ),
+        discreteSpace_( agglomeration ),
+        solution_( "solution", discreteSpace_ ),
+        rhs_( "rhs", discreteSpace_ ),
+        // the elliptic operator (implicit)
+        implicitOperator_( implicitModel_, discreteSpace_ ),
+        // create linear operator (domainSpace,rangeSpace)
+        linearOperator_( "assembled elliptic operator", discreteSpace_, discreteSpace_ ),
+        // tolerance for iterative solver
+        solverEps_( Dune::Fem::Parameter::getValue< double >( "poisson.solvereps", 1e-8 ) )
+    {
+      // set all DoF to zero
+      solution_.clear();
+    }
 
-    DiscreteFunctionType &solution()
-    {
-      return solution_;
-    }
-    const DiscreteFunctionType &solution() const
-    {
-      return solution_;
-    }
+    DiscreteFunctionType &solution() { return solution_; }
+    const DiscreteFunctionType &solution() const { return solution_; }
 
     //! setup the right hand side
     void prepare()
@@ -182,8 +170,6 @@ class VemScheme
     const ModelType& implicitModel_;   // the mathematical model
 
     GridPartType  &gridPart_;         // grid part(view), e.g. here the leaf grid the discrete space is build with
-
-    AgglomerationIndexSetType indexSet_;
 
     //DiscreteFunctionSpaceType discreteSpace_; // discrete function space
     VemSpaceType discreteSpace_;

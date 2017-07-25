@@ -1,6 +1,7 @@
 #ifndef DUNE_VEM_SPACE_INTERPOLATE_HH
 #define DUNE_VEM_SPACE_INTERPOLATE_HH
 
+#include <type_traits>
 #include <vector>
 
 #include <dune/grid/common/partitionset.hh>
@@ -8,13 +9,28 @@
 
 #include <dune/fem/function/common/discretefunction.hh>
 #include <dune/vem/space/interpolation.hh>
-#include <dune/vem/space/declaration.hh>
 
 namespace Dune
 {
 
+  namespace Vem
+  {
+
+    // External Forward Declarations
+    // -----------------------------
+
+    template< class DiscreteFunctionSpace >
+    struct IsAgglomerationVEMSpace;
+
+  } // namespace Vem
+
+
+
   namespace Fem
   {
+
+    // interpolate
+    // -----------
 
     template< class GridFunction, class DiscreteFunction, unsigned int partitions >
     static inline std::enable_if_t< std::is_convertible< GridFunction, HasLocalFunction >::value && Dune::Vem::IsAgglomerationVEMSpace< typename DiscreteFunction::DiscreteFunctionSpaceType >::value >

@@ -1,6 +1,8 @@
 #ifndef DUNE_VEMDIRICHLETCONSTRAINTS_HH
 #define DUNE_VEMDIRICHLETCONSTRAINTS_HH
 
+#include <dune/common/version.hh>
+
 #include <dune/fem/function/common/scalarproducts.hh>
 
 #include <dune/vem/space/interpolation.hh>
@@ -27,10 +29,11 @@ namespace Dune
 
         typedef typename DiscreteFunctionSpaceType::BlockMapperType BlockMapperType;
 
+#if DUNE_VERSION_NEWER(DUNE_FEM, 2, 5)
+        typedef typename DiscreteFunctionSpaceType::SlaveDofsType SlaveDofsType;
+#else // #if DUNE_VERSION_NEWER(DUNE_FEM, 2, 5)
         typedef Fem::SlaveDofs< DiscreteFunctionSpaceType, BlockMapperType > SlaveDofsType;
-        typedef typename SlaveDofsType::SingletonKey SlaveDofsKeyType;
-        typedef Fem::SingletonList< SlaveDofsKeyType, SlaveDofsType >
-          SlaveDofsProviderType;
+#endif // #else // #if DUNE_VERSION_NEWER(DUNE_FEM, 2, 5)
 
         static const int localBlockSize = DiscreteFunctionSpaceType::localBlockSize;
         static_assert( localBlockSize == DiscreteFunctionSpaceType::FunctionSpaceType::dimRange,
@@ -41,7 +44,11 @@ namespace Dune
             "local block size of the space must be less or equahl to the dimension of the range of the model." );
 
         DirichletConstraints ( const ModelType &model, const DiscreteFunctionSpaceType &space )
+#if DUNE_VERSION_NEWER(DUNE_FEM, 2, 5)
+          : model_( model ), space_( space )
+#else // #if DUNE_VERSION_NEWER(DUNE_FEM, 2, 5)
           : model_( model ), space_( space ), slaveDofs_( getSlaveDofs( space_ ) )
+#endif // #else // #if DUNE_VERSION_NEWER(DUNE_FEM, 2, 5)
         {}
 
         /*! treatment of Dirichlet-DoFs for given discrete function
@@ -147,7 +154,7 @@ namespace Dune
           void dirichletDofsCorrectOnEntity ( LinearOperator &linearOperator, const EntityType &entity ) const
           {
             // get slave dof structure (for parallel runs)   /*@LST0S@*/
-            SlaveDofsType &slaveDofs = this->slaveDofs();
+            const auto &slaveDofs = this->slaveDofs();
 
             typedef typename LinearOperator::LocalMatrixType LocalMatrixType;
 
@@ -326,25 +333,35 @@ namespace Dune
             return hasDirichletBoundary;
           }
 
+#if DUNE_VERSION_NEWER(DUNE_FEM, 2, 5)
+        const SlaveDofsType &slaveDofs () const { return space_.slaveDofs(); }
+#else // #if DUNE_VERSION_NEWER(DUNE_FEM, 2, 5)
         // return slave dofs
         static SlaveDofsType *getSlaveDofs ( const DiscreteFunctionSpaceType &space )
         {
+          typedef typename SlaveDofsType::SingletonKey SlaveDofsKeyType;
+          typedef Fem::SingletonList< SlaveDofsKeyType, SlaveDofsType > SlaveDofsProviderType;
+
           SlaveDofsKeyType key( space, space.blockMapper() );
-          return &( SlaveDofsProviderType::getObject( key ));
+          return &(SlaveDofsProviderType::getObject( key ));
         }
 
         // return reference to slave dofs
-        SlaveDofsType &slaveDofs () const
+        const SlaveDofsType &slaveDofs () const
         {
           slaveDofs_->rebuild();
           return *slaveDofs_;
         }
+#endif // #else // #if DUNE_VERSION_NEWER(DUNE_FEM, 2, 5)
+
         class DirichletBuilder;
 
         //! pointer to slave dofs
         const ModelType &model_;
         const DiscreteFunctionSpaceType &space_;
+#if !DUNE_VERSION_NEWER(DUNE_FEM, 2, 5)
         SlaveDofsType *const slaveDofs_;
+#endif // #if !DUNE_VERSION_NEWER(DUNE_FEM, 2, 5)
         mutable std::vector< DirichletBlock > dirichletBlocks_;
         mutable bool hasDirichletDofs_ = false;
         mutable int sequence_ = -1;
