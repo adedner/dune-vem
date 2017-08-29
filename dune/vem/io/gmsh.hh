@@ -11,6 +11,7 @@
 #include <dune/common/iteratorrange.hh>
 #include <dune/common/fvector.hh>
 #include <dune/common/std/memory.hh>
+#include <dune/common/version.hh>
 
 #include <dune/geometry/type.hh>
 #include <dune/geometry/referenceelements.hh>
@@ -64,7 +65,14 @@ namespace Dune
 
         std::size_t id () const { return id_; }
 
-        std::size_t size () const { return Impl::size( type().id(), type().dim(), type().dim() ); }
+        std::size_t size () const
+        {
+#if DUNE_VERSION_NEWER(DUNE_GEOMETRY, 2, 6)
+          return Geo::Impl::size( type().id(), type().dim(), type().dim() );
+#else // #if DUNE_VERSION_NEWER(DUNE_GEOMETRY, 2, 6)
+          return Impl::size( type().id(), type().dim(), type().dim() );
+#endif // #else // #if DUNE_VERSION_NEWER(DUNE_GEOMETRY, 2, 6)
+        }
 
         GeometryType type () const { return type_; }
 
