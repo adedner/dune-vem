@@ -1,0 +1,45 @@
+##### Verbosity #####
+# number of process that prints output (-1 no output)
+fem.verboserank: 0
+# true for iteration output, false means no output
+fem.solver.verbose: false
+
+##### Parameters for preconditioned linear solver
+# preconditioning method: none, ssor, sor, ilu-0, ilu-n, gauss-seidel, jacobi, amg-ilu-0
+istl.preconditioning.method: ilu-0
+istl.preconditioning.iterations: 1
+istl.preconditioning.relaxation: 1.2
+# enable simple Jacobi preconditioning (for non istl inverse operators)
+fem.preconditioning: false
+
+#### Parameters for input ######
+# macro grid files
+fem.io.macroGridFile_2d: ./data/mymesh.msh
+
+#### Parameters for output ######
+# path for output
+fem.prefix: ./output
+# time interval for data output
+fem.io.savestep: 0.1
+# number of calls to write() after which a file is produced
+fem.io.savecount: 1
+# output format (vtk-cell, vtk-vertex, sub-vtk-cell, sub-vtk-vertex, gnuplot)
+fem.io.outputformat: vtk-cell
+# print partitioning for parallel runs: none, rank, rank+thread, rank/thread
+fem.io.partitioning: rank
+
+##### Problem setup parameters #####
+# level of initial global refinement
+poisson.level: 0
+# number of EOC steps to be performed
+poisson.repeats: 6
+# tolerance for linear solver
+poisson.solvereps: 1e-12
+# valid are: cos | sin | corner | curvedridges | sphere
+poisson.problem: sin
+dg.penalty: 20
+##### parameters used for afem example #####
+# valid are: none | maximum | equidistribution | uniform
+adaptation.strategy: maximum
+# tolerance for error estimator
+adaptation.tolerance: 0.01
