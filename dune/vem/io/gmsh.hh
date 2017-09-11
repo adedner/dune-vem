@@ -64,7 +64,7 @@ namespace Dune
 
         std::size_t id () const { return id_; }
 
-        // std::size_t size () const { return Dune::Impl::size( type().id(), type().dim(), type().dim() ); }
+        std::size_t size () const { return Dune::Geo::Impl::size( type().id(), type().dim(), type().dim() ); }
 
         GeometryType type () const { return type_; }
 
@@ -128,7 +128,8 @@ namespace Dune
       template< class GridView >
       inline std::vector< std::size_t > vertices ( const GridView &gridView, const GridFactory< typename GridView::Grid > &factory, const std::vector< std::size_t > &vertices )
       {
-        MultipleCodimMultipleGeomTypeMapper< GridView, MCMGVertexLayout > mapper( gridView );
+        // MultipleCodimMultipleGeomTypeMapper< GridView, MCMGVertexLayout > mapper( gridView );
+        MultipleCodimMultipleGeomTypeMapper< GridView > mapper( gridView, mcmgVertexLayout() );
         std::vector< std::size_t > ids( mapper.size(), std::size_t( 0 ) );
         for( const auto vertex : vertices( gridView, Partitions::all ) )
           ids[ mapper.index( vertex ) ] = vertices[ factory.insertionIndex( vertex ) ];
@@ -138,7 +139,8 @@ namespace Dune
       template< class GridView >
       inline std::vector< std::size_t > elements ( const GridView &gridView, const GridFactory< typename GridView::Grid > &factory, const std::vector< DuneEntity > &entities )
       {
-        MultipleCodimMultipleGeomTypeMapper< GridView, MCMGElementLayout > mapper( gridView );
+        // MultipleCodimMultipleGeomTypeMapper< GridView, MCMGElementLayout > mapper( gridView );
+        MultipleCodimMultipleGeomTypeMapper< GridView > mapper( gridView, mcmgElementLayout );
         std::vector< std::size_t > ids( mapper.size(), std::size_t( 0 ) );
         for( const auto element : elements( gridView, Partitions::all ) )
           ids[ mapper.index( element ) ] = entities[ factory.insertionIndex( element ) ].id();
