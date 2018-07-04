@@ -2,6 +2,8 @@ add_subdirectory( gmsh )
 add_subdirectory( poisson-test )
 add_subdirectory( heat-test )
 add_subdirectory( nonlinear-test )
+add_subdirectory( quasilinear-test )
+add_subdirectory( quasilinear-fixed-point )
 
 add_executable( test-gmsh EXCLUDE_FROM_ALL test-gmsh.cc )
 target_link_libraries( test-gmsh dunevem )

@@ -9,7 +9,7 @@
 
 #include <dune/fem/operator/common/differentiableoperator.hh>
 
-#include "vemdirichletconstraints.hh"
+#include "vemdirichletconstraintsfromnewton.hh"
 //#include <dune/vem/operator/constraints/dirichlet.hh>
 
 //! [Class for elliptic operator]
@@ -179,6 +179,7 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model,
         dfSpace.agglomeration());
     // iterate over grid
     const GridPartType &gridPart = w.gridPart();
+    //#if 0
     for (const auto &entity : Dune::elements(
           static_cast<typename GridPartType::GridViewType>(gridPart),
           Dune::Partitions::interiorBorder)) {
@@ -197,7 +198,7 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model,
 
       RangeRangeType Dcoeff = 0;
       const std::size_t agglomerate = dfSpace.agglomeration().index(
-          entity);
+          entity);		
 
       // ====
       for (const auto &intersection : Dune::intersections(
@@ -229,6 +230,16 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model,
           //
         }
       }
+      // ====
+
+      //if (!stabilization[dfSpace.agglomeration().index(entity)]) {
+      //const auto &stabMatrix = dfSpace.stabilization(entity);
+      //for (std::size_t r = 0; r < stabMatrix.rows(); ++r)
+      //for (std::size_t c = 0; c < stabMatrix.cols(); ++c)
+      //wLocal[r] += VectorOfAveragedDiffusionCoefficients[agglomerate]  * stabMatrix[r][c] * uLocal[c];
+      //stabilization[dfSpace.agglomeration().index(entity)] = true;
+      //}
+
       // obtain quadrature order
       const int quadOrder = uLocal.order() + wLocal.order();
 
@@ -247,6 +258,7 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model,
           uLocal.evaluate(quadrature[pt], vu);
           DomainJacobianRangeType du;
           uLocal.jacobian(quadrature[pt], du);
+          //std::cout << "in ell" << std::endl;
 
           // compute mass contribution (studying linear case so linearizing around zero)
           RangeRangeType avu(0);
@@ -301,7 +313,7 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model,
           }
         }
       }
-    } // element loop end
+    }
     // assemble the stablisation matrix
     for (const auto &entity : Dune::elements(
           static_cast<typename GridPartType::GridViewType>(gridPart),
@@ -309,7 +321,7 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model,
       RangeLocalFunctionType wLocal = w.localFunction(entity);
       const DomainLocalFunctionType uLocal = u.localFunction(entity);
       const std::size_t agglomerate = dfSpace.agglomeration().index(
-          entity);
+          entity);	
       if (!stabilization[dfSpace.agglomeration().index(entity)]) {
         const auto &stabMatrix = dfSpace.stabilization(entity);
         for (std::size_t r = 0; r < stabMatrix.rows(); ++r)
@@ -321,6 +333,7 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model,
     w.communicate();
     // apply constraints, e.g. Dirichlet contraints, to the result
     constraints()(u, w);
+    //#endif
   }
 
 // Implementation of DifferentiableVEMEllipticOperator
@@ -360,9 +373,9 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model, Constraints>::ja
   std::vector<double> VectorOfAveragedLinearlisedDiffusionCoefficients (rangeSpace.agglomeration().size(), 0.0);
   //
   RangeRangeType avgDiffusionCoefficient = 0;
-  RangeRangeType avgLinDiffusionCoefficient = 0;
+  //RangeRangeType avgLinDiffusionCoefficient = 0;
   RangeRangeType Dcoeff = 0;
-  RangeRangeType LinDcoeff = 0;
+  //RangeRangeType LinDcoeff = 0;
   const GridPartType &gridPart = rangeSpace.gridPart();
   //
   std::vector<std::size_t> pindices =
@@ -371,7 +384,8 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model, Constraints>::ja
   int oldPolygon = pindices[0];
   const Dune::Vem::AgglomerationIndexSet<GridPartType> agIndexSet(
       rangeSpace.agglomeration());
-
+  //  Dune::Vem::Agglomeration<GridPartType>:: agglo (gridPart, aggloIndices);
+  //
   for (const auto &entity : Dune::elements(
         static_cast<typename GridPartType::GridViewType>(gridPart),
         Dune::Partitions::interiorBorder)) {
@@ -392,7 +406,7 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model, Constraints>::ja
         entity.type());
     //
     if (oldPolygon!=currentPolygon)
-    {
+    {		
       avgDiffusionCoefficient = 0;
       oldPolygon = currentPolygon;
     }
@@ -407,6 +421,9 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model, Constraints>::ja
       const int numEdgeVertices = refElement.size(faceIndex, 1,
           GridPartType::dimension);
       for (int i = 0; i < numEdgeVertices; ++i) {
+        // local vertex number in the triangle/quad, this is not the local vertex number
+        // of the polygon!
+
         const int j = refElement.subEntity(faceIndex, 1, i,
             GridPartType::dimension);
         // global coordinate of the vertex
@@ -419,18 +436,20 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model, Constraints>::ja
         uLocal.evaluate(LocalPoint, vu);
         //
         model().diffusionCoefficient(entity, LocalPoint, vu, Dcoeff);
-        model().lindiffusionCoefficient(entity,LocalPoint, vu, LinDcoeff);
+        //model().lindiffusionCoefficient(entity,LocalPoint, vu, LinDcoeff);
         // Each vertex visited twice in looping around the edges, so we divide by 2
         avgDiffusionCoefficient += Dcoeff / (2.0 * numVertices);
-        VectorOfAveragedDiffusionCoefficients[agglomerate] += Dcoeff/ (2.0 * numVertices);
-        VectorOfAveragedLinearlisedDiffusionCoefficients[agglomerate] += LinDcoeff / (2.0 * numVertices);
-        //
+        VectorOfAveragedDiffusionCoefficients[agglomerate] += Dcoeff/ (2.0 * numVertices);     
       }
     }
+    
     //
     polygonareas[currentPolygon] += geometry.volume();
+    // For Stabilisation..
+    //std::cout << avgDiffusionCoefficient << std::endl;
     valueProjections_.resize(rangeSpace.agglomeration().size());
-    const auto &valueProjection = valueProjections_[agglomerate];
+    const auto &valueProjection = valueProjections_[agglomerate];  
+
     const DomainBasisFunctionSetType &domainBaseSet =
       jLocal.domainBasisFunctionSet();
     const RangeBasisFunctionSetType &rangeBaseSet =
@@ -475,9 +494,9 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model, Constraints>::ja
 
         // get column object and call axpy method
         jLocal.column(localCol).axpy(rphi, rdphi, aphi, adphi, weight);
-      } // basis function loop in stiffness computation
+      }
       //! [Assembling the local matrix]
-    } // stiffness quadrature loop
+    }
 
     if (model().hasNeumanBoundary() && entity.hasBoundaryIntersections()) {
       std::cout << "see! " << std::endl;
@@ -516,42 +535,41 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model, Constraints>::ja
                 alpha[k] = 0;
             }
             jLocal.column(localCol).axpy(phi, alpha, weight);
-          } // basis function loop
-        } // quadrature loop over edge
-      } // intersection loop
-    } // Neumann boundary loop
-  } // element loop end
-
+          }
+        }
+      }
+    }
+  }
 
   // the second element loop to add the stabilisation term
   for (const auto &entity : Dune::elements(
         static_cast<typename GridPartType::GridViewType>(gridPart),
         Dune::Partitions::interiorBorder)) {
-    const GeometryType &geometry = entity.geometry();
+    const GeometryType &geometry = entity.geometry();   
     auto asmFlag = stabilization[rangeSpace.agglomeration().index(entity)] ;
     if (!stabilization[rangeSpace.agglomeration().index(entity)])
-    {
+    {     
       const auto &stabMatrix = rangeSpace.stabilization(entity);
       LocalMatrixType jLocal = jOp.localMatrix(entity, entity);
-      const DomainLocalFunctionType uLocal = u.localFunction(entity);
       const std::size_t agglomerate = rangeSpace.agglomeration().index(
           entity);
-      const int nE = agIndexSet.numPolyVertices(entity,
-          GridPartType::dimension);
       for (std::size_t r = 0; r < stabMatrix.rows(); ++r)
         for (std::size_t c = 0; c < stabMatrix.cols(); ++c)
           jLocal.add(r, c,
-              VectorOfAveragedDiffusionCoefficients[agglomerate]  * stabMatrix[r][c]);
-       for (std::size_t c = 0; c < stabMatrix.cols(); ++c)
-         for (std::size_t r = 0; r < stabMatrix.rows(); ++r)
-                  for (std::size_t ccc = 0; ccc < stabMatrix.cols(); ++ccc)
-                    jLocal.add(r, c,VectorOfAveragedLinearlisedDiffusionCoefficients [agglomerate]  * stabMatrix[r][ccc] * uLocal[ccc] / (nE));
-      stabilization[rangeSpace.agglomeration().index(entity)] = true;
+          VectorOfAveragedDiffusionCoefficients[agglomerate]  * stabMatrix[r][c]);
+          //jLocal.add(r,c,
+              //VectorOfAveragedLinearlisedDiffusionCoefficients[agglomerate] * stabMatrix[r][c]);
+      //jLocal.add(r, c,
+      //1 * stabMatrix[r][c]);
+      //jLocal.add( r, c, 1 * stabMatrix[ r ][ c ] );
+      stabilization[rangeSpace.agglomeration().index(entity)] = true;   
     }
 
     //}
   }
-  std::vector<double> localmeshsizevec(rangeSpace.agglomeration().size(),0.0);
+
+  std::vector<double> localmeshsizevec(rangeSpace.agglomeration().size(),
+      0.0);
   for (int i = 0; i < rangeSpace.agglomeration().size(); ++i) {
     localmeshsizevec[i] = std::pow(polygonareas[i],
         1.0 / GridPartType::dimension);
@@ -560,8 +578,11 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model, Constraints>::ja
   for (int i = 0; i < rangeSpace.agglomeration().size(); ++i)
     averagemeshsize += localmeshsizevec[i]
       / rangeSpace.agglomeration().size();
+  std::cout << "avg mesh size = " << averagemeshsize << std::endl;
+
   // apply constraints to matrix operator
   constraints().applyToOperator(jOp);
   jOp.communicate();
 }
+
 #endif // #ifndef VEMELLIPTIC_HH

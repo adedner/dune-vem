@@ -1,0 +1,5 @@
+add_subdirectory( data )
+add_executable( fem-quasilinear-fp EXCLUDE_FROM_ALL fem-quasilinear-fp.cc )
+target_link_libraries(fem-quasilinear-fp dunevem )
+add_executable( vem-quasilinear-fp EXCLUDE_FROM_ALL vem-quasilinear-fp.cc )
+target_link_libraries( vem-quasilinear-fp dunevem )

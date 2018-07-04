@@ -1,0 +1,7 @@
+configure_file( unit-square-one-partition.msh ${CMAKE_CURRENT_BINARY_DIR}/unit-square-one-partition.msh COPYONLY )
+configure_file( pmesh-4x4-quads.msh ${CMAKE_CURRENT_BINARY_DIR}/pmesh-4x4-quads.msh COPYONLY )
+configure_file( pmesh-16x16-quads.msh ${CMAKE_CURRENT_BINARY_DIR}/pmesh-16x16-quads.msh COPYONLY )
+configure_file( pmesh-agg-trias-4x4.msh ${CMAKE_CURRENT_BINARY_DIR}/pmesh-agg-trias-4x4.msh COPYONLY )
+configure_file( pmesh-16x16-trias.msh ${CMAKE_CURRENT_BINARY_DIR}/pmesh-16x16-trias.msh COPYONLY )
+configure_file( vem-parameter ${CMAKE_CURRENT_BINARY_DIR}/vem-parameter COPYONLY )
+configure_file( fem-parameter ${CMAKE_CURRENT_BINARY_DIR}/fem-parameter COPYONLY )
