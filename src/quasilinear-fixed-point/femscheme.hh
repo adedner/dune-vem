@@ -1,16 +1,11 @@
-#ifndef ELLIPT_VEMSCHEME_HH
-#define ELLIPT_VEMSCHEME_HH
-/*
- * 1) this scheme file is copied from /dune-fem-howto/05.nonlinear/source/
- *
- * */
+#ifndef ELLIPT_FEMSCHEME_HH
+#define ELLIPT_FEMSCHEME_HH
+
 // iostream includes
 #include <iostream>
 
 // include discrete function space
-//#include <dune/fem/space/lagrange.hh>
-#include <dune/fem/space/discontinuousgalerkin.hh>
-#include <dune/vem/space/agglomeration.hh>
+#include <dune/fem/space/lagrange.hh>
 
 // adaptation ...
 #include <dune/fem/function/adaptivefunction.hh>
@@ -22,13 +17,12 @@
 // include linear operators
 #include <dune/fem/operator/linear/spoperator.hh>
 #include <dune/fem/solver/diagonalpreconditioner.hh>
-//
+
 #include <dune/fem/operator/linear/istloperator.hh>
 #include <dune/fem/solver/istlsolver.hh>
 #include <dune/fem/solver/oemsolver.hh>
 #include <dune/fem/solver/cginverseoperator.hh>
-#include <dune/fem/solver/newtoninverseoperator.hh>
-#include <dune/fem/solver/umfpacksolver.hh>
+#include <dune/fem/solver/newtoninverseoperatorfp.hh>
 
 // lagrange interpolation
 #include <dune/fem/operator/lagrangeinterpolation.hh>
@@ -44,7 +38,7 @@
 
 // local includes
 #include "rhs.hh"
-#include "vemelliptic.hh"
+#include "elliptic.hh"
 
 // DataOutputParameters
 // --------------------
@@ -71,7 +65,7 @@ private:
   int step_;
 };
 
-// VemScheme
+// FemScheme
 //----------
 
 /*******************************************************************************
@@ -84,7 +78,7 @@ private:
  *                        and the type of the function space
  *******************************************************************************/
 template < class Model >
-class VemScheme
+class FemScheme
 {
 public:
   //! type of the mathematical model
@@ -100,39 +94,32 @@ public:
   typedef typename ModelType::FunctionSpaceType   FunctionSpaceType;
 
   //! choose type of discrete function space
-  //typedef Dune::Fem::LagrangeDiscreteFunctionSpace< FunctionSpaceType, GridPartType, POLORDER > DiscreteFunctionSpaceType;
-  typedef Dune::Vem::Agglomeration <GridPartType>  AgglomerationType;
-  typedef Dune::Vem::AgglomerationIndexSet< GridPartType > AgglomerationIndexSetType;
-  typedef Dune::Vem::AgglomerationVEMSpace< FunctionSpaceType, GridPartType, POLORDER > VemSpaceType;
+  typedef Dune::Fem::LagrangeDiscreteFunctionSpace< FunctionSpaceType, GridPartType, POLORDER > DiscreteFunctionSpaceType;
 
   // choose type of discrete function, Matrix implementation and solver implementation
 #if HAVE_DUNE_ISTL && WANT_ISTL
-  typedef Dune::Fem::ISTLBlockVectorDiscreteFunction< VemSpaceType > DiscreteFunctionType;
+  typedef Dune::Fem::ISTLBlockVectorDiscreteFunction< DiscreteFunctionSpaceType > DiscreteFunctionType;
   typedef Dune::Fem::ISTLLinearOperator< DiscreteFunctionType, DiscreteFunctionType > LinearOperatorType;
-  //typedef Dune::Fem::ISTLBICGSTABOp< DiscreteFunctionType, LinearOperatorType > LinearInverseOperatorType;
-  //typedef Dune::Fem::ISTLGMResOp< DiscreteFunctionType, LinearOperatorType > LinearInverseOperatorType;
-  typedef Dune::Fem::ISTLCGOp< DiscreteFunctionType, LinearOperatorType > LinearInverseOperatorType;
+  typedef Dune::Fem::ISTLBICGSTABOp< DiscreteFunctionType, LinearOperatorType > LinearInverseOperatorType;
 #else
-  typedef Dune::Fem::AdaptiveDiscreteFunction< VemSpaceType > DiscreteFunctionType;
+  typedef Dune::Fem::AdaptiveDiscreteFunction< DiscreteFunctionSpaceType > DiscreteFunctionType;
   typedef Dune::Fem::SparseRowLinearOperator< DiscreteFunctionType, DiscreteFunctionType > LinearOperatorType;
-  //typedef Dune::Fem::CGInverseOperator< DiscreteFunctionType > LinearInverseOperatorType;
-  //typedef Dune::Fem::OEMBICGSTABOp< DiscreteFunctionType, LinearOperatorType > LinearInverseOperatorType;
-  typedef Dune::Fem::UMFPACKOp< DiscreteFunctionType, LinearOperatorType > LinearInverseOperatorType;
+  // typedef Dune::Fem::CGInverseOperator< DiscreteFunctionType > LinearInverseOperatorType;
+  typedef Dune::Fem::OEMBICGSTABOp< DiscreteFunctionType, LinearOperatorType > LinearInverseOperatorType;
 #endif
 
   /*********************************************************/
 
   //! define Laplace operator
-  typedef DifferentiableVEMEllipticOperator < LinearOperatorType, ModelType > EllipticOperatorType;
+  typedef DifferentiableEllipticOperator< LinearOperatorType, ModelType > EllipticOperatorType;
   //! [Newton solver]
   typedef Dune::Fem::NewtonInverseOperator< LinearOperatorType, LinearInverseOperatorType > InverseOperatorType;
   //! [Newton solver]
 
-  VemScheme( GridPartType &gridPart, const ModelType &implicitModel, const AgglomerationType& agglomeration  )
+  FemScheme( GridPartType &gridPart, const ModelType &implicitModel )
   : implicitModel_( implicitModel ),
     gridPart_( gridPart ),
-    indexSet_( agglomeration ),
-    discreteSpace_( gridPart_, indexSet_ ),
+    discreteSpace_( gridPart_ ),
     solution_( "solution", discreteSpace_ ),
     rhs_( "rhs", discreteSpace_ ),
     // the elliptic operator (implicit)
@@ -171,13 +158,12 @@ protected:
   const ModelType& implicitModel_;   // the mathematical model
 
   GridPartType  &gridPart_;         // grid part(view), e.g. here the leaf grid the discrete space is build with
-  AgglomerationIndexSetType indexSet_;
-  //DiscreteFunctionSpaceType discreteSpace_; // discrete function space
-  VemSpaceType discreteSpace_; // discrete function space
+
+  DiscreteFunctionSpaceType discreteSpace_; // discrete function space
   DiscreteFunctionType solution_;   // the unknown
   DiscreteFunctionType rhs_;        // the right hand side
 
   EllipticOperatorType implicitOperator_; // the implicit operator
 };
 
-#endif // end #if ELLIPT_VEMSCHEME_HH
+#endif // end #if ELLIPT_FEMSCHEME_HH

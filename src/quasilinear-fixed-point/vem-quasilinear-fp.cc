@@ -88,12 +88,12 @@ double algorithm ( Grid &grid, AgglomerationType &agglomeration )
   vemscheme.solve( true );
 
   // VTK output
-  Dune::Fem::VTKIO< GridPartType > vtkIO( gridPart, Dune::VTK::nonconforming );
-  vtkIO.addVertexData( vemscheme.solution() );
-  vtkIO.write( "./vem-output/vemvtk", Dune::VTK::ascii );
+  //Dune::Fem::VTKIO< GridPartType > vtkIO( gridPart, Dune::VTK::nonconforming );
+  //vtkIO.addVertexData( vemscheme.solution() );
+  //vtkIO.write( "./vem-output/vemvtk", Dune::VTK::ascii );
 
-  // write initial solve
-  dataOutput.write();
+  //// write initial solve
+  //dataOutput.write();
 
 
   std::ofstream resultfile;
@@ -113,7 +113,8 @@ double algorithm ( Grid &grid, AgglomerationType &agglomeration )
   const double errorL2 = normL2.distance( gridExactSolution, vemscheme.solution() );
   const double errorH1 = normH1.distance( gridExactSolution, vemscheme.solution() );
 
-  std::cout << "Vem: " << vemscheme.solution().size() << " " << errorL2 << " " << errorH1 << std::endl;
+  std::cout << "ndof = " << vemscheme.solution().size() << std::endl;
+  std::cout << "Vem: " << errorL2 << " " << errorH1 << std::endl;
   resultfile << vemscheme.solution().size() << " " << errorL2 << " " << errorH1 << std::endl;
   }
 
@@ -126,13 +127,12 @@ try
 {
   // initialize MPI, if necessary
   Dune::Fem::MPIManager::initialize( argc, argv );
-  //
+
   if( argc <= 1 )
   {
     std::cerr << "Usage: " << argv[ 0 ] << " <msh file>" << std::endl;
     return 1;
   }
-
 
   // append overloaded parameters from the command line
   Dune::Fem::Parameter::append( argc, argv );
@@ -154,8 +154,8 @@ try
     //std::cout << "Loading macro grid: " << gridfile << std::endl;
 
   // copied from our agglomeration code..
-  const auto sectionMap = Gmsh::readFile( argv[ 1 ] );
   //const auto sectionMap = Gmsh::readFile (gridfile);
+  const auto sectionMap = Gmsh::readFile( argv[ 1 ] );
   const auto nodes = Gmsh::parseNodes( sectionMap );
   const auto elements = Gmsh::parseElements( sectionMap );
 

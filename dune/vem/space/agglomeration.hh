@@ -74,18 +74,46 @@ namespace Dune
     private:
       typedef typename GridPartType::template Codim< codimension >::EntityType EntityType;
 
+#if 0
       typedef typename Fem::FunctionSpace< typename FunctionSpaceType::DomainFieldType, typename FunctionSpaceType::RangeFieldType, FunctionSpaceType::dimDomain, 1 > ScalarFunctionSpaceType;
       typedef Fem::OrthonormalShapeFunctionSet< ScalarFunctionSpaceType, polOrder > ScalarShapeFunctionSetType;
       typedef Fem::VectorialShapeFunctionSet< Fem::ShapeFunctionSetProxy< ScalarShapeFunctionSetType >, typename FunctionSpaceType::RangeType > ShapeFunctionSetType;
+#endif
 
     public:
+      typedef Dune::Fem::FunctionSpace<
+          typename FunctionSpace::DomainFieldType, typename FunctionSpace::RangeFieldType,
+           GridPartType::dimension, 1
+        > ScalarShapeFunctionSpaceType;
+
+      struct ScalarShapeFunctionSet
+        : public Dune::Fem::OrthonormalShapeFunctionSet< ScalarShapeFunctionSpaceType >
+      {
+        typedef Dune::Fem::OrthonormalShapeFunctionSet< ScalarShapeFunctionSpaceType >   BaseType;
+
+        static constexpr int numberShapeFunctions =
+              Dune::Fem::OrthonormalShapeFunctions< ScalarShapeFunctionSpaceType::dimDomain >::size(polOrder);
+      public:
+        explicit ScalarShapeFunctionSet ( Dune::GeometryType type )
+          : BaseType( type, polOrder )
+        {
+          assert( size() == BaseType::size() );
+        }
+        explicit ScalarShapeFunctionSet ( Dune::GeometryType type, int p )
+          : BaseType( type, p )
+        {
+          assert( size() == BaseType::size() );
+        }
+
+        // overload size method because it's a static value
+        static constexpr unsigned int size() { return numberShapeFunctions; }
+      };
+      typedef ScalarShapeFunctionSet ScalarShapeFunctionSetType;
+      typedef Fem::VectorialShapeFunctionSet< Fem::ShapeFunctionSetProxy< ScalarShapeFunctionSetType >, typename FunctionSpaceType::RangeType > ShapeFunctionSetType;
+
       typedef VEMBasisFunctionSet< EntityType, ShapeFunctionSetType > BasisFunctionSetType;
 
-#if DUNE_VERSION_NEWER(DUNE_FEM, 2, 6)
       typedef Hybrid::IndexRange< int, FunctionSpaceType::dimRange > LocalBlockIndices;
-#else // #if DUNE_VERSION_NEWER(DUNE_FEM, 2, 6)
-      static const std::size_t localBlockSize = FunctionSpaceType::dimRange;
-#endif // #else // #if DUNE_VERSION_NEWER(DUNE_FEM, 2, 6)
       typedef AgglomerationDofMapper< GridPartType > BlockMapperType;
 
       template< class DiscreteFunction, class Operation = Fem::DFCommunicationOperation::Copy >

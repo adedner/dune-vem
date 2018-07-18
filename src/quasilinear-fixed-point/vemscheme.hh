@@ -27,7 +27,7 @@
 #include <dune/fem/solver/istlsolver.hh>
 #include <dune/fem/solver/oemsolver.hh>
 #include <dune/fem/solver/cginverseoperator.hh>
-#include <dune/fem/solver/newtoninverseoperator.hh>
+#include <dune/fem/solver/newtoninverseoperatorfp.hh>
 #include <dune/fem/solver/umfpacksolver.hh>
 
 // lagrange interpolation
@@ -44,7 +44,7 @@
 
 // local includes
 #include "rhs.hh"
-#include "vemelliptic.hh"
+#include "vemelliptic-fp.hh"
 
 // DataOutputParameters
 // --------------------

@@ -1,4 +1,4 @@
-from _vem import *
+from dune.vem._vem import *
 registry = dict()
 registry["space"] = {
         "AgglomeratedDG" : agglomerateddg,

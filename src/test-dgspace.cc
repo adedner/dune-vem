@@ -86,7 +86,7 @@ try
 
   typedef Dune::Fem::FunctionSpace< GridPart::ctype, double, GridPart::dimension, 1 > FunctionSpace;
   typedef Dune::Vem::AgglomerationDGSpace< FunctionSpace, GridPart, 1 > DiscreteFunctionSpace;
-  DiscreteFunctionSpace dgSpace( gridPart, agglomeration );
+  DiscreteFunctionSpace dgSpace( agglomeration );
 
   // initialize solution
 

@@ -4,6 +4,7 @@ import sys
 import logging
 logger = logging.getLogger(__name__)
 
+from dune.generator import Constructor, Method
 import dune.common.checkconfiguration as checkconfiguration
 
 def agglomerateddg(view, agglomerate, order=1, dimrange=1, field="double", storage="adaptive", **unused):
@@ -21,7 +22,7 @@ def agglomerateddg(view, agglomerate, order=1, dimrange=1, field="double", stora
         Space: the constructed Space
     """
 
-    from dune.fem.space import module
+    from dune.fem.space import module, addStorage
     if dimrange < 1:
         raise KeyError(\
             "Parameter error in DiscontinuosGalerkinSpace with "+
@@ -44,20 +45,25 @@ def agglomerateddg(view, agglomerate, order=1, dimrange=1, field="double", stora
       "Dune::Fem::FunctionSpace< double, " + field + ", " + str(dimw) + ", " + str(dimrange) + " >, " +\
       gridPartName + ", " + str(order) + " >"
 
-    constructor = ['[] ( ' + typeName + ' &self, pybind11::object gridView, ' +\
-                   'const pybind11::function agglomerate) {',
-                   '    auto agglo = new Dune::Vem::Agglomeration<' + gridPartName + '>',
-                   '         (Dune::FemPy::gridPart<' + viewType + '>(gridView), [agglomerate](const auto& e) { return agglomerate(e).template cast<unsigned int>(); } ); ',
-                   '    new (&self) ' + typeName + '( *agglo );',
-                   '    pybind11::cpp_function remove_agglo( [ agglo ] ( pybind11::handle weakref ) {',
-                   '        delete agglo;',
-                   '        weakref.dec_ref();',
-                   '      } );',
-                   '    pybind11::handle nurse = pybind11::detail::get_object_handle( &self, pybind11::detail::get_type_info( typeid( ' + typeName + ' ) ) );',
-                   '    pybind11::weakref( nurse, remove_agglo ).release();',
-                   '  }, "gridView"_a, "agglomerate"_a, pybind11::keep_alive< 1, 2 >()']
+    constructor = Constructor(
+                   ['pybind11::object gridView',
+                    'const pybind11::function agglomerate'],
+                   ['auto agglo = new Dune::Vem::Agglomeration<' + gridPartName + '>',
+                    '         (Dune::FemPy::gridPart<' + viewType + '>(gridView), [agglomerate](const auto& e) { return agglomerate(e).template cast<unsigned int>(); } ); ',
+                    'auto obj = new DuneType( *agglo );',
+                    'pybind11::cpp_function remove_agglo( [ agglo ] ( pybind11::handle weakref ) {',
+                    '  delete agglo;',
+                    '  weakref.dec_ref();',
+                    '} );',
+                    '// pybind11::handle nurse = pybind11::detail::get_object_handle( obj, pybind11::detail::get_type_info( typeid( ' + typeName + ' ) ) );',
+                    '// pybind11::weakref( nurse, remove_agglo ).release();',
+                    'return obj;'],
+                   ['"gridView"_a', '"agglomerate"_a',
+                    'pybind11::keep_alive< 1, 2 >()'] )
 
-    return module(field, storage, includes, typeName, [constructor]).Space(view, agglomerate)
+    spc = module(field, includes, typeName, constructor).Space(view, agglomerate)
+    addStorage(spc, storage)
+    return spc.as_ufl()
 
 def agglomeratedvem(view, agglomerate, order=1, dimrange=1, field="double", storage="adaptive", **unused):
     """create a virtual element space over an agglomerated grid
@@ -110,7 +116,9 @@ def agglomeratedvem(view, agglomerate, order=1, dimrange=1, field="double", stor
                    '    pybind11::weakref( nurse, remove_agglo ).release();',
                    '  }, "gridView"_a, "agglomerate"_a, pybind11::keep_alive< 1, 2 >()']
 
-    return module(field, storage, includes, typeName, [constructor]).Space(view, agglomerate)
+    spc = module(field, includes, typeName, constructor).Space(view, agglomerate)
+    addStorage(spc, storage)
+    return spc.as_ufl()
 
 def vem(space, model, solver=None, parameters={}):
     """create a scheme for solving second order pdes with the virtual element method

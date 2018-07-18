@@ -196,10 +196,9 @@ struct NonLinearModel
         RangeType &Dcoeff ) const
     {
       // Problem 1 dcoeff
-      // this is not bounded in R
       Dcoeff = 1.0 / ( ( 1.0 + value[0] ) * ( 1.0 + value[0] ) );
-      // bounded in R
-      //Dcoeff = 1.0 /  ( 1.0 + 0.8 * std::sin(4.0 * value[0]) * std::sin(4.0 * value[0]) ) ;
+      Dcoeff = 1.0 /  ( 1.0 + 0.8 * std::sin(4.0 * value[0]) * std::sin(4.0 * value[0]) ) ;
+
       // Problem 2 dcoeff
       //if (value[0]<1.0)
       //{
@@ -214,30 +213,30 @@ struct NonLinearModel
       //Dcoeff = 1.0 + value[0];
     }
     //! return the derivative of the diffusion coefficient alone
-  template< class Entity, class Point >
-    void lindiffusionCoefficient ( const Entity &entity,
-        const Point &x,
-        const RangeType &value,
-        RangeType &LinDcoeff ) const
-    {
-      // Problem 1 dcoeff
-      // Dcoeff = 1.0 / ( ( 1.0 + value[0] ) * ( 1.0 + value[0] ) );
-      LinDcoeff = -2.0/( (value[0] + 1) * (value[0] + 1) * (value[0] + 1) );
-      //Dcoeff = 1.0 /  ( 1.0 + 0.8 * std::sin(4.0 * value[0]) * std::sin(4.0 * value[0]) ) ;
+  //template< class Entity, class Point >
+    //void lindiffusionCoefficient ( const Entity &entity,
+        //const Point &x,
+        //const RangeType &value,
+        //RangeType &LinDcoeff ) const
+    //{
+      //// Problem 1 dcoeff
+      //// Dcoeff = 1.0 / ( ( 1.0 + value[0] ) * ( 1.0 + value[0] ) );
+      ////LinDcoeff = -2.0/( (value[0] + 1) * (value[0] + 1) * (value[0] + 1) );
+      ////Dcoeff = 1.0 /  ( 1.0 + 0.8 * std::sin(4.0 * value[0]) * std::sin(4.0 * value[0]) ) ;
 
-      // Problem 2 dcoeff
-      //if (value[0]<1.0)
-      //{
-        //Dcoeff = 0.125 * ( -value[0]*value[0]*value[0] + 4.0 * value[0] * value[0] - 7.0* value[0] + 8.0);
-      //}
-      //else
-      //{
-        //Dcoeff = 1.0 / ( ( 1.0 + value[0] ) );
-      //}
+      //// Problem 2 dcoeff
+      ////if (value[0]<1.0)
+      ////{
+        ////Dcoeff = 0.125 * ( -value[0]*value[0]*value[0] + 4.0 * value[0] * value[0] - 7.0* value[0] + 8.0);
+      ////}
+      ////else
+      ////{
+        ////Dcoeff = 1.0 / ( ( 1.0 + value[0] ) );
+      ////}
 
-      // Problem 3 dcoeff
-      //Dcoeff = 1.0 + value[0];
-    }
+      //// Problem 3 dcoeff
+      //LinDcoeff = 1.0;
+    //}
   //! return the diffusive flux
   template< class Entity, class Point >
     void diffusiveFlux ( const Entity &entity,
@@ -249,10 +248,9 @@ struct NonLinearModel
       flux = gradient;
       //
       // problem 1
-      // not bounded in R
       flux *= 1.0 / ( ( 1.0 + value[0] ) * ( 1.0 + value[0] ) );
-      // bounded in R
       //flux *= 1.0 /  ( 1.0 + 0.8 * std::sin(4.0 * value[0]) * std::sin(4.0 * value[0]) ) ;
+
       // problem 2
       //if (value[0]<1.0)
       //{
@@ -279,12 +277,7 @@ struct NonLinearModel
       diffusiveFlux(entity,x,uBar,gradient,flux);
       //
       // problem 1 lindiffusiveflux
-      // not bounded in R
-      flux.axpy( (-2./( (uBar[0]+1.) * (uBar[0]+1.) * (uBar[0]+1.) ) ) * value[0], gradientBar);
-      // bounded in R
-      //flux.axpy( (-(32.0*std::cos(4.0*uBar[0])*std::sin(4.0*uBar[0]))/(5.0*((4.0*std::sin(4.0*uBar[0]) * std::sin(4.0*uBar[0]))/5.0 + 1.0) * ((4.0*std::sin(4.0*uBar[0]) * std::sin(4.0*uBar[0]))/5.0 + 1.0))
-                //)* value[0], gradientBar);
-      //Dcoeff = 1.0 /  ( 1.0 + 0.8 * std::sin(4.0 * value[0]) * std::sin(4.0 * value[0]) ) ;
+      //flux.axpy( (-2./( (uBar[0]+1.) * (uBar[0]+1.) * (uBar[0]+1.) ) ) * value[0], gradientBar);
       //
       // problem 2 lindiffusiveflux
       //if (uBar < 1.0 )
