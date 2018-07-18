@@ -4,6 +4,7 @@
 #include <utility>
 
 #include <dune/common/power.hh>
+#include <dune/common/version.hh>
 
 #if DUNE_VERSION_NEWER(DUNE_FEM, 2, 6)
 #include <dune/fem/common/hybrid.hh>
@@ -69,20 +70,47 @@ namespace Dune
     private:
       typedef typename GridPartType::template Codim< codimension >::EntityType EntityType;
 
+      /*
       typedef typename Fem::FunctionSpace< typename FunctionSpaceType::DomainFieldType, typename FunctionSpaceType::RangeFieldType, FunctionSpaceType::dimDomain, 1 > ScalarFunctionSpaceType;
       // typedef Fem::LegendreShapeFunctionSet< ScalarFunctionSpaceType > ScalarShapeFunctionSetType;
-      typedef Fem::OrthonormalShapeFunctionSet< ScalarFunctionSpaceType, polOrder > ScalarShapeFunctionSetType;
-      typedef Fem::VectorialShapeFunctionSet< Fem::ShapeFunctionSetProxy< ScalarShapeFunctionSetType >, typename FunctionSpaceType::RangeType > ShapeFunctionSetType;
+      typedef Fem::OrthonormalShapeFunctionSet< ScalarFunctionSpaceType > ScalarShapeFunctionSetType;
+      */
 
     public:
+      typedef Dune::Fem::FunctionSpace<
+          typename FunctionSpace::DomainFieldType, typename FunctionSpace::RangeFieldType,
+           GridPartType::dimension, 1
+        > ScalarShapeFunctionSpaceType;
+
+      struct ScalarShapeFunctionSet
+        : public Dune::Fem::OrthonormalShapeFunctionSet< ScalarShapeFunctionSpaceType >
+      {
+        typedef Dune::Fem::OrthonormalShapeFunctionSet< ScalarShapeFunctionSpaceType >   BaseType;
+
+        static constexpr int numberShapeFunctions =
+              Dune::Fem::OrthonormalShapeFunctions< ScalarShapeFunctionSpaceType::dimDomain >::size(polOrder);
+      public:
+        explicit ScalarShapeFunctionSet ( Dune::GeometryType type )
+          : BaseType( type, polOrder )
+        {
+          assert( size() == BaseType::size() );
+        }
+        explicit ScalarShapeFunctionSet ( Dune::GeometryType type, int p )
+          : BaseType( type, p )
+        {
+          assert( size() == BaseType::size() );
+        }
+
+        // overload size method because it's a static value
+        static constexpr unsigned int size() { return numberShapeFunctions; }
+      };
+      typedef ScalarShapeFunctionSet ScalarShapeFunctionSetType;
+      typedef Fem::VectorialShapeFunctionSet< Fem::ShapeFunctionSetProxy< ScalarShapeFunctionSetType >, typename FunctionSpaceType::RangeType > ShapeFunctionSetType;
+
       typedef BoundingBoxBasisFunctionSet< EntityType, ShapeFunctionSetType > BasisFunctionSetType;
 
       // static const std::size_t localBlockSize = FunctionSpaceType::dimRange * StaticPower< polOrder+1, GridPartType::dimension >::power;
-#if DUNE_VERSION_NEWER(DUNE_FEM, 2, 6)
-      typedef Hybrid::IndexRange< int, FunctionSpaceType::dimRange * Fem::OrthonormalShapeFunctionSetSize< ScalarFunctionSpaceType, polOrder >::v > LocalBlockIndices;
-#else // #if DUNE_VERSION_NEWER(DUNE_FEM, 2, 6)
-      static const int localBlockSize = FunctionSpaceType::dimRange * Fem::OrthonormalShapeFunctionSetSize< ScalarFunctionSpaceType, polOrder >::v;
-#endif // #else // #if DUNE_VERSION_NEWER(DUNE_FEM, 2, 6)
+      typedef Hybrid::IndexRange< int, FunctionSpaceType::dimRange * ScalarShapeFunctionSet::numberShapeFunctions > LocalBlockIndices;
       typedef AgglomerationDGMapper< GridPartType > BlockMapperType;
 
       template< class DiscreteFunction, class Operation = Fem::DFCommunicationOperation::Copy >
@@ -125,7 +153,7 @@ namespace Dune
           boundingBoxes_( boundingBoxes( agglomeration ) ),
           // scalarShapeFunctionSet_( polOrder )
           scalarShapeFunctionSet_(
-              Dune::GeometryType(Dune::GeometryType::cube,GridPart::dimension) )
+              Dune::GeometryType(Dune::GeometryType::cube,GridPart::dimension), polOrder )
       {}
 
       const BasisFunctionSetType basisFunctionSet ( const EntityType &entity ) const
