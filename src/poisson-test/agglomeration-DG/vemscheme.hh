@@ -144,13 +144,13 @@ public:
     //! define Laplace operator
     typedef Dune::Vem::DifferentiableEllipticOperator < LinearOperatorType, ModelType > EllipticOperatorType;
 
-    VemScheme ( const VemSpaceType& space, const ModelType& implicitModel )
+    VemScheme ( const VemSpaceType& space, ModelType& implicitModel )
     : implicitModel_( implicitModel ),
       discreteSpace_( space ),
       solution_( "solution", discreteSpace_ ),
       rhs_( "rhs", discreteSpace_ ),
       // the elliptic operator (implicit)
-      implicitOperator_( implicitModel_, discreteSpace_ ),
+      implicitOperator_( discreteSpace_, implicitModel ),
       // create linear operator (domainSpace,rangeSpace)
       linearOperator_( "assempled elliptic operator", discreteSpace_, discreteSpace_ ),
       // exact solution

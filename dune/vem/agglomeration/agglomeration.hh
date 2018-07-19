@@ -69,6 +69,12 @@ namespace Dune
 
       std::size_t size () const { return size_; }
 
+      std::vector<std::size_t> polygonindices() const
+      {
+        std::vector< std::size_t > w(size(),0);
+        return std::move(w);
+      }
+
     private:
       template< class T >
       static std::vector< std::size_t > convert ( const std::vector< T > &v )

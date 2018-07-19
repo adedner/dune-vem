@@ -12,6 +12,7 @@
 #include <dune/fem/operator/common/differentiableoperator.hh>
 
 #include <dune/vem/operator/constraints/dirichlet.hh>
+#include <dune/fem/io/parameter.hh>
 
 
 namespace Dune
@@ -52,7 +53,9 @@ namespace Dune
       typedef Dune::Fem::ElementQuadrature< GridPartType, 1 > FaceQuadratureType;
 
     public:
-      EllipticOperator ( const ModelType &model, const RangeDiscreteFunctionSpaceType &rangeSpace )
+      EllipticOperator ( const RangeDiscreteFunctionSpaceType &rangeSpace,
+                         ModelType &model,
+                         const Dune::Fem::ParameterReader &parameter = Dune::Fem::Parameter::container() )
         : model_( model ), constraints_( model, rangeSpace )
       {}
 
@@ -116,8 +119,10 @@ namespace Dune
       typedef typename BaseType::FaceQuadratureType FaceQuadratureType;
 
     public:
-      DifferentiableEllipticOperator ( const ModelType &model, const RangeDiscreteFunctionSpaceType &space )
-        : BaseType( model, space )
+      DifferentiableEllipticOperator ( const RangeDiscreteFunctionSpaceType &rangeSpace,
+                         ModelType &model,
+                         const Dune::Fem::ParameterReader &parameter = Dune::Fem::Parameter::container() )
+        : BaseType( rangeSpace, model )
       {}
 
       //! method to setup the jacobian of the operator for storage in a matrix

@@ -55,8 +55,9 @@ def agglomerateddg(view, agglomerate, order=1, dimrange=1, field="double", stora
                     '  delete agglo;',
                     '  weakref.dec_ref();',
                     '} );',
-                    '// pybind11::handle nurse = pybind11::detail::get_object_handle( obj, pybind11::detail::get_type_info( typeid( ' + typeName + ' ) ) );',
-                    '// pybind11::weakref( nurse, remove_agglo ).release();',
+                    '// pybind11::handle nurse = pybind11::detail::get_object_handle( &obj, pybind11::detail::get_type_info( typeid( ' + typeName + ' ) ) );',
+                    '// assert(nurse);',
+                    'pybind11::weakref( agglomerate, remove_agglo ).release();',
                     'return obj;'],
                    ['"gridView"_a', '"agglomerate"_a',
                     'pybind11::keep_alive< 1, 2 >()'] )
@@ -80,7 +81,7 @@ def agglomeratedvem(view, agglomerate, order=1, dimrange=1, field="double", stor
         Space: the constructed Space
     """
 
-    from dune.fem.space import module
+    from dune.fem.space import module, addStorage
     if dimrange < 1:
         raise KeyError(\
             "Parameter error in DiscontinuosGalerkinSpace with "+
@@ -103,24 +104,28 @@ def agglomeratedvem(view, agglomerate, order=1, dimrange=1, field="double", stor
       "Dune::Fem::FunctionSpace< double, " + field + ", " + str(dimw) + ", " + str(dimrange) + " >, " +\
       gridPartName + ", " + str(order) + " >"
 
-    constructor = ['[] ( ' + typeName + ' &self, pybind11::object gridView, ' +\
-                   'const pybind11::function agglomerate) {',
-                   '    auto agglo = new Dune::Vem::Agglomeration<' + gridPartName + '>',
-                   '         (Dune::FemPy::gridPart<' + viewType + '>(gridView), [agglomerate](const auto& e) { return agglomerate(e).template cast<unsigned int>(); } ); ',
-                   '    new (&self) ' + typeName + '( *agglo );',
-                   '    pybind11::cpp_function remove_agglo( [ agglo ] ( pybind11::handle weakref ) {',
-                   '        delete agglo;',
-                   '        weakref.dec_ref();',
-                   '      } );',
-                   '    pybind11::handle nurse = pybind11::detail::get_object_handle( &self, pybind11::detail::get_type_info( typeid( ' + typeName + ' ) ) );',
-                   '    pybind11::weakref( nurse, remove_agglo ).release();',
-                   '  }, "gridView"_a, "agglomerate"_a, pybind11::keep_alive< 1, 2 >()']
+    constructor = Constructor(
+                   ['pybind11::object gridView',
+                    'const pybind11::function agglomerate'],
+                   ['auto agglo = new Dune::Vem::Agglomeration<' + gridPartName + '>',
+                    '         (Dune::FemPy::gridPart<' + viewType + '>(gridView), [agglomerate](const auto& e) { return agglomerate(e).template cast<unsigned int>(); } ); ',
+                    'auto obj = new DuneType( *agglo );',
+                    'pybind11::cpp_function remove_agglo( [ agglo ] ( pybind11::handle weakref ) {',
+                    '  delete agglo;',
+                    '  weakref.dec_ref();',
+                    '} );',
+                    '// pybind11::handle nurse = pybind11::detail::get_object_handle( &obj, pybind11::detail::get_type_info( typeid( ' + typeName + ' ) ) );',
+                    '// assert(nurse);',
+                    'pybind11::weakref( agglomerate, remove_agglo ).release();',
+                    'return obj;'],
+                   ['"gridView"_a', '"agglomerate"_a',
+                    'pybind11::keep_alive< 1, 2 >()'] )
 
     spc = module(field, includes, typeName, constructor).Space(view, agglomerate)
     addStorage(spc, storage)
     return spc.as_ufl()
 
-def vem(space, model, solver=None, parameters={}):
+def vem(model, space, solver=None, parameters={}):
     """create a scheme for solving second order pdes with the virtual element method
 
     Args:
@@ -137,12 +142,11 @@ def vem(space, model, solver=None, parameters={}):
     """
     # from dune.fem.space import module
     from dune.fem.scheme import module
-    from dune.fem.scheme import femscheme
+    from dune.fem.scheme import femschemeModule
     # from . import module
     includes = [ "dune/vem/operator/elliptic.hh" ]
 
     operator = lambda linOp,model: "Dune::Vem::DifferentiableEllipticOperator< " +\
                                    ",".join([linOp,model]) + ">"
-    includes, typeName = femscheme(includes, space, solver, operator)
 
-    return module(includes, typeName).Scheme(space,model,parameters)
+    return femschemeModule(space, model,includes,solver,operator,parameters=parameters)

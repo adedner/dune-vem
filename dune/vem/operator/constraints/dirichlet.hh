@@ -36,12 +36,13 @@ namespace Dune
 
       typedef typename DiscreteFunctionSpaceType::BlockMapperType BlockMapperType;
 
+      static const int dimRange = DiscreteFunctionSpaceType::FunctionSpaceType::dimRange;
       static const int localBlockSize = DiscreteFunctionSpaceType::localBlockSize;
-      static_assert( localBlockSize == DiscreteFunctionSpaceType::FunctionSpaceType::dimRange,
+      static_assert( localBlockSize == dimRange,
                      "local block size of the space must be identical to the dimension of the range of the function space." );
       typedef FieldVector< bool, localBlockSize > DirichletBlock;
-      typedef FieldVector< int, ModelType::dimRange > ModelDirichletBlock;
-      static_assert( ModelType::dimRange >= localBlockSize,
+      typedef FieldVector< int, dimRange > ModelDirichletBlock;
+      static_assert( dimRange >= localBlockSize,
                      "local block size of the space must be less or equahl to the dimension of the range of the model." );
 
       DirichletConstraints ( const ModelType &model, const DiscreteFunctionSpaceType &space )
