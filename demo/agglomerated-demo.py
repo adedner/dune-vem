@@ -16,6 +16,8 @@ import dune.create as create
 
 from voronoi import triangulated_voronoi
 
+dimRange = 2
+
 dune.fem.parameter.append("parameter")
 
 def plot(grid, solution):
@@ -87,10 +89,10 @@ def solve(grid,agglomerate,model,exact,name,space,scheme,penalty=None):
     print("SOLVING: ",name,flush=True)
     gf_exact = create.function("ufl",grid,"exact",4,exact)
     if agglomerate:
-        spc = create.space(space, grid, agglomerate, dimrange=1, order=1, storage="istl")
+        spc = create.space(space, grid, agglomerate, dimrange=dimRange, order=1, storage="istl")
         assert agglomerate.check(), "missing or too many indices provided by agglomoration object. Should be "+str(NX*NY)+" was "+str(len(ind))
     else:
-        spc = create.space(space, grid, dimrange=1, order=1, storage="istl")
+        spc = create.space(space, grid, dimrange=dimRange, order=1, storage="istl")
     interpol = spc.interpolate( gf_exact, "exact_"+name )
     if penalty:
         df,info = create.scheme(scheme, model, spc, penalty=penalty, solver="cg",
@@ -114,16 +116,19 @@ def compute(agglomerate):
         points, triangles = triangulated_voronoi(agglomerate.voronoi_points, bounding_box)
         grid = create.grid("ALUSimplex", {'vertices':points, 'simplices':triangles}, dimgrid=2)
 
-    uflSpace = dune.ufl.Space((grid.dimGrid, grid.dimWorld), 1, field="double")
+    uflSpace = dune.ufl.Space((grid.dimGrid, grid.dimWorld), dimRange, field="double")
     u = TrialFunction(uflSpace)
     v = TestFunction(uflSpace)
     x = SpatialCoordinate(uflSpace.cell())
-    exact = as_vector( [cos(2.*pi*x[0])*cos(2.*pi*x[1])] )
+    exact = as_vector( [cos(2.*pi*x[0])*cos(2.*pi*x[1]),]*dimRange )
+    H = lambda w: grad(grad(w))
     a = (inner(grad(u), grad(v)) + inner(u,v)) * dx
-    # a = a + 20./(u[0]*u[0]+1.) * v[0] * dx
-    H = grad(grad(exact[0]))
-    b = ( -(H[0,0]+H[1,1]) + exact[0] ) * v[0] * dx
-    model = create.model("elliptic", grid, a==b) # , dune.ufl.DirichletBC(uflSpace,exact,1))
+    b = ( -(H(exact[0])[0,0]+H(exact[0])[1,1]) + exact[0] ) * v[0] * dx
+    if dimRange == 2:
+        def nonLinear(w): return 20./(w*w+1.)
+        a = a + nonLinear(u[1]) * v[1] * dx
+        b = b + ( -(H(exact[1])[0,0]+H(exact[1])[1,1]) + exact[1] + nonLinear(exact[1])) * v[1] * dx
+    model = create.model("elliptic", grid, a==b, dune.ufl.DirichletBC(uflSpace,exact,1))
 
     # df_adg.grid <- caues error
 
@@ -143,7 +148,10 @@ def compute(agglomerate):
                 "dgonb","DGONB","dg",penalty=10)
         interpol_adg, df_adg = solve(grid,agglomerate, model,exact,
                 "adg","AgglomeratedDG","dg",penalty=1)
-    interpol_vem, df_vem = solve(grid,agglomerate,model,exact,"vem","AgglomeratedVEM","vem")
+    if dimRange == 1:
+        interpol_vem, df_vem = solve(grid,agglomerate,model,exact,"vem","AgglomeratedVEM","vem")
+    else:
+        interpol_vem, df_vem = interpol_adg, df_adg
 
     if agglomerate.cartesian:
         coarsegrid.writeVTK("agglomerate_coarse"+agglomerate.suffix,

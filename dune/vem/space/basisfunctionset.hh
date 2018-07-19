@@ -47,6 +47,7 @@ namespace Dune
       typedef typename FunctionSpaceType::HessianRangeType HessianRangeType;
 
       static constexpr int dimDomain = DomainType::dimension;
+      static constexpr int dimRange  = RangeType::dimension;
 
       typedef ReferenceElement< typename DomainType::field_type, dimDomain > ReferenceElementType;
 
@@ -67,7 +68,7 @@ namespace Dune
 
       int order () const { return shapeFunctionSet_.order(); }
 
-      std::size_t size () const { return valueProjection_[0].size(); }
+      std::size_t size () const { return valueProjection_[0].size() * dimRange; }
 
       const ReferenceElementType &referenceElement () const
       {

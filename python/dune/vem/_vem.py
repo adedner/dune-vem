@@ -144,9 +144,9 @@ def vem(model, space, solver=None, parameters={}):
     from dune.fem.scheme import module
     from dune.fem.scheme import femschemeModule
     # from . import module
-    includes = [ "dune/vem/operator/elliptic.hh" ]
+    includes = [ "dune/vem/operator/vemelliptic.hh" ]
 
-    operator = lambda linOp,model: "Dune::Vem::DifferentiableEllipticOperator< " +\
+    operator = lambda linOp,model: "DifferentiableVEMEllipticOperator< " +\
                                    ",".join([linOp,model]) + ">"
 
     return femschemeModule(space, model,includes,solver,operator,parameters=parameters)
