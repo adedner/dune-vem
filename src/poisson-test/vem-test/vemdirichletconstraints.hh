@@ -29,26 +29,16 @@ namespace Dune
 
         typedef typename DiscreteFunctionSpaceType::BlockMapperType BlockMapperType;
 
-#if DUNE_VERSION_NEWER(DUNE_FEM, 2, 5)
-        typedef typename DiscreteFunctionSpaceType::SlaveDofsType SlaveDofsType;
-#else // #if DUNE_VERSION_NEWER(DUNE_FEM, 2, 5)
-        typedef Fem::SlaveDofs< DiscreteFunctionSpaceType, BlockMapperType > SlaveDofsType;
-#endif // #else // #if DUNE_VERSION_NEWER(DUNE_FEM, 2, 5)
-
         static const int localBlockSize = DiscreteFunctionSpaceType::localBlockSize;
         static_assert( localBlockSize == DiscreteFunctionSpaceType::FunctionSpaceType::dimRange,
             "local block size of the space must be identical to the dimension of the range of the function space." );
         typedef FieldVector< bool, localBlockSize > DirichletBlock;
-        typedef FieldVector< bool, ModelType::dimRange > ModelDirichletBlock;
+        typedef FieldVector< int, ModelType::dimRange > ModelDirichletBlock;
         static_assert( ModelType::dimRange >= localBlockSize,
             "local block size of the space must be less or equahl to the dimension of the range of the model." );
 
         DirichletConstraints ( const ModelType &model, const DiscreteFunctionSpaceType &space )
-#if DUNE_VERSION_NEWER(DUNE_FEM, 2, 5)
           : model_( model ), space_( space )
-#else // #if DUNE_VERSION_NEWER(DUNE_FEM, 2, 5)
-          : model_( model ), space_( space ), slaveDofs_( getSlaveDofs( space_ ) )
-#endif // #else // #if DUNE_VERSION_NEWER(DUNE_FEM, 2, 5)
         {}
 
         /*! treatment of Dirichlet-DoFs for given discrete function
@@ -154,7 +144,7 @@ namespace Dune
           void dirichletDofsCorrectOnEntity ( LinearOperator &linearOperator, const EntityType &entity ) const
           {
             // get slave dof structure (for parallel runs)   /*@LST0S@*/
-            const auto &slaveDofs = this->slaveDofs();
+            const auto &slaveDofs = linearOperator.rangeSpace().slaveDofs();
 
             typedef typename LinearOperator::LocalMatrixType LocalMatrixType;
 
@@ -203,7 +193,7 @@ namespace Dune
             space_.blockMapper().map( entity, globalBlockDofs );
             std::vector< double > values( localBlocks*localBlockSize );
 
-            agglomerationVEMInterpolation( space_.blockMapper().indexSet() )( uLocal, values );
+            agglomerationVEMInterpolation( space_.blockMapper().indexSet() )( entity, uLocal, values );
 
             int localDof = 0;
 
@@ -308,7 +298,7 @@ namespace Dune
               if( intersection.boundary() )
               {
                 // get dirichlet information from model
-                ModelDirichletBlock block( true );
+                ModelDirichletBlock block( 1 );
                 const bool isDirichletIntersection = model.isDirichletIntersection( intersection, block );
                 if( isDirichletIntersection )
                 {
@@ -333,35 +323,11 @@ namespace Dune
             return hasDirichletBoundary;
           }
 
-#if DUNE_VERSION_NEWER(DUNE_FEM, 2, 5)
-        const SlaveDofsType &slaveDofs () const { return space_.slaveDofs(); }
-#else // #if DUNE_VERSION_NEWER(DUNE_FEM, 2, 5)
-        // return slave dofs
-        static SlaveDofsType *getSlaveDofs ( const DiscreteFunctionSpaceType &space )
-        {
-          typedef typename SlaveDofsType::SingletonKey SlaveDofsKeyType;
-          typedef Fem::SingletonList< SlaveDofsKeyType, SlaveDofsType > SlaveDofsProviderType;
-
-          SlaveDofsKeyType key( space, space.blockMapper() );
-          return &(SlaveDofsProviderType::getObject( key ));
-        }
-
-        // return reference to slave dofs
-        const SlaveDofsType &slaveDofs () const
-        {
-          slaveDofs_->rebuild();
-          return *slaveDofs_;
-        }
-#endif // #else // #if DUNE_VERSION_NEWER(DUNE_FEM, 2, 5)
-
         class DirichletBuilder;
 
         //! pointer to slave dofs
         const ModelType &model_;
         const DiscreteFunctionSpaceType &space_;
-#if !DUNE_VERSION_NEWER(DUNE_FEM, 2, 5)
-        SlaveDofsType *const slaveDofs_;
-#endif // #if !DUNE_VERSION_NEWER(DUNE_FEM, 2, 5)
         mutable std::vector< DirichletBlock > dirichletBlocks_;
         mutable bool hasDirichletDofs_ = false;
         mutable int sequence_ = -1;

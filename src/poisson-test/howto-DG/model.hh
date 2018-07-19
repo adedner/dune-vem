@@ -55,7 +55,9 @@ struct DiffusionModel
 {
   typedef FunctionSpace FunctionSpaceType;
   typedef GridPart GridPartType;
+  typedef typename GridPart::template Codim< 0 >::EntityType EntityType;
 
+  static const int dimRange = FunctionSpaceType::dimRange;
   typedef typename FunctionSpaceType::DomainType DomainType;
   typedef typename FunctionSpaceType::RangeType RangeType;
   typedef typename FunctionSpaceType::JacobianRangeType JacobianRangeType;
@@ -86,44 +88,49 @@ public:
   {
   }
 
-  template< class Entity, class Point >
-  void source ( const Entity &entity,
-                const Point &x,
+  bool init ( const EntityType &entity ) const
+  {
+    entity_ = &entity;
+    return true;
+  }
+  const EntityType &entity () const
+  {
+    return *entity_;
+  }
+  template< class Point >
+  void source ( const Point &x,
                 const RangeType &value,
                 RangeType &flux ) const
   {
-    linSource( value, entity, x, value, flux );
+    linSource( value, x, value, flux );
   }
 
   // the linearization of the source function
-  template< class Entity, class Point >
+  template< class Point >
   void linSource ( const RangeType& uBar,
-                   const Entity &entity,
                    const Point &x,
                    const RangeType &value,
                    RangeType &flux ) const
   {
-    const DomainType xGlobal = entity.geometry().global( Dune::Fem::coordinate( x ) );
+    const DomainType xGlobal = entity().geometry().global( Dune::Fem::coordinate( x ) );
     RangeType m;
     problem_.m(xGlobal,m);
     for (unsigned int i=0;i<flux.size();++i)
       flux[i] = m[i]*value[i];
   }
   //! return the diffusive flux
-  template< class Entity, class Point >
-  void diffusiveFlux ( const Entity &entity,
-                       const Point &x,
+  template< class Point >
+  void diffusiveFlux ( const Point &x,
                        const RangeType &value,
                        const JacobianRangeType &gradient,
                        JacobianRangeType &flux ) const
   {
-    linDiffusiveFlux( value, gradient, entity, x, value, gradient, flux );
+    linDiffusiveFlux( value, gradient, x, value, gradient, flux );
   }
   // linearization of diffusiveFlux
-  template< class Entity, class Point >
+  template< class Point >
   void linDiffusiveFlux ( const RangeType& uBar,
                           const JacobianRangeType& gradientBar,
-                          const Entity &entity,
                           const Point &x,
                           const RangeType &value,
                           const JacobianRangeType &gradient,
@@ -142,7 +149,7 @@ public:
   //! return true if given intersection belongs to the Dirichlet boundary -
   //! we test here if the center is a dirichlet point
   template <class Intersection>
-  bool isDirichletIntersection( const Intersection& inter ) const
+  bool isDirichletIntersection( const Intersection& inter, Dune::FieldVector<int,dimRange> &dirichletComponent ) const
   {
     return isDirichletPoint( inter.geometry().center() );
   }
@@ -215,6 +222,7 @@ protected:
   FunctionWrapper<rhs> rhs_;
   FunctionWrapper<bnd> bnd_;
   double penalty_;
+  mutable const EntityType *entity_ = nullptr;
 };
 
 #endif // #ifndef ELLIPTC_MODEL_HH

@@ -23,7 +23,7 @@ struct HeatScheme : public VemScheme<ImplicitModel>
   HeatScheme( GridPartType &gridPart,
               const ImplicitModelType& implicitModel,
               const ExplicitModelType& explicitModel,
-              const typename BaseType::AgglomerationType& agglomeration )
+              typename BaseType::AgglomerationType& agglomeration )
   : BaseType(gridPart, implicitModel, agglomeration),
     explicitModel_(explicitModel),
     explicitOperator_( explicitModel_, discreteSpace_ )

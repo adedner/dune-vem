@@ -148,7 +148,7 @@ try
   GridExactSolutionType gridExactSolution("exact solution", problem, gridPart, 5 );
 
   //! input/output tuple and setup datawritter
-  typedef Dune::tuple<const typename SchemeType::DiscreteFunctionType *, GridExactSolutionType * > IOTupleType;
+  typedef std::tuple<const typename SchemeType::DiscreteFunctionType *, GridExactSolutionType * > IOTupleType;
   typedef Dune::Fem::DataOutput< Grid, IOTupleType > DataOutputType;
   IOTupleType ioTuple( &(scheme.solution()), &gridExactSolution) ; // tuple with pointers
 

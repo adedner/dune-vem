@@ -128,12 +128,13 @@ double algorithm ( GridPart &gridPart, std::vector< int > agglomerateIndices )
   // define a function space type
   typedef Dune::Fem::FunctionSpace< typename GridPart::ctype, double, GridPart::dimension, 1 > FunctionSpace;
   typedef Dune::Vem::AgglomerationDGSpace< FunctionSpace, GridPart, POLORDER > DiscreteFunctionSpace;
-  DiscreteFunctionSpace dfSpace( gridPart, agglomeration );
+  DiscreteFunctionSpace dfSpace( agglomeration );
 
   // create VEM space
   Dune::Vem::AgglomerationIndexSet< GridPart > agIndexSet( agglomeration );
   typedef Dune::Vem::AgglomerationVEMSpace< FunctionSpace, GridPart, POLORDER > VemSpaceType;
-  VemSpaceType vemSpace( gridPart, agIndexSet );
+  // VemSpaceType vemSpace( agIndexSet );
+  VemSpaceType vemSpace( agglomeration );
   typedef Dune::Fem::AdaptiveDiscreteFunction< VemSpaceType > VemDFType;
   VemDFType vemDF( "vemFunction", vemSpace );
   vemDF.clear();
@@ -428,7 +429,7 @@ double algorithm ( GridPart &gridPart, std::vector< int > agglomerateIndices )
         const std::size_t InsidePolygon = agglomeration.index( element );                         // the polygon we are integrating
         int refface = intersection.indexInInside();                         // local face number based on the reference element class
 
-        if( !intersection.boundary() && (agglomeration.index( Dune::Fem::make_entity( intersection.outside() ) ) == InsidePolygon) )
+        if( !intersection.boundary() && (agglomeration.index( intersection.outside() ) == InsidePolygon) )
           continue;
 
         for( int i = 0; i < kdis_edge; ++i )

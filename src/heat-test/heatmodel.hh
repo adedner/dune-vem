@@ -12,7 +12,7 @@
 #include "model.hh"
 
 template< class FunctionSpace, class GridPart >
-struct HeatModel : protected DiffusionModel<FunctionSpace,GridPart>
+struct HeatModel : public DiffusionModel<FunctionSpace,GridPart>
 {
   typedef DiffusionModel<FunctionSpace,GridPart> BaseType;
   typedef FunctionSpace FunctionSpaceType;
@@ -52,18 +52,19 @@ struct HeatModel : protected DiffusionModel<FunctionSpace,GridPart>
       timeStepFactor_ = -( 1.0 - theta ) ;
   }
 
-  template< class Entity, class Point >
-  void source ( const Entity &entity,
-                const Point &x,
+  using BaseType::entity;
+
+  template< class Point >
+  void source ( const Point &x,
                 const RangeType &value,
                 const JacobianRangeType &gradient,
                 RangeType &flux ) const
   {
-    linSource( value, gradient, entity, x, value, gradient, flux );
+    linSource( value, gradient, x, value, gradient, flux );
     // the explicit model should also evaluate the RHS
     if( !implicit_ )
     {
-      const DomainType xGlobal = entity.geometry().global( coordinate( x ) );
+      const DomainType xGlobal = entity().geometry().global( coordinate( x ) );
       // evaluate right hand side
       RangeType rhs ;
       problem_.f( xGlobal, rhs );
@@ -72,16 +73,15 @@ struct HeatModel : protected DiffusionModel<FunctionSpace,GridPart>
     }
   }
 
-  template< class Entity, class Point >
+  template< class Point >
   void linSource ( const RangeType& uBar,
                    const JacobianRangeType &gradientBar,
-                   const Entity &entity,
                    const Point &x,
                    const RangeType &value,
                    const JacobianRangeType &gradient,
                    RangeType &flux ) const
   {
-    const DomainType xGlobal = entity.geometry().global( coordinate( x ) );
+    const DomainType xGlobal = entity().geometry().global( coordinate( x ) );
     RangeType m;
     problem_.m(xGlobal,m);
     for (unsigned int i=0;i<flux.size();++i)
@@ -92,20 +92,18 @@ struct HeatModel : protected DiffusionModel<FunctionSpace,GridPart>
   }
 
    //! return the diffusive flux
-  template< class Entity, class Point >
-  void diffusiveFlux ( const Entity &entity,
-                       const Point &x,
+  template< class Point >
+  void diffusiveFlux ( const Point &x,
                        const RangeType &value,
                        const JacobianRangeType &gradient,
                        JacobianRangeType &flux ) const
   {
-    linDiffusiveFlux( value, gradient, entity, x, value, gradient, flux );
+    linDiffusiveFlux( value, gradient, x, value, gradient, flux );
   }
   //! return the diffusive flux
-  template< class Entity, class Point >
+  template< class Point >
   void linDiffusiveFlux ( const RangeType& uBar,
                           const JacobianRangeType &gradientBar,
-                          const Entity &entity,
                           const Point &x,
                           const RangeType &value,
                           const JacobianRangeType &gradient,
@@ -114,20 +112,20 @@ struct HeatModel : protected DiffusionModel<FunctionSpace,GridPart>
     flux  = gradient;
     flux *= timeStepFactor_ * timeProvider_.deltaT();
   }
-  template< class Entity, class Point >
-  void alpha(const Entity &entity, const Point &x,
+  template< class Point >
+  void alpha(const Point &x,
              const RangeType &value,
              RangeType &val) const
   {
-    BaseType::alpha(entity,x,value,val);
+    BaseType::alpha(x,value,val);
   }
-  template< class Entity, class Point >
+  template< class Point >
   void linAlpha(const RangeType &uBar,
-                const Entity &entity, const Point &x,
+                const Point &x,
                 const RangeType &value,
                 RangeType &val) const
   {
-    BaseType::linAlpha(uBar,entity,x,value,val);
+    BaseType::linAlpha(uBar,x,value,val);
   }
   //! exact some methods from the problem class
   bool hasDirichletBoundary () const
@@ -141,7 +139,7 @@ struct HeatModel : protected DiffusionModel<FunctionSpace,GridPart>
 
   //! return true if given point belongs to the Dirichlet boundary (default is true)
   template <class Intersection>
-  bool isDirichletIntersection( const Intersection& inter, Dune::FieldVector<bool,dimRange> &dirichletComponent ) const
+  bool isDirichletIntersection( const Intersection& inter, Dune::FieldVector<int,dimRange> &dirichletComponent ) const
   {
     return BaseType::isDirichletIntersection(inter,dirichletComponent) ;
   }

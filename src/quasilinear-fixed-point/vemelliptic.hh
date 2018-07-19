@@ -205,7 +205,7 @@ Constraints>::operator()(const DomainDiscreteFunctionType &u,
      for (const auto &intersection : Dune::intersections(
         static_cast<typename GridPartType::GridViewType>(gridPart),
         entity)) {
-      if( !intersection.boundary() && (dfSpace.agglomeration().index( Dune::Fem::make_entity( intersection.outside() ) ) == agglomerate) )
+      if( !intersection.boundary() && (dfSpace.agglomeration().index( intersection.outside() ) == agglomerate) )
         continue;
       //
       const int faceIndex = intersection.indexInInside();
@@ -399,7 +399,7 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model, Constraints>::ja
     for (const auto &intersection : Dune::intersections(
         static_cast<typename GridPartType::GridViewType>(gridPart),
         entity)) {
-      if( !intersection.boundary() && (rangeSpace.agglomeration().index( Dune::Fem::make_entity( intersection.outside() ) ) == currentPolygon) )
+      if( !intersection.boundary() && (rangeSpace.agglomeration().index( intersection.outside() ) == currentPolygon) )
         continue;
       //
       const int faceIndex = intersection.indexInInside();

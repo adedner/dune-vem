@@ -196,7 +196,7 @@ namespace Dune
       space_.blockMapper().map( entity, globalBlockDofs );
       std::vector< double > values( localBlocks*localBlockSize );
 
-      agglomerationVEMInterpolation( space_.blockMapper().indexSet() )( uLocal, values );
+      agglomerationVEMInterpolation( space_.blockMapper().indexSet() )( entity, uLocal, values );
 
       int localDof = 0;
 

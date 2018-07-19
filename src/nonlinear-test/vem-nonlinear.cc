@@ -76,7 +76,7 @@ double algorithm ( Grid &grid, AgglomerationType &agglomeration )
   GridExactSolutionType gridExactSolution("exact solution", problem, gridPart, 5 );
 
   //! input/output tuple and setup datawritter
-  typedef Dune::tuple< const typename VemSchemeType::DiscreteFunctionType *, GridExactSolutionType * > IOTupleType;
+  typedef std::tuple< const typename VemSchemeType::DiscreteFunctionType *, GridExactSolutionType * > IOTupleType;
   typedef Dune::Fem::DataOutput< Grid, IOTupleType > DataOutputType;
   IOTupleType ioTuple( &(vemscheme.solution()), &gridExactSolution) ; // tuple with pointers
   DataOutputType dataOutput( grid, ioTuple, DataOutputParameters( step ) );

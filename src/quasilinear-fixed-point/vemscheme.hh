@@ -30,9 +30,6 @@
 #include <dune/fem/solver/newtoninverseoperatorfp.hh>
 #include <dune/fem/solver/umfpacksolver.hh>
 
-// lagrange interpolation
-#include <dune/fem/operator/lagrangeinterpolation.hh>
-
 /*********************************************************/
 
 // include norms
@@ -128,11 +125,11 @@ public:
   typedef Dune::Fem::NewtonInverseOperator< LinearOperatorType, LinearInverseOperatorType > InverseOperatorType;
   //! [Newton solver]
 
-  VemScheme( GridPartType &gridPart, const ModelType &implicitModel, const AgglomerationType& agglomeration  )
+  VemScheme( GridPartType &gridPart, const ModelType &implicitModel, AgglomerationType& agglomeration  )
   : implicitModel_( implicitModel ),
     gridPart_( gridPart ),
     indexSet_( agglomeration ),
-    discreteSpace_( gridPart_, indexSet_ ),
+    discreteSpace_( agglomeration ),
     solution_( "solution", discreteSpace_ ),
     rhs_( "rhs", discreteSpace_ ),
     // the elliptic operator (implicit)

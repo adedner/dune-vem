@@ -127,7 +127,7 @@ try
 
     // create discrete function space
     typedef Dune::Vem::AgglomerationDGSpace< FunctionSpaceType, GridPart, polynomialOrder > DiscreteFunctionSpace;
-    DiscreteFunctionSpace dfSpace( gridPart, agglomeration );
+    DiscreteFunctionSpace dfSpace( agglomeration );
 
     // create solution
     typedef Dune::Fem::AdaptiveDiscreteFunction< DiscreteFunctionSpace > DiscreteFunction;

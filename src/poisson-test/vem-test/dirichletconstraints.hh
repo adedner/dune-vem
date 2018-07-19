@@ -21,15 +21,9 @@ namespace Dune {
         // ----------------------------
         typedef typename DiscreteFunctionSpaceType :: BlockMapperType BlockMapperType;
 
-        typedef Fem::SlaveDofs< DiscreteFunctionSpaceType, BlockMapperType > SlaveDofsType;
-        typedef typename SlaveDofsType :: SingletonKey SlaveDofsKeyType;
-        typedef Fem::SingletonList< SlaveDofsKeyType, SlaveDofsType >
-          SlaveDofsProviderType;
-
         DirichletConstraints( const ModelType &model, const DiscreteFunctionSpaceType& space )
           : model_(model),
           space_( space ),
-          slaveDofs_( getSlaveDofs( space_ ) ),
           dirichletBlocks_(),
           // mark DoFs on the Dirichlet boundary
           hasDirichletDofs_( false ),
@@ -162,7 +156,7 @@ namespace Dune {
               const EntityType &entity ) const
           {
             // get slave dof structure (for parallel runs)   /*@LST0S@*/
-            SlaveDofsType &slaveDofs = this->slaveDofs();
+            const auto &slaveDofs = linearOperator.rangeSpace().slaveDofs();
 
             typedef typename DiscreteFunctionSpaceType :: LagrangePointSetType
               LagrangePointSetType;
@@ -414,24 +408,10 @@ namespace Dune {
         //! pointer to slave dofs
         const ModelType& model_;
         const DiscreteFunctionSpaceType& space_;
-        SlaveDofsType *const slaveDofs_;
         mutable std::vector< bool > dirichletBlocks_;
         mutable bool hasDirichletDofs_ ;
         mutable int sequence_ ;
 
-        // return slave dofs
-        static SlaveDofsType *getSlaveDofs ( const DiscreteFunctionSpaceType &space )
-        {
-          SlaveDofsKeyType key( space, space.blockMapper() );
-          return &(SlaveDofsProviderType :: getObject( key ));
-        }
-
-        // return reference to slave dofs
-        SlaveDofsType &slaveDofs () const
-        {
-          slaveDofs_->rebuild();
-          return *slaveDofs_;
-        }
         class DirichletBuilder;
     };
 

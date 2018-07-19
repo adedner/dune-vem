@@ -24,9 +24,6 @@
 #include <dune/fem/solver/cginverseoperator.hh>
 #include <dune/fem/solver/newtoninverseoperatorfp.hh>
 
-// lagrange interpolation
-#include <dune/fem/operator/lagrangeinterpolation.hh>
-
 /*********************************************************/
 
 // include norms
