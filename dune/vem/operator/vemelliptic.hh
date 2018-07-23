@@ -225,11 +225,12 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model,
           DomainType LocalPoint = geometry.local(GlobalPoint);
           //
           DomainRangeType vu;
+          DomainJacobianRangeType dvu;
           //
           uLocal.evaluate(LocalPoint, vu);
+          uLocal.jacobian(LocalPoint, dvu);
           //
-          // model().diffusionCoefficient( LocalPoint, vu, Dcoeff);
-          Dcoeff = RangeRangeType(1);
+          model().diffusionCoefficient( LocalPoint, vu, dvu, Dcoeff);
           //
           double factor = 1. / (2.0 * numVertices);
           VectorOfAveragedDiffusionCoefficients[agglomerate].axpy(factor,Dcoeff);
@@ -424,14 +425,13 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model, Constraints>::ja
         DomainType LocalPoint = geometry.local(GlobalPoint);
         //
         DomainRangeType vu;
+        DomainJacobianRangeType dvu;
         //
         uLocal.evaluate(LocalPoint, vu);
+        uLocal.jacobian(LocalPoint, dvu);
         //
-        // model().diffusionCoefficient(LocalPoint, vu, Dcoeff);
-        // model().lindiffusionCoefficient(LocalPoint, vu, LinDcoeff);
-        //!!!
-        Dcoeff    = RangeRangeType(1);
-        LinDcoeff = RangeRangeType(1);
+        model().diffusionCoefficient(LocalPoint, vu, dvu, Dcoeff);
+        model().lindiffusionCoefficient(LocalPoint, vu, dvu, LinDcoeff);
         // Each vertex visited twice in looping around the edges, so we divide by 2
         double factor = 1./(2. * numVertices);
         avgDiffusionCoefficient.axpy(factor,Dcoeff);
