@@ -29,7 +29,7 @@ namespace Dune
 
       typedef typename GridPartType::template Codim< 0 >::EntityType ElementType;
 
-      Agglomeration ( GridPartType &gridPart, std::vector< std::size_t > indices )
+      Agglomeration ( const GridPartType &gridPart, std::vector< std::size_t > indices )
         : gridPart_( gridPart ),
           mapper_( static_cast< typename GridPartType::GridViewType >( gridPart ) ),
           indices_( std::move( indices ) ),
@@ -40,34 +40,18 @@ namespace Dune
           size_ = *std::max_element( indices_.begin(), indices_.end() ) + 1u;
       }
 
-      template <class Callback>
-      Agglomeration ( GridPartType &gridPart, const Callback callBack )
-        : gridPart_( gridPart ),
-          mapper_( static_cast< typename GridPartType::GridViewType >( gridPart ) ),
-          indices_( mapper_.size() ),
-          size_( 0 )
-      {
-        const auto &end = gridPart.template end<0>();
-        for ( auto it = gridPart.template begin<0>(); it != end; ++it )
-        {
-          const auto &element = *it;
-          indices_[ mapper_.index( element ) ] = callBack( element );
-        }
-        if( !indices_.empty() )
-          size_ = *std::max_element( indices_.begin(), indices_.end() ) + 1u;
-      }
-
       template< class T >
-      Agglomeration ( GridPartType &gridPart, const std::vector< T > &indices )
+      Agglomeration ( const GridPartType &gridPart, const std::vector< T > &indices )
         : Agglomeration( gridPart, convert( indices ) )
       {}
 
-      // const GridPart &gridPart () const { return gridPart_; }
-      GridPart &gridPart () const { return gridPart_; }
+      const GridPart &gridPart () const { return gridPart_; }
 
       std::size_t index ( const ElementType &element ) const { return indices_[ mapper_.index( element ) ]; }
 
       std::size_t size () const { return size_; }
+
+      std::vector< std::size_t > polygonindices () const { return indices_; }
 
     private:
       template< class T >
@@ -80,7 +64,7 @@ namespace Dune
         return std::move( w );
       }
 
-      GridPart &gridPart_;
+      const GridPart &gridPart_;
       MultipleCodimMultipleGeomTypeMapper< typename GridPartType::GridViewType, MCMGElementLayout > mapper_;
       std::vector< std::size_t > indices_;
       std::size_t size_;
