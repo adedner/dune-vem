@@ -16,7 +16,7 @@ import dune.create as create
 
 from voronoi import triangulated_voronoi
 
-dimRange = 2
+dimRange = 1
 
 dune.fem.parameter.append("parameter")
 
@@ -37,10 +37,14 @@ def plot(grid, solution):
     except ImportError:
         pass
 
-def error(grid,df, exact):
-    l2error_gf = create.function("ufl", grid, "error", 5,
-            as_vector([(exact[0]-df[0])**2]) )
-    return math.sqrt( l2error_gf.integrate() )
+def error(grid, df, interp, exact):
+    edf = exact-df
+    ein = exact-interp
+    errors = create.function("ufl", grid, "error", 5,
+            [ dot(edf,edf), dot(ein,ein),
+              inner(grad(edf),grad(edf)), inner(grad(ein),grad(ein))
+            ] ).integrate()
+    return [ math.sqrt(e) for e in errors ]
 
 # http://zderadicka.eu/voronoi-diagrams/
 class Agglomerate:
@@ -83,10 +87,10 @@ parameters = {"linabstol": 1e-8, "reduction": 1e-8,
         "maxiterations": 50,
         "maxlineariterations": 2500,
         "maxlinesearchiterations":50,
-        "verbose": "true", "linear.verbose": "true"}
+        "verbose": "false", "linear.verbose": "false"}
 
 def solve(grid,agglomerate,model,exact,name,space,scheme,penalty=None):
-    print("SOLVING: ",name,flush=True)
+    print("SOLVING: ",name,space,scheme,penalty,flush=True)
     gf_exact = create.function("ufl",grid,"exact",4,exact)
     if agglomerate:
         spc = create.space(space, grid, agglomerate, dimrange=dimRange, order=1, storage="istl")
@@ -102,16 +106,22 @@ def solve(grid,agglomerate,model,exact,name,space,scheme,penalty=None):
         df,info = create.scheme(scheme, model, spc, solver="cg",
                      parameters={"fem.solver.newton." + k: v for k, v in parameters.items()})\
                 .solve(name=name)
-    print(name+" size:",spc.size,"L2-error:", error(grid,df,exact), error(grid,interpol,exact),\
+    errors = error(grid,df,interpol,exact)
+    print("Computed",name+" size:",spc.size,
+          "L^2 (s,i):", [errors[0],errors[1]],
+          "H^1 (s,i):", [errors[2],errors[3]],
+          "linear and Newton iterations:",
           info["linear_iterations"], info["iterations"],flush=True)
     return interpol, df
 
 def compute(agglomerate):
-    NX = NY = 24*8
+    NX = NY = 60*4
     if agglomerate.cartesian:
+        print("Cartesian",flush=True)
         grid       = create.view("ALUSimplex", constructor=dune.grid.cartesianDomain([0, 0], [1, 1], [NX, NY]))
         coarsegrid = create.view("ALUSimplex", constructor=dune.grid.cartesianDomain([0, 0], [1, 1], [agglomerate.NX, agglomerate.NY]))
     else:
+        print("Voronoi",flush=True)
         bounding_box = numpy.array([0., 1., 0., 1.]) # [x_min, x_max, y_min, y_max]
         points, triangles = triangulated_voronoi(agglomerate.voronoi_points, bounding_box)
         grid = create.grid("ALUSimplex", {'vertices':points, 'simplices':triangles}, dimgrid=2)
@@ -120,7 +130,8 @@ def compute(agglomerate):
     u = TrialFunction(uflSpace)
     v = TestFunction(uflSpace)
     x = SpatialCoordinate(uflSpace.cell())
-    exact = as_vector( [cos(2.*pi*x[0])*cos(2.*pi*x[1]),]*dimRange )
+    zeroBnd = x[0]*(1-x[0])*x[1]*(1-x[1])
+    exact = as_vector( [cos(2.*pi*x[0])*cos(2.*pi*x[1])*zeroBnd,]*dimRange )
     H = lambda w: grad(grad(w))
     a = (inner(grad(u), grad(v)) + inner(u,v)) * dx
     b = ( -(H(exact[0])[0,0]+H(exact[0])[1,1]) + exact[0] ) * v[0] * dx
@@ -130,10 +141,14 @@ def compute(agglomerate):
         b = b + ( -(H(exact[1])[0,0]+H(exact[1])[1,1]) + exact[1] + nonLinear(exact[1])) * v[1] * dx
     model = create.model("elliptic", grid, a==b, dune.ufl.DirichletBC(uflSpace,exact,1))
 
-    # df_adg.grid <- caues error
+    # print(df_adg.grid) # <- causes error
+    if dimRange == 1:
+        interpol_vem, df_vem = solve(grid,agglomerate,model,exact,"vem","AgglomeratedVEM","vem")
+    else:
+        interpol_vem, df_vem = interpol_adg.copy("tmp_interpol"), df_adg.copy("tmp")
 
     if agglomerate.cartesian:
-        print(NX,NY,NX*NY,agglomerate.NX,agglomerate.NY,agglomerate.N,flush=True)
+        print("NX,NY,NX*NY,...",NX,NY,NX*NY,agglomerate.NX,agglomerate.NY,agglomerate.N,flush=True)
         interpol_lag, df_lag = solve(coarsegrid,None, model,exact,
                 "h1","Lagrange","h1")
         interpol_dg,  df_dg  = solve(coarsegrid,None, model,exact,
@@ -148,10 +163,6 @@ def compute(agglomerate):
                 "dgonb","DGONB","dg",penalty=10)
         interpol_adg, df_adg = solve(grid,agglomerate, model,exact,
                 "adg","AgglomeratedDG","dg",penalty=1)
-    if dimRange == 1:
-        interpol_vem, df_vem = solve(grid,agglomerate,model,exact,"vem","AgglomeratedVEM","vem")
-    else:
-        interpol_vem, df_vem = interpol_adg, df_adg
 
     if agglomerate.cartesian:
         coarsegrid.writeVTK("agglomerate_coarse"+agglomerate.suffix,
@@ -167,8 +178,24 @@ def compute(agglomerate):
                         df_dg, df_lag ],
             celldata =[ create.function("local",grid,"cells",1,lambda en,x: [agglomerate(en)]) ])
 
-# compute(Agglomerate(26))
-compute(Agglomerate(1999))
-# compute(Agglomerate(6,6))
-compute(Agglomerate(24,24))
-# compute(Agglomerate(48,48))
+print("*******************************************************")
+print("Test 1: Agglomerate(251)")
+compute(Agglomerate(251))
+print("*****************")
+print("Test 1: Agglomerate(999)")
+compute(Agglomerate(999))
+print("*****************")
+print("Test 1: Agglomerate(4013)")
+compute(Agglomerate(4013))
+if False:
+    # these test don't make a lot of sense since 'hanging' nodes are not removed
+    print("*******************************************************")
+    print("Test 2: Agglomerate(15,15)")
+    compute(Agglomerate(15,15))
+    print("*****************")
+    print("Test 2: Agglomerate(30,30)")
+    compute(Agglomerate(30,30))
+    print("*****************")
+    print("Test 2: Agglomerate(60,60)")
+    compute(Agglomerate(60,60))
+    print("*******************************************************")
