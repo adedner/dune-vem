@@ -77,6 +77,15 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model,
                           const Dune::Fem::ParameterReader &parameter = Dune::Fem::Parameter::container() )
     : model_( model ), constraints_( model, rangeSpace )
     {}
+    VEMEllipticOperator ( const DomainDiscreteFunctionSpaceType &dSpace,
+                          const RangeDiscreteFunctionSpaceType &rSpace,
+                          ModelType &model,
+                          const Dune::Fem::ParameterReader &parameter = Dune::Fem::Parameter::container() )
+    : model_( model ),
+      constraints_( model, rSpace )
+      // dSpace_(dSpace), rSpace_(rSpace),
+      // interiorOrder_(-1), surfaceOrder_(-1)
+    {}
 
     // prepare the solution vector
     template<class Function>
@@ -154,6 +163,13 @@ template<class JacobianOperator, class Model,
                      const Dune::Fem::ParameterReader &parameter = Dune::Fem::Parameter::container() )
     : BaseType( rangeSpace, model )
   {}
+  DifferentiableVEMEllipticOperator ( const DomainDiscreteFunctionSpaceType &dSpace,
+                                      const RangeDiscreteFunctionSpaceType &rSpace,
+                                      ModelType &model,
+                                      const Dune::Fem::ParameterReader &parameter = Dune::Fem::Parameter::container() )
+  : BaseType( dSpace, rSpace, model, parameter )
+  {}
+
   //! method to setup the jacobian of the operator for storage in a matrix
   void jacobian(const DomainDiscreteFunctionType &u,
       JacobianOperatorType &jOp) const;
@@ -230,7 +246,8 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model,
           uLocal.evaluate(LocalPoint, vu);
           uLocal.jacobian(LocalPoint, dvu);
           //
-          model().diffusionCoefficient( LocalPoint, vu, dvu, Dcoeff);
+          //!!!! model().diffusionCoefficient( LocalPoint, vu, dvu, Dcoeff);
+          Dcoeff[0] = 1.;
           //
           double factor = 1. / (2.0 * numVertices);
           VectorOfAveragedDiffusionCoefficients[agglomerate].axpy(factor,Dcoeff);
@@ -430,8 +447,11 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model, Constraints>::ja
         uLocal.evaluate(LocalPoint, vu);
         uLocal.jacobian(LocalPoint, dvu);
         //
-        model().diffusionCoefficient(LocalPoint, vu, dvu, Dcoeff);
-        model().lindiffusionCoefficient(LocalPoint, vu, dvu, LinDcoeff);
+        //!!! model().diffusionCoefficient(LocalPoint, vu, dvu, Dcoeff);
+        //!!! model().lindiffusionCoefficient(LocalPoint, vu, dvu, LinDcoeff);
+        Dcoeff[0] = 1.;
+        LinDcoeff[0] = 0.;
+
         // Each vertex visited twice in looping around the edges, so we divide by 2
         double factor = 1./(2. * numVertices);
         avgDiffusionCoefficient.axpy(factor,Dcoeff);
@@ -483,8 +503,7 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model, Constraints>::ja
             phi[localCol], dphi[localCol], aphi);
 
         // if gradient term is present
-        model().linDiffusiveFlux(u0, jacU0, quadrature[pt],
-            phi[localCol], dphi[localCol], adphi);
+        model().linDiffusiveFlux(u0, jacU0, quadrature[pt], phi[localCol], dphi[localCol], adphi);
 
         // get column object and call axpy method
         jLocal.column(localCol).axpy(rphi, rdphi, aphi, adphi, weight);
@@ -493,7 +512,6 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model, Constraints>::ja
     } // stiffness quadrature loop
 
     if (model().hasNeumanBoundary() && entity.hasBoundaryIntersections()) {
-      std::cout << "see! " << std::endl;
       for (const IntersectionType &intersection : intersections(
             static_cast<typename GridPartType::GridViewType>(gridPart),
             entity)) {
@@ -551,7 +569,6 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model, Constraints>::ja
           entity);
       const int nE = agIndexSet.numPolyVertices(entity,
           GridPartType::dimension);
-      std::cout << stabMatrix.rows() << " " << jLocal.rows() << std::endl;
       for (std::size_t r = 0; r < stabMatrix.rows(); ++r)
         for (std::size_t c = 0; c < stabMatrix.cols(); ++c)
           //!!!

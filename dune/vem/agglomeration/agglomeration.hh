@@ -40,6 +40,11 @@ namespace Dune
           size_ = *std::max_element( indices_.begin(), indices_.end() ) + 1u;
       }
 
+      template< class T >
+      Agglomeration ( GridPartType &gridPart, const std::vector< T > &indices )
+        : Agglomeration( gridPart, convert( indices ) )
+      {}
+
       template <class Callback>
       Agglomeration ( GridPartType &gridPart, const Callback callBack )
         : gridPart_( gridPart ),
@@ -53,17 +58,13 @@ namespace Dune
           const auto &element = *it;
           indices_[ mapper_.index( element ) ] = callBack( element );
         }
+        assert( indices_.size() == static_cast< std::size_t >( mapper_.size() ) );
         if( !indices_.empty() )
           size_ = *std::max_element( indices_.begin(), indices_.end() ) + 1u;
       }
 
-      template< class T >
-      Agglomeration ( GridPartType &gridPart, const std::vector< T > &indices )
-        : Agglomeration( gridPart, convert( indices ) )
-      {}
-
-      // const GridPart &gridPart () const { return gridPart_; }
-      GridPart &gridPart () const { return gridPart_; }
+      GridPart &gridPart () { return gridPart_; }
+      const GridPart &gridPart () const { return gridPart_; }
 
       std::size_t index ( const ElementType &element ) const { return indices_[ mapper_.index( element ) ]; }
 
@@ -74,6 +75,7 @@ namespace Dune
         std::vector< std::size_t > w(size(),0);
         return std::move(w);
       }
+      // std::vector< std::size_t > polygonindices () const { return indices_; }
 
     private:
       template< class T >
