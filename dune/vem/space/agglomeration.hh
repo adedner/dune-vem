@@ -15,6 +15,7 @@
 #include <dune/fem/space/shapefunctionset/orthonormal.hh>
 #include <dune/fem/space/shapefunctionset/proxy.hh>
 #include <dune/fem/space/shapefunctionset/vectorial.hh>
+#include <dune/fem/space/common/capabilities.hh>
 
 #include <dune/vem/agglomeration/boundingbox.hh>
 #include <dune/vem/agglomeration/dofmapper.hh>
@@ -152,6 +153,19 @@ namespace Dune
 
       enum { hasLocalInterpolate = false };
 
+#if 1 // for interpolation
+      struct InterpolationType
+      {
+        InterpolationType( const AgglomerationIndexSetType &indexSet, const EntityType &element ) noexcept
+        : inter_(indexSet), element_(element) {}
+        template <class U,class V>
+        void operator()(const U& u, V& v)
+        { inter_(element_, u,v); }
+        AgglomerationInterpolationType inter_;
+        const EntityType &element_;
+      };
+#endif
+
       explicit AgglomerationVEMSpace ( AgglomerationType &agglomeration )
         : BaseType( agglomeration.gridPart() ),
           agIndexSet_( agglomeration ),
@@ -191,6 +205,19 @@ namespace Dune
 
       const Stabilization &stabilization ( const EntityType &entity ) const { return stabilizations_[ agglomeration().index( entity ) ]; }
 
+#if 1 // for interpolation
+      //////////////////////////////////////////////////////////
+      // Non-interface methods (used in DirichletConstraints) //
+      //////////////////////////////////////////////////////////
+      /** \brief return local interpolation for given entity
+       *
+       *  \param[in]  entity  grid part entity
+       */
+      InterpolationType interpolation ( const EntityType &entity ) const
+      {
+        return InterpolationType( blockMapper().indexSet(), entity );
+      }
+#endif
     private:
       void buildProjections ();
 
@@ -379,6 +406,16 @@ namespace Dune
     };
 #endif // #if HAVE_DUNE_ISTL
 
+#if 1 // for interpolation
+    namespace Capabilities
+    {
+      template< class FunctionSpace, class GridPart, int polOrder >
+      struct hasInterpolation< Vem::AgglomerationVEMSpace< FunctionSpace, GridPart, polOrder > >
+      {
+        static const bool v = false;
+      };
+    }
+#endif
   } // namespace Fem
 
 } // namespace Dune

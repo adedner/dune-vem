@@ -87,7 +87,7 @@ parameters = {"linabstol": 1e-8, "reduction": 1e-8,
         "maxiterations": 50,
         "maxlineariterations": 2500,
         "maxlinesearchiterations":50,
-        "verbose": "false", "linear.verbose": "false"}
+        "verbose": "true", "linear.verbose": "false"}
 
 def solve(grid,agglomerate,model,exact,name,space,scheme,penalty=None):
     print("SOLVING: ",name,space,scheme,penalty,flush=True)
@@ -103,6 +103,13 @@ def solve(grid,agglomerate,model,exact,name,space,scheme,penalty=None):
                      parameters={"fem.solver.newton." + k: v for k, v in parameters.items()})\
         .solve(name=name)
     else:
+        # scheme = create.scheme(scheme, model, spc, solver="cg",
+        #              parameters={"fem.solver.newton." + k: v for k, v in parameters.items()})
+        # df = spc.interpolate([-0.5],name=name)
+        # scheme.setConstraints(df)
+        # info = {}
+        # info["linear_iterations"] = 0
+        # info["iterations"] = 0
         df,info = create.scheme(scheme, model, spc, solver="cg",
                      parameters={"fem.solver.newton." + k: v for k, v in parameters.items()})\
                 .solve(name=name)
@@ -130,8 +137,8 @@ def compute(agglomerate):
     u = TrialFunction(uflSpace)
     v = TestFunction(uflSpace)
     x = SpatialCoordinate(uflSpace.cell())
-    zeroBnd = x[0]*(1-x[0])*x[1]*(1-x[1])
-    exact = as_vector( [cos(2.*pi*x[0])*cos(2.*pi*x[1])*zeroBnd,]*dimRange )
+    multBnd = 1 # x[0]*(1-x[0])*x[1]*(1-x[1])
+    exact = as_vector( [cos(2.*pi*x[0])*cos(2.*pi*x[1])*multBnd,]*dimRange )
     H = lambda w: grad(grad(w))
     a = (inner(grad(u), grad(v)) + inner(u,v)) * dx
     b = ( -(H(exact[0])[0,0]+H(exact[0])[1,1]) + exact[0] ) * v[0] * dx

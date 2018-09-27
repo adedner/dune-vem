@@ -146,7 +146,17 @@ def vem(model, space, solver=None, parameters={}):
     # from . import module
     includes = [ "dune/vem/operator/vemelliptic.hh" ]
 
-    operator = lambda linOp,model: "DifferentiableVEMEllipticOperator< " +\
-                                   ",".join([linOp,model]) + ">"
+    op = lambda linOp,model: "DifferentiableVEMEllipticOperator< " +\
+                             ",".join([linOp,model]) + ">"
+
+    if model.hasDirichletBoundary:
+        includes += [ "dune/fem/schemes/dirichletwrapper.hh",
+                      "dune/vem/operator/vemdirichletconstraints.hh"]
+        constraints = lambda model: "Dune::VemDirichletConstraints< " +\
+                ",".join([model,space._typeName]) + " > "
+        operator = lambda linOp,model: "DirichletWrapperOperator< " +\
+                ",".join([op(linOp,model),constraints(model)]) + " >"
+    else:
+        operator = op
 
     return femschemeModule(space, model,includes,solver,operator,parameters=parameters)

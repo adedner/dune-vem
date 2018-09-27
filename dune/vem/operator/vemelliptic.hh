@@ -11,10 +11,11 @@
 #include <dune/fem/io/parameter.hh>
 
 #include <dune/vem/agglomeration/indexset.hh>
-#include <dune/vem/operator/vemdirichletconstraints.hh>
+// #include <dune/vem/operator/vemdirichletconstraints.hh>
 
 //#include <dune/vem/operator/constraints/dirichlet.hh>
 
+#if 0
 //! [Class for elliptic operator]
 struct NoConstraints {
   template<class ModelType, class DiscreteFunctionSpaceType>
@@ -34,20 +35,22 @@ struct NoConstraints {
     void applyToOperator(LinearOperator &linearOperator) const {
     }
 };
+#endif
 
 // VEMEllipticOperator
 // -------------------
 template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model,
-  class Constraints = Dune::DirichletConstraints<Model,
-  typename RangeDiscreteFunction::DiscreteFunctionSpaceType> >
+  class Constraints = void> // Dune::DirichletConstraints<Model,
+                            // typename RangeDiscreteFunction::DiscreteFunctionSpaceType> >
   struct VEMEllipticOperator: public virtual Dune::Fem::Operator<
                               DomainDiscreteFunction, RangeDiscreteFunction>
                               //! [Class for elliptic operator]
 {
-  protected:
+  public:
     typedef DomainDiscreteFunction DomainDiscreteFunctionType;
     typedef RangeDiscreteFunction RangeDiscreteFunctionType;
     typedef Model ModelType;
+    typedef Model                  DirichletModelType;
     typedef Constraints ConstraintsType; // the class taking care of boundary constraints e.g. dirichlet bc
     //
     typedef typename DomainDiscreteFunctionType::DiscreteFunctionSpaceType DomainDiscreteFunctionSpaceType;
@@ -75,55 +78,65 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model,
     VEMEllipticOperator ( const RangeDiscreteFunctionSpaceType &rangeSpace,
                           ModelType &model,
                           const Dune::Fem::ParameterReader &parameter = Dune::Fem::Parameter::container() )
-    : model_( model ), constraints_( model, rangeSpace )
+    : model_( model ), // , constraints_( model, rangeSpace )
+      dSpace_(rangeSpace), rSpace_(rangeSpace)
     {}
     VEMEllipticOperator ( const DomainDiscreteFunctionSpaceType &dSpace,
                           const RangeDiscreteFunctionSpaceType &rSpace,
                           ModelType &model,
                           const Dune::Fem::ParameterReader &parameter = Dune::Fem::Parameter::container() )
     : model_( model ),
-      constraints_( model, rSpace )
-      // dSpace_(dSpace), rSpace_(rSpace),
+      // constraints_( model, rSpace )
+      dSpace_(dSpace), rSpace_(rSpace)
       // interiorOrder_(-1), surfaceOrder_(-1)
     {}
 
+#if 0
     // prepare the solution vector
     template<class Function>
       void prepare(const Function &func, RangeDiscreteFunctionType &u) {
         // set boundary values for solution
         constraints()(func, u);
       }
+#endif
 
     //! application operator
     virtual void
       operator()(const DomainDiscreteFunctionType &u,
           RangeDiscreteFunctionType &w) const;
 
-  protected:
-    const ModelType &model() const {
-      return model_;
-    }
+    ModelType &model() const
+    { return model_; }
+    const DomainDiscreteFunctionSpaceType& domainSpace() const
+    { return dSpace_; }
+    const RangeDiscreteFunctionSpaceType& rangeSpace() const
+    { return rSpace_; }
+#if 0
     const ConstraintsType &constraints() const {
       return constraints_;
     }
+#endif
 
   private:
     ModelType &model_;
-    ConstraintsType constraints_;
+    const DomainDiscreteFunctionSpaceType &dSpace_;
+    const RangeDiscreteFunctionSpaceType &rSpace_;
+    // ConstraintsType constraints_;
 };
 
 // DifferentiableVEMEllipticOperator
 // ------------------------------
 //! [Class for linearizable elliptic operator]
 template<class JacobianOperator, class Model,
-  class Constraints = Dune::DirichletConstraints<Model,
-  typename JacobianOperator::RangeFunctionType::DiscreteFunctionSpaceType> >
+  class Constraints = void> // Dune::DirichletConstraints<Model,
+                            // typename JacobianOperator::RangeFunctionType::DiscreteFunctionSpaceType> >
   struct DifferentiableVEMEllipticOperator: public VEMEllipticOperator<
                                             typename JacobianOperator::DomainFunctionType,
                                             typename JacobianOperator::RangeFunctionType, Model, Constraints>,
                                             public Dune::Fem::DifferentiableOperator<JacobianOperator>
                                             //! [Class for linearizable VEMelliptic operator]
 {
+  public:
   typedef VEMEllipticOperator<typename JacobianOperator::DomainFunctionType,
   typename JacobianOperator::RangeFunctionType, Model, Constraints> BaseType;
 
@@ -133,7 +146,6 @@ template<class JacobianOperator, class Model,
   typedef typename BaseType::RangeDiscreteFunctionType RangeDiscreteFunctionType;
   typedef typename BaseType::ModelType ModelType;
 
-  protected:
   typedef typename DomainDiscreteFunctionType::DiscreteFunctionSpaceType DomainDiscreteFunctionSpaceType;
   typedef typename DomainDiscreteFunctionType::LocalFunctionType DomainLocalFunctionType;
   typedef typename DomainLocalFunctionType::RangeType DomainRangeType;
@@ -174,9 +186,8 @@ template<class JacobianOperator, class Model,
   void jacobian(const DomainDiscreteFunctionType &u,
       JacobianOperatorType &jOp) const;
 
-  protected:
   using BaseType::model;
-  using BaseType::constraints;
+  // using BaseType::constraints;
 };
 
 // Implementation of VEMEllipticOperator
@@ -346,7 +357,7 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model,
     }
     w.communicate();
     // apply constraints, e.g. Dirichlet contraints, to the result
-    constraints()(u, w);
+    // constraints()(u, w);
   }
 
 // Implementation of DifferentiableVEMEllipticOperator
@@ -593,7 +604,7 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model, Constraints>::ja
     averagemeshsize += localmeshsizevec[i]
       / rangeSpace.agglomeration().size();
   // apply constraints to matrix operator
-  constraints().applyToOperator(jOp);
+  // constraints().applyToOperator(jOp);
   jOp.communicate();
 }
 #endif // #ifndef VEMELLIPTIC_HH

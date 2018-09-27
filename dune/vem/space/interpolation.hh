@@ -59,6 +59,17 @@ namespace Dune
           localDofVector[ k ] = value[ 0 ];
         }
       }
+      void operator() ( const ElementType &element, std::vector<bool> &mask) const
+      {
+        std::fill(mask.begin(),mask.end(),false);
+        const auto &refElement = ReferenceElements< ctype, dimension >::general( element.type() );
+
+        for( int i = 0; i < refElement.size( dimension ); ++i )
+        {
+          const int k = indexSet_.localIndex( element, i, dimension );
+          mask[k] = !( k == -1 );
+        }
+      }
 
       template< class ShapeFunctionSet, class LocalDofMatrix >
       void operator() ( const BoundingBoxShapeFunctionSet< ElementType, ShapeFunctionSet > &shapeFunctionSet, LocalDofMatrix &localDofMatrix ) const
