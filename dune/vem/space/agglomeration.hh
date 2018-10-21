@@ -286,6 +286,7 @@ namespace Dune
 
           interpolation( shapeFunctionSet, D );
 
+          const auto &refElement = ReferenceElements< typename GridPart::ctype, GridPart::dimension >::general( element.type() );
 #if 0
           if( polOrder > 1 )
           {
@@ -296,8 +297,8 @@ namespace Dune
               if( k == -1 )
                 continue;
 
-              const auto left = idSet.subId( element, refElement.subEntity( i, dimension-1, 0, dimension ), dimension );
-              const auto right = idSet.subId( element, refElement.subEntity( i, dimension-1, 1, dimension ), dimension );
+              const auto left = idSet.subId( element, refElement.subEntity( i, GridPart::dimension-1, 0, GridPart::dimension ), GridPart::dimension );
+              const auto right = idSet.subId( element, refElement.subEntity( i, GridPart::dimension-1, 1, GridPart::dimension ), GridPart::dimension );
 
               const auto subEntity = element.template subEntity< GridPart::dimension-1 >( i );
               const auto geometry = subEntity.geometry();
@@ -326,7 +327,6 @@ namespace Dune
           }
   #endif
 
-          const auto &refElement = ReferenceElements< typename GridPart::ctype, GridPart::dimension >::general( element.type() );
           for( const auto &intersection : intersections( static_cast< typename GridPart::GridViewType >( gridPart() ), element ) )
           {
             if( !intersection.boundary() && (agglomeration().index( intersection.outside() ) == agglomerate) )

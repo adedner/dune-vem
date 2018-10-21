@@ -220,18 +220,23 @@ def compute(agglomerate,filename):
                     df_dg, df_lag ],
         celldata =[ create.function("local",grid,"cells",1,lambda en,x: [agglomerate(en)]) ])
 
+# test of higher order vem spaces
 if True:
-    constructor = cartesianDomain([0,0],[1,1],[2,2])
-    agglomerate = Agglomerate([1,1],version="cartesian",constructor=constructor)
+    constructor = cartesianDomain([0,0],[1,1],[12,12])
+    agglomerate = Agglomerate([4,4],version="cartesian",constructor=constructor)
     space = create.space("agglomeratedvem", agglomerate.grid, agglomerate,
             dimrange=1, order=1, storage="fem")
+    dfs = [space.interpolate(lambda x:(x[0]*x[1])**2,name="one")]
     print("order=1, size=",space.size)
     space = create.space("agglomeratedvem", agglomerate.grid, agglomerate,
             dimrange=1, order=2, storage="fem")
+    dfs += [space.interpolate(lambda x:(x[0]*x[1])**2,name="two")]
     print("order=2, size=",space.size)
     space = create.space("agglomeratedvem", agglomerate.grid, agglomerate,
             dimrange=1, order=3, storage="fem")
+    dfs += [space.interpolate(lambda x:(x[0]*x[1])**2,name="three")]
     print("order=3",space.size)
+    space.grid.writeVTK("test", pointdata=dfs)
     sys.exit(0)
 
 if testVoronoi:
