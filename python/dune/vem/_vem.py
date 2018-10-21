@@ -62,7 +62,7 @@ def agglomerateddg(view, agglomerate, order=1, dimrange=1, field="double", stora
                    ['"gridView"_a', '"agglomerate"_a',
                     'pybind11::keep_alive< 1, 2 >()'] )
 
-    spc = module(field, includes, typeName, constructor).Space(view, agglomerate)
+    spc = module(field, includes, typeName, constructor, storage=storage).Space(view, agglomerate)
     addStorage(spc, storage)
     return spc.as_ufl()
 
@@ -121,7 +121,7 @@ def agglomeratedvem(view, agglomerate, order=1, dimrange=1, field="double", stor
                    ['"gridView"_a', '"agglomerate"_a',
                     'pybind11::keep_alive< 1, 2 >()'] )
 
-    spc = module(field, includes, typeName, constructor).Space(view, agglomerate)
+    spc = module(field, includes, typeName, constructor, storage=storage).Space(view, agglomerate)
     addStorage(spc, storage)
     return spc.as_ufl()
 

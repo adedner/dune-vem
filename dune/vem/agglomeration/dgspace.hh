@@ -194,13 +194,15 @@ namespace Dune
     interpolate ( const GridFunction &u, DiscreteFunction &v, PartitionSet< partitions > ps )
     {
       // !!! a very crude implementation - should be done locally on each polygon
+      v.clear();
       DiscreteFunction rhs( v );
+      rhs.clear();
       Dune::Vem::applyMass( u, rhs );
       typedef Dune::Fem::SparseRowLinearOperator< DiscreteFunction, DiscreteFunction > LinearOperator;
       LinearOperator assembledMassOp( "assembled mass operator", v.space(), v.space() );
       Dune::Vem::MassOperator< LinearOperator > massOp( v.space() );
       massOp.jacobian( v, assembledMassOp );
-      Dune::Fem::CGInverseOperator< DiscreteFunction > invOp( assembledMassOp, 1e-8, 1e-8 );
+      Dune::Fem::CGInverseOperator< DiscreteFunction > invOp( assembledMassOp, 1e-8, 1e-8, true );
       invOp( rhs, v );
     }
   } // namespace Fem

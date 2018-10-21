@@ -1,13 +1,14 @@
-"""Solve the Laplace equation
-"""
 from __future__ import print_function
 
 import math
 import numpy
 from scipy.spatial import Voronoi, voronoi_plot_2d, cKDTree
+import numpy.linalg
+import scipy.sparse.linalg
 
 from ufl import *
 
+from dune.grid import cartesianDomain
 import dune.ufl
 import dune.fem
 import dune.fem.function as gf
@@ -15,10 +16,17 @@ import dune.fem.function as gf
 import dune.create as create
 
 from voronoi import triangulated_voronoi
+import graph
+import holes
+
+testVoronoi = False
+testMetis = False
 
 dimRange = 1
 
-dune.fem.parameter.append("parameter")
+# dune.fem.parameter.append("parameter")
+dune.fem.parameter.append({"fem.verboserank": 0})
+dune.fem.parameter.append({"fem.solver.verbose":False})
 
 def plot(grid, solution):
     try:
@@ -48,100 +56,144 @@ def error(grid, df, interp, exact):
 
 # http://zderadicka.eu/voronoi-diagrams/
 class Agglomerate:
-    def __init__(self,NX,NY=None):
-        if NY is not None:
-            self.NX = NX
-            self.NY = NY
-            self.N  = NX*NY
-            self.suffix = str(NX)+"_"+str(NY)
-            self.cartesian = True
+    def __init__(self,N,constructor=None,version="voronoi"):
+        self.N = N
+        self.suffix = str(self.N)
+        self.version = version
+        if version == "metis" or version == "metisVoronoi":
+            self.suffix = "m" + self.suffix
+            self.grid = create.grid("ALUSimplex", constructor=constructor, dimgrid=2)
+            self.parts = graph.partition(self.grid, nparts=self.N,
+                    contig=True, iptype="node", objtype="vol")
+            if version == "metisVoronoi":
+                voronoi_points = numpy.zeros((self.N,2))
+                weights = numpy.zeros(self.N)
+                for en in self.grid.elements:
+                    index = self.parts[ self.grid.indexSet.index(en) ]
+                    voronoi_points[index] += en.geometry.center
+                    weights[index] += 1
+                for p,w in zip(voronoi_points,weights):
+                    p /= w
+                voronoi_kdtree = cKDTree(voronoi_points)
+                for en in self.grid.elements:
+                    p = en.geometry.center
+                    test_point_dist, test_point_regions = voronoi_kdtree.query([p], k=1)
+                    index = test_point_regions[0]
+                    self.parts[ self.grid.indexSet.index(en) ] = index
+                vor = Voronoi(voronoi_points)
+                voronoi_plot_2d(vor).savefig("metis_voronoi"+self.suffix+".pdf", bbox_inches='tight')
+        elif version == "voronoi":
+            self.suffix = "v" + self.suffix
+            numpy.random.seed(1234)
+            self.voronoi_points = numpy.random.rand(self.N, 2)
+            self.voronoi_kdtree = cKDTree(self.voronoi_points)
+            vor = Voronoi(self.voronoi_points)
+            voronoi_plot_2d(vor).savefig("agglomerate_voronoi"+self.suffix+".pdf", bbox_inches='tight')
+            if constructor == None:
+                bounding_box = numpy.array([0., 1., 0., 1.]) # [x_min, x_max, y_min, y_max]
+                points, triangles = triangulated_voronoi(self.voronoi_points, bounding_box)
+                self.grid = create.grid("ALUSimplex", {'vertices':points, 'simplices':triangles}, dimgrid=2)
+            else:
+                self.grid = create.grid("ALUSimplex", constructor=constructor, dimgrid=2)
         else:
-            self.N = NX
-            self.suffix = str(self.N)
-            self.cartesian = False
-
-        numpy.random.seed(1234)
-        self.voronoi_points = numpy.random.rand(self.N, 2)
-        self.voronoi_kdtree = cKDTree(self.voronoi_points)
+            self.suffix = "c" + self.suffix
+            self.grid = create.grid("yasp", constructor=constructor)
+            self.division = constructor.division
         self.ind = set()
 
-        vor = Voronoi(self.voronoi_points)
-        voronoi_plot_2d(vor).savefig("agglomerate_voronoi"+self.suffix+".pdf", bbox_inches='tight')
-
     def __call__(self,en):
-        p = en.geometry.center
-        if self.cartesian:
-            index = int(p[0] * self.NX)*self.NY + int(p[1] * self.NY)
-        else:  # Voronoi
+        if self.version == "metis" or self.version == "metisVoronoi":
+            index = self.parts[ self.grid.indexSet.index(en) ]
+            self.ind.add(index)
+        elif self.version == "voronoi":
+            p = en.geometry.center
             test_point_dist, test_point_regions = self.voronoi_kdtree.query([p], k=1)
             index = test_point_regions[0]
-        self.ind.add(index)
+            self.ind.add(index)
+        else:
+            idx = self.grid.indexSet.index(en)
+            nx = int(idx / self.division[1])
+            ny = int(idx % self.division[1])
+            print(nx,ny)
+            nx = int(nx/self.division[0]*self.N[0])
+            ny = int(ny/self.division[1]*self.N[1])
+            index = nx*self.N[1]+ny
+            print(index)
         return index
     def check(self):
         return len(self.ind)==self.N
 
-parameters = {"linabstol": 1e-8, "reduction": 1e-8,
-        "tolerance": 3e-7,
-        "krylovmethod": "gmres",
-        "istl.preconditioning.method": "amg-ilu",
-        "maxiterations": 50,
-        "maxlineariterations": 2500,
-        "maxlinesearchiterations":50,
-        "verbose": "true", "linear.verbose": "false"}
+newtonParameters = {"linabstol": 1e-8, "reduction": 1e-8, "tolerance": 3e-5,
+              "maxiterations": 50,
+              "maxlineariterations": 2500,
+              "maxlinesearchiterations":50,
+              "verbose": "true", "linear.verbose": "true",
+              }
+parameters = {"fem.solver.newton." + k: v for k, v in newtonParameters.items()}
+parameters["istl.preconditioning.method"] = "ilu"
 
-def solve(grid,agglomerate,model,exact,name,space,scheme,penalty=None):
+def solve(grid,agglomerate,model,exact,name,space,scheme,order=1,penalty=None):
     print("SOLVING: ",name,space,scheme,penalty,flush=True)
     gf_exact = create.function("ufl",grid,"exact",4,exact)
     if agglomerate:
-        spc = create.space(space, grid, agglomerate, dimrange=dimRange, order=1, storage="istl")
-        assert agglomerate.check(), "missing or too many indices provided by agglomoration object. Should be "+str(NX*NY)+" was "+str(len(ind))
+        print("agglomerate",agglomerate)
+        spc = create.space(space, grid, agglomerate, dimrange=dimRange,
+                order=order, storage="fem")
+        assert agglomerate.check(), "missing or too many indices provided by agglomoration object. Should be "+str(agglomerate.N)+" was "+str(len(agglomerate.ind))
     else:
-        spc = create.space(space, grid, dimrange=dimRange, order=1, storage="istl")
+        print("no agglomerate")
+        spc = create.space(space, grid, dimrange=dimRange, order=order,
+                storage="fem")
+    print("interpolate")
     interpol = spc.interpolate( gf_exact, "exact_"+name )
     if penalty:
-        df,info = create.scheme(scheme, model, spc, penalty=penalty, solver="cg",
-                     parameters={"fem.solver.newton." + k: v for k, v in parameters.items()})\
-        .solve(name=name)
+        print("penalty",penalty)
+        scheme = create.scheme(scheme, model, spc, penalty=penalty,
+                solver=("suitesparse","umfpack"),
+                parameters=parameters)
+        df,info = scheme.solve(name=name)
     else:
-        # scheme = create.scheme(scheme, model, spc, solver="cg",
-        #              parameters={"fem.solver.newton." + k: v for k, v in parameters.items()})
-        # df = spc.interpolate([-0.5],name=name)
-        # scheme.setConstraints(df)
-        # info = {}
-        # info["linear_iterations"] = 0
-        # info["iterations"] = 0
-        df,info = create.scheme(scheme, model, spc, solver="cg",
-                     parameters={"fem.solver.newton." + k: v for k, v in parameters.items()})\
-                .solve(name=name)
+        print("no penalty")
+        scheme = create.scheme(scheme, model, spc,
+                solver=("suitesparse","umfpack"),
+                parameters=parameters)
+        df,info = scheme.solve(name=name)
+    print("computing errors")
     errors = error(grid,df,interpol,exact)
+    if spc.size < 0:
+        A = scheme.assemble(df).as_numpy.transpose()
+        try:
+            c1 = numpy.linalg.cond(A.todense())
+        except:
+            c1 = -1
+        norm_A    = scipy.sparse.linalg.norm(A)
+        norm_invA = scipy.sparse.linalg.norm(scipy.sparse.linalg.inv(A))
+        c2        = norm_A*norm_invA
+    else:
+        c1 = -1
+        c2 = -1
     print("Computed",name+" size:",spc.size,
           "L^2 (s,i):", [errors[0],errors[1]],
           "H^1 (s,i):", [errors[2],errors[3]],
+          "cond:",[c1,c2],
           "linear and Newton iterations:",
           info["linear_iterations"], info["iterations"],flush=True)
     return interpol, df
 
-def compute(agglomerate):
-    NX = NY = 60*4
-    if agglomerate.cartesian:
-        print("Cartesian",flush=True)
-        grid       = create.view("ALUSimplex", constructor=dune.grid.cartesianDomain([0, 0], [1, 1], [NX, NY]))
-        coarsegrid = create.view("ALUSimplex", constructor=dune.grid.cartesianDomain([0, 0], [1, 1], [agglomerate.NX, agglomerate.NY]))
-    else:
-        print("Voronoi",flush=True)
-        bounding_box = numpy.array([0., 1., 0., 1.]) # [x_min, x_max, y_min, y_max]
-        points, triangles = triangulated_voronoi(agglomerate.voronoi_points, bounding_box)
-        grid = create.grid("ALUSimplex", {'vertices':points, 'simplices':triangles}, dimgrid=2)
-
+def compute(agglomerate,filename):
+    grid = agglomerate.grid
     uflSpace = dune.ufl.Space((grid.dimGrid, grid.dimWorld), dimRange, field="double")
     u = TrialFunction(uflSpace)
     v = TestFunction(uflSpace)
     x = SpatialCoordinate(uflSpace.cell())
-    multBnd = 1 # x[0]*(1-x[0])*x[1]*(1-x[1])
+    multBnd = 1 # x[0]*(1-x[0])*x[1]*(1-x[1]) # to get zero bcs
     exact = as_vector( [cos(2.*pi*x[0])*cos(2.*pi*x[1])*multBnd,]*dimRange )
+    exact = as_vector( [cos(x[0])*cos(x[1])*multBnd,]*dimRange )
+    # exact = as_vector( [0] )
     H = lambda w: grad(grad(w))
     a = (inner(grad(u), grad(v)) + inner(u,v)) * dx
     b = ( -(H(exact[0])[0,0]+H(exact[0])[1,1]) + exact[0] ) * v[0] * dx
+    # b = v[0]*dx
     if dimRange == 2:
         def nonLinear(w): return 20./(w*w+1.)
         a = a + nonLinear(u[1]) * v[1] * dx
@@ -149,60 +201,69 @@ def compute(agglomerate):
     model = create.model("elliptic", grid, a==b, dune.ufl.DirichletBC(uflSpace,exact,1))
 
     # print(df_adg.grid) # <- causes error
+    interpol_lag, df_lag = solve(grid,None, model,exact,
+            "h1","Lagrange","h1",order=1)
+    interpol_dg,  df_dg  = solve(grid,None, model,exact,
+            "dgonb","DGONB","dg",penalty=10)
+    interpol_adg, df_adg = solve(grid,agglomerate, model,exact,
+            "adg","AgglomeratedDG","dg",order=1,penalty=0.1)
+
     if dimRange == 1:
         interpol_vem, df_vem = solve(grid,agglomerate,model,exact,"vem","AgglomeratedVEM","vem")
     else:
-        interpol_vem, df_vem = interpol_adg.copy("tmp_interpol"), df_adg.copy("tmp")
+        interpol_vem, df_vem = None, None # interpol_adg.copy("tmp_interpol"), df_adg.copy("tmp")
+        print("Skippting vem: not yet implemented for dimRange>1")
 
-    if agglomerate.cartesian:
-        print("NX,NY,NX*NY,...",NX,NY,NX*NY,agglomerate.NX,agglomerate.NY,agglomerate.N,flush=True)
-        interpol_lag, df_lag = solve(coarsegrid,None, model,exact,
-                "h1","Lagrange","h1")
-        interpol_dg,  df_dg  = solve(coarsegrid,None, model,exact,
-                "dgonb","DGONB","dg",penalty=10)
-        penalty = max(agglomerate.NX,agglomerate.NY) / min(NX,NY)
-        interpol_adg, df_adg = solve(grid,agglomerate, model,exact,
-                "adg","AgglomeratedDG","dg",penalty=10*penalty)
-    else:
-        interpol_lag, df_lag = solve(grid,None, model,exact,
-                "h1","Lagrange","h1")
-        interpol_dg,  df_dg  = solve(grid,None, model,exact,
-                "dgonb","DGONB","dg",penalty=10)
-        interpol_adg, df_adg = solve(grid,agglomerate, model,exact,
-                "adg","AgglomeratedDG","dg",penalty=1)
+    grid.writeVTK(filename+agglomerate.suffix,
+        pointdata=[ df_adg, interpol_adg,
+                    df_vem, interpol_vem,
+                    df_dg, df_lag ],
+        celldata =[ create.function("local",grid,"cells",1,lambda en,x: [agglomerate(en)]) ])
 
-    if agglomerate.cartesian:
-        coarsegrid.writeVTK("agglomerate_coarse"+agglomerate.suffix,
-            pointdata=[ df_dg, df_lag ] )
-        grid.writeVTK("agglomerate"+agglomerate.suffix,
-            pointdata=[ df_adg, interpol_adg,
-                        df_vem, interpol_vem ],
-            celldata =[ create.function("local",grid,"cells",1,lambda en,x: [agglomerate(en)]) ])
-    else:
-        grid.writeVTK("agglomerate"+agglomerate.suffix,
-            pointdata=[ df_adg, interpol_adg,
-                        df_vem, interpol_vem,
-                        df_dg, df_lag ],
-            celldata =[ create.function("local",grid,"cells",1,lambda en,x: [agglomerate(en)]) ])
+if True:
+    constructor = cartesianDomain([0,0],[1,1],[2,2])
+    agglomerate = Agglomerate([1,1],version="cartesian",constructor=constructor)
+    space = create.space("agglomeratedvem", agglomerate.grid, agglomerate,
+            dimrange=1, order=1, storage="fem")
+    print("order=1",space.size)
+    space = create.space("agglomeratedvem", agglomerate.grid, agglomerate,
+            dimrange=1, order=2, storage="fem")
+    print("order=2",space.size)
+    space = create.space("agglomeratedvem", agglomerate.grid, agglomerate,
+            dimrange=1, order=3, storage="fem")
+    print("order=3",space.size)
+    sys.exit(0)
 
-print("*******************************************************")
-print("Test 1: Agglomerate(251)")
-compute(Agglomerate(251))
-print("*****************")
-print("Test 1: Agglomerate(999)")
-compute(Agglomerate(999))
-print("*****************")
-print("Test 1: Agglomerate(4013)")
-compute(Agglomerate(4013))
-if False:
-    # these test don't make a lot of sense since 'hanging' nodes are not removed
+if testVoronoi:
     print("*******************************************************")
-    print("Test 2: Agglomerate(15,15)")
-    compute(Agglomerate(15,15))
+    constructor = None # cartesianDomain([0,0],[3,2],[200,200])
+    print("Test 1: Voronoi(251)")
+    # compute(Agglomerate(251,version="voronoi",constructor=constructor),
+    #         "voronoi")
     print("*****************")
-    print("Test 2: Agglomerate(30,30)")
-    compute(Agglomerate(30,30))
+    print("Test 2: Voronoi(999)")
+    # compute(Agglomerate(999,version="voronoi",constructor=constructor),
+    #         "voronoi")
     print("*****************")
-    print("Test 2: Agglomerate(60,60)")
-    compute(Agglomerate(60,60))
+    print("Test 3: Voronoi(4013)")
+    # compute(Agglomerate(4013,version="voronoi",constructor=constructor),
+    #         "voronoi")
+
+if testMetis:
     print("*******************************************************")
+    # constructor = cartesianDomain([0,0],[1,1],[200,200])
+    print("Test 1: Metis(251)")
+    constructor = holes.get(area=0.05,plotDomain=False)
+    compute(Agglomerate(251,version="metis",constructor=constructor),
+            "metis")
+    print("*****************")
+    print("Test 2: Metis(999)")
+    constructor = holes.get(area=0.01,plotDomain=False)
+    compute(Agglomerate(999,version="metisVoronoi",constructor=constructor),
+            "metisVoronoi")
+    compute(Agglomerate(999,version="metisVoronoi",constructor=constructor),
+            "metisVoronoi")
+    print("*****************")
+    print("Test 3: Metis(4013)")
+    # compute(Agglomerate(4013,version="metis",constructor=constructor),
+    #         "metis")

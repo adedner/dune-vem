@@ -67,7 +67,8 @@ namespace Dune
         for( int i = 0; i < refElement.size( dimension ); ++i )
         {
           const int k = indexSet_.localIndex( element, i, dimension );
-          mask[k] = !( k == -1 );
+          if ( k!=-1 ) mask[k] = true;
+          // mask[k] = !( k == -1 );
         }
       }
 
