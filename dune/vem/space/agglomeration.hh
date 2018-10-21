@@ -169,7 +169,7 @@ namespace Dune
       explicit AgglomerationVEMSpace ( AgglomerationType &agglomeration )
         : BaseType( agglomeration.gridPart() ),
           agIndexSet_( agglomeration ),
-          blockMapper_( agIndexSet_, AgglomerationInterpolationType::dofsPerCodim() ),
+          blockMapper_( agIndexSet_, AgglomerationInterpolationType::template dofsPerCodim<polOrder>() ),
           boundingBoxes_( boundingBoxes( agIndexSet_.agglomeration() ) ),
           scalarShapeFunctionSet_( Dune::GeometryType( Dune::GeometryType::cube, GridPart::dimension ) )
       {

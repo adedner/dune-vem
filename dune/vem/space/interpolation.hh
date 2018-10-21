@@ -92,7 +92,24 @@ namespace Dune
         }
       }
 
-      static std::initializer_list< std::pair< int, unsigned int > > dofsPerCodim () { return { std::make_pair( dimension, 1u ) }; }
+      template <int polOrder>
+      static std::initializer_list< std::pair< int, unsigned int > > dofsPerCodim ()
+      {
+        switch (polOrder)
+        {
+        case 1:
+          return { std::make_pair( dimension, 1u ) };
+        case 2:
+          return { std::make_pair( dimension, 1u ),
+                   std::make_pair( dimension-1, 1u ) };
+        case 3:
+          return { std::make_pair( dimension, 1u ),
+                   std::make_pair( dimension-1, 2u ),
+                   std::make_pair( dimension-2, 1u ) };
+        otherwise:
+          DUNE_THROW( NotImplemented, "dofsPerCodim only implemented for order 1,2, and 3" );
+        }
+      }
 
     private:
       const AgglomerationIndexSet &indexSet_;
