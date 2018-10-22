@@ -147,7 +147,7 @@ namespace Dune
 
       enum { hasLocalInterpolate = false };
 
-      AgglomerationDGSpace ( AgglomerationType &agglomeration )
+      AgglomerationDGSpace ( const AgglomerationType &agglomeration )
         : BaseType( agglomeration.gridPart() ),
           blockMapper_( agglomeration ),
           boundingBoxes_( boundingBoxes( agglomeration ) ),

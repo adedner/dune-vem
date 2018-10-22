@@ -63,8 +63,8 @@ namespace Dune
           size_ = *std::max_element( indices_.begin(), indices_.end() ) + 1u;
       }
 
-      GridPart &gridPart () { return gridPart_; }
-      const GridPart &gridPart () const { return gridPart_; }
+      // GridPart &gridPart () { return gridPart_; }
+      GridPart &gridPart () const { return gridPart_; }
 
       std::size_t index ( const ElementType &element ) const { return indices_[ mapper_.index( element ) ]; }
 

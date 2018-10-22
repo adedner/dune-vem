@@ -136,7 +136,7 @@ namespace Dune
       typedef AgglomerationIndexSet< GridPart > AgglomerationIndexSetType;
 
     private:
-      typedef AgglomerationVEMInterpolation< AgglomerationIndexSetType > AgglomerationInterpolationType;
+      typedef AgglomerationVEMInterpolation< AgglomerationIndexSetType, polOrder > AgglomerationInterpolationType;
       typedef typename Traits::ScalarShapeFunctionSetType ScalarShapeFunctionSetType;
 
     public:
@@ -152,6 +152,7 @@ namespace Dune
       using BaseType::gridPart;
 
       enum { hasLocalInterpolate = false };
+      static const int polynomialOrder = polOrder;
 
 #if 1 // for interpolation
       struct InterpolationType
@@ -169,7 +170,7 @@ namespace Dune
       explicit AgglomerationVEMSpace ( AgglomerationType &agglomeration )
         : BaseType( agglomeration.gridPart() ),
           agIndexSet_( agglomeration ),
-          blockMapper_( agIndexSet_, AgglomerationInterpolationType::template dofsPerCodim<polOrder>() ),
+          blockMapper_( agIndexSet_, AgglomerationInterpolationType::dofsPerCodim() ),
           boundingBoxes_( boundingBoxes( agIndexSet_.agglomeration() ) ),
           scalarShapeFunctionSet_( Dune::GeometryType( Dune::GeometryType::cube, GridPart::dimension ) )
       {

@@ -43,19 +43,22 @@ namespace Dune
       std::vector< typename DiscreteFunction::RangeFieldType > ldv;
       ldv.reserve( mapper.maxNumDofs() * DiscreteFunction::DiscreteFunctionSpaceType::localBlockSize );
 
+      typedef typename DiscreteFunction::DiscreteFunctionSpaceType::AgglomerationIndexSetType IndexSetType;
+      const int polOrder = DiscreteFunction::DiscreteFunctionSpaceType::polynomialOrder;
       typedef typename DiscreteFunction::GridPartType GridPartType;
       typedef typename GridPartType::template Codim< 0 >::EntitySeedType ElementSeedType;
       std::vector< std::vector< ElementSeedType > > entitySeeds( agglomeration.size() );
       for( const auto &element : elements( static_cast< typename GridPartType::GridViewType >( v.gridPart() ), ps ) )
         entitySeeds[ agglomeration.index( element ) ].push_back( element.seed() );
 
-      auto interpolation = agglomerationVEMInterpolation( mapper.indexSet() );
+      auto interpolation = Dune::Vem::agglomerationVEMInterpolation<IndexSetType, polOrder>( mapper.indexSet() );
+
       for( std::size_t agglomerate = 0; agglomerate < agglomeration.size(); ++agglomerate )
       {
         if( entitySeeds[ agglomerate ].empty() )
           continue;
 
-        ldv.resize( mapper.numDofs( agglomerate ) );
+        ldv.resize( mapper.numDofs( agglomerate ), 0. );
         for( const ElementSeedType &entitySeed : entitySeeds[ agglomerate ] )
         {
           const auto &element = v.gridPart().entity( entitySeed );
