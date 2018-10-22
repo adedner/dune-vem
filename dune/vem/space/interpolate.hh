@@ -51,7 +51,7 @@ namespace Dune
       for( const auto &element : elements( static_cast< typename GridPartType::GridViewType >( v.gridPart() ), ps ) )
         entitySeeds[ agglomeration.index( element ) ].push_back( element.seed() );
 
-      auto interpolation = Dune::Vem::agglomerationVEMInterpolation<IndexSetType, polOrder>( mapper.indexSet() );
+      auto interpolation = Dune::Vem::agglomerationVEMInterpolation<polOrder>( mapper.indexSet() );
 
       for( std::size_t agglomerate = 0; agglomerate < agglomeration.size(); ++agglomerate )
       {

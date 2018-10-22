@@ -263,8 +263,8 @@ namespace Dune
         const auto &bbox = boundingBoxes_[ agglomerate ];
 
         const std::size_t numDofs = blockMapper().numDofs( agglomerate );
-        D.resize( numDofs, numShapeFunctions );
-        pi0XT.resize( numDofs );
+        D.resize( numDofs, numShapeFunctions, 0 );
+        pi0XT.resize( numDofs, DomainType(0)  );
 
         DomainFieldType H0 = 0;
         std::fill( pi0XT.begin(), pi0XT.end(), DomainType( 0 ) );

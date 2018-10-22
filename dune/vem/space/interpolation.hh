@@ -43,12 +43,10 @@ namespace Dune
         , innerSpace_( indexSet.agglomeration() )
       {}
 
-      template< class LocalFunction, class LocalDofVector >
-      void operator() ( const ElementType &element, const LocalFunction &localFunction, LocalDofVector &localDofVector ) const
+      template< class Vertex, class Edge, class Inner>
+      void operator() ( const ElementType &element,
+          const Vertex &vertex, const Edge &edge, const Inner &inner) const
       {
-        typename LocalFunction::RangeType value;
-        assert( value.dimension == 1 );
-
         const auto &refElement = ReferenceElements< ctype, dimension >::general( element.type() );
 
         const int poly = indexSet_.index( element );
@@ -56,93 +54,136 @@ namespace Dune
         const int edgeSize = Dune::Fem::OrthonormalShapeFunctions< GridPartType::dimension-1 >::size( std::max(polOrder-2,0) );
         const int innerOffset = edgeOffset*edgeSize + indexSet_.subAgglomerates(poly,dimension-1);
         const int innerSize = Dune::Fem::OrthonormalShapeFunctions< GridPartType::dimension >::size( std::max(polOrder-3,0) );
+#if 0
         std::cout << "polygon: " << poly
                   << " numDofs: " << localDofVector.size()
                   << " edgeOffset " << edgeOffset
                   << " innerOffset " << innerOffset
                   << std::endl;
-
+#endif
         // vertex dofs
         for( int i = 0; i < refElement.size( dimension ); ++i )
         {
           const int k = indexSet_.localIndex( element, i, dimension );
-          if( k == -1 ) continue;
-          const auto &x = refElement.position( i, dimension );
-          localFunction.evaluate( x, value );
-          assert( k < localDofVector.size() );
-          localDofVector[ k ] = value[ 0 ];
-          std::cout << "    vertex = " << indexSet_.subIndex(element,i,dimension)
-                    << " k=" << k
-                    << " global=" << element.geometry().global(x)
-                    << " value=" << value << std::endl;
+          if( k >= 0 )
+          {
+            vertex(i,k,1);
+#if 0
+            std::cout << "    vertex = " << indexSet_.subIndex(element,i,dimension)
+                      << " k=" << k
+                      << " global=" << element.geometry().global(x)
+                      << " value=" << value << std::endl;
+#endif
+          }
         }
         // edge dofs
         if (polOrder>1)
           for( int i = 0; i < refElement.size( dimension-1 ); ++i )
           {
-            const int k = indexSet_.localIndex( element, i, dimension-1 );
-            if( k == -1 ) continue;
-            const auto &x = refElement.position( i, dimension-1 );
-            localFunction.evaluate( x, value );
-            for ( int kk = k*edgeSize+edgeOffset; kk < (k+1)*edgeSize+edgeOffset; ++kk )
+            const int k = indexSet_.localIndex( element, i, dimension-1 )*edgeSize+edgeOffset;
+            if( k >= 0 )
             {
-              assert( kk < localDofVector.size() );
-              localDofVector[ kk ] = value[ 0 ] * element.template subEntity<dimension-1>(i).geometry().volume();
+              edge(i,k,edgeSize);
+#if 0
               std::cout << "    edge = " << indexSet_.subIndex(element,i,dimension-1)
-                        << "  k=" << kk
+                        << "  k=" << kk << " - " << kk+edgeSize-1
                         << " global=" << element.geometry().global(x)
                         << " value=" << value << std::endl;
+#endif
             }
           }
         // inner dofs
         if (polOrder>2)
         {
           assert(polOrder == 3);
-          const int k = indexSet_.localIndex( element, 0, 0 );
-          const auto &x = refElement.position( 0, 0 );
-          localFunction.evaluate( x, value );
-          for ( int kk = innerOffset; kk < innerOffset+innerSize; ++kk )
-          {
-            assert( kk < localDofVector.size() );
-            localDofVector[ kk ] += value[ 0 ]*element.geometry().volume();
-            std::cout << "    inner = " << indexSet_.subIndex(element,0,0)
-                      << "  k=" << kk
-                      << " global=" << element.geometry().global(x)
-                      << " value=" << value << std::endl;
-          }
+          const int k = indexSet_.localIndex( element, 0, 0 ) + innerOffset;
+          inner(0,k,innerSize);
+#if 0
+          std::cout << "    inner = " << indexSet_.subIndex(element,0,0)
+                    << "  k=" << kk << " - " << kk+innerSize
+                    << " global=" << element.geometry().global(x)
+                    << " value=" << value << std::endl;
+#endif
         }
       }
-#if 0
+      template< class LocalFunction, class LocalDofVector >
+      void operator() ( const ElementType &element, const LocalFunction &localFunction, LocalDofVector &localDofVector ) const
+      {
+        typename LocalFunction::RangeType value;
+        assert( value.dimension == 1 );
+
+        const auto &refElement = ReferenceElements< ctype, dimension >::general( element.type() );
+        auto vertex = [&element,&localFunction,&localDofVector,&refElement,&value] (int i,int k,int numDofs)
+        {
+          const auto &x = refElement.position( i, dimension );
+          localFunction.evaluate( x, value );
+          assert( k < localDofVector.size() );
+          localDofVector[ k ] = value[ 0 ];
+        };
+        auto edge = [&element,&localFunction,&localDofVector,&refElement,&value] (int i,int k,int numDofs)
+        {
+          double length = element.template subEntity<dimension-1>(i).geometry().volume();
+          const auto &x = refElement.position( i, dimension-1 );
+          localFunction.evaluate( x, value );
+          for ( int kk = k; kk < k+numDofs; ++kk )
+          {
+            assert( kk < localDofVector.size() );
+            localDofVector[ kk ] = value[ 0 ] * length;
+          }
+        };
+        auto inner = [&element,&localFunction,&localDofVector,&refElement,&value] (int i,int k,int numDofs)
+        {
+          assert(polOrder == 3);
+          double volume = element.geometry().volume();
+          const auto &x = refElement.position( 0, 0 );
+          localFunction.evaluate( x, value );
+          for ( int kk = k; kk < k+numDofs; ++kk )
+          {
+            assert( kk < localDofVector.size() );
+            localDofVector[ kk ] += value[ 0 ]*volume;
+          }
+        };
+        (*this)(element,vertex,edge,inner);
+      }
       void operator() ( const ElementType &element, std::vector<bool> &mask) const
       {
         std::fill(mask.begin(),mask.end(),false);
-        const auto &refElement = ReferenceElements< ctype, dimension >::general( element.type() );
-
-        for( int i = 0; i < refElement.size( dimension ); ++i )
-        {
-          const int k = indexSet_.localIndex( element, i, dimension );
-          if ( k!=-1 ) mask[k] = true;
-          // mask[k] = !( k == -1 );
-        }
+        auto set = [&mask] (int i,int k,int numDofs)
+        { std::fill(mask.begin()+k,mask.begin()+k+numDofs,true); };
+        (*this)(element,set,set,set);
       }
-#endif
       template< class ShapeFunctionSet, class LocalDofMatrix >
       void operator() ( const BoundingBoxShapeFunctionSet< ElementType, ShapeFunctionSet > &shapeFunctionSet, LocalDofMatrix &localDofMatrix ) const
       {
-        std::cout << "WARNING: second interpolation method only implemented for polOrder=1" << std::endl;
         const ElementType &element = shapeFunctionSet.entity();
         const auto &refElement = ReferenceElements< ctype, dimension >::general( element.type() );
-
-        for( int i = 0; i < refElement.size( dimension ); ++i )
+        auto vertex = [&element,&shapeFunctionSet,&localDofMatrix,&refElement] (int i,int k,int numDofs)
         {
-          const int k = indexSet_.localIndex( element, i, dimension );
-          if( k == -1 ) continue;
           const auto &x = refElement.position( i, dimension );
           shapeFunctionSet.evaluateEach( x, [ &localDofMatrix, k ] ( std::size_t alpha, typename ShapeFunctionSet::RangeType phi ) {
               assert( phi.dimension == 1 );
               localDofMatrix[ k ][ alpha ] = phi[ 0 ];
             } );
-        }
+        };
+        auto edge = [&element,&shapeFunctionSet,&localDofMatrix,&refElement] (int i,int k,int numDofs)
+        {
+          double length = element.template subEntity<dimension-1>(i).geometry().volume();
+          const auto &x = refElement.position( i, dimension-1 );
+          for ( int kk = k; kk < k+numDofs; ++kk )
+            shapeFunctionSet.evaluateEach( x, [ &localDofMatrix, kk, length ] ( std::size_t alpha, typename ShapeFunctionSet::RangeType phi ) {
+                localDofMatrix[ kk ][ alpha ] = phi[ 0 ]*length;
+              } );
+        };
+        auto inner = [&element,&shapeFunctionSet,&localDofMatrix,&refElement] (int i,int k,int numDofs)
+        {
+          double volume = element.geometry().volume();
+          const auto &x = refElement.position( 0, 0 );
+          for ( int kk = k; kk < k+numDofs; ++kk )
+            shapeFunctionSet.evaluateEach( x, [ &localDofMatrix, kk, volume ] ( std::size_t alpha, typename ShapeFunctionSet::RangeType phi ) {
+                localDofMatrix[ kk ][ alpha ] += phi[ 0 ]*volume;
+              } );
+        };
+        (*this)(element,vertex,edge,inner);
       }
 
       static std::initializer_list< std::pair< int, unsigned int > > dofsPerCodim ()
@@ -157,7 +198,6 @@ namespace Dune
           return { std::make_pair( dimension, 1u ),
                    std::make_pair( dimension-1, eSize ) };
         default:
-          std::cout << "dofsPerCodim:" << 1 << " " << eSize << " " << iSize << std::endl;
           return { std::make_pair( dimension, 1u ),
                    std::make_pair( dimension-1, eSize ),
                    std::make_pair( dimension-2, iSize ) };
@@ -177,7 +217,7 @@ namespace Dune
     // agglomerationVEMInterpolation
     // -----------------------------
 
-    template< class AgglomerationIndexSet, int polOrder >
+    template< int polOrder, class AgglomerationIndexSet >
     inline static AgglomerationVEMInterpolation< AgglomerationIndexSet, polOrder >
     agglomerationVEMInterpolation ( const AgglomerationIndexSet &indexSet ) noexcept
     {

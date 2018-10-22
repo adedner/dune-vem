@@ -3,6 +3,7 @@
 
 #include <dune/fem/function/common/scalarproducts.hh>
 #include <dune/fem/schemes/dirichletconstraints.hh>
+#include <dune/vem/space/interpolation.hh>
 
 namespace Dune {
 
@@ -85,7 +86,7 @@ namespace Dune {
       // obtain all DofBlocks for this element
       space_.blockMapper().map( entity, globalBlockDofs );
       std::vector<bool> mask( localBlocks*localBlockSize );
-      agglomerationVEMInterpolation( space_.blockMapper().indexSet() )( entity, mask );
+      Dune::Vem::agglomerationVEMInterpolation<space_.polynomialOrder>( space_.blockMapper().indexSet() )( entity, mask );
 
       // counter for all local dofs (i.e. localBlockDof * localBlockSize + ... )
       int localDof = 0;
@@ -123,7 +124,7 @@ namespace Dune {
       space_.blockMapper().map( entity, globalBlockDofs );
       std::vector< double > values( localBlocks*localBlockSize );
       std::vector< bool > mask( localBlocks*localBlockSize );
-      agglomerationVEMInterpolation( space_.blockMapper().indexSet() )( entity, mask );
+      Dune::Vem::agglomerationVEMInterpolation<space_.polynomialOrder>( space_.blockMapper().indexSet() ) ( entity, mask );
 
       int localDof = 0;
 
@@ -134,7 +135,7 @@ namespace Dune {
         for( int l = 0; l < localBlockSize; ++l, ++localDof )
           if( dirichletBlocks_[ global ][ l ] && mask[ localDof ])
           {
-            agglomerationVEMInterpolation( space_.blockMapper().indexSet() )
+            Dune::Vem::agglomerationVEMInterpolation<space_.polynomialOrder>( space_.blockMapper().indexSet() )
             ( entity, typename BaseType::BoundaryWrapper(model_,dirichletBlocks_[global][l]),
                 values );
             // store result
@@ -165,7 +166,7 @@ namespace Dune {
       assert( uLocal.size() == values.size() );
       for (unsigned int i=0;i<uLocal.size();++i)
         values[i] = uLocal[i];
-      agglomerationVEMInterpolation( space_.blockMapper().indexSet() )( entity, mask );
+      Dune::Vem::agglomerationVEMInterpolation<space_.polynomialOrder>( space_.blockMapper().indexSet() )( entity, mask );
 
       int localDof = 0;
 
@@ -179,7 +180,7 @@ namespace Dune {
           {
             if (op == Operation::sub)
             {
-              agglomerationVEMInterpolation( space_.blockMapper().indexSet() )
+              Dune::Vem::agglomerationVEMInterpolation<space_.polynomialOrder>( space_.blockMapper().indexSet() )
               ( entity, typename BaseType::BoundaryWrapper(model_,dirichletBlocks_[global][l]),
                   valuesModel );
               values[ localDof ] -= valuesModel[ localDof ];
