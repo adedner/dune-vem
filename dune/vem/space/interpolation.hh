@@ -9,6 +9,7 @@
 #include <dune/geometry/referenceelements.hh>
 
 #include <dune/fem/space/shapefunctionset/orthonormal.hh>
+#include <dune/fem/space/lagrange.hh>
 
 #include <dune/vem/agglomeration/shapefunctionset.hh>
 #include <dune/vem/agglomeration/dgspace.hh>
@@ -56,7 +57,6 @@ namespace Dune
         const int innerSize = Dune::Fem::OrthonormalShapeFunctions< GridPartType::dimension >::size( std::max(polOrder-3,0) );
 #if 0
         std::cout << "polygon: " << poly
-                  << " numDofs: " << localDofVector.size()
                   << " edgeOffset " << edgeOffset
                   << " innerOffset " << innerOffset
                   << std::endl;
@@ -67,13 +67,11 @@ namespace Dune
           const int k = indexSet_.localIndex( element, i, dimension );
           if( k >= 0 )
           {
-            vertex(i,k,1);
 #if 0
             std::cout << "    vertex = " << indexSet_.subIndex(element,i,dimension)
-                      << " k=" << k
-                      << " global=" << element.geometry().global(x)
-                      << " value=" << value << std::endl;
+                      << " k=" << k;
 #endif
+            vertex(i,k,1);
           }
         }
         // edge dofs
@@ -81,15 +79,13 @@ namespace Dune
           for( int i = 0; i < refElement.size( dimension-1 ); ++i )
           {
             const int k = indexSet_.localIndex( element, i, dimension-1 )*edgeSize+edgeOffset;
-            if( k >= 0 )
+            if( k >= edgeOffset )
             {
-              edge(i,k,edgeSize);
 #if 0
               std::cout << "    edge = " << indexSet_.subIndex(element,i,dimension-1)
-                        << "  k=" << kk << " - " << kk+edgeSize-1
-                        << " global=" << element.geometry().global(x)
-                        << " value=" << value << std::endl;
+                        << "  k=" << k << " - " << k+edgeSize-1;
 #endif
+              edge(i,k,edgeSize);
             }
           }
         // inner dofs
@@ -97,13 +93,11 @@ namespace Dune
         {
           assert(polOrder == 3);
           const int k = indexSet_.localIndex( element, 0, 0 ) + innerOffset;
-          inner(0,k,innerSize);
 #if 0
           std::cout << "    inner = " << indexSet_.subIndex(element,0,0)
-                    << "  k=" << kk << " - " << kk+innerSize
-                    << " global=" << element.geometry().global(x)
-                    << " value=" << value << std::endl;
+                    << "  k=" << k << " - " << k+innerSize;
 #endif
+          inner(0,k,innerSize);
         }
       }
       template< class LocalFunction, class LocalDofVector >
@@ -115,21 +109,34 @@ namespace Dune
         const auto &refElement = ReferenceElements< ctype, dimension >::general( element.type() );
         auto vertex = [&element,&localFunction,&localDofVector,&refElement,&value] (int i,int k,int numDofs)
         {
+          // std::cout << " ... " << k;
           const auto &x = refElement.position( i, dimension );
           localFunction.evaluate( x, value );
           assert( k < localDofVector.size() );
           localDofVector[ k ] = value[ 0 ];
+          // std::cout << std::endl;
         };
-        auto edge = [&element,&localFunction,&localDofVector,&refElement,&value] (int i,int k,int numDofs)
+        int lagSize = edgeSpace_.blockMapper().numDofs(element);
+        std::vector< bool> globalBlockDofsFilter(lagSize);
+        std::vector<double> lagDofs(lagSize);
+        edgeSpace.interpolate(element)(localFunction,lagDofs);
+        auto edge = [&element,&localFunction,&localDofVector,&refElement,&value,&lagDofs] (int i,int k,int numDofs)
         {
-          double length = element.template subEntity<dimension-1>(i).geometry().volume();
-          const auto &x = refElement.position( i, dimension-1 );
-          localFunction.evaluate( x, value );
+          space_.blockMapper().onSubEntity(element,i,1,globalBlockDofsFilter);
+          // double length = element.template subEntity<dimension-1>(i).geometry().volume();
+          // const auto &x = refElement.position( i, dimension-1 );
+          // localFunction.evaluate( x, value );
+          auto itFilter = globalBlockDofsFilter.begin();
+          auto itValues = lagDofs.begin();
           for ( int kk = k; kk < k+numDofs; ++kk )
           {
+            for ( ; *itFilter; ++itFilter,++itValues );
+            // std::cout << " ... " << kk;
             assert( kk < localDofVector.size() );
-            localDofVector[ kk ] = value[ 0 ] * length;
+            // localDofVector[ kk ] = value[ 0 ] * length;
+            localDofVector[ kk ] = *itValues;
           }
+          // std::cout << std::endl;
         };
         auto inner = [&element,&localFunction,&localDofVector,&refElement,&value] (int i,int k,int numDofs)
         {
@@ -139,14 +146,17 @@ namespace Dune
           localFunction.evaluate( x, value );
           for ( int kk = k; kk < k+numDofs; ++kk )
           {
+            // std::cout << " ... " << kk;
             assert( kk < localDofVector.size() );
             localDofVector[ kk ] += value[ 0 ]*volume;
           }
+          // std::cout << std::endl;
         };
         (*this)(element,vertex,edge,inner);
       }
       void operator() ( const ElementType &element, std::vector<bool> &mask) const
       {
+        // std::cout << std::endl;
         std::fill(mask.begin(),mask.end(),false);
         auto set = [&mask] (int i,int k,int numDofs)
         { std::fill(mask.begin()+k,mask.begin()+k+numDofs,true); };
@@ -159,29 +169,40 @@ namespace Dune
         const auto &refElement = ReferenceElements< ctype, dimension >::general( element.type() );
         auto vertex = [&element,&shapeFunctionSet,&localDofMatrix,&refElement] (int i,int k,int numDofs)
         {
+          // std::cout << " ... " << k;
           const auto &x = refElement.position( i, dimension );
           shapeFunctionSet.evaluateEach( x, [ &localDofMatrix, k ] ( std::size_t alpha, typename ShapeFunctionSet::RangeType phi ) {
               assert( phi.dimension == 1 );
               localDofMatrix[ k ][ alpha ] = phi[ 0 ];
             } );
+          // std::cout << std::endl;
         };
         auto edge = [&element,&shapeFunctionSet,&localDofMatrix,&refElement] (int i,int k,int numDofs)
         {
           double length = element.template subEntity<dimension-1>(i).geometry().volume();
-          const auto &x = refElement.position( i, dimension-1 );
+          // const auto &x = refElement.position( i, dimension-1 );
           for ( int kk = k; kk < k+numDofs; ++kk )
+          {
+            // std::cout << " ... " << kk;
+            Dune::FieldVector<double,1> x({double(kk-k+1)/double(numDofs+1)});
             shapeFunctionSet.evaluateEach( x, [ &localDofMatrix, kk, length ] ( std::size_t alpha, typename ShapeFunctionSet::RangeType phi ) {
                 localDofMatrix[ kk ][ alpha ] = phi[ 0 ]*length;
               } );
+          }
+          // std::cout << std::endl;
         };
         auto inner = [&element,&shapeFunctionSet,&localDofMatrix,&refElement] (int i,int k,int numDofs)
         {
           double volume = element.geometry().volume();
           const auto &x = refElement.position( 0, 0 );
           for ( int kk = k; kk < k+numDofs; ++kk )
+          {
+            // std::cout << " ... " << kk;
             shapeFunctionSet.evaluateEach( x, [ &localDofMatrix, kk, volume ] ( std::size_t alpha, typename ShapeFunctionSet::RangeType phi ) {
                 localDofMatrix[ kk ][ alpha ] += phi[ 0 ]*volume;
               } );
+          }
+          // std::cout << std::endl;
         };
         (*this)(element,vertex,edge,inner);
       }
@@ -208,7 +229,7 @@ namespace Dune
       typedef Dune::Fem::FunctionSpace<double,double,GridPartType::dimensionworld-1,1> EdgeFSType;
       typedef Dune::Fem::FunctionSpace<double,double,GridPartType::dimensionworld,1> InnerFSType;
       const AgglomerationIndexSet &indexSet_;
-      Dune::Fem::OrthonormalShapeFunctionSet<EdgeFSType> edgeSpace_;
+      Dune::Fem::LagrangeSpace<FSType> edgeSpace_;
       AgglomerationDGSpace<InnerFSType,GridPartType,std::max(polOrder-3,0)> innerSpace_;
     };
 
