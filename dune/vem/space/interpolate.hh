@@ -58,7 +58,8 @@ namespace Dune
         if( entitySeeds[ agglomerate ].empty() )
           continue;
 
-        ldv.resize( mapper.numDofs( agglomerate ), 0. );
+        ldv.resize( mapper.numDofs( agglomerate ) );
+        std::fill(ldv.begin(),ldv.end(),0);
         for( const ElementSeedType &entitySeed : entitySeeds[ agglomerate ] )
         {
           const auto &element = v.gridPart().entity( entitySeed );

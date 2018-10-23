@@ -29,18 +29,20 @@ namespace Dune
       typedef AgglomerationVEMInterpolation< AgglomerationIndexSet, polOrder > ThisType;
 
     public:
-      static const int dimension = AgglomerationIndexSet::dimension;
-
       typedef typename AgglomerationIndexSet::ElementType ElementType;
       typedef typename AgglomerationIndexSet::GridPartType GridPartType;
+      static const int dimension = AgglomerationIndexSet::dimension;
 
     private:
+      typedef Dune::Fem::CachingQuadrature<GridPartType,1> EdgeQuadratureType;
       typedef typename ElementType::Geometry::ctype ctype;
+      typedef Dune::Fem::FunctionSpace<double,double,GridPartType::dimensionworld-1,1> EdgeFSType;
+      typedef Dune::Fem::FunctionSpace<double,double,GridPartType::dimensionworld,1> InnerFSType;
 
     public:
       explicit AgglomerationVEMInterpolation ( const AgglomerationIndexSet &indexSet ) noexcept
         : indexSet_( indexSet )
-        , edgeSpace_( Dune::GeometryType(Dune::GeometryType::cube,GridPartType::dimension-1), std::max(polOrder-22,0) )
+        , edgeSpace_( Dune::GeometryType(Dune::GeometryType::cube,GridPartType::dimension-1), std::max(polOrder-2,0) )
         , innerSpace_( indexSet.agglomeration() )
       {}
 
@@ -67,47 +69,47 @@ namespace Dune
           const int k = indexSet_.localIndex( element, i, dimension );
           if( k >= 0 )
           {
-#if 0
-            std::cout << "    vertex = " << indexSet_.subIndex(element,i,dimension)
-                      << " k=" << k;
-#endif
+            // std::cout << "    vertex = " << indexSet_.subIndex(element,i,dimension) << " k=" << k;
             vertex(i,k,1);
           }
         }
         // edge dofs
         if (polOrder>1)
-          for( int i = 0; i < refElement.size( dimension-1 ); ++i )
+        {
+          // to avoid any issue with twists we use an intersection iterator
+          // here instead of going over the edges
+          auto it = innerSpace_.gridPart().ibegin( element );
+          const auto endit = innerSpace_.gridPart().iend( element );
+          for( ; it != endit; ++it )
           {
+            const auto& intersection = *it;
+            const int i = intersection.indexInInside();
             const int k = indexSet_.localIndex( element, i, dimension-1 )*edgeSize+edgeOffset;
-            if( k >= edgeOffset )
+            if (k>=edgeOffset)
             {
-#if 0
-              std::cout << "    edge = " << indexSet_.subIndex(element,i,dimension-1)
-                        << "  k=" << k << " - " << k+edgeSize-1;
-#endif
-              edge(i,k,edgeSize);
+              // std::cout << "    edge = " << indexSet_.subIndex(element,i,dimension-1) << "  k=" << k << " - " << k+edgeSize-1;
+              edge(intersection,k,edgeSize);
             }
           }
+        }
         // inner dofs
         if (polOrder>2)
         {
           assert(polOrder == 3);
           const int k = indexSet_.localIndex( element, 0, 0 ) + innerOffset;
-#if 0
-          std::cout << "    inner = " << indexSet_.subIndex(element,0,0)
-                    << "  k=" << k << " - " << k+innerSize;
-#endif
+          // std::cout << "    inner = " << indexSet_.subIndex(element,0,0) << "  k=" << k << " - " << k+innerSize;
           inner(0,k,innerSize);
         }
       }
       template< class LocalFunction, class LocalDofVector >
       void operator() ( const ElementType &element, const LocalFunction &localFunction, LocalDofVector &localDofVector ) const
       {
+        // std::fill(localDofVector.begin(), localDofVector.end(),0);
         typename LocalFunction::RangeType value;
         assert( value.dimension == 1 );
 
         const auto &refElement = ReferenceElements< ctype, dimension >::general( element.type() );
-        auto vertex = [&element,&localFunction,&localDofVector,&refElement,&value] (int i,int k,int numDofs)
+        auto vertex = [&] (auto i,int k,int numDofs)
         {
           // std::cout << " ... " << k;
           const auto &x = refElement.position( i, dimension );
@@ -116,29 +118,44 @@ namespace Dune
           localDofVector[ k ] = value[ 0 ];
           // std::cout << std::endl;
         };
-        int lagSize = edgeSpace_.blockMapper().numDofs(element);
-        std::vector< bool> globalBlockDofsFilter(lagSize);
-        std::vector<double> lagDofs(lagSize);
-        edgeSpace.interpolate(element)(localFunction,lagDofs);
-        auto edge = [&element,&localFunction,&localDofVector,&refElement,&value,&lagDofs] (int i,int k,int numDofs)
+        auto edge = [&] (auto intersection,int k,int numDofs)
         {
-          space_.blockMapper().onSubEntity(element,i,1,globalBlockDofsFilter);
-          // double length = element.template subEntity<dimension-1>(i).geometry().volume();
-          // const auto &x = refElement.position( i, dimension-1 );
-          // localFunction.evaluate( x, value );
-          auto itFilter = globalBlockDofsFilter.begin();
-          auto itValues = lagDofs.begin();
-          for ( int kk = k; kk < k+numDofs; ++kk )
+          const int el = indexSet_.index( intersection.inside() );
+          bool twist = true;
+          if (false && intersection.neighbor())
+            twist = el < indexSet_.index( intersection.outside() );
+          assert(numDofs == edgeSpace_.size());
+          EdgeQuadratureType edgeQuad( innerSpace_.gridPart(),
+                intersection, 2*polOrder, EdgeQuadratureType::INSIDE );
+#if 0
+          std::cout << "in edge for LF (" << k << ") twist=" << twist
+                    << " " << intersection.geometry().center()
+                    << ": " << std::endl;
+#endif
+          for (int qp=0;qp<edgeQuad.nop();++qp)
           {
-            for ( ; *itFilter; ++itFilter,++itValues );
-            // std::cout << " ... " << kk;
-            assert( kk < localDofVector.size() );
-            // localDofVector[ kk ] = value[ 0 ] * length;
-            localDofVector[ kk ] = *itValues;
+            auto x = edgeQuad.localPoint(qp);
+            if (!twist) x[0] = 1-x[0];
+            auto y = intersection.geometryInInside().global(x);
+            localFunction.evaluate( y, value );
+            edgeSpace_.evaluateEach(x,
+              [&](std::size_t alpha, typename LocalFunction::RangeType phi ) {
+                int kk = alpha+k;
+#if 0
+                std::cout << " ... (" << kk << "," << qp << ") ";
+                std::cout << x
+                          << " " << element.geometry().global(y)
+                          << " " << value << " " << phi << std::endl;
+#endif
+                assert( kk < localDofVector.size() );
+                localDofVector[ kk ] += value[0]*phi[0]
+                     * edgeQuad.weight(qp); // *intersection.geometry().integrationElement(x);
+              }
+            );
           }
           // std::cout << std::endl;
         };
-        auto inner = [&element,&localFunction,&localDofVector,&refElement,&value] (int i,int k,int numDofs)
+        auto inner = [&] (int i,int k,int numDofs)
         {
           assert(polOrder == 3);
           double volume = element.geometry().volume();
@@ -158,7 +175,7 @@ namespace Dune
       {
         // std::cout << std::endl;
         std::fill(mask.begin(),mask.end(),false);
-        auto set = [&mask] (int i,int k,int numDofs)
+        auto set = [&mask] (auto i,int k,int numDofs)
         { std::fill(mask.begin()+k,mask.begin()+k+numDofs,true); };
         (*this)(element,set,set,set);
       }
@@ -167,7 +184,7 @@ namespace Dune
       {
         const ElementType &element = shapeFunctionSet.entity();
         const auto &refElement = ReferenceElements< ctype, dimension >::general( element.type() );
-        auto vertex = [&element,&shapeFunctionSet,&localDofMatrix,&refElement] (int i,int k,int numDofs)
+        auto vertex = [&] (int i,int k,int numDofs)
         {
           // std::cout << " ... " << k;
           const auto &x = refElement.position( i, dimension );
@@ -177,21 +194,39 @@ namespace Dune
             } );
           // std::cout << std::endl;
         };
-        auto edge = [&element,&shapeFunctionSet,&localDofMatrix,&refElement] (int i,int k,int numDofs)
+        auto edge = [&] (auto intersection,int k,int numDofs)
         {
-          double length = element.template subEntity<dimension-1>(i).geometry().volume();
-          // const auto &x = refElement.position( i, dimension-1 );
-          for ( int kk = k; kk < k+numDofs; ++kk )
+          // std::cout << "edge for SFS(" << k << "): ";
+          const int el = indexSet_.index( intersection.inside() );
+          bool twist = true;
+          if (false && intersection.neighbor())
+            twist = el < indexSet_.index( intersection.outside() );
+          assert(numDofs == edgeSpace_.size());
+          EdgeQuadratureType edgeQuad( innerSpace_.gridPart(),
+                intersection, 2*polOrder, EdgeQuadratureType::INSIDE );
+          for (int qp=0;qp<edgeQuad.nop();++qp)
           {
-            // std::cout << " ... " << kk;
-            Dune::FieldVector<double,1> x({double(kk-k+1)/double(numDofs+1)});
-            shapeFunctionSet.evaluateEach( x, [ &localDofMatrix, kk, length ] ( std::size_t alpha, typename ShapeFunctionSet::RangeType phi ) {
-                localDofMatrix[ kk ][ alpha ] = phi[ 0 ]*length;
-              } );
+            auto x = edgeQuad.localPoint(qp);
+            if (!twist) x[0] = 1.-x[0];
+            auto y = intersection.geometryInInside().global(x);
+            shapeFunctionSet.evaluateEach( y,
+              [ & ] ( std::size_t beta, typename ShapeFunctionSet::RangeType value )
+              {
+                edgeSpace_.evaluateEach( x,
+                  [&](std::size_t alpha, typename EdgeFSType::RangeType phi ) {
+                    int kk = alpha+k;
+                    // std::cout << " ... (" << kk << "," << qp << ") ";
+                    localDofMatrix[ kk ][ beta ] += value[0]*phi[0]
+                        * edgeQuad.weight(qp); // *intersection.geometry().integrationElement(x);
+                  }
+                );
+              }
+            );
           }
           // std::cout << std::endl;
         };
-        auto inner = [&element,&shapeFunctionSet,&localDofMatrix,&refElement] (int i,int k,int numDofs)
+
+        auto inner = [&] (int i,int k,int numDofs)
         {
           double volume = element.geometry().volume();
           const auto &x = refElement.position( 0, 0 );
@@ -226,10 +261,8 @@ namespace Dune
       }
 
     private:
-      typedef Dune::Fem::FunctionSpace<double,double,GridPartType::dimensionworld-1,1> EdgeFSType;
-      typedef Dune::Fem::FunctionSpace<double,double,GridPartType::dimensionworld,1> InnerFSType;
       const AgglomerationIndexSet &indexSet_;
-      Dune::Fem::LagrangeSpace<FSType> edgeSpace_;
+      Dune::Fem::OrthonormalShapeFunctionSet<EdgeFSType> edgeSpace_;
       AgglomerationDGSpace<InnerFSType,GridPartType,std::max(polOrder-3,0)> innerSpace_;
     };
 
