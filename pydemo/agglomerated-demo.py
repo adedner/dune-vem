@@ -228,8 +228,8 @@ def test(agglomerate):
     f = as_vector( [cos(x[0])*cos(x[1]) ] )
     space = create.space("agglomeratedvem", agglomerate.grid, agglomerate,
             dimrange=1, order=1, storage="fem")
-    dfs = [space.interpolate(f,name="one")]
-    err = [error(agglomerate.grid,dfs[-1],dfs[-1],f)]
+    dfs += [space.interpolate(f,name="one")]
+    err += [error(agglomerate.grid,dfs[-1],dfs[-1],f)]
     print("order=1, size=",space.size, err[-1])
     space = create.space("agglomeratedvem", agglomerate.grid, agglomerate,
             dimrange=1, order=2, storage="fem")

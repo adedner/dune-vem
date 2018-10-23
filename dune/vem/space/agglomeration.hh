@@ -249,7 +249,12 @@ namespace Dune
         entitySeeds[ agglomeration().index( element ) ].push_back( element.seed() );
 
       const std::size_t numShapeFunctions = scalarShapeFunctionSet_.size();
-      DynamicMatrix< DomainFieldType > D;
+      const std::size_t numShapeFunctionsMinus1 =
+              Dune::Fem::OrthonormalShapeFunctions< DomainType::dimension >::size(polOrder-1);
+      const std::size_t numShapeFunctionsMinus3 = polOrder<3?0:
+              Dune::Fem::OrthonormalShapeFunctions< DomainType::dimension >::size(std::max(polOrder-3,0));
+
+      DynamicMatrix< DomainFieldType > D, C, Hp, HpMinus1;
       LeftPseudoInverse< DomainFieldType > pseudoInverse( numShapeFunctions );
       std::vector< DomainType > pi0XT;
 
@@ -264,6 +269,9 @@ namespace Dune
 
         const std::size_t numDofs = blockMapper().numDofs( agglomerate );
         D.resize( numDofs, numShapeFunctions, 0 );
+        C.resize( numShapeFunctions, numDofs, 0 );
+        Hp.resize( numShapeFunctions, numShapeFunctions, 0 );
+        HpMinus1.resize( numShapeFunctionsMinus1, numShapeFunctionsMinus1, 0 );
         pi0XT.resize( numDofs, DomainType(0)  );
 
         DomainFieldType H0 = 0;
@@ -272,22 +280,31 @@ namespace Dune
         {
           const ElementType &element = gridPart().entity( entitySeed );
           const auto geometry = element.geometry();
+          const auto &refElement = ReferenceElements< typename GridPart::ctype, GridPart::dimension >::general( element.type() );
 
           BoundingBoxShapeFunctionSet< ElementType, ScalarShapeFunctionSetType > shapeFunctionSet( element, bbox, scalarShapeFunctionSet_ );
 
-          Fem::ElementQuadrature< GridPart, 0 > quadrature( element, 0 );
+          interpolation( shapeFunctionSet, D );
+
+          Fem::ElementQuadrature< GridPart, 0 > quadrature( element, 2*polOrder );
           for( std::size_t qp = 0; qp < quadrature.nop(); ++qp )
           {
             const DomainFieldType weight = geometry.integrationElement( quadrature.point( qp ) ) * quadrature.weight( qp );
-            shapeFunctionSet.evaluateEach( quadrature[ qp ], [ &H0, weight ] ( std::size_t alpha, FieldVector< DomainFieldType, 1 > phi ) {
+            shapeFunctionSet.evaluateEach( quadrature[ qp ], [ & ] ( std::size_t alpha, FieldVector< DomainFieldType, 1 > phi ) {
+                // volume
                 if( alpha == 0 )
                   H0 += weight * phi[ 0 ];
+                // compute required mass matrix
+                shapeFunctionSet.evaluateEach( quadrature[ qp ], [ & ] ( std::size_t beta, FieldVector< DomainFieldType, 1 > psi ) {
+                    std::size_t i = 0;
+                    if (alpha<numShapeFunctionsMinus1 &&
+                        beta<numShapeFunctionsMinus1)
+                      HpMinus1[alpha][beta] += phi[0]*psi[0]*weight;
+                    Hp[alpha][beta] += phi[0]*psi[0]*weight;
+                  } );
               } );
           }
 
-          interpolation( shapeFunctionSet, D );
-
-          const auto &refElement = ReferenceElements< typename GridPart::ctype, GridPart::dimension >::general( element.type() );
 #if 0
           if( polOrder > 1 )
           {
@@ -350,6 +367,29 @@ namespace Dune
 
         auto &valueProjection = valueProjections_[ agglomerate ];
         pseudoInverse( D, valueProjection );
+
+        if (polOrder > 2)
+        {
+          std::size_t alpha=0;
+          for (; alpha<numShapeFunctions-numShapeFunctionsMinus3; ++alpha)
+            for (std::size_t i=0; i<numDofs; ++i)
+              for (std::size_t beta=0; beta<numShapeFunctions; ++beta)
+                C[alpha][i] += Hp[alpha][beta]*valueProjection[beta][i];
+          for (; alpha<numShapeFunctions; ++alpha)
+            C[alpha][alpha] = H0;
+        }
+
+        Hp.invert();
+        HpMinus1.invert();
+
+        if (0 && polOrder > 2) // not working yet
+          for (std::size_t alpha=0; alpha<numShapeFunctions; ++alpha)
+            for (std::size_t i=0; i<numDofs; ++i)
+            {
+              valueProjection[alpha][i] = 0;
+              for (std::size_t beta=0; beta<numShapeFunctions; ++beta)
+                valueProjection[alpha][i] += Hp[alpha][beta]*C[beta][i];
+            }
 
         Stabilization S( numDofs, numDofs, 0 );
         for( std::size_t i = 0; i < numDofs; ++i )

@@ -165,7 +165,7 @@ namespace Dune
           {
             // std::cout << " ... " << kk;
             assert( kk < localDofVector.size() );
-            localDofVector[ kk ] += value[ 0 ]*volume;
+            localDofVector[ kk ] += value[ 0 ]; // *volume;
           }
           // std::cout << std::endl;
         };
@@ -234,7 +234,7 @@ namespace Dune
           {
             // std::cout << " ... " << kk;
             shapeFunctionSet.evaluateEach( x, [ &localDofMatrix, kk, volume ] ( std::size_t alpha, typename ShapeFunctionSet::RangeType phi ) {
-                localDofMatrix[ kk ][ alpha ] += phi[ 0 ]*volume;
+                localDofMatrix[ kk ][ alpha ] += phi[ 0 ]; // *volume;
               } );
           }
           // std::cout << std::endl;
