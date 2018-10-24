@@ -251,8 +251,8 @@ namespace Dune
       const std::size_t numShapeFunctions = scalarShapeFunctionSet_.size();
       const std::size_t numShapeFunctionsMinus1 =
               Dune::Fem::OrthonormalShapeFunctions< DomainType::dimension >::size(polOrder-1);
-      const std::size_t numShapeFunctionsMinus3 = polOrder<3?0:
-              Dune::Fem::OrthonormalShapeFunctions< DomainType::dimension >::size(std::max(polOrder-3,0));
+      const std::size_t numShapeFunctionsMinus2 = polOrder==1?0:
+              Dune::Fem::OrthonormalShapeFunctions< DomainType::dimension >::size(std::max(polOrder-2,0));
 
       DynamicMatrix< DomainFieldType > D, C, Hp, HpMinus1;
       LeftPseudoInverse< DomainFieldType > pseudoInverse( numShapeFunctions );
@@ -268,19 +268,23 @@ namespace Dune
         const auto &bbox = boundingBoxes_[ agglomerate ];
 
         const std::size_t numDofs = blockMapper().numDofs( agglomerate );
+
         D.resize( numDofs, numShapeFunctions, 0 );
         C.resize( numShapeFunctions, numDofs, 0 );
         Hp.resize( numShapeFunctions, numShapeFunctions, 0 );
         HpMinus1.resize( numShapeFunctionsMinus1, numShapeFunctionsMinus1, 0 );
         pi0XT.resize( numDofs, DomainType(0)  );
-
-        DomainFieldType H0 = 0;
         std::fill( pi0XT.begin(), pi0XT.end(), DomainType( 0 ) );
+
+        // volume
+        DomainFieldType H0 = 0;
         for( const ElementSeedType &entitySeed : entitySeeds[ agglomerate ] )
         {
           const ElementType &element = gridPart().entity( entitySeed );
           const auto geometry = element.geometry();
           const auto &refElement = ReferenceElements< typename GridPart::ctype, GridPart::dimension >::general( element.type() );
+
+          H0 += geometry.volume();
 
           BoundingBoxShapeFunctionSet< ElementType, ScalarShapeFunctionSetType > shapeFunctionSet( element, bbox, scalarShapeFunctionSet_ );
 
@@ -290,11 +294,8 @@ namespace Dune
           for( std::size_t qp = 0; qp < quadrature.nop(); ++qp )
           {
             const DomainFieldType weight = geometry.integrationElement( quadrature.point( qp ) ) * quadrature.weight( qp );
+            // compute required mass matrices
             shapeFunctionSet.evaluateEach( quadrature[ qp ], [ & ] ( std::size_t alpha, FieldVector< DomainFieldType, 1 > phi ) {
-                // volume
-                if( alpha == 0 )
-                  H0 += weight * phi[ 0 ];
-                // compute required mass matrix
                 shapeFunctionSet.evaluateEach( quadrature[ qp ], [ & ] ( std::size_t beta, FieldVector< DomainFieldType, 1 > psi ) {
                     std::size_t i = 0;
                     if (alpha<numShapeFunctionsMinus1 &&
@@ -365,24 +366,34 @@ namespace Dune
           }
         }
 
+        assert( std::abs(H0 - blockMapper_.indexSet().volume(agglomerate)) < 1e-12 );
+
         auto &valueProjection = valueProjections_[ agglomerate ];
         pseudoInverse( D, valueProjection );
 
-        if (polOrder > 2)
+        if (polOrder > 1)
         {
           std::size_t alpha=0;
-          for (; alpha<numShapeFunctions-numShapeFunctionsMinus3; ++alpha)
+          for (; alpha<numShapeFunctions-numShapeFunctionsMinus2; ++alpha)
             for (std::size_t i=0; i<numDofs; ++i)
               for (std::size_t beta=0; beta<numShapeFunctions; ++beta)
                 C[alpha][i] += Hp[alpha][beta]*valueProjection[beta][i];
           for (; alpha<numShapeFunctions; ++alpha)
             C[alpha][alpha] = H0;
+          // std::cout << "Before:" << std::endl;
+          // for (std::size_t alpha=0; alpha<numShapeFunctions; ++alpha)
+          // {
+          //   for (std::size_t i=0; i<numDofs; ++i)
+          //     std::cout << C[alpha][i] << " ";
+          //   std::cout << std::endl;
+          // }
         }
 
         Hp.invert();
         HpMinus1.invert();
 
-        if (0 && polOrder > 2) // not working yet
+        if (polOrder > 1) // not working yet - if this part is removed the EOC looks right
+        {
           for (std::size_t alpha=0; alpha<numShapeFunctions; ++alpha)
             for (std::size_t i=0; i<numDofs; ++i)
             {
@@ -390,6 +401,14 @@ namespace Dune
               for (std::size_t beta=0; beta<numShapeFunctions; ++beta)
                 valueProjection[alpha][i] += Hp[alpha][beta]*C[beta][i];
             }
+          // std::cout << "After:" << std::endl;
+          // for (std::size_t alpha=0; alpha<numShapeFunctions; ++alpha)
+          // {
+          //   for (std::size_t i=0; i<numDofs; ++i)
+          //     std::cout << valueProjection[alpha][i] << " ";
+          //   std::cout << std::endl;
+          // }
+        }
 
         Stabilization S( numDofs, numDofs, 0 );
         for( std::size_t i = 0; i < numDofs; ++i )

@@ -226,21 +226,21 @@ def test(agglomerate):
     err = []
     x = SpatialCoordinate(triangle)
     f = as_vector( [cos(x[0])*cos(x[1]) ] )
-    space = create.space("agglomeratedvem", agglomerate.grid, agglomerate,
-            dimrange=1, order=1, storage="fem")
-    dfs += [space.interpolate(f,name="one")]
-    err += [error(agglomerate.grid,dfs[-1],dfs[-1],f)]
-    print("order=1, size=",space.size, err[-1])
+    # space = create.space("agglomeratedvem", agglomerate.grid, agglomerate,
+    #         dimrange=1, order=1, storage="fem")
+    # dfs += [space.interpolate(f,name="one")]
+    # err += [error(agglomerate.grid,dfs[-1],dfs[-1],f)]
+    # print("order=1, size=",space.size, err[-1])
     space = create.space("agglomeratedvem", agglomerate.grid, agglomerate,
             dimrange=1, order=2, storage="fem")
     dfs += [space.interpolate(f,name="two")]
     err += [error(agglomerate.grid,dfs[-1],dfs[-1],f)]
     print("order=2, size=",space.size,err[-1])
-    space = create.space("agglomeratedvem", agglomerate.grid, agglomerate,
-            dimrange=1, order=3, storage="fem")
-    dfs += [space.interpolate(f,name="three")]
-    err += [error(agglomerate.grid,dfs[-1],dfs[-1],f)]
-    print("order=3, size=",space.size,err[-1])
+    # space = create.space("agglomeratedvem", agglomerate.grid, agglomerate,
+    #         dimrange=1, order=3, storage="fem")
+    # dfs += [space.interpolate(f,name="three")]
+    # err += [error(agglomerate.grid,dfs[-1],dfs[-1],f)]
+    # print("order=3, size=",space.size,err[-1])
     return dfs, err
 
 if True:

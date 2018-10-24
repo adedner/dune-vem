@@ -56,7 +56,7 @@ namespace Dune
         const int edgeOffset = indexSet_.subAgglomerates(poly,dimension);
         const int edgeSize = Dune::Fem::OrthonormalShapeFunctions< GridPartType::dimension-1 >::size( std::max(polOrder-2,0) );
         const int innerOffset = edgeOffset*edgeSize + indexSet_.subAgglomerates(poly,dimension-1);
-        const int innerSize = Dune::Fem::OrthonormalShapeFunctions< GridPartType::dimension >::size( std::max(polOrder-3,0) );
+        const int innerSize = Dune::Fem::OrthonormalShapeFunctions< GridPartType::dimension >::size( std::max(polOrder-2,0) );
 #if 0
         std::cout << "polygon: " << poly
                   << " edgeOffset " << edgeOffset
@@ -70,7 +70,7 @@ namespace Dune
           if( k >= 0 )
           {
             // std::cout << "    vertex = " << indexSet_.subIndex(element,i,dimension) << " k=" << k;
-            vertex(i,k,1);
+            vertex(poly,i,k,1);
           }
         }
         // edge dofs
@@ -88,17 +88,17 @@ namespace Dune
             if (k>=edgeOffset)
             {
               // std::cout << "    edge = " << indexSet_.subIndex(element,i,dimension-1) << "  k=" << k << " - " << k+edgeSize-1;
-              edge(intersection,k,edgeSize);
+              edge(poly,intersection,k,edgeSize);
             }
           }
         }
         // inner dofs
-        if (polOrder>2)
+        if (polOrder>1)
         {
-          assert(polOrder == 3);
+          assert(polOrder == 2);
           const int k = indexSet_.localIndex( element, 0, 0 ) + innerOffset;
           // std::cout << "    inner = " << indexSet_.subIndex(element,0,0) << "  k=" << k << " - " << k+innerSize;
-          inner(0,k,innerSize);
+          inner(poly,0,k,innerSize);
         }
       }
       template< class LocalFunction, class LocalDofVector >
@@ -109,7 +109,7 @@ namespace Dune
         assert( value.dimension == 1 );
 
         const auto &refElement = ReferenceElements< ctype, dimension >::general( element.type() );
-        auto vertex = [&] (auto i,int k,int numDofs)
+        auto vertex = [&] (int poly,auto i,int k,int numDofs)
         {
           // std::cout << " ... " << k;
           const auto &x = refElement.position( i, dimension );
@@ -118,7 +118,7 @@ namespace Dune
           localDofVector[ k ] = value[ 0 ];
           // std::cout << std::endl;
         };
-        auto edge = [&] (auto intersection,int k,int numDofs)
+        auto edge = [&] (int poly,auto intersection,int k,int numDofs)
         {
           const int el = indexSet_.index( intersection.inside() );
           bool twist = true;
@@ -138,6 +138,7 @@ namespace Dune
             if (!twist) x[0] = 1-x[0];
             auto y = intersection.geometryInInside().global(x);
             localFunction.evaluate( y, value );
+            double weight = edgeQuad.weight(qp) * intersection.geometry().integrationElement(x) / intersection.geometry().volume();
             edgeSpace_.evaluateEach(x,
               [&](std::size_t alpha, typename LocalFunction::RangeType phi ) {
                 int kk = alpha+k;
@@ -148,24 +149,23 @@ namespace Dune
                           << " " << value << " " << phi << std::endl;
 #endif
                 assert( kk < localDofVector.size() );
-                localDofVector[ kk ] += value[0]*phi[0]
-                     * edgeQuad.weight(qp); // *intersection.geometry().integrationElement(x);
+                localDofVector[ kk ] += value[0]*phi[0] * weight;
               }
             );
           }
           // std::cout << std::endl;
         };
-        auto inner = [&] (int i,int k,int numDofs)
+        auto inner = [&] (int poly,int i,int k,int numDofs)
         {
-          assert(polOrder == 3);
-          double volume = element.geometry().volume();
+          assert(polOrder == 2);
+          double volume = element.geometry().volume() / indexSet_.volume(poly);
           const auto &x = refElement.position( 0, 0 );
           localFunction.evaluate( x, value );
           for ( int kk = k; kk < k+numDofs; ++kk )
           {
             // std::cout << " ... " << kk;
             assert( kk < localDofVector.size() );
-            localDofVector[ kk ] += value[ 0 ]; // *volume;
+            localDofVector[ kk ] += value[ 0 ]*volume;
           }
           // std::cout << std::endl;
         };
@@ -175,7 +175,7 @@ namespace Dune
       {
         // std::cout << std::endl;
         std::fill(mask.begin(),mask.end(),false);
-        auto set = [&mask] (auto i,int k,int numDofs)
+        auto set = [&mask] (int poly,auto i,int k,int numDofs)
         { std::fill(mask.begin()+k,mask.begin()+k+numDofs,true); };
         (*this)(element,set,set,set);
       }
@@ -184,7 +184,7 @@ namespace Dune
       {
         const ElementType &element = shapeFunctionSet.entity();
         const auto &refElement = ReferenceElements< ctype, dimension >::general( element.type() );
-        auto vertex = [&] (int i,int k,int numDofs)
+        auto vertex = [&] (int poly,int i,int k,int numDofs)
         {
           // std::cout << " ... " << k;
           const auto &x = refElement.position( i, dimension );
@@ -194,7 +194,7 @@ namespace Dune
             } );
           // std::cout << std::endl;
         };
-        auto edge = [&] (auto intersection,int k,int numDofs)
+        auto edge = [&] (int poly,auto intersection,int k,int numDofs)
         {
           // std::cout << "edge for SFS(" << k << "): ";
           const int el = indexSet_.index( intersection.inside() );
@@ -209,6 +209,7 @@ namespace Dune
             auto x = edgeQuad.localPoint(qp);
             if (!twist) x[0] = 1.-x[0];
             auto y = intersection.geometryInInside().global(x);
+            double weight = edgeQuad.weight(qp) * intersection.geometry().integrationElement(x) / intersection.geometry().volume();
             shapeFunctionSet.evaluateEach( y,
               [ & ] ( std::size_t beta, typename ShapeFunctionSet::RangeType value )
               {
@@ -216,8 +217,7 @@ namespace Dune
                   [&](std::size_t alpha, typename EdgeFSType::RangeType phi ) {
                     int kk = alpha+k;
                     // std::cout << " ... (" << kk << "," << qp << ") ";
-                    localDofMatrix[ kk ][ beta ] += value[0]*phi[0]
-                        * edgeQuad.weight(qp); // *intersection.geometry().integrationElement(x);
+                    localDofMatrix[ kk ][ beta ] += value[0]*phi[0] * weight;
                   }
                 );
               }
@@ -226,15 +226,15 @@ namespace Dune
           // std::cout << std::endl;
         };
 
-        auto inner = [&] (int i,int k,int numDofs)
+        auto inner = [&] (int poly,int i,int k,int numDofs)
         {
-          double volume = element.geometry().volume();
+          double volume = element.geometry().volume() / indexSet_.volume(poly);
           const auto &x = refElement.position( 0, 0 );
           for ( int kk = k; kk < k+numDofs; ++kk )
           {
             // std::cout << " ... " << kk;
             shapeFunctionSet.evaluateEach( x, [ &localDofMatrix, kk, volume ] ( std::size_t alpha, typename ShapeFunctionSet::RangeType phi ) {
-                localDofMatrix[ kk ][ alpha ] += phi[ 0 ]; // *volume;
+                localDofMatrix[ kk ][ alpha ] += phi[ 0 ]*volume;
               } );
           }
           // std::cout << std::endl;
@@ -245,14 +245,11 @@ namespace Dune
       static std::initializer_list< std::pair< int, unsigned int > > dofsPerCodim ()
       {
         const int eSize = Dune::Fem::OrthonormalShapeFunctions< GridPartType::dimension-1 >::size( std::max(polOrder-2,0) );
-        const int iSize = Dune::Fem::OrthonormalShapeFunctions< GridPartType::dimension >::size( std::max(polOrder-3,0) );
+        const int iSize = Dune::Fem::OrthonormalShapeFunctions< GridPartType::dimension >::size( std::max(polOrder-2,0) );
         switch (polOrder)
         {
         case 1:
           return { std::make_pair( dimension, 1u ) };
-        case 2:
-          return { std::make_pair( dimension, 1u ),
-                   std::make_pair( dimension-1, eSize ) };
         default:
           return { std::make_pair( dimension, 1u ),
                    std::make_pair( dimension-1, eSize ),

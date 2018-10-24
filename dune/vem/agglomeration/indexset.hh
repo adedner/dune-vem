@@ -141,6 +141,12 @@ namespace Dune
       const AgglomerationType &agglomeration () const { return agglomeration_; }
       const GridPartType &gridPart () const { return agglomeration().gridPart(); }
 
+      double volume( std::size_t index ) const { return volumes_[index]; }
+      double volume( const ElementType &element ) const
+      {
+        return volume( index( element ) );
+      }
+
     private:
       const Agglomerate &agglomerate ( std::size_t agglomerateIndex ) const { return agglomerates_[ agglomerateIndex ]; }
       const Agglomerate &agglomerate ( const ElementType &element ) const { return agglomerate( index( element ) ); }
@@ -151,6 +157,7 @@ namespace Dune
       std::array< std::size_t, dimension+1 > size_;
       std::array< std::size_t, dimension+1 > maxSubAgglomerates_;
       std::vector< std::vector< int > > globalIndex_;
+      std::vector< double > volumes_;
     };
 
 
@@ -305,6 +312,8 @@ namespace Dune
       maxSubAgglomerates_[ dimension ] = 1;
       size_[ dimension ] = agglomeration.size();
       std::vector< std::array< std::vector< std::size_t >, dimension > > connectivity( size_[ dimension ] );
+      volumes_.resize( agglomeration.size() );
+      std::fill(volumes_.begin(), volumes_.end(), 0.);
 
       for( const auto element : elements( static_cast< typename GridPart::GridViewType >( agglomeration_.gridPart() ), Partitions::interiorBorder ) )
       {
@@ -333,6 +342,7 @@ namespace Dune
             }
           }
         }
+        volumes_[agIndex] += element.geometry().volume();
       }
 
       // compress connectivity
