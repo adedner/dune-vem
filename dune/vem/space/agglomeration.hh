@@ -290,20 +290,23 @@ namespace Dune
 
           interpolation( shapeFunctionSet, D );
 
-          Fem::ElementQuadrature< GridPart, 0 > quadrature( element, 2*polOrder );
-          for( std::size_t qp = 0; qp < quadrature.nop(); ++qp )
+          if (polOrder > 1)
           {
-            const DomainFieldType weight = geometry.integrationElement( quadrature.point( qp ) ) * quadrature.weight( qp );
-            // compute required mass matrices
-            shapeFunctionSet.evaluateEach( quadrature[ qp ], [ & ] ( std::size_t alpha, FieldVector< DomainFieldType, 1 > phi ) {
-                shapeFunctionSet.evaluateEach( quadrature[ qp ], [ & ] ( std::size_t beta, FieldVector< DomainFieldType, 1 > psi ) {
-                    std::size_t i = 0;
-                    if (alpha<numShapeFunctionsMinus1 &&
-                        beta<numShapeFunctionsMinus1)
-                      HpMinus1[alpha][beta] += phi[0]*psi[0]*weight;
-                    Hp[alpha][beta] += phi[0]*psi[0]*weight;
-                  } );
-              } );
+            Fem::ElementQuadrature< GridPart, 0 > quadrature( element, 2*polOrder );
+            for( std::size_t qp = 0; qp < quadrature.nop(); ++qp )
+            {
+              const DomainFieldType weight = geometry.integrationElement( quadrature.point( qp ) ) * quadrature.weight( qp );
+              // compute required mass matrices
+              shapeFunctionSet.evaluateEach( quadrature[ qp ], [ & ] ( std::size_t alpha, FieldVector< DomainFieldType, 1 > phi ) {
+                  shapeFunctionSet.evaluateEach( quadrature[ qp ], [ & ] ( std::size_t beta, FieldVector< DomainFieldType, 1 > psi ) {
+                      std::size_t i = 0;
+                      if (alpha<numShapeFunctionsMinus1 &&
+                          beta<numShapeFunctionsMinus1)
+                        HpMinus1[alpha][beta] += phi[0]*psi[0]*weight;
+                      Hp[alpha][beta] += phi[0]*psi[0]*weight;
+                    } );
+                } );
+            }
           }
 
 #if 0
@@ -379,21 +382,22 @@ namespace Dune
               for (std::size_t beta=0; beta<numShapeFunctions; ++beta)
                 C[alpha][i] += Hp[alpha][beta]*valueProjection[beta][i];
           for (; alpha<numShapeFunctions; ++alpha)
-            C[alpha][alpha] = H0;
+            C[alpha][alpha-numShapeFunctions+numDofs] = H0;
           // std::cout << "Before:" << std::endl;
           // for (std::size_t alpha=0; alpha<numShapeFunctions; ++alpha)
           // {
-          //   for (std::size_t i=0; i<numDofs; ++i)
-          //     std::cout << C[alpha][i] << " ";
+          //   // for (std::size_t i=0; i<numDofs; ++i)
+          //   for (std::size_t beta=0; beta<numShapeFunctions; ++beta)
+          //     std::cout << Hp[alpha][beta] << " ";
           //   std::cout << std::endl;
           // }
         }
 
-        Hp.invert();
-        HpMinus1.invert();
-
         if (polOrder > 1) // not working yet - if this part is removed the EOC looks right
         {
+          Hp.invert();
+          HpMinus1.invert();
+
           for (std::size_t alpha=0; alpha<numShapeFunctions; ++alpha)
             for (std::size_t i=0; i<numDofs; ++i)
             {
@@ -404,8 +408,9 @@ namespace Dune
           // std::cout << "After:" << std::endl;
           // for (std::size_t alpha=0; alpha<numShapeFunctions; ++alpha)
           // {
-          //   for (std::size_t i=0; i<numDofs; ++i)
-          //     std::cout << valueProjection[alpha][i] << " ";
+          //   // for (std::size_t i=0; i<numDofs; ++i)
+          //   for (std::size_t beta=0; beta<numShapeFunctions; ++beta)
+          //     std::cout << Hp[alpha][beta] << " ";
           //   std::cout << std::endl;
           // }
         }
