@@ -46,7 +46,7 @@ namespace Dune
       explicit AgglomerationVEMInterpolation ( const AgglomerationIndexSet &indexSet ) noexcept
         : indexSet_( indexSet )
         , edgeSpace_( Dune::GeometryType(Dune::GeometryType::cube,GridPartType::dimension-1), std::max(polOrder-2,0) )
-        , innerSpace_( Dune::GeometryType(Dune::GeometryType::cube,GridPartType::dimension-1), std::max(polOrder-2,0) )
+        , innerSpace_( Dune::GeometryType(Dune::GeometryType::cube,GridPartType::dimension), std::max(polOrder-2,0) )
       {}
 
       const GridPartType &gridPart() const { return indexSet_.agglomeration().gridPart(); }
@@ -137,9 +137,9 @@ namespace Dune
           for (int qp=0;qp<innerQuad.nop();++qp)
           {
             auto y = innerQuad.point(qp);
-            localFunction.evaluate( y, value );
+            localFunction.evaluate( innerQuad[qp], value );
             double weight = innerQuad.weight(qp) * element.geometry().integrationElement(y) / indexSet_.volume(poly);
-            innerSpace_.evaluateEach(y,
+            innerSpace_.evaluateEach(innerQuad[qp],
               [&](std::size_t alpha, typename LocalFunction::RangeType phi ) {
                 int kk = alpha+k;
                 // std::cout << "inner kk=" << kk << " " << value[0] << " " << phi[0] << " " << weight
@@ -211,10 +211,10 @@ namespace Dune
           {
             auto y = innerQuad.point(qp);
             double weight = innerQuad.weight(qp) * element.geometry().integrationElement(y) / indexSet_.volume(poly);
-            shapeFunctionSet.evaluateEach( y,
+            shapeFunctionSet.evaluateEach( innerQuad[qp],
               [ & ] ( std::size_t beta, typename ShapeFunctionSet::RangeType value )
               {
-                innerShapeFunctionSet.evaluateEach( y,
+                innerShapeFunctionSet.evaluateEach( innerQuad[qp],
                   [&](std::size_t alpha, typename InnerFSType::RangeType phi ) {
                     int kk = alpha+k;
                     localDofMatrix[ kk ][ beta ] += value[0]*phi[0] * weight;
