@@ -17,7 +17,6 @@
 #include <dune/fem/space/shapefunctionset/vectorial.hh>
 #include <dune/fem/space/common/capabilities.hh>
 
-#include <dune/vem/agglomeration/boundingbox.hh>
 #include <dune/vem/agglomeration/dofmapper.hh>
 #include <dune/vem/agglomeration/shapefunctionset.hh>
 #include <dune/vem/misc/compatibility.hh>
@@ -171,7 +170,6 @@ namespace Dune
         : BaseType( agglomeration.gridPart() ),
           agIndexSet_( agglomeration ),
           blockMapper_( agIndexSet_, AgglomerationInterpolationType::dofsPerCodim() ),
-          boundingBoxes_( boundingBoxes( agIndexSet_.agglomeration() ) ),
           scalarShapeFunctionSet_( Dune::GeometryType( Dune::GeometryType::cube, GridPart::dimension ) )
       {
         buildProjections();
@@ -181,7 +179,7 @@ namespace Dune
       {
         typename Traits::ShapeFunctionSetType shapeFunctionSet( &scalarShapeFunctionSet_ );
         const std::size_t agglomerate = agglomeration().index( entity );
-        const auto &bbox = boundingBoxes_[ agglomerate ];
+        const auto &bbox = blockMapper_.indexSet().boundingBox(agglomerate);
         const auto &valueProjection = valueProjections_[ agglomerate ];
         const auto &jacobianProjection = jacobianProjections_[ agglomerate ];
         return BasisFunctionSetType( entity, bbox, valueProjection, jacobianProjection, std::move( shapeFunctionSet ) );
@@ -224,7 +222,6 @@ namespace Dune
 
       AgglomerationIndexSetType agIndexSet_;
       mutable BlockMapperType blockMapper_;
-      std::vector< BoundingBox< GridPart > > boundingBoxes_;
       std::vector< typename BasisFunctionSetType::ValueProjection > valueProjections_;
       std::vector< typename BasisFunctionSetType::JacobianProjection > jacobianProjections_;
       std::vector< Stabilization > stabilizations_;
@@ -265,7 +262,7 @@ namespace Dune
       AgglomerationInterpolationType interpolation( blockMapper().indexSet() );
       for( std::size_t agglomerate = 0; agglomerate < agglomeration().size(); ++agglomerate )
       {
-        const auto &bbox = boundingBoxes_[ agglomerate ];
+        const auto &bbox = blockMapper_.indexSet().boundingBox(agglomerate);
 
         const std::size_t numDofs = blockMapper().numDofs( agglomerate );
 
@@ -386,9 +383,8 @@ namespace Dune
           // std::cout << "Before:" << std::endl;
           // for (std::size_t alpha=0; alpha<numShapeFunctions; ++alpha)
           // {
-          //   // for (std::size_t i=0; i<numDofs; ++i)
-          //   for (std::size_t beta=0; beta<numShapeFunctions; ++beta)
-          //     std::cout << Hp[alpha][beta] << " ";
+          //   for (std::size_t i=0; i<numDofs; ++i)
+          //     std::cout << C[alpha][i] << " ";
           //   std::cout << std::endl;
           // }
         }
@@ -408,9 +404,8 @@ namespace Dune
           // std::cout << "After:" << std::endl;
           // for (std::size_t alpha=0; alpha<numShapeFunctions; ++alpha)
           // {
-          //   // for (std::size_t i=0; i<numDofs; ++i)
-          //   for (std::size_t beta=0; beta<numShapeFunctions; ++beta)
-          //     std::cout << Hp[alpha][beta] << " ";
+          //   for (std::size_t i=0; i<numDofs; ++i)
+          //     std::cout << valueProjection[alpha][i] << " ";
           //   std::cout << std::endl;
           // }
         }

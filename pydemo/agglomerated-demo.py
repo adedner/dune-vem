@@ -222,47 +222,37 @@ def compute(agglomerate,filename):
 
 # test of higher order vem spaces
 def test(agglomerate):
-    dfs = []
-    err = []
+    dfs,err = [],[]
     x = SpatialCoordinate(triangle)
     f = as_vector( [cos(x[0])*cos(x[1]) ] )
-    # space = create.space("agglomeratedvem", agglomerate.grid, agglomerate,
-    #         dimrange=1, order=1, storage="fem")
-    # dfs += [space.interpolate(f,name="one")]
-    # err += [error(agglomerate.grid,dfs[-1],dfs[-1],f)]
-    # print("order=1, size=",space.size, err[-1])
-    space = create.space("agglomeratedvem", agglomerate.grid, agglomerate,
-            dimrange=1, order=2, storage="fem")
-    dfs += [space.interpolate(f,name="two")]
-    err += [error(agglomerate.grid,dfs[-1],dfs[-1],f)]
-    print("order=2, size=",space.size,err[-1])
-    # space = create.space("agglomeratedvem", agglomerate.grid, agglomerate,
-    #         dimrange=1, order=3, storage="fem")
-    # dfs += [space.interpolate(f,name="three")]
-    # err += [error(agglomerate.grid,dfs[-1],dfs[-1],f)]
-    # print("order=3, size=",space.size,err[-1])
-    return dfs, err
+    polys = [2,3]
+    for p in polys:
+        space = create.space("agglomeratedvem", agglomerate.grid, agglomerate,
+                dimrange=1, order=p, storage="fem")
+        dfs += [space.interpolate(f,name="df"+str(p))]
+        err += [error(agglomerate.grid,dfs[-1],dfs[-1],f)]
+    return polys, dfs, err
 
 if True:
     constructor = cartesianDomain([0,0],[1,1],[32,32])
     err = [[],[],[]]
 
     agglomerate = Agglomerate([4,4],version="cartesian",constructor=constructor)
-    dfs,err[0] = test(agglomerate )
+    polys,dfs,err[0] = test(agglomerate )
     dfs[0].space.grid.writeVTK("test0",
         pointdata=dfs, celldata =[ create.function("local",agglomerate.grid,"cells",1,lambda en,x: [agglomerate(en)]) ])
     agglomerate = Agglomerate([8,8],version="cartesian",constructor=constructor)
-    dfs,err[1] = test(agglomerate)
+    polys,dfs,err[1] = test(agglomerate)
     dfs[0].space.grid.writeVTK("test1",
         pointdata=dfs, celldata =[ create.function("local",agglomerate.grid,"cells",1,lambda en,x: [agglomerate(en)]) ])
     agglomerate = Agglomerate([16,16],version="cartesian",constructor=constructor)
-    dfs,err[2] = test(agglomerate)
+    polys,dfs,err[2] = test(agglomerate)
     dfs[0].space.grid.writeVTK("test2",
         pointdata=dfs, celldata =[ create.function("local",agglomerate.grid,"cells",1,lambda en,x: [agglomerate(en)]) ])
     eoc = lambda E,e: math.log(E/e)/math.log(2.)
-    for p in range(len(err[0])):
+    for p,poly in enumerate(polys):
         for i in range(1,len(err)):
-            print(p+1,i,eoc(err[i-1][p][0],err[i][p][0]), eoc(err[i-1][p][2],err[i][p][2]))
+            print(poly,i,eoc(err[i-1][p][0],err[i][p][0]), eoc(err[i-1][p][2],err[i][p][2]))
 
 if testVoronoi:
     print("*******************************************************")
