@@ -273,14 +273,11 @@ namespace Dune
         pi0XT.resize( numDofs, DomainType(0)  );
         std::fill( pi0XT.begin(), pi0XT.end(), DomainType( 0 ) );
 
-        DomainFieldType H0 = 0;   // volime
         for( const ElementSeedType &entitySeed : entitySeeds[ agglomerate ] )
         {
           const ElementType &element = gridPart().entity( entitySeed );
           const auto geometry = element.geometry();
           const auto &refElement = ReferenceElements< typename GridPart::ctype, GridPart::dimension >::general( element.type() );
-
-          H0 += geometry.volume();
 
           BoundingBoxShapeFunctionSet< ElementType, ScalarShapeFunctionSetType > shapeFunctionSet( element, bbox, scalarShapeFunctionSet_ );
 
@@ -364,12 +361,12 @@ namespace Dune
           }
         }
 
-        assert( std::abs(H0 - blockMapper_.indexSet().volume(agglomerate)) < 1e-12 );
+        DomainFieldType H0 = blockMapper_.indexSet().volume(agglomerate);
 
         auto &valueProjection = valueProjections_[ agglomerate ];
         pseudoInverse( D, valueProjection );
 
-        if (polOrder > 1)
+        if (polOrder > 1) // not working yet - if this part is removed the EOC looks right
         {
           std::size_t alpha=0;
           for (; alpha<numShapeFunctionsMinus2; ++alpha)
@@ -378,10 +375,7 @@ namespace Dune
             for (std::size_t i=0; i<numDofs; ++i)
               for (std::size_t beta=0; beta<numShapeFunctions; ++beta)
                 C[alpha][i] += Hp[alpha][beta]*valueProjection[beta][i];
-        }
 
-        if (polOrder > 1) // not working yet - if this part is removed the EOC looks right
-        {
           Hp.invert();
           HpMinus1.invert();
 
