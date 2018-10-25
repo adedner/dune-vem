@@ -225,12 +225,14 @@ def test(agglomerate):
     dfs,err = [],[]
     x = SpatialCoordinate(triangle)
     f = as_vector( [cos(x[0])*cos(x[1]) ] )
-    polys = [2,3]
+    polys = [2]
     for p in polys:
         space = create.space("agglomeratedvem", agglomerate.grid, agglomerate,
                 dimrange=1, order=p, storage="fem")
         dfs += [space.interpolate(f,name="df"+str(p))]
         err += [error(agglomerate.grid,dfs[-1],dfs[-1],f)]
+        dfs += [dune.create.function("ufl",space.grid,name="gdf"+str(p),
+            ufl=grad(dfs[-1][0]),order=p-1)]
     return polys, dfs, err
 
 if True:

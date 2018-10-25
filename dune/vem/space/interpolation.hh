@@ -32,14 +32,15 @@ namespace Dune
       typedef typename AgglomerationIndexSet::ElementType ElementType;
       typedef typename AgglomerationIndexSet::GridPartType GridPartType;
       static const int dimension = AgglomerationIndexSet::dimension;
+      typedef typename GridPartType::IntersectionType IntersectionType;
 
     private:
       typedef Dune::Fem::CachingQuadrature<GridPartType,0> InnerQuadratureType;
       typedef Dune::Fem::CachingQuadrature<GridPartType,1> EdgeQuadratureType;
       typedef typename ElementType::Geometry::ctype ctype;
       typedef Dune::Fem::FunctionSpace<double,double,GridPartType::dimensionworld-1,1> EdgeFSType;
-      typedef Dune::Fem::FunctionSpace<double,double,GridPartType::dimensionworld,1> InnerFSType;
       typedef Dune::Fem::OrthonormalShapeFunctionSet<EdgeFSType> EdgeShapeFunctionSetType;
+      typedef Dune::Fem::FunctionSpace<double,double,GridPartType::dimensionworld,1> InnerFSType;
       typedef Dune::Fem::OrthonormalShapeFunctionSet<InnerFSType> InnerShapeFunctionSetType;
 
     public:
@@ -179,8 +180,7 @@ namespace Dune
           bool twist = true;
           if (false && intersection.neighbor())
             twist = poly < indexSet_.index( intersection.outside() );
-          EdgeQuadratureType edgeQuad( gridPart(),
-                intersection, 2*polOrder, EdgeQuadratureType::INSIDE );
+          EdgeQuadratureType edgeQuad( gridPart(), intersection, 2*polOrder, EdgeQuadratureType::INSIDE );
           for (int qp=0;qp<edgeQuad.nop();++qp)
           {
             auto x = edgeQuad.localPoint(qp);
@@ -223,6 +223,88 @@ namespace Dune
           }
         };
         (*this)(element,vertex,edge,inner);
+      }
+
+      // interpolation onto a single intersection
+      template< class Vertex, class Edge>
+      void operator() ( const IntersectionType &intersection,
+                        const Vertex &vertex, const Edge &edge,
+                        std::vector<int> &mask, bool tmp) const
+      {
+        mask.clear();
+        const ElementType &element = intersection.inside();
+        const auto &refElement = ReferenceElements< ctype, dimension >::general( element.type() );
+
+        const int poly = indexSet_.index( element );
+        const int edgeOffset = indexSet_.subAgglomerates(poly,dimension);
+        const int edgeSize = Dune::Fem::OrthonormalShapeFunctions< GridPartType::dimension-1 >::size( std::max(polOrder-2,0) );
+        int edgeNumber = intersection.indexInInside();
+        const int k = indexSet_.localIndex( element, edgeNumber, dimension-1 );
+        assert(k>=0);
+        if (k>=0)
+        {
+          std::size_t i = 0;
+          for( ; i < refElement.size( edgeNumber, dimension-1, dimension ); ++i )
+          {
+            int vertexNumber = refElement.subEntity( edgeNumber, dimension-1, i, dimension);
+            const int k = indexSet_.localIndex( element, vertexNumber, dimension );
+            assert(k>=0);
+            vertex(poly,vertexNumber,i,1);
+            mask.push_back(k);
+          }
+          if (polOrder>1)
+          {
+            edge(poly,intersection,i,edgeSize);
+            for (int kk=0;kk<edgeSize;++kk)
+              mask.push_back(k*edgeSize+edgeOffset+kk);
+          }
+        }
+      }
+      template< class ShapeFunctionSet >
+      void operator() (const IntersectionType &intersection,
+                       const ShapeFunctionSet &shapeFunctionSet, Dune::DynamicMatrix<double> &localDofMatrix,
+                       std::vector<int> &mask) const
+      {
+        mask.clear();
+        const ElementType &element = intersection.inside();
+        const auto &refElement = ReferenceElements< ctype, dimension >::general( element.type() );
+        int edgeNumber = intersection.indexInInside();
+        const auto &edgeGeo = refElement.template geometry<1>(edgeNumber);
+        auto vertex = [&] (int poly,int i,int k,int numDofs)
+        {
+          const auto &x = edgeGeo.local( refElement.position( i, dimension ) );
+          shapeFunctionSet.evaluateEach( x, [ &localDofMatrix, k ] ( std::size_t alpha, typename ShapeFunctionSet::RangeType phi ) {
+              assert( phi.dimension == 1 );
+              assert( k < localDofMatrix.size() );
+              localDofMatrix[ k ][ alpha ] = phi[ 0 ];
+            } );
+        };
+        auto edge = [&] (int poly,auto intersection,int k,int numDofs)
+        {
+          assert(numDofs == edgeBFS_.size());
+          bool twist = true;
+          if (false && intersection.neighbor())
+            twist = poly < indexSet_.index( intersection.outside() );
+          EdgeQuadratureType edgeQuad( gridPart(),
+                intersection, 2*polOrder, EdgeQuadratureType::INSIDE );
+          for (int qp=0;qp<edgeQuad.nop();++qp)
+          {
+            auto x = edgeQuad.localPoint(qp);
+            if (!twist) x[0] = 1.-x[0];
+            double weight = edgeQuad.weight(qp) * intersection.geometry().integrationElement(x) / intersection.geometry().volume();
+            shapeFunctionSet.evaluateEach( x, [ & ] ( std::size_t beta, typename ShapeFunctionSet::RangeType value ) {
+                edgeBFS_.evaluateEach( x,
+                  [&](std::size_t alpha, typename EdgeFSType::RangeType phi ) {
+                    int kk = alpha+k;
+                    assert( kk < localDofMatrix.size() );
+                    localDofMatrix[ kk ][ beta ] += value[0]*phi[0] * weight;
+                  }
+                );
+              }
+            );
+          }
+        };
+        (*this)(intersection,vertex,edge,mask,false);
       }
 
       static std::initializer_list< std::pair< int, unsigned int > > dofsPerCodim ()
