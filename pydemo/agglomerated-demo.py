@@ -225,7 +225,7 @@ def test(agglomerate):
     dfs,err = [],[]
     x = SpatialCoordinate(triangle)
     f = as_vector( [cos(x[0])*cos(x[1]) ] )
-    polys = [2]
+    polys = [1,2,3]
     for p in polys:
         space = create.space("agglomeratedvem", agglomerate.grid, agglomerate,
                 dimrange=1, order=p, storage="fem")

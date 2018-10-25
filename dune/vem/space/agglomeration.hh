@@ -25,6 +25,8 @@
 #include <dune/vem/space/interpolation.hh>
 #include <dune/vem/space/interpolate.hh>
 
+#include <dune/vem/space/test.hh>
+
 namespace Dune
 {
 
@@ -323,6 +325,18 @@ namespace Dune
             interpolation( intersection, edgeShapeFunctionSet_, edgePhi, mask );
             assert( mask.size() == edgeShapeFunctionSet_.size() );
             edgePhi.invert();
+            { // test edgePhi
+              std::vector<double> lambda(numDofs);
+              for (int i=0;i<mask.size();++i)
+              {
+                std::fill(lambda.begin(),lambda.end(),0);
+                PhiEdge<GridPartType, Dune::DynamicMatrix<double>,EdgeShapeFunctionSetType>
+                  phiEdge(gridPart(),intersection,edgePhi,edgeShapeFunctionSet_,i);
+                interpolation(element,phiEdge,lambda);
+                for (int k=0;k<numDofs;++k)
+                  assert( mask[i]==k? std::abs(lambda[k]-1)<1e-10: std::abs(lambda[k])<1e-10 );
+              }
+            }
             typedef Fem::ElementQuadrature< GridPart, 1 > EdgeQuadratureType;
             EdgeQuadratureType quadrature( gridPart(), intersection, 2*polOrder-1, EdgeQuadratureType::INSIDE );
             for( std::size_t qp = 0; qp < quadrature.nop(); ++qp )
@@ -332,10 +346,7 @@ namespace Dune
                  if (alpha<numShapeFunctionsMinus1)
                     edgeShapeFunctionSet_.evaluateEach( quadrature.localPoint(qp), [ & ] ( std::size_t beta, FieldVector< DomainFieldType, 1 > psi ) {
                         for (int s=0;s<mask.size();++s)
-                        {
-                          double value = edgePhi[beta][s]*psi[0]*phi[0]*weight;
-                          R[alpha][mask[s]].axpy(value,normal);
-                        }
+                          R[alpha][mask[s]].axpy( edgePhi[beta][s]*psi[0]*phi[0]*weight, normal);
                     } );
               } );
             }
@@ -352,7 +363,7 @@ namespace Dune
 
         pseudoInverse( D, valueProjection );
 
-        if (polOrder > 1) // not working yet - if this part is removed the EOC looks right
+        if (polOrder > 1)
         {
           std::size_t alpha=0;
           for (; alpha<numShapeFunctionsMinus2; ++alpha)
@@ -367,12 +378,35 @@ namespace Dune
           auto Gtmp = G;
           for (std::size_t alpha=0; alpha<numShapeFunctionsMinus1; ++alpha)
             for (std::size_t beta=0; beta<numShapeFunctionsMinus1; ++beta)
+            {
+              G[alpha][beta] = DomainType(0);
               for (std::size_t gamma=0; gamma<numShapeFunctionsMinus1; ++gamma)
                 G[alpha][beta].axpy(HpMinus1[alpha][gamma],Gtmp[gamma][beta]);
+            }
+
+          { // test G matrix
+            const ElementType &element = gridPart().entity( *(entitySeeds[agglomerate].begin()) );
+            BoundingBoxShapeFunctionSet< ElementType, ScalarShapeFunctionSetType > shapeFunctionSet( element, bbox, scalarShapeFunctionSet_ );
+            Fem::ElementQuadrature< GridPart, 0 > quad( element, 2*polOrder );
+            for( std::size_t qp = 0; qp < quad.nop(); ++qp )
+            {
+              shapeFunctionSet.jacobianEach( quad[qp], [ & ] ( std::size_t alpha, FieldMatrix< DomainFieldType, 1,2 > phi ) {
+                if (alpha<numShapeFunctionsMinus1)
+                {
+                  Dune::FieldVector<double,2> d;
+                  Derivative<GridPartType, Dune::DynamicMatrix<DomainType>,decltype(shapeFunctionSet)>
+                      derivative(gridPart(),G,shapeFunctionSet,alpha);
+                  derivative.evaluate(quad[qp],d);
+                  d -= phi[0];
+                  assert(d.two_norm() < 1e-10);
+                }
+              });
+            }
+          }
 
           for (std::size_t alpha=0; alpha<numShapeFunctionsMinus1; ++alpha)
             for (std::size_t beta=0; beta<numShapeFunctionsMinus2; ++beta)
-              R[alpha][beta+numDofs-numShapeFunctionsMinus2].axpy(H0,G[alpha][beta]);
+              R[alpha][beta+numDofs-numShapeFunctionsMinus2].axpy(-H0, G[alpha][beta]);
 
           for (std::size_t alpha=0; alpha<numShapeFunctions; ++alpha)
           {
