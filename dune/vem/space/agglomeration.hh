@@ -175,7 +175,7 @@ namespace Dune
           agIndexSet_( agglomeration ),
           blockMapper_( agIndexSet_, AgglomerationInterpolationType::dofsPerCodim() ),
           scalarShapeFunctionSet_( Dune::GeometryType( Dune::GeometryType::cube, GridPart::dimension ) ),
-          edgeShapeFunctionSet_( Dune::GeometryType( Dune::GeometryType::cube, GridPart::dimension ), polOrder )
+          edgeShapeFunctionSet_( Dune::GeometryType( Dune::GeometryType::cube, GridPart::dimension-1 ), polOrder )
       {
         buildProjections();
       }
@@ -255,12 +255,11 @@ namespace Dune
       const std::size_t numShapeFunctionsMinus1 =
               Dune::Fem::OrthonormalShapeFunctions< DomainType::dimension >::size(polOrder-1);
       const std::size_t numShapeFunctionsMinus2 = polOrder==1?0:
-              Dune::Fem::OrthonormalShapeFunctions< DomainType::dimension >::size(std::max(polOrder-2,0));
+              Dune::Fem::OrthonormalShapeFunctions< DomainType::dimension >::size(polOrder-2);
 
       DynamicMatrix< DomainFieldType > D, C, Hp, HpMinus1;
       DynamicMatrix< DomainType > G, R;
-      DynamicMatrix< DomainFieldType > edgePhi;
-      edgePhi.resize(polOrder+1,0);
+      DynamicMatrix< DomainFieldType > edgePhi; // compute Phi_i on the edge
 
       LeftPseudoInverse< DomainFieldType > pseudoInverse( numShapeFunctions );
 
@@ -294,6 +293,7 @@ namespace Dune
 
           if (polOrder > 1)
           {
+            // compute mass matrices Hp, HpMinus1, and the gradient matrices G^l
             Fem::ElementQuadrature< GridPart, 0 > quadrature( element, 2*polOrder );
             for( std::size_t qp = 0; qp < quadrature.nop(); ++qp )
             {
@@ -301,7 +301,7 @@ namespace Dune
               shapeFunctionSet.evaluateEach( quadrature[ qp ], [ & ] ( std::size_t alpha, FieldVector< DomainFieldType, 1 > phi ) {
                   shapeFunctionSet.evaluateEach( quadrature[ qp ], [ & ] ( std::size_t beta, FieldVector< DomainFieldType, 1 > psi ) {
                       if (alpha<numShapeFunctionsMinus1 &&
-                          beta<numShapeFunctionsMinus1)
+                          beta<numShapeFunctionsMinus1) // basis set is hierarchic so we can compute HpMinus1 using the order p shapeFunctionSet
                         HpMinus1[alpha][beta] += phi[0]*psi[0]*weight;
                       Hp[alpha][beta] += phi[0]*psi[0]*weight;
                     } );
@@ -314,29 +314,31 @@ namespace Dune
             }
           }
 
+          // compute the boundary terms for the gradient projection
           for( const auto &intersection : intersections( static_cast< typename GridPart::GridViewType >( gridPart() ), element ) )
           {
             if( !intersection.boundary() && (agglomeration().index( intersection.outside() ) == agglomerate) )
               continue;
             assert( intersection.conforming() );
             auto normal = intersection.centerUnitOuterNormal();
-            std::vector<int> mask;
+            std::vector<int> mask; // contains indices with Phi_mask[i] has support on edge
             edgePhi.resize(edgeShapeFunctionSet_.size(),edgeShapeFunctionSet_.size(),0);
             interpolation( intersection, edgeShapeFunctionSet_, edgePhi, mask );
-            assert( mask.size() == edgeShapeFunctionSet_.size() );
             edgePhi.invert();
             { // test edgePhi
+              assert( mask.size() == edgeShapeFunctionSet_.size() );
               std::vector<double> lambda(numDofs);
               for (int i=0;i<mask.size();++i)
               {
                 std::fill(lambda.begin(),lambda.end(),0);
                 PhiEdge<GridPartType, Dune::DynamicMatrix<double>,EdgeShapeFunctionSetType>
-                  phiEdge(gridPart(),intersection,edgePhi,edgeShapeFunctionSet_,i);
+                  phiEdge(gridPart(),intersection,edgePhi,edgeShapeFunctionSet_,i); // behaves like Phi_mask[i] restricted to edge
                 interpolation(element,phiEdge,lambda);
-                for (int k=0;k<numDofs;++k)
+                for (int k=0;k<numDofs;++k) // lambda should be 1 for k=mask[i] otherwise 0
                   assert( mask[i]==k? std::abs(lambda[k]-1)<1e-10: std::abs(lambda[k])<1e-10 );
               }
             }
+            // now compute int_e Phi_mask[i] m_alpha
             typedef Fem::ElementQuadrature< GridPart, 1 > EdgeQuadratureType;
             EdgeQuadratureType quadrature( gridPart(), intersection, 2*polOrder-1, EdgeQuadratureType::INSIDE );
             for( std::size_t qp = 0; qp < quadrature.nop(); ++qp )
@@ -345,13 +347,15 @@ namespace Dune
               shapeFunctionSet.evaluateEach( quadrature[qp], [ & ] ( std::size_t alpha, FieldVector< DomainFieldType, 1 > phi ) {
                  if (alpha<numShapeFunctionsMinus1)
                     edgeShapeFunctionSet_.evaluateEach( quadrature.localPoint(qp), [ & ] ( std::size_t beta, FieldVector< DomainFieldType, 1 > psi ) {
-                        for (int s=0;s<mask.size();++s)
+                        for (int s=0;s<mask.size();++s) // note that edgePhi is the transposed of the basis transform matrix
                           R[alpha][mask[s]].axpy( edgePhi[beta][s]*psi[0]*phi[0]*weight, normal);
                     } );
               } );
             }
           }
         }
+        // finished agglomerating all auxiliary matrices
+        // now compute projection matrices and stabilization
 
         DomainFieldType H0 = blockMapper_.indexSet().volume(agglomerate);
 
@@ -365,6 +369,7 @@ namespace Dune
 
         if (polOrder > 1)
         {
+          // modify C for inner dofs
           std::size_t alpha=0;
           for (; alpha<numShapeFunctionsMinus2; ++alpha)
             C[alpha][alpha+numDofs-numShapeFunctionsMinus2] = H0;
@@ -375,6 +380,7 @@ namespace Dune
 
           Hp.invert();
           HpMinus1.invert();
+
           auto Gtmp = G;
           for (std::size_t alpha=0; alpha<numShapeFunctionsMinus1; ++alpha)
             for (std::size_t beta=0; beta<numShapeFunctionsMinus1; ++beta)
@@ -395,7 +401,7 @@ namespace Dune
                 {
                   Dune::FieldVector<double,2> d;
                   Derivative<GridPartType, Dune::DynamicMatrix<DomainType>,decltype(shapeFunctionSet)>
-                      derivative(gridPart(),G,shapeFunctionSet,alpha);
+                      derivative(gridPart(),G,shapeFunctionSet,alpha); // used G matrix to compute gradients of monomials
                   derivative.evaluate(quad[qp],d);
                   d -= phi[0];
                   assert(d.two_norm() < 1e-10);
@@ -404,10 +410,12 @@ namespace Dune
             }
           }
 
+          // add interior integrals for gradient projection
           for (std::size_t alpha=0; alpha<numShapeFunctionsMinus1; ++alpha)
             for (std::size_t beta=0; beta<numShapeFunctionsMinus2; ++beta)
               R[alpha][beta+numDofs-numShapeFunctionsMinus2].axpy(-H0, G[alpha][beta]);
 
+          // now compute projection by multiplying with inverse mass matrix
           for (std::size_t alpha=0; alpha<numShapeFunctions; ++alpha)
           {
             for (std::size_t i=0; i<numDofs; ++i)
@@ -422,12 +430,10 @@ namespace Dune
           }
         }
         else
-        {
+        { // for p=1 we didn't compute the inverse of the mass matrix H_{p-1} -
+          // it's simply 1/H0 so we implement the p=1 case separately
           for (std::size_t i=0; i<numDofs; ++i)
-          {
-            R[0][i] /= H0;
-            jacobianProjection[0][i] = R[0][i];
-          }
+            jacobianProjection[0][i].axpy(1./H0, R[0][i]);
         }
 
         // stabilization matrix
