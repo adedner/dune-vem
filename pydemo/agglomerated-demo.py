@@ -224,9 +224,11 @@ def compute(agglomerate,filename):
 def test(agglomerate):
     dfs,err = [],[]
     x = SpatialCoordinate(triangle)
-    f = as_vector( [2*(x[0]*x[1])**2] )
-    # f = as_vector( [cos(x[0])*cos(x[1]) ] )
-    polys = [1,2,3]
+    # f = as_vector( [2] )
+    # f = as_vector( [2*x[0]] )
+    # f = as_vector( [2*(x[0]*x[1])**2] )
+    f = as_vector( [cos(x[0])*cos(x[1]) ] )
+    polys = [1,2,3,4]
     for p in polys:
         space = create.space("agglomeratedvem", agglomerate.grid, agglomerate,
                 dimrange=1, order=p, storage="fem")
@@ -238,21 +240,19 @@ def test(agglomerate):
     return polys, dfs, err
 
 if True:
-    constructor = cartesianDomain([0,0],[1,1],[32,32])
-    err = [[],[],[]]
+    constructor = cartesianDomain([0,0],[1,1],[64,64])
+    err = []
 
-    agglomerate = Agglomerate([4,4],version="cartesian",constructor=constructor)
-    polys,dfs,err[0] = test(agglomerate )
-    dfs[0].space.grid.writeVTK("test0",
-        pointdata=dfs, celldata =[ create.function("local",agglomerate.grid,"cells",1,lambda en,x: [agglomerate(en)]) ])
-    agglomerate = Agglomerate([8,8],version="cartesian",constructor=constructor)
-    polys,dfs,err[1] = test(agglomerate)
-    dfs[0].space.grid.writeVTK("test1",
-        pointdata=dfs, celldata =[ create.function("local",agglomerate.grid,"cells",1,lambda en,x: [agglomerate(en)]) ])
-    agglomerate = Agglomerate([16,16],version="cartesian",constructor=constructor)
-    polys,dfs,err[2] = test(agglomerate)
-    dfs[0].space.grid.writeVTK("test2",
-        pointdata=dfs, celldata =[ create.function("local",agglomerate.grid,"cells",1,lambda en,x: [agglomerate(en)]) ])
+    n = 1
+    while n <= 64:
+        agglomerate = Agglomerate([n,n],version="cartesian",constructor=constructor)
+        polys,dfs,e = test(agglomerate )
+        err += [e]
+        dfs[0].space.grid.writeVTK("test"+str(n),
+            pointdata=dfs, celldata = [ create.function("local",agglomerate.grid,"cells",1,lambda en,x: [agglomerate(en)]) ])
+        n = n*2
+        # break
+
     eoc = lambda E,e: math.log(E/e)/math.log(2.)
     for p,poly in enumerate(polys):
         for i in range(1,len(err)):

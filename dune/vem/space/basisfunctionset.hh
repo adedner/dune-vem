@@ -134,10 +134,20 @@ namespace Dune
       template< class Point, class DofVector >
       void evaluateAll ( const Point &x, const DofVector &dofs, RangeType &value ) const
       {
+        // std::cout << "POINT=" << entity_->geometry().global(Fem::coordinate(x)) << std::endl;
         value = RangeType( 0 );
         shapeFunctionSet_.evaluateEach( position( x ), [ this, &dofs, &value ] ( std::size_t alpha, RangeType phi_alpha ) {
+            // std::cout << "with dofs: alpha=" << alpha << std::endl;
             for( std::size_t j = 0; j < size(); ++j )
+            {
+              double v = valueProjection_[ alpha ][ j ];
+              // std::cout << "  j=" << j
+              //           << "    " << (std::abs(v)<1e-12?0:v)
+              //           << "    " << (std::abs(dofs[j])<1e-12?0:dofs[j]) << std::endl;
               value.axpy( valueProjection_[ alpha ][ j ]*dofs[ j ], phi_alpha );
+            }
+            // std::cout << "value: " << value << std::endl;
+            // std::cout << std::endl;
           } );
       }
 
@@ -167,12 +177,22 @@ namespace Dune
       {
         jacobian = JacobianRangeType( 0 );
         shapeFunctionSet_.evaluateEach( position( x ), [ this, &dofs, &jacobian ] ( std::size_t alpha, RangeType phi_alpha ) {
+            // std::cout << "with dofs: alpha=" << alpha << std::endl;
             for( std::size_t j = 0; j < size(); ++j )
+            {
               for( int k = 0; k < dimDomain; ++k )
               {
+                double v = jacobianProjection_[ alpha ][ j ][ k ];
+                // std::cout << "  j=" << j << ", k=" << k
+                //           << "    " << (std::abs(v)<1e-12?0:v)
+                //           << "    " << dofs[j] << "     ";
                 FieldMatrixColumn< JacobianRangeType > jacobian_k( jacobian, k );
                 jacobian_k.axpy( jacobianProjection_[ alpha ][ j ][ k ]*dofs[ j ], phi_alpha );
               }
+              // std::cout << std::endl;
+            }
+            // std::cout << "value: " << jacobian << std::endl;
+            // std::cout << std::endl;
           } );
       }
 

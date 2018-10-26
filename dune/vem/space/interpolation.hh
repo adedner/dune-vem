@@ -8,11 +8,9 @@
 
 #include <dune/geometry/referenceelements.hh>
 
+#include <dune/fem/quadrature/elementquadrature.hh>
 #include <dune/fem/space/shapefunctionset/orthonormal.hh>
-#include <dune/fem/space/lagrange.hh>
-
 #include <dune/vem/agglomeration/shapefunctionset.hh>
-#include <dune/vem/agglomeration/dgspace.hh>
 
 namespace Dune
 {
@@ -35,8 +33,8 @@ namespace Dune
       typedef typename GridPartType::IntersectionType IntersectionType;
 
     private:
-      typedef Dune::Fem::CachingQuadrature<GridPartType,0> InnerQuadratureType;
-      typedef Dune::Fem::CachingQuadrature<GridPartType,1> EdgeQuadratureType;
+      typedef Dune::Fem::ElementQuadrature<GridPartType,0> InnerQuadratureType;
+      typedef Dune::Fem::ElementQuadrature<GridPartType,1> EdgeQuadratureType;
       typedef typename ElementType::Geometry::ctype ctype;
       typedef Dune::Fem::FunctionSpace<double,double,GridPartType::dimensionworld-1,1> EdgeFSType;
       typedef Dune::Fem::OrthonormalShapeFunctionSet<EdgeFSType> EdgeShapeFunctionSetType;
@@ -118,7 +116,7 @@ namespace Dune
           {
             auto x = edgeQuad.localPoint(qp);
             if (!twist) x[0] = 1-x[0];
-            auto y = edgeQuad[qp]; // intersection.geometryInInside().global(x);
+            auto y = intersection.geometryInInside().global(x);
             localFunction.evaluate( y, value );
             double weight = edgeQuad.weight(qp) * intersection.geometry().integrationElement(x) / intersection.geometry().volume();
             edgeBFS_.evaluateEach(x,
@@ -132,21 +130,26 @@ namespace Dune
         };
         auto inner = [&] (int poly,int i,int k,int numDofs)
         {
+          // std::cout << "poly=" << poly << " k=" << k << " numDofs=" << numDofs
+          //           << "   x=" << element.geometry().center()
+          //           << std::endl;
           assert(numDofs == innerShapeFunctionSet.size());
+          assert(k+numDofs == localDofVector.size());
           InnerQuadratureType innerQuad( element, 2*polOrder );
           for (int qp=0;qp<innerQuad.nop();++qp)
           {
             auto y = innerQuad.point(qp);
             localFunction.evaluate( innerQuad[qp], value );
             double weight = innerQuad.weight(qp) * element.geometry().integrationElement(y) / indexSet_.volume(poly);
-            innerBFS_.evaluateEach(innerQuad[qp],
+            innerShapeFunctionSet.evaluateEach(innerQuad[qp],
               [&](std::size_t alpha, typename LocalFunction::RangeType phi ) {
                 int kk = alpha+k;
-                // std::cout << "inner kk=" << kk << " " << value[0] << " " << phi[0] << " " << weight
-                //           << " " << element.geometry().integrationElement(y)
-                //           << " " << indexSet_.volume(poly) << std::endl;
                 assert( kk < localDofVector.size() );
                 localDofVector[ kk ] += value[0]*phi[0] * weight;
+                // std::cout << "    kk=" << kk << " val=" << value[0] << " phi=" << phi[0]
+                //           << " weight=" << weight
+                //           << "    localDofVec=" <<  localDofVector[ kk ]
+                //           << std::endl;
               }
             );
           }
@@ -185,7 +188,7 @@ namespace Dune
           {
             auto x = edgeQuad.localPoint(qp);
             if (!twist) x[0] = 1.-x[0];
-            auto y = edgeQuad[qp]; // intersection.geometryInInside().global(x);
+            auto y = intersection.geometryInInside().global(x);
             double weight = edgeQuad.weight(qp) * intersection.geometry().integrationElement(x) / intersection.geometry().volume();
             shapeFunctionSet.evaluateEach( y,
               [ & ] ( std::size_t beta, typename ShapeFunctionSet::RangeType value )
@@ -193,6 +196,7 @@ namespace Dune
                 edgeBFS_.evaluateEach( x,
                   [&](std::size_t alpha, typename EdgeFSType::RangeType phi ) {
                     int kk = alpha+k;
+                    assert(kk<localDofMatrix.size());
                     localDofMatrix[ kk ][ beta ] += value[0]*phi[0] * weight;
                   }
                 );
@@ -215,6 +219,7 @@ namespace Dune
                 innerShapeFunctionSet.evaluateEach( innerQuad[qp],
                   [&](std::size_t alpha, typename InnerFSType::RangeType phi ) {
                     int kk = alpha+k;
+                    assert(kk<localDofMatrix.size());
                     localDofMatrix[ kk ][ beta ] += value[0]*phi[0] * weight;
                   }
                 );
@@ -231,7 +236,6 @@ namespace Dune
                         const Vertex &vertex, const Edge &edge,
                         std::vector<int> &mask, bool tmp) const
       {
-        mask.clear();
         const ElementType &element = intersection.inside();
         const auto &refElement = ReferenceElements< ctype, dimension >::general( element.type() );
 

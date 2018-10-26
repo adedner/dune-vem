@@ -272,6 +272,8 @@ namespace Dune
       for( std::size_t agglomerate = 0; agglomerate < agglomeration().size(); ++agglomerate )
       {
         const auto &bbox = blockMapper_.indexSet().boundingBox(agglomerate);
+        auto extend = bbox.second;
+        extend -= bbox.first;
 
         const std::size_t numDofs = blockMapper().numDofs( agglomerate );
 
@@ -306,7 +308,9 @@ namespace Dune
                       Hp[alpha][beta] += phi[0]*psi[0]*weight;
                     } );
                   if (alpha<numShapeFunctionsMinus1)
-                    shapeFunctionSet.jacobianEach( quadrature[ qp ], [ & ] ( std::size_t beta, const typename ScalarShapeFunctionSetType::JacobianRangeType &psi ) {
+                    shapeFunctionSet.jacobianEach( quadrature[ qp ], [ & ] ( std::size_t beta, typename ScalarShapeFunctionSetType::JacobianRangeType psi ) {
+                        psi[0][0] /= extend[0]; // need correct scalling here
+                        psi[0][1] /= extend[1];
                         if (beta<numShapeFunctionsMinus1)
                           G[beta][alpha].axpy(phi[0]*weight, psi[0]);
                       } );
@@ -357,6 +361,7 @@ namespace Dune
         // finished agglomerating all auxiliary matrices
         // now compute projection matrices and stabilization
 
+        // volume
         DomainFieldType H0 = blockMapper_.indexSet().volume(agglomerate);
 
         auto &valueProjection    = valueProjections_[ agglomerate ];
@@ -391,22 +396,27 @@ namespace Dune
             }
 
           { // test G matrix
-            const ElementType &element = gridPart().entity( *(entitySeeds[agglomerate].begin()) );
-            BoundingBoxShapeFunctionSet< ElementType, ScalarShapeFunctionSetType > shapeFunctionSet( element, bbox, scalarShapeFunctionSet_ );
-            Fem::ElementQuadrature< GridPart, 0 > quad( element, 2*polOrder );
-            for( std::size_t qp = 0; qp < quad.nop(); ++qp )
+            for( const ElementSeedType &entitySeed : entitySeeds[ agglomerate ] )
             {
-              shapeFunctionSet.jacobianEach( quad[qp], [ & ] ( std::size_t alpha, FieldMatrix< DomainFieldType, 1,2 > phi ) {
-                if (alpha<numShapeFunctionsMinus1)
-                {
-                  Dune::FieldVector<double,2> d;
-                  Derivative<GridPartType, Dune::DynamicMatrix<DomainType>,decltype(shapeFunctionSet)>
-                      derivative(gridPart(),G,shapeFunctionSet,alpha); // used G matrix to compute gradients of monomials
-                  derivative.evaluate(quad[qp],d);
-                  d -= phi[0];
-                  assert(d.two_norm() < 1e-10);
-                }
-              });
+              const ElementType &element = gridPart().entity( entitySeed );
+              BoundingBoxShapeFunctionSet< ElementType, ScalarShapeFunctionSetType > shapeFunctionSet( element, bbox, scalarShapeFunctionSet_ );
+              Fem::ElementQuadrature< GridPart, 0 > quad( element, 2*polOrder );
+              for( std::size_t qp = 0; qp < quad.nop(); ++qp )
+              {
+                shapeFunctionSet.jacobianEach( quad[qp], [ & ] ( std::size_t alpha, FieldMatrix< DomainFieldType, 1,2 > phi ) {
+                  if (alpha<numShapeFunctionsMinus1)
+                  {
+                    Dune::FieldVector<double,2> d;
+                    Derivative<GridPartType, Dune::DynamicMatrix<DomainType>,decltype(shapeFunctionSet)>
+                        derivative(gridPart(),G,shapeFunctionSet,alpha); // used G matrix to compute gradients of monomials
+                    derivative.evaluate(quad[qp],d);
+                    phi[0][0] /= extend[0];
+                    phi[0][1] /= extend[1];
+                    d -= phi[0];
+                    assert(d.two_norm() < 1e-10);
+                  }
+                });
+              }
             }
           }
 
