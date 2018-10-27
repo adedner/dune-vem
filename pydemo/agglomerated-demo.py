@@ -24,7 +24,7 @@ testVoronoi = True
 testMetis = False
 
 dimRange = 1
-polOrder = 3
+polOrder = 2
 
 dune.fem.parameter.append({"fem.verboserank": 0})
 dune.fem.parameter.append({"fem.solver.verbose":False})

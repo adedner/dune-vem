@@ -109,10 +109,12 @@ namespace Dune
         {
           assert(numDofs == edgeBFS_.size());
           int edgeNumber = intersection.indexInInside();
+#if 0
           const auto &idSet = gridPart().grid().localIdSet();
           const auto left = idSet.subId( element, refElement.subEntity( edgeNumber, dimension-1, 0, dimension ), dimension );
           const auto right = idSet.subId( element, refElement.subEntity( edgeNumber, dimension-1, 1, dimension ), dimension );
           bool noTwist = true; // left < right;
+#endif
           EdgeQuadratureType edgeQuad( gridPart(),
                 intersection, 2*polOrder, EdgeQuadratureType::INSIDE );
           for (int qp=0;qp<edgeQuad.nop();++qp)
@@ -121,7 +123,6 @@ namespace Dune
             auto y = intersection.geometryInInside().global(x);
             localFunction.evaluate( y, value );
             double weight = edgeQuad.weight(qp) * intersection.geometry().integrationElement(x) / intersection.geometry().volume();
-            if (!noTwist) x[0] = 1-x[0];
             edgeBFS_.evaluateEach(x,
               [&](std::size_t alpha, typename LocalFunction::RangeType phi ) {
                 int kk = alpha+k;
@@ -177,17 +178,18 @@ namespace Dune
         {
           assert(numDofs == edgeBFS_.size());
           int edgeNumber = intersection.indexInInside();
+#if 0
           const auto &idSet = gridPart().grid().localIdSet();
           const auto left = idSet.subId( element, refElement.subEntity( edgeNumber, dimension-1, 0, dimension ), dimension );
           const auto right = idSet.subId( element, refElement.subEntity( edgeNumber, dimension-1, 1, dimension ), dimension );
           bool noTwist = true; // left < right;
+#endif
           EdgeQuadratureType edgeQuad( gridPart(), intersection, 2*polOrder, EdgeQuadratureType::INSIDE );
           for (int qp=0;qp<edgeQuad.nop();++qp)
           {
             auto x = edgeQuad.localPoint(qp);
             auto y = intersection.geometryInInside().global(x);
             double weight = edgeQuad.weight(qp) * intersection.geometry().integrationElement(x) / intersection.geometry().volume();
-            if (!noTwist) x[0] = 1.-x[0];
             shapeFunctionSet.evaluateEach( y,
               [ & ] ( std::size_t beta, typename ShapeFunctionSet::RangeType value )
               {
@@ -243,17 +245,18 @@ namespace Dune
         int edgeNumber = intersection.indexInInside();
         const int k = indexSet_.localIndex( element, edgeNumber, dimension-1 );
         assert(k>=0);
+#if 0
         const auto &idSet = gridPart().grid().localIdSet();
         const auto left = idSet.subId( element, refElement.subEntity( edgeNumber, dimension-1, 0, dimension ), dimension );
         const auto right = idSet.subId( element, refElement.subEntity( edgeNumber, dimension-1, 1, dimension ), dimension );
         bool noTwist = true; // left < right;
+#endif
         if (k>=0)
         {
           std::size_t i = 0;
           for( ; i < refElement.size( edgeNumber, dimension-1, dimension ); ++i )
           {
-            int j = (noTwist)? i : 1-i;
-            int vertexNumber = refElement.subEntity( edgeNumber, dimension-1, j, dimension);
+            int vertexNumber = refElement.subEntity( edgeNumber, dimension-1, i, dimension);
             const int k = indexSet_.localIndex( element, vertexNumber, dimension );
             assert(k>=0);
             vertex(poly,vertexNumber,i,1);
@@ -278,19 +281,20 @@ namespace Dune
         int edgeNumber = intersection.indexInInside();
         const auto &edgeGeo = refElement.template geometry<1>(edgeNumber);
 
+#if 0
         const auto &idSet = gridPart().grid().localIdSet();
         const auto left = idSet.subId( element, refElement.subEntity( edgeNumber, dimension-1, 0, dimension ), dimension );
         const auto right = idSet.subId( element, refElement.subEntity( edgeNumber, dimension-1, 1, dimension ), dimension );
         bool noTwist = true; // left < right;
-        // bool noTwist = true;
-        // if (intersection.neighbor())
-        //   noTwist = indexSet_.index( intersection.inside() ) < indexSet_.index( intersection.outside() );
+#endif
 
         auto vertex = [&] (int poly,int i,int k,int numDofs)
         {
-          // auto x = edgeGeo.local( refElement.position( i, dimension ) );
           const auto &x = edgeGeo.local( refElement.position( i, dimension ) );
-          // if (!noTwist) x[0] = 1.-x[0];
+          // auto y = edgeGeo.global(x);
+          // y -= refElement.position( i, dimension );
+          // assert( y.two_norm() < 1e-10 );
+
           shapeFunctionSet.evaluateEach( x, [ &localDofMatrix, k ] ( std::size_t alpha, typename ShapeFunctionSet::RangeType phi ) {
               assert( phi.dimension == 1 );
               assert( k < localDofMatrix.size() );
@@ -306,7 +310,6 @@ namespace Dune
           {
             auto x = edgeQuad.localPoint(qp);
             auto xx = x;
-            if (!noTwist) xx[0] = 1.-xx[0];
             double weight = edgeQuad.weight(qp) * intersection.geometry().integrationElement(x) / intersection.geometry().volume();
             shapeFunctionSet.evaluateEach( x, [ & ] ( std::size_t beta, typename ShapeFunctionSet::RangeType value ) {
                 edgeBFS_.evaluateEach( xx,

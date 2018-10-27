@@ -329,15 +329,18 @@ namespace Dune
             edgePhi.resize(edgeShapeFunctionSet_.size(),edgeShapeFunctionSet_.size(),0);
             interpolation( intersection, edgeShapeFunctionSet_, edgePhi, mask );
             edgePhi.invert();
+#if 0
             int edgeNumber = intersection.indexInInside();
             const auto &idSet = gridPart().grid().localIdSet();
             const int dimension = GridPartType::dimension;
             const auto left = idSet.subId( element, refElement.subEntity( edgeNumber, dimension-1, 0, dimension ), dimension );
             const auto right = idSet.subId( element, refElement.subEntity( edgeNumber, dimension-1, 1, dimension ), dimension );
             bool noTwist = true; // left < right;
+#endif
             { // test edgePhi
               assert( mask.size() == edgeShapeFunctionSet_.size() );
               std::vector<double> lambda(numDofs);
+#if 1 // terrible hack!
               bool succ = true;
               for (int i=0;i<mask.size();++i)
               {
@@ -349,6 +352,7 @@ namespace Dune
                   succ &= ( mask[i]==k? std::abs(lambda[k]-1)<1e-10: std::abs(lambda[k])<1e-10 );
               }
               if (!succ) std::swap(mask[0],mask[1]);
+#endif
               for (int i=0;i<mask.size();++i)
               {
                 std::fill(lambda.begin(),lambda.end(),0);
@@ -365,7 +369,6 @@ namespace Dune
             for( std::size_t qp = 0; qp < quadrature.nop(); ++qp )
             {
               auto x = quadrature.localPoint(qp);
-              if (!noTwist) x[0] = 1.-x[0];
               auto y = intersection.geometryInInside().global(x);
               const DomainFieldType weight = intersection.geometry().integrationElement( x ) * quadrature.weight( qp );
               shapeFunctionSet.evaluateEach( y, [ & ] ( std::size_t alpha, FieldVector< DomainFieldType, 1 > phi ) {
