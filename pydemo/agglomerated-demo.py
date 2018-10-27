@@ -19,12 +19,13 @@ from voronoi import triangulated_voronoi
 import graph
 import holes
 
-testVoronoi = False
+testInterpolation = False
+testVoronoi = True
 testMetis = False
 
 dimRange = 1
+polOrder = 3
 
-# dune.fem.parameter.append("parameter")
 dune.fem.parameter.append({"fem.verboserank": 0})
 dune.fem.parameter.append({"fem.solver.verbose":False})
 
@@ -97,6 +98,7 @@ class Agglomerate:
                 self.grid = create.grid("ALUSimplex", constructor=constructor, dimgrid=2)
         else:
             self.suffix = "c" + self.suffix
+            # self.grid = create.grid("ALUSimplex", constructor=constructor)
             self.grid = create.grid("yasp", constructor=constructor)
             self.division = constructor.division
         self.ind = set()
@@ -111,7 +113,7 @@ class Agglomerate:
             index = test_point_regions[0]
             self.ind.add(index)
         else:
-            idx = self.grid.indexSet.index(en)
+            idx = self.grid.indexSet.index(en) # /2
             nx = int(idx / self.division[1])
             ny = int(idx % self.division[1])
             # print("nx,ny",nx,ny)
@@ -201,17 +203,18 @@ def compute(agglomerate,filename):
     model = create.model("elliptic", grid, a==b, dune.ufl.DirichletBC(uflSpace,exact,1))
 
     # print(df_adg.grid) # <- causes error
-    interpol_lag, df_lag = solve(grid,None, model,exact,
-            "h1","Lagrange","h1",order=1)
-    interpol_dg,  df_dg  = solve(grid,None, model,exact,
-            "dgonb","DGONB","dg",penalty=10)
-    interpol_adg, df_adg = solve(grid,agglomerate, model,exact,
-            "adg","AgglomeratedDG","dg",order=1,penalty=0.1)
+    interpol_lag, df_lag = None,None # solve(grid,None, model,exact,
+            # "h1","Lagrange","h1",order=polOrder)
+    interpol_dg,  df_dg  = None,None # solve(grid,None, model,exact,
+            # "dgonb","DGONB","dg",penalty=10, order=polOrder)
+    interpol_adg, df_adg = None,None # solve(grid,agglomerate, model,exact,
+            # "adg","AgglomeratedDG","dg",penalty=0.1,order=polOrder)
 
     if dimRange == 1:
-        interpol_vem, df_vem = solve(grid,agglomerate,model,exact,"vem","AgglomeratedVEM","vem")
+        interpol_vem, df_vem = solve(grid,agglomerate,model,exact,
+                                     "vem","AgglomeratedVEM","vem",order=polOrder)
     else:
-        interpol_vem, df_vem = None, None # interpol_adg.copy("tmp_interpol"), df_adg.copy("tmp")
+        interpol_vem, df_vem = None, Nonei
         print("Skippting vem: not yet implemented for dimRange>1")
 
     grid.writeVTK(filename+agglomerate.suffix,
@@ -220,7 +223,7 @@ def compute(agglomerate,filename):
                     df_dg, df_lag ],
         celldata =[ create.function("local",grid,"cells",1,lambda en,x: [agglomerate(en)]) ])
 
-# test of higher order vem spaces
+# test of higher order vem spaces (only interpolation)
 def test(agglomerate):
     dfs,err = [],[]
     x = SpatialCoordinate(triangle)
@@ -228,7 +231,7 @@ def test(agglomerate):
     # f = as_vector( [2*x[0]] )
     # f = as_vector( [2*(x[0]*x[1])**2] )
     f = as_vector( [cos(x[0])*cos(x[1]) ] )
-    polys = [1,2,3,4]
+    polys = [2,3]
     for p in polys:
         space = create.space("agglomeratedvem", agglomerate.grid, agglomerate,
                 dimrange=1, order=p, storage="fem")
@@ -239,19 +242,18 @@ def test(agglomerate):
         print("error:",p,err[-1])
     return polys, dfs, err
 
-if True:
-    constructor = cartesianDomain([0,0],[1,1],[64,64])
+if testInterpolation:
+    N = 16
+    constructor = cartesianDomain([0,0],[1,1],[N,N])
     err = []
-
     n = 1
-    while n <= 64:
+    while n <= N:
         agglomerate = Agglomerate([n,n],version="cartesian",constructor=constructor)
         polys,dfs,e = test(agglomerate )
         err += [e]
         dfs[0].space.grid.writeVTK("test"+str(n),
             pointdata=dfs, celldata = [ create.function("local",agglomerate.grid,"cells",1,lambda en,x: [agglomerate(en)]) ])
         n = n*2
-        # break
 
     eoc = lambda E,e: math.log(E/e)/math.log(2.)
     for p,poly in enumerate(polys):
@@ -262,16 +264,16 @@ if testVoronoi:
     print("*******************************************************")
     constructor = None # cartesianDomain([0,0],[3,2],[200,200])
     print("Test 1: Voronoi(251)")
-    # compute(Agglomerate(251,version="voronoi",constructor=constructor),
-    #         "voronoi")
+    compute(Agglomerate(251,version="voronoi",constructor=constructor),
+            "voronoi")
     print("*****************")
     print("Test 2: Voronoi(999)")
-    # compute(Agglomerate(999,version="voronoi",constructor=constructor),
-    #         "voronoi")
+    compute(Agglomerate(999,version="voronoi",constructor=constructor),
+            "voronoi")
     print("*****************")
     print("Test 3: Voronoi(4013)")
-    # compute(Agglomerate(4013,version="voronoi",constructor=constructor),
-    #         "voronoi")
+    compute(Agglomerate(4013,version="voronoi",constructor=constructor),
+            "voronoi")
 
 if testMetis:
     print("*******************************************************")
@@ -289,5 +291,5 @@ if testMetis:
             "metisVoronoi")
     print("*****************")
     print("Test 3: Metis(4013)")
-    # compute(Agglomerate(4013,version="metis",constructor=constructor),
-    #         "metis")
+    compute(Agglomerate(4013,version="metis",constructor=constructor),
+            "metis")

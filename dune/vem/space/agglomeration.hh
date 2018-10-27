@@ -312,7 +312,7 @@ namespace Dune
                         psi[0][0] /= extend[0]; // need correct scalling here
                         psi[0][1] /= extend[1];
                         if (beta<numShapeFunctionsMinus1)
-                          G[beta][alpha].axpy(phi[0]*weight, psi[0]);
+                          G[alpha][beta].axpy(phi[0]*weight, psi[0]);
                       } );
                 } );
             }
@@ -329,9 +329,26 @@ namespace Dune
             edgePhi.resize(edgeShapeFunctionSet_.size(),edgeShapeFunctionSet_.size(),0);
             interpolation( intersection, edgeShapeFunctionSet_, edgePhi, mask );
             edgePhi.invert();
+            int edgeNumber = intersection.indexInInside();
+            const auto &idSet = gridPart().grid().localIdSet();
+            const int dimension = GridPartType::dimension;
+            const auto left = idSet.subId( element, refElement.subEntity( edgeNumber, dimension-1, 0, dimension ), dimension );
+            const auto right = idSet.subId( element, refElement.subEntity( edgeNumber, dimension-1, 1, dimension ), dimension );
+            bool noTwist = true; // left < right;
             { // test edgePhi
               assert( mask.size() == edgeShapeFunctionSet_.size() );
               std::vector<double> lambda(numDofs);
+              bool succ = true;
+              for (int i=0;i<mask.size();++i)
+              {
+                std::fill(lambda.begin(),lambda.end(),0);
+                PhiEdge<GridPartType, Dune::DynamicMatrix<double>,EdgeShapeFunctionSetType>
+                  phiEdge(gridPart(),intersection,edgePhi,edgeShapeFunctionSet_,i); // behaves like Phi_mask[i] restricted to edge
+                interpolation(element,phiEdge,lambda);
+                for (int k=0;k<numDofs;++k) // lambda should be 1 for k=mask[i] otherwise 0
+                  succ &= ( mask[i]==k? std::abs(lambda[k]-1)<1e-10: std::abs(lambda[k])<1e-10 );
+              }
+              if (!succ) std::swap(mask[0],mask[1]);
               for (int i=0;i<mask.size();++i)
               {
                 std::fill(lambda.begin(),lambda.end(),0);
@@ -347,10 +364,13 @@ namespace Dune
             EdgeQuadratureType quadrature( gridPart(), intersection, 2*polOrder-1, EdgeQuadratureType::INSIDE );
             for( std::size_t qp = 0; qp < quadrature.nop(); ++qp )
             {
-              const DomainFieldType weight = intersection.geometry().integrationElement( quadrature.localPoint( qp ) ) * quadrature.weight( qp );
-              shapeFunctionSet.evaluateEach( quadrature[qp], [ & ] ( std::size_t alpha, FieldVector< DomainFieldType, 1 > phi ) {
+              auto x = quadrature.localPoint(qp);
+              if (!noTwist) x[0] = 1.-x[0];
+              auto y = intersection.geometryInInside().global(x);
+              const DomainFieldType weight = intersection.geometry().integrationElement( x ) * quadrature.weight( qp );
+              shapeFunctionSet.evaluateEach( y, [ & ] ( std::size_t alpha, FieldVector< DomainFieldType, 1 > phi ) {
                  if (alpha<numShapeFunctionsMinus1)
-                    edgeShapeFunctionSet_.evaluateEach( quadrature.localPoint(qp), [ & ] ( std::size_t beta, FieldVector< DomainFieldType, 1 > psi ) {
+                    edgeShapeFunctionSet_.evaluateEach( x, [ & ] ( std::size_t beta, FieldVector< DomainFieldType, 1 > psi ) {
                         for (int s=0;s<mask.size();++s) // note that edgePhi is the transposed of the basis transform matrix
                           R[alpha][mask[s]].axpy( edgePhi[beta][s]*psi[0]*phi[0]*weight, normal);
                     } );
@@ -388,12 +408,14 @@ namespace Dune
 
           auto Gtmp = G;
           for (std::size_t alpha=0; alpha<numShapeFunctionsMinus1; ++alpha)
+          {
             for (std::size_t beta=0; beta<numShapeFunctionsMinus1; ++beta)
             {
               G[alpha][beta] = DomainType(0);
               for (std::size_t gamma=0; gamma<numShapeFunctionsMinus1; ++gamma)
                 G[alpha][beta].axpy(HpMinus1[alpha][gamma],Gtmp[gamma][beta]);
             }
+          }
 
           { // test G matrix
             for( const ElementSeedType &entitySeed : entitySeeds[ agglomerate ] )
@@ -423,7 +445,7 @@ namespace Dune
           // add interior integrals for gradient projection
           for (std::size_t alpha=0; alpha<numShapeFunctionsMinus1; ++alpha)
             for (std::size_t beta=0; beta<numShapeFunctionsMinus2; ++beta)
-              R[alpha][beta+numDofs-numShapeFunctionsMinus2].axpy(-H0, G[alpha][beta]);
+              R[alpha][beta+numDofs-numShapeFunctionsMinus2].axpy(-H0, G[beta][alpha]);
 
           // now compute projection by multiplying with inverse mass matrix
           for (std::size_t alpha=0; alpha<numShapeFunctions; ++alpha)
