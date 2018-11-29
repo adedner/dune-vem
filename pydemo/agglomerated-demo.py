@@ -138,7 +138,6 @@ def solve(grid,agglomerate,model,exact,name,space,scheme,order=1,penalty=None):
     print("SOLVING: ",name,space,scheme,penalty,flush=True)
     gf_exact = create.function("ufl",grid,"exact",4,exact)
     if agglomerate:
-        print("agglomerate",agglomerate)
         spc = create.space(space, grid, agglomerate, dimrange=dimRange,
                 order=order, storage="fem")
         assert agglomerate.check(), "missing or too many indices provided by agglomoration object. Should be "+str(agglomerate.N)+" was "+str(len(agglomerate.ind))
