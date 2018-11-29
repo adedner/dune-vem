@@ -53,6 +53,7 @@ namespace Dune
 
       auto interpolation = Dune::Vem::agglomerationVEMInterpolation<polOrder>( mapper.indexSet() );
 
+      Dune::Fem::ConstLocalFunction<GridFunction> uLocal(u);
       for( std::size_t agglomerate = 0; agglomerate < agglomeration.size(); ++agglomerate )
       {
         if( entitySeeds[ agglomerate ].empty() )
@@ -63,7 +64,8 @@ namespace Dune
         for( const ElementSeedType &entitySeed : entitySeeds[ agglomerate ] )
         {
           const auto &element = v.gridPart().entity( entitySeed );
-          interpolation( element, u.localFunction( element ), ldv );
+          uLocal.bind(element);
+          interpolation( element, uLocal, ldv );
           // interpolation( u.localFunction( element ), ldv );
         }
         v.setLocalDofs( v.gridPart().entity( entitySeeds[ agglomerate ].front() ), ldv );

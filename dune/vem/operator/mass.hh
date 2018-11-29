@@ -26,7 +26,7 @@ namespace Dune
       w.clear();
 
       Fem::TemporaryLocalFunction< typename DiscreteFunction::DiscreteFunctionSpaceType > wLocal( w.space() );
-      for( const auto &entity : elements( static_cast< typename GridFunction::GridPartType::GridViewType >( u.gridPart() ) ) )
+      for( const auto &entity : elements( static_cast< typename GridFunction::GridPartType::GridViewType >( w.gridPart() ) ) )
       {
         const auto geometry = entity.geometry();
 
