@@ -19,15 +19,14 @@ from voronoi import triangulated_voronoi
 import graph
 import holes
 
-testInterpolation = False
-testVoronoi = True
-testMetis = False
+testInterpolation = True
+testVoronoi       = False
+testMetis         = False
 
 dimRange = 1
 polOrder = 2
 
-dune.fem.parameter.append({"fem.verboserank": 0})
-dune.fem.parameter.append({"fem.solver.verbose":False})
+dune.fem.parameter.append({"fem.verboserank": -1})
 
 def plot(grid, solution):
     try:
@@ -125,20 +124,19 @@ class Agglomerate:
     def check(self):
         return len(self.ind)==self.N
 
-newtonParameters = {"linabstol": 1e-8, "reduction": 1e-8, "tolerance": 3e-5,
-              "maxiterations": 50,
-              "maxlineariterations": 2500,
-              "maxlinesearchiterations":50,
-              "verbose": "true", "linear.verbose": "true",
+parameters = {"newton.inear.absolutetol": 1e-8, "newton.linear.reductiontol": 1e-8,
+              "newton.linear.verbose": "true",
+              "newton.tolerance": 3e-5,
+              "newton.maxiterations": 50,
+              "newton.maxiterations": 2500,
+              "newton.maxlinesearchiterations":50,
+              "newton.verbose": "true"
               }
-parameters = {"fem.solver.newton." + k: v for k, v in newtonParameters.items()}
-parameters["istl.preconditioning.method"] = "ilu"
 
 def solve(grid,agglomerate,model,exact,name,space,scheme,order=1,penalty=None):
     print("SOLVING: ",name,space,scheme,penalty,flush=True)
     gf_exact = create.function("ufl",grid,"exact",4,exact)
     if agglomerate:
-        print("agglomerate",agglomerate)
         spc = create.space(space, grid, agglomerate, dimrange=dimRange,
                 order=order, storage="fem")
         assert agglomerate.check(), "missing or too many indices provided by agglomoration object. Should be "+str(agglomerate.N)+" was "+str(len(agglomerate.ind))
@@ -146,20 +144,21 @@ def solve(grid,agglomerate,model,exact,name,space,scheme,order=1,penalty=None):
         print("no agglomerate")
         spc = create.space(space, grid, dimrange=dimRange, order=order,
                 storage="fem")
-    print("interpolate")
     interpol = spc.interpolate( gf_exact, "exact_"+name )
     if penalty:
-        print("penalty",penalty)
+        # print("penalty",penalty)
         scheme = create.scheme(scheme, model, spc, penalty=penalty,
                 solver=("suitesparse","umfpack"),
                 parameters=parameters)
-        df,info = scheme.solve(name=name)
+        df = spc.interpolate([0],name=name)
+        info = scheme.solve(target=df)
     else:
-        print("no penalty")
+        # print("no penalty")
         scheme = create.scheme(scheme, model, spc,
                 solver=("suitesparse","umfpack"),
                 parameters=parameters)
-        df,info = scheme.solve(name=name)
+        df = spc.interpolate([0],name=name)
+        info = scheme.solve(target=df)
     print("computing errors")
     errors = error(grid,df,interpol,exact)
     if spc.size < 0:
