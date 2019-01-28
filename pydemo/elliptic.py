@@ -1,6 +1,6 @@
 from __future__ import print_function
 
-import math
+import math, sys
 import numpy
 from scipy.spatial import Voronoi, voronoi_plot_2d, cKDTree
 import numpy.linalg
@@ -24,6 +24,9 @@ try:
     import holes
 except:
     holes = False
+
+dimRange = 1
+polOrder = 1
 
 dune.fem.parameter.append({"fem.verboserank": -1})
 
@@ -122,51 +125,71 @@ class Agglomerate:
             # print("index",index)
         return index
     def check(self):
+        return True
         return len(self.ind)==self.N
 
-parameters = {"newton.inear.absolutetol": 1e-13, "newton.linear.reductiontol": 1e-13,
+parameters = {"newton.inear.absolutetol": 1e-8, "newton.linear.reductiontol": 1e-8,
               "newton.linear.verbose": "true",
-              "newton.tolerance": 3e-12,
+              "newton.tolerance": 3e-5,
               "newton.maxiterations": 50,
               "newton.maxiterations": 2500,
               "newton.maxlinesearchiterations":50,
               "newton.verbose": "true"
               }
 
-# test of higher order vem spaces (only interpolation)
-def test(agglomerate, polys):
-    dfs,err = [],[]
-    x = SpatialCoordinate(triangle)
-    # f = as_vector( [2] )
-    # f = as_vector( [2*x[0]] )
-    # f = as_vector( [2*(x[0]*x[1])**2] )
-    f = as_vector( [cos(x[0])*cos(x[1]) ] )
-    for p in polys:
-        space = create.space("agglomeratedvem", agglomerate.grid, agglomerate,
-                dimrange=1, order=p, storage="fem")
-        dfs += [space.interpolate(f,name="df"+str(p))]
-        err += [error(agglomerate.grid,dfs[-1],dfs[-1],f)]
-        dfs += [dune.create.function("ufl",space.grid,name="gdf"+str(p),
-            ufl=grad(dfs[-1][0]),order=p-1)]
-        print("error:",p,err[-1])
-    return polys, dfs, err
+def solve(grid,agglomerate,model,exact,name,space,scheme,order=1,penalty=None):
+    print("SOLVING: ",name,space,scheme,penalty,flush=True)
+    gf_exact = create.function("ufl",grid,"exact",4,exact)
+    spc = create.space(space, grid, agglomerate, dimrange=dimRange,
+    # spc = create.space(space, grid, dimrange=dimRange,
+                order=order, storage="fem")
+    assert agglomerate.check(), "missing or too many indices provided by agglomoration object. Should be "+str(agglomerate.N)+" was "+str(len(agglomerate.ind))
+    interpol = spc.interpolate( gf_exact, "interpol_"+name )
+    scheme = create.scheme(scheme, model, spc,
+                        solver=("suitesparse","umfpack"),
+                parameters=parameters)
+    df = spc.interpolate([0],name=name)
+    info = scheme.solve(target=df)
+    print("computing errors")
+    errors = error(grid,df,interpol,exact)
+    print("Computed",name+" size:",spc.size,
+          "L^2 (s,i):", [errors[0],errors[1]],
+          "H^1 (s,i):", [errors[2],errors[3]],
+          "linear and Newton iterations:",
+          info["linear_iterations"], info["iterations"],flush=True)
+    return interpol, df
 
-N = 16
-constructor = cartesianDomain([0,0],[1,1],[N,N])
-err = []
-n = 1
-polys = [1,2,3]
-while n <= N:
-    print("n/N=",n,N)
-    agglomerate = Agglomerate([n,n],version="cartesian",constructor=constructor)
-    polys,dfs,e = test(agglomerate,polys)
-    err += [e]
-    dfs[0].space.grid.writeVTK("test"+str(n),
-        pointdata=dfs, celldata = [ create.function("local",agglomerate.grid,"cells",1,lambda en,x: [agglomerate(en)]) ])
-    n = n*2
+def compute(agglomerate,filename):
+    grid = agglomerate.grid
+    uflSpace = dune.ufl.Space((grid.dimGrid, grid.dimWorld), dimRange, field="double")
+    u = TrialFunction(uflSpace)
+    v = TestFunction(uflSpace)
+    x = SpatialCoordinate(uflSpace.cell())
+    exact = as_vector( [cos(pi*x[0])*cos(pi*x[1])]*dimRange )
+    H = lambda w: grad(grad(w))
+    a = (inner(grad(u), grad(v)) + inner(u,v)) * dx
+    b = ( -(H(exact[0])[0,0]+H(exact[0])[1,1]) + exact[0] ) * v[0] * dx
+    model = create.model("elliptic", grid, a==b, dune.ufl.DirichletBC(uflSpace, exact, 1) )
 
-eoc = lambda E,e: math.log(E/e)/math.log(2.)
-print("degree","\t","step","\t\t","eocL2","\t\t\t","eocH1")
-for p,poly in enumerate(polys):
-    for i in range(1,len(err)):
-        print(poly,"\t",i,"\t\t",eoc(err[i-1][p][0],err[i][p][0]), "\t", eoc(err[i-1][p][2],err[i][p][2]))
+    interpol_vem, df_vem = solve(grid,agglomerate,model,exact,
+                                     "vem","AgglomeratedVEM","vem",order=polOrder)
+                                     # "vem","lagrange","h1",order=polOrder)
+
+    grid.writeVTK(filename+agglomerate.suffix,
+        pointdata=[ df_vem, interpol_vem ],
+        celldata =[ create.function("local",grid,"cells",1,lambda en,x: [agglomerate(en)]) ])
+
+print("*******************************************************")
+constructor = cartesianDomain([0,0],[1.5,1.5],[64,64])
+
+print("Test 1: [10,10]")
+compute(Agglomerate([64,64],version="cartesian",constructor=constructor),
+        "cartesian")
+print("*****************")
+print("Test 2: [20,20]")
+compute(Agglomerate([32,32],version="cartesian",constructor=constructor),
+        "cartesian")
+print("*****************")
+print("Test 3: [40,40]")
+compute(Agglomerate([16,16],version="cartesian",constructor=constructor),
+        "cartesian")

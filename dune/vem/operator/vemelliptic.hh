@@ -563,7 +563,6 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model, Constraints>::ja
     } // Neumann boundary loop
   } // element loop end
 
-
   // the second element loop to add the stabilisation term
   for (const auto &entity : Dune::elements(
         static_cast<typename GridPartType::GridViewType>(gridPart),

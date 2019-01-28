@@ -326,7 +326,8 @@ namespace Dune
         (*this)(intersection,vertex,edge,mask,false);
       }
 
-      static std::initializer_list< std::pair< int, unsigned int > > dofsPerCodim ()
+      // static std::initializer_list< std::pair< int, unsigned int > > dofsPerCodim ()
+      static std::vector< std::pair< int, unsigned int > > dofsPerCodim ()
       {
         const int eSize = Dune::Fem::OrthonormalShapeFunctions< GridPartType::dimension-1 >::size( std::max(polOrder-2,0) );
         const int iSize = Dune::Fem::OrthonormalShapeFunctions< GridPartType::dimension >::size( std::max(polOrder-2,0) );
