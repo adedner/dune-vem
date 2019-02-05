@@ -26,9 +26,9 @@ except:
     holes = False
 
 dimRange = 1
-polOrder = 1
+polOrder = 3
 
-dune.fem.parameter.append({"fem.verboserank": -1})
+dune.fem.parameter.append({"fem.verboserank": 0})
 
 def plot(grid, solution):
     try:
@@ -108,55 +108,61 @@ class Agglomerate:
     def __call__(self,en):
         if self.version == "metis" or self.version == "metisVoronoi":
             index = self.parts[ self.grid.indexSet.index(en) ]
-            self.ind.add(index)
         elif self.version == "voronoi":
             p = en.geometry.center
             test_point_dist, test_point_regions = self.voronoi_kdtree.query([p], k=1)
             index = test_point_regions[0]
-            self.ind.add(index)
         else:
-            idx = self.grid.indexSet.index(en) # /2
+            idx = self.grid.indexSet.index(en)
             nx = int(idx / self.division[1])
             ny = int(idx % self.division[1])
-            # print("nx,ny",nx,ny)
+            # print("nx,ny",nx,ny,flush=True,end="\t")
             nx = int(nx/self.division[0]*self.N[0])
             ny = int(ny/self.division[1]*self.N[1])
             index = nx*self.N[1]+ny
-            # print("index",index)
+            # print("    idx",idx,"Dx",self.division[0],"Dy",self.division[1],"nx,ny",nx,ny,flush=True, end="\t")
+            # print("     index",index,flush=True)
+        self.ind.add(index)
         return index
     def check(self):
-        return True
-        return len(self.ind)==self.N
+        return len(self.ind)==self.N[0]*self.N[1]
 
 parameters = {"newton.inear.absolutetol": 1e-8, "newton.linear.reductiontol": 1e-8,
               "newton.linear.verbose": "true",
               "newton.tolerance": 3e-5,
-              "newton.maxiterations": 50,
-              "newton.maxiterations": 2500,
+              "newton.maxiterations": 1,
               "newton.maxlinesearchiterations":50,
               "newton.verbose": "true"
               }
 
+h1errors = []
+l2errors = []
+
 def solve(grid,agglomerate,model,exact,name,space,scheme,order=1,penalty=None):
     print("SOLVING: ",name,space,scheme,penalty,flush=True)
     gf_exact = create.function("ufl",grid,"exact",4,exact)
-    spc = create.space(space, grid, agglomerate, dimrange=dimRange,
-    # spc = create.space(space, grid, dimrange=dimRange,
+    if agglomerate:
+        spc = create.space(space, grid, agglomerate, dimrange=dimRange,
                 order=order, storage="fem")
-    assert agglomerate.check(), "missing or too many indices provided by agglomoration object. Should be "+str(agglomerate.N)+" was "+str(len(agglomerate.ind))
+        assert agglomerate.check(), "missing or too many indices provided by agglomoration object. Should be "+str(agglomerate.N)+" was "+str(len(agglomerate.ind))
+    else:
+        spc = create.space(space, grid, dimrange=dimRange,
+                order=order, storage="fem")
     interpol = spc.interpolate( gf_exact, "interpol_"+name )
     scheme = create.scheme(scheme, model, spc,
                         solver=("suitesparse","umfpack"),
                 parameters=parameters)
     df = spc.interpolate([0],name=name)
     info = scheme.solve(target=df)
-    print("computing errors")
     errors = error(grid,df,interpol,exact)
     print("Computed",name+" size:",spc.size,
           "L^2 (s,i):", [errors[0],errors[1]],
           "H^1 (s,i):", [errors[2],errors[3]],
           "linear and Newton iterations:",
           info["linear_iterations"], info["iterations"],flush=True)
+    global h1errors, l2errors
+    l2errors += [errors[0],errors[1]]
+    h1errors += [errors[2],errors[3]]
     return interpol, df
 
 def compute(agglomerate,filename):
@@ -165,31 +171,43 @@ def compute(agglomerate,filename):
     u = TrialFunction(uflSpace)
     v = TestFunction(uflSpace)
     x = SpatialCoordinate(uflSpace.cell())
-    exact = as_vector( [cos(pi*x[0])*cos(pi*x[1])]*dimRange )
+
+    ###` trivial Neuman bc
+    exact  = as_vector( [cos(pi*x[0])*cos(pi*x[1])] )
+    ### zero boundary conditions
+    exact *= x[0]*x[1]*(2-x[0])*(2-x[1])
+    ### non zero and non trivial Neuman boundary conditions
+    # exact += as_vector( [sin(x[0]*x[1])] )
+
     H = lambda w: grad(grad(w))
     a = (inner(grad(u), grad(v)) + inner(u,v)) * dx
     b = ( -(H(exact[0])[0,0]+H(exact[0])[1,1]) + exact[0] ) * v[0] * dx
-    model = create.model("elliptic", grid, a==b, dune.ufl.DirichletBC(uflSpace, exact, 1) )
+    model = create.model("elliptic", grid, a==b,
+            *[dune.ufl.DirichletBC(uflSpace, exact, i+1) for i in range(4)]
+            )
 
     interpol_vem, df_vem = solve(grid,agglomerate,model,exact,
                                      "vem","AgglomeratedVEM","vem",order=polOrder)
-                                     # "vem","lagrange","h1",order=polOrder)
+    interpol_fem, df_fem = solve(grid,None,model,exact,
+                                     "fem","lagrange","h1",order=polOrder)
 
-    grid.writeVTK(filename+agglomerate.suffix,
-        pointdata=[ df_vem, interpol_vem ],
+    grid.writeVTK(filename+agglomerate.suffix,subsampling=1,
+        pointdata=[ df_vem, interpol_vem, df_fem, interpol_fem ],
         celldata =[ create.function("local",grid,"cells",1,lambda en,x: [agglomerate(en)]) ])
 
-print("*******************************************************")
-constructor = cartesianDomain([0,0],[1.5,1.5],[64,64])
 
-print("Test 1: [10,10]")
-compute(Agglomerate([64,64],version="cartesian",constructor=constructor),
-        "cartesian")
-print("*****************")
-print("Test 2: [20,20]")
-compute(Agglomerate([32,32],version="cartesian",constructor=constructor),
-        "cartesian")
-print("*****************")
-print("Test 3: [40,40]")
-compute(Agglomerate([16,16],version="cartesian",constructor=constructor),
-        "cartesian")
+start = 0
+end   = 5
+for i in range(start,end):
+    print("*******************************************************")
+    n = 2**(i+5)
+    N = 2*n
+    print("Test: ",n,N)
+    constructor = cartesianDomain([0,0],[2,2],[N,N])
+    compute(Agglomerate([n,n],version="cartesian",constructor=constructor), "cartesian")
+    if i>start:
+        for j in range(4):
+            l2eoc = math.log( l2errors[4*i+j]/l2errors[4*(i-1)+j] ) / math.log(0.5)
+            h1eoc = math.log( h1errors[4*i+j]/h1errors[4*(i-1)+j] ) / math.log(0.5)
+            print("eoc:",j,l2eoc,h1eoc)
+    print("*******************************************************")

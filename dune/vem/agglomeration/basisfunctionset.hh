@@ -49,7 +49,11 @@ namespace Dune
     private:
       struct Transformation
       {
-        explicit Transformation ( const std::pair< DomainType, DomainType > &bbox ) : extent( bbox.second - bbox.first ) {}
+        explicit Transformation ( const std::pair< DomainType, DomainType > &bbox ) : extentInv_( bbox.second - bbox.first )
+        {
+          std::transform(extentInv_.begin(),extentInv_.end(),extentInv_.begin(),
+              [](const double &x){return 1./x;});
+        }
 
         JacobianRangeType operator() ( JacobianRangeType jacobian ) const
         {
@@ -82,17 +86,17 @@ namespace Dune
         void applyScalar ( FieldVector< RangeFieldType, dimDomain > &jacobian ) const
         {
           for( int j = 0; j < dimDomain; ++j )
-            jacobian[ j ] /= extent[ j ];
+            jacobian[ j ] *= extentInv_[ j ];
         }
 
         void applyScalar ( FieldMatrix< RangeFieldType, dimDomain, dimDomain > &hessian ) const
         {
           for( int j = 0; j < dimDomain; ++j )
             for( int k = 0; k < dimDomain; ++k )
-              hessian[ j ][ k ] /= (extent[ j ] * extent[ k ]);
+              hessian[ j ][ k ] *= (extentInv_[ j ] * extentInv_[ k ]);
         }
 
-        DomainType extent;
+        DomainType extentInv_;
       };
 
     public:
@@ -100,7 +104,8 @@ namespace Dune
 
       BoundingBoxBasisFunctionSet ( const EntityType &entity, std::pair< DomainType, DomainType > bbox,
                                     ShapeFunctionSet shapeFunctionSet = ShapeFunctionSet() )
-        : entity_( &entity ), shapeFunctionSet_( std::move( shapeFunctionSet ) ), bbox_( std::move( bbox ) )
+        : entity_( &entity ), shapeFunctionSet_( std::move( shapeFunctionSet ) ), bbox_( std::move( bbox ) ),
+          transformation_(bbox_)
       {}
 
       int order () const { return shapeFunctionSet_.order(); }
@@ -141,7 +146,7 @@ namespace Dune
       template< class Point, class DofVector >
       void axpy ( const Point &x, const JacobianRangeType &jacobianFactor, DofVector &dofs ) const
       {
-        const JacobianRangeType transformedFactor = Transformation( bbox_ )( jacobianFactor );
+        const JacobianRangeType transformedFactor = transformation_( jacobianFactor );
         Fem::FunctionalAxpyFunctor< JacobianRangeType, DofVector > f( transformedFactor, dofs );
         shapeFunctionSet_.jacobianEach( position( x ), f );
       }
@@ -191,15 +196,15 @@ namespace Dune
         jacobian = JacobianRangeType( 0 );
         Fem::AxpyFunctor< DofVector, JacobianRangeType > f( dofs, jacobian );
         shapeFunctionSet_.jacobianEach( position( x ), f );
-        jacobian = Transformation( bbox_ )( jacobian );
+        jacobian = transformation_( jacobian );
       }
 
       template< class Point, class Jacobians > const
       void jacobianAll ( const Point &x, Jacobians &jacobians ) const
       {
         assert( jacobians.size() >= size() );
-        Fem::AssignFunctor< Jacobians, TransformedAssign< Transformation > > f( jacobians, Transformation( bbox_ ) );
-        shapeFunctionSet_.jacobianEach( position( x ), f );
+        Fem::AssignFunctor< Jacobians, TransformedAssign< Transformation > > f( jacobians, transformation_ );
+        shapeFunctionSet_.jacobianEach( x , f );
       }
 
       template< class Quadrature, class DofVector, class Hessians >
@@ -216,14 +221,14 @@ namespace Dune
         hessian = HessianRangeType( RangeFieldType( 0 ) );
         Fem::AxpyFunctor< DofVector, HessianRangeType > f( dofs, hessian );
         shapeFunctionSet_.hessianEach( position( x ), f );
-        hessian = Transformation( bbox_ )( hessian );
+        hessian = transformation_( hessian );
       }
 
       template< class Point, class Hessians > const
       void hessianAll ( const Point &x, Hessians &hessians ) const
       {
         assert( hessians.size() >= size() );
-        Fem::AssignFunctor< Hessians, TransformedAssign< Transformation > > f( hessians, Transformation( bbox_ ) );
+        Fem::AssignFunctor< Hessians, TransformedAssign< Transformation > > f( hessians, transformation_ );
         shapeFunctionSet_.hessianEach( position( x ), f );
       }
 
@@ -242,6 +247,7 @@ namespace Dune
       const EntityType *entity_ = nullptr;
       ShapeFunctionSet shapeFunctionSet_;
       std::pair< DomainType, DomainType > bbox_;
+      Transformation transformation_;
     };
 
   } // namespace Vem

@@ -122,7 +122,7 @@ namespace Dune {
       // map local to global BlockDofs
       std::vector< std::size_t > globalBlockDofs( localBlocks );
       space_.blockMapper().map( entity, globalBlockDofs );
-      std::vector< double > values( localBlocks*localBlockSize );
+      std::vector< double > valuesModel( localBlocks*localBlockSize );
       std::vector< bool > mask( localBlocks*localBlockSize );
       Dune::Vem::agglomerationVEMInterpolation<space_.polynomialOrder>( space_.blockMapper().indexSet() ) ( entity, mask );
 
@@ -135,12 +135,13 @@ namespace Dune {
         for( int l = 0; l < localBlockSize; ++l, ++localDof )
           if( dirichletBlocks_[ global ][ l ] && mask[ localDof ])
           {
+            std::fill(valuesModel.begin(),valuesModel.end(),0);
             Dune::Vem::agglomerationVEMInterpolation<space_.polynomialOrder>( space_.blockMapper().indexSet() )
             ( entity, typename BaseType::BoundaryWrapper(model_,dirichletBlocks_[global][l]),
-                values );
+                valuesModel );
             // store result
             assert( (unsigned int)localDof < wLocal.size() );
-            wLocal[ localDof ] = values[ localDof ];
+            wLocal[ localDof ] = valuesModel[ localDof ];
           }
       }
     }
@@ -180,6 +181,7 @@ namespace Dune {
           {
             if (op == Operation::sub)
             {
+              std::fill(valuesModel.begin(),valuesModel.end(),0);
               Dune::Vem::agglomerationVEMInterpolation<space_.polynomialOrder>( space_.blockMapper().indexSet() )
               ( entity, typename BaseType::BoundaryWrapper(model_,dirichletBlocks_[global][l]),
                   valuesModel );

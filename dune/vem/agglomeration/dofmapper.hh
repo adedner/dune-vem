@@ -206,11 +206,17 @@ namespace Dune
         for( int k = 0; k < size; ++k )
         {
           int idx = indexSet().localIndex( element, refElement.subEntity( i, c, k, info.codim ), info.codim );
+          // std::cout << "   k=" << k << " idx=" << idx << " "
+          //   << "vertexNr=" << refElement.subEntity( i, c, k, info.codim ) << std::endl;
           if( idx >= 0 )
             filter[ localOfs + idx ] = true;
         }
         localOfs += info.numDofs * indexSet().subAgglomerates( element, info.codim );
       }
+      // std::cout << indexSet().agglomeration().index(element) << "      ";
+      // std::cout << i << " " << c << " " << element.geometry().center() << " : ";
+      // for (const auto &f : filter) std::cout << f << " ";
+      // std::cout << std::endl;
     }
 
 
