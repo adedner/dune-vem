@@ -207,7 +207,8 @@ namespace Dune
         {
           int idx = indexSet().localIndex( element, refElement.subEntity( i, c, k, info.codim ), info.codim );
           if( idx >= 0 )
-            filter[ localOfs + idx ] = true;
+            for (int l=0;l<info.numDofs;++l)
+              filter[ localOfs + idx*info.numDofs + l ] = true;
         }
         localOfs += info.numDofs * indexSet().subAgglomerates( element, info.codim );
       }
