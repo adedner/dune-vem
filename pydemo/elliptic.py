@@ -172,19 +172,18 @@ def compute(agglomerate,filename):
     v = TestFunction(uflSpace)
     x = SpatialCoordinate(uflSpace.cell())
 
-    ###` trivial Neuman bc
+    ### trivial Neuman bc
     exact  = as_vector( [cos(pi*x[0])*cos(pi*x[1])] )
     ### zero boundary conditions
-    exact *= x[0]*x[1]*(2-x[0])*(2-x[1])
+    # exact *= x[0]*x[1]*(2-x[0])*(2-x[1])
     ### non zero and non trivial Neuman boundary conditions
     # exact += as_vector( [sin(x[0]*x[1])] )
 
     H = lambda w: grad(grad(w))
     a = (inner(grad(u), grad(v)) + inner(u,v)) * dx
     b = ( -(H(exact[0])[0,0]+H(exact[0])[1,1]) + exact[0] ) * v[0] * dx
-    model = create.model("elliptic", grid, a==b,
-            *[dune.ufl.DirichletBC(uflSpace, exact, i+1) for i in range(4)]
-            )
+    model = create.model("elliptic", grid, a==b)
+            # *[dune.ufl.DirichletBC(uflSpace, exact, i+1) for i in range(4)]
 
     interpol_vem, df_vem = solve(grid,agglomerate,model,exact,
                                      "vem","AgglomeratedVEM","vem",order=polOrder)
@@ -196,16 +195,16 @@ def compute(agglomerate,filename):
         celldata =[ create.function("local",grid,"cells",1,lambda en,x: [agglomerate(en)]) ])
 
 
-start = 0
-end   = 5
-for i in range(start,end):
+start = 5
+end   = 10
+for i in range(end-start):
     print("*******************************************************")
-    n = 2**(i+5)
-    N = 2*n
+    n = 2**(i+start)
+    N = n
     print("Test: ",n,N)
     constructor = cartesianDomain([0,0],[2,2],[N,N])
     compute(Agglomerate([n,n],version="cartesian",constructor=constructor), "cartesian")
-    if i>start:
+    if i>0:
         for j in range(4):
             l2eoc = math.log( l2errors[4*i+j]/l2errors[4*(i-1)+j] ) / math.log(0.5)
             h1eoc = math.log( h1errors[4*i+j]/h1errors[4*(i-1)+j] ) / math.log(0.5)

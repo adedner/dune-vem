@@ -335,15 +335,17 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
 
   // std::cout << "   in assembly: setting up vectors    " << timer.elapsed() << std::endl;;
   const int domainBlockSize = domainSpace.localBlockSize; // is equal to 1 for scalar functions
-  std::vector<typename DomainLocalFunctionType::RangeType> phi(
-      domainSpace.blockMapper().maxNumDofs() * domainBlockSize);
-  std::vector<typename DomainLocalFunctionType::JacobianRangeType> dphi(
-      domainSpace.blockMapper().maxNumDofs() * domainBlockSize);
-  const int rangeBlockSize = rangeSpace.localBlockSize; // is equal to 1 for scalar functions
-  std::vector<typename RangeLocalFunctionType::RangeType> rphi(
-      rangeSpace.blockMapper().maxNumDofs() * rangeBlockSize);
-  std::vector<typename RangeLocalFunctionType::JacobianRangeType> rdphi(
-      rangeSpace.blockMapper().maxNumDofs() * rangeBlockSize);
+  // Note the following is much! too large since it assumes e.g. all vertices in one polygon
+  std::size_t maxSize = domainSpace.blockMapper().maxNumDofs() * domainBlockSize;
+  std::vector<typename DomainLocalFunctionType::RangeType> phi;
+  phi.reserve(maxSize);
+  std::vector<typename DomainLocalFunctionType::JacobianRangeType> dphi;
+  dphi.reserve(maxSize);
+  // const int rangeBlockSize = rangeSpace.localBlockSize; // is equal to 1 for scalar functions
+  // std::vector<typename RangeLocalFunctionType::RangeType> rphi(
+  //     rangeSpace.blockMapper().maxNumDofs() * rangeBlockSize);
+  // std::vector<typename RangeLocalFunctionType::JacobianRangeType> rdphi(
+  //     rangeSpace.blockMapper().maxNumDofs() * rangeBlockSize);
 
   std::vector<double> polygonareas(rangeSpace.agglomeration().size(), 0.0);
   std::vector<RangeRangeType> VectorOfAveragedDiffusionCoefficients (rangeSpace.agglomeration().size(), RangeRangeType(0));
@@ -411,6 +413,8 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
     const DomainBasisFunctionSetType &domainBaseSet = jLocal.domainBasisFunctionSet();
     const RangeBasisFunctionSetType &rangeBaseSet = jLocal.rangeBasisFunctionSet();
     const unsigned int domainNumBasisFunctions = domainBaseSet.size();
+    phi.resize(domainNumBasisFunctions);
+    dphi.resize(domainNumBasisFunctions);
 
     QuadratureType quadrature(entity, domainSpace.order() + rangeSpace.order());
     const std::size_t numQuadraturePoints = quadrature.nop();
