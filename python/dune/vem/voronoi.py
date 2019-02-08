@@ -5,6 +5,8 @@ import numpy as np
 import scipy as sp
 import scipy.spatial
 import sys
+from scipy.spatial import Voronoi, voronoi_plot_2d, cKDTree
+import numpy
 
 eps = sys.float_info.epsilon
 
@@ -13,7 +15,17 @@ def in_box(towers, bounding_box):
                                          towers[:, 0] <= bounding_box[1]),
                           np.logical_and(bounding_box[2] <= towers[:, 1],
                                          towers[:, 1] <= bounding_box[3]))
-def triangulated_voronoi(towers, bounding_box):
+
+def voronoiCells(constructor, towers):
+    lowerleft  = numpy.array(constructor.lower)
+    upperright = numpy.array(constructor.upper)
+    bounding_box = numpy.array(
+            [lowerleft[0],upperright[0],lowerleft[1],upperright[1]] )
+    if isinstance(towers,int):
+        numpy.random.seed(1234)
+        towers = numpy.array(
+                [ p*(upperright-lowerleft) + lowerleft
+                    for p in numpy.random.rand(towers, 2) ])
     # Select towers inside the bounding box
     i = in_box(towers, bounding_box)
     # Mirror points
@@ -54,26 +66,45 @@ def triangulated_voronoi(towers, bounding_box):
                     break
         if region != [] and flag:
             regions.append(region)
-    vor.filtered_points = points_center
-    vor.filtered_regions = regions
+
+    # polys = [ r+[r[0]] for r in regions ]
 
     indices = set()
-    triangles = np.zeros([0,3],int)
-    for region in vor.filtered_regions:
-        vertices = vor.vertices[region + [region[0]], :]
-        for r in region + [region[0] ]:
+    for poly in regions:
+        for r in poly:
             indices.add( r )
-        tri = sp.spatial.Delaunay(vertices).simplices
-        triangles = np.concatenate(
-                (triangles, np.array(region + [region[0]])[tri] ),
-                axis=0 )
-
     indices = np.array(list(indices))
-    vertices = vor.vertices[indices,:]
+    vorVertices = vor.vertices[indices,:]
     newind = np.zeros(len(vor.vertices),int)
     for i in range(len(indices)):
         newind[indices[i]] = i
+    return {"vertices":vorVertices, "polygons":[newind[r] for r in regions]}
+
+def triangulated_voronoi(constructor, towers):
+    voronoi = voronoiCells(constructor, towers)
+    vorVertices, polys = voronoi["vertices"], voronoi["polygons"]
+    indices = set()
+    triangles = np.zeros([0,3],int)
+    for poly in polys:
+        p = numpy.append(poly,[poly[0]])
+        vert = vorVertices[p, :]
+        for r in poly:
+            indices.add( r )
+        tri = sp.spatial.Delaunay(vert).simplices
+        # print("p,vert,tri",p,vert,tri)
+        # print("triangles",p[tri])
+        triangles = np.concatenate(
+                (triangles, p[tri] ),
+                axis=0 )
+
+    indices = np.array(list(indices))
+    vertices = vorVertices[indices,:]
+    newind = np.zeros(len(vorVertices),int)
+    for i in range(len(indices)):
+        newind[indices[i]] = i
     return vertices, newind[triangles]
+
+
 
 # n_towers = 100
 # towers = np.random.rand(n_towers, 2)

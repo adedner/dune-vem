@@ -1,9 +1,14 @@
 from dune.vem._vem import *
+from dune.vem.voronoi import voronoiCells
 registry = dict()
 registry["space"] = {
-        "AgglomeratedDG" : agglomerateddg,
-        "AgglomeratedVEM" : agglomeratedvem
+        "bbdg"   : bbdgSpace,
+        "vem"    : vemSpace
     }
 registry["scheme"] = {
-         "vem"         : vem
+         "vem"    : vemScheme,
+         "bbdg"   : bbdgScheme
     }
+registry["grid"] = {
+        "polygrid" : polyGrid
+   }

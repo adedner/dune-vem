@@ -42,3 +42,5 @@ def get(area,plotDomain=False):
     tr['simplices'] = tr.pop('triangles')
     tr.pop('segments')
     return tr
+
+get(0.1,True)

@@ -49,6 +49,7 @@ namespace Dune
     private:
       struct Transformation
       {
+        Transformation() {}
         explicit Transformation ( const std::pair< DomainType, DomainType > &bbox ) : extentInv_( bbox.second - bbox.first )
         {
           std::transform(extentInv_.begin(),extentInv_.end(),extentInv_.begin(),
@@ -100,7 +101,9 @@ namespace Dune
       };
 
     public:
-      BoundingBoxBasisFunctionSet () = default;
+      BoundingBoxBasisFunctionSet ()
+      : entity_(nullptr)
+      { }
 
       BoundingBoxBasisFunctionSet ( const EntityType &entity, std::pair< DomainType, DomainType > bbox,
                                     ShapeFunctionSet shapeFunctionSet = ShapeFunctionSet() )

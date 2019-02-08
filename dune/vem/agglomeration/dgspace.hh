@@ -156,6 +156,11 @@ namespace Dune
               Dune::GeometryType(Dune::GeometryType::cube,GridPart::dimension), polOrder )
       {}
 
+      const BoundingBox< GridPart >& boundingBox( const EntityType &entity ) const
+      {
+        return boundingBoxes_[ agglomeration().index( entity ) ];
+      }
+
       const BasisFunctionSetType basisFunctionSet ( const EntityType &entity ) const
       {
         typename Traits::ShapeFunctionSetType shapeFunctionSet( &scalarShapeFunctionSet_ );
@@ -185,6 +190,55 @@ namespace Dune
       typename Traits::ScalarShapeFunctionSetType scalarShapeFunctionSet_;
     };
 
+    template <class DFSpace>
+    struct BBDGPenalty
+    {
+      BBDGPenalty(const DFSpace &space, double penalty)
+      : space_(space)
+      , penalty_(penalty)
+      {}
+      template <class Intersection>
+      double operator()(const Intersection &intersection,
+                        double intersectionArea, double area, double nbArea) const
+      {
+        const auto &bbIn = space_.boundingBox(intersection.inside());
+        auto delta = bbIn.second - bbIn.first;
+        auto volume = bbIn.volume;
+        if (intersection.neighbor())
+        {
+          const auto &bbOut  = space_.boundingBox(intersection.outside());
+          delta[0] = std::min(delta[0], bbOut.second[0]-bbOut.first[0]);
+          delta[1] = std::min(delta[1], bbOut.second[1]-bbOut.first[1]);
+          volume = std::min(volume,bbOut.volume);
+        }
+        /*
+        auto normal = intersection.unitOuterNormal({0.5});
+        normal[0] = std::abs(normal[0]);
+        normal[1] = std::abs(normal[1]);
+        double h = 0;
+        if (normal[0]<1e-10)
+          h = delta[1];
+        else if (normal[1]<1e-10)
+          h = delta[0];
+        else
+          h = std::min(delta[0]/normal[0], delta[1]/normal[1]);
+        std::cout << "n=" << normal[0] << "," << normal[1];
+        std::cout << "    bbox=" << bbIn.first << "," << bbIn.second;
+        std::cout << "    delta=" << delta[0] << " " << delta[1];
+        std::cout << "    h=" << h << std::endl;
+        return penalty_ / h;
+        */
+        const double hInv = intersectionArea / std::min( area, nbArea );
+        return penalty_ * hInv;
+        // const double hInv = intersectionArea / volume;
+        // return penalty_ * hInv;
+      }
+      const double &factor() const { return penalty_; }
+      private:
+      const DFSpace &space_;
+      double penalty_;
+    };
+
   } // namespace Vem
 
   namespace Fem
@@ -202,9 +256,10 @@ namespace Dune
       LinearOperator assembledMassOp( "assembled mass operator", v.space(), v.space() );
       Dune::Vem::MassOperator< LinearOperator > massOp( v.space() );
       massOp.jacobian( v, assembledMassOp );
-      Dune::Fem::CGInverseOperator< DiscreteFunction > invOp( assembledMassOp, 1e-8, 1e-8, true );
+      Dune::Fem::CGInverseOperator< DiscreteFunction > invOp( assembledMassOp, 1e-8, 1e-8, v.space().size(), false );
       invOp( rhs, v );
     }
+
   } // namespace Fem
 
 } // namespace Dune

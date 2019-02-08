@@ -22,9 +22,14 @@ namespace Dune
     // -----------
 
     template< class GridPart >
-    using BoundingBox = std::pair< FieldVector< typename GridPart::ctype, GridPart::dimensionworld >, FieldVector< typename GridPart::ctype, GridPart::dimensionworld > >;
-
-
+    // using BoundingBox = std::pair< FieldVector< typename GridPart::ctype, GridPart::dimensionworld >, FieldVector< typename GridPart::ctype, GridPart::dimensionworld > >;
+    struct BoundingBox : public
+      std::pair< FieldVector< typename GridPart::ctype, GridPart::dimensionworld >, FieldVector< typename GridPart::ctype, GridPart::dimensionworld > >
+    {
+      typedef std::pair< FieldVector< typename GridPart::ctype, GridPart::dimensionworld >, FieldVector< typename GridPart::ctype, GridPart::dimensionworld > > BaseType;
+      using BaseType::BaseType;
+      double volume = 0;
+    };
 
     // agglomerateBoundingBoxes
     // ------------------------
@@ -45,9 +50,12 @@ namespace Dune
       for( const auto element : elements( static_cast< typename GridPart::GridViewType >( agglomeration.gridPart() ), Partitions::interiorBorder ) )
       {
         BoundingBox< GridPart > &bbox = boundingBoxes[ agglomeration.index( element ) ];
+        bbox.volume += element.geometry().volume();
+        // std::cout << agglomeration.index( element );
         const GeometryType geometry = element.geometry();
         for( int i = 0; i < geometry.corners(); ++i )
         {
+          // std::cout << "   " << geometry.corner(i);
           const typename GeometryType::GlobalCoordinate corner = geometry.corner( i );
           for( int k = 0; k < GridPart::dimensionworld; ++k )
           {
@@ -55,6 +63,8 @@ namespace Dune
             bbox.second[ k ] = std::max( bbox.second[ k ], corner[ k ] );
           }
         }
+        // std::cout << "   " << bbox.first << " and " << bbox.second << std::endl;
+        // std::cout << std::endl;
       }
 
       return std::move( boundingBoxes );

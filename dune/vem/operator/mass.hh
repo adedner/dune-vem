@@ -26,11 +26,12 @@ namespace Dune
       w.clear();
 
       Fem::TemporaryLocalFunction< typename DiscreteFunction::DiscreteFunctionSpaceType > wLocal( w.space() );
+      Fem::ConstLocalFunction<GridFunction> uLocal(u);
       for( const auto &entity : elements( static_cast< typename GridFunction::GridPartType::GridViewType >( w.gridPart() ) ) )
       {
         const auto geometry = entity.geometry();
 
-        typename GridFunction::LocalFunctionType uLocal = u.localFunction( entity );
+        uLocal.bind(entity);
 
         wLocal.init( entity );
         wLocal.clear();
@@ -46,6 +47,7 @@ namespace Dune
         }
 
         w.addLocalDofs( entity, wLocal.localDofVector() );
+        uLocal.unbind();
       }
 
       w.communicate();

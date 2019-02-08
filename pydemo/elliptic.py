@@ -2,7 +2,6 @@ from __future__ import print_function
 
 import math, sys
 import numpy
-from scipy.spatial import Voronoi, voronoi_plot_2d, cKDTree
 import numpy.linalg
 import scipy.sparse.linalg
 
@@ -15,18 +14,10 @@ import dune.fem.function as gf
 
 import dune.create as create
 
-from voronoi import triangulated_voronoi
-try:
-    import graph
-except:
-    graph = False
-try:
-    import holes
-except:
-    holes = False
+from dune.vem import voronoiCells
 
 dimRange = 1
-polOrder = 2
+polOrder = 4
 
 dune.fem.parameter.append({"fem.verboserank": 0})
 
@@ -56,106 +47,44 @@ def error(grid, df, interp, exact):
             ] ).integrate()
     return [ math.sqrt(e) for e in errors ]
 
-# http://zderadicka.eu/voronoi-diagrams/
-class Agglomerate:
-    def __init__(self,N,constructor=None,version="voronoi"):
-        self.N = N
-        self.suffix = str(self.N)
-        self.version = version
-        if version == "metis" or version == "metisVoronoi":
-            assert graph
-            self.suffix = "m" + self.suffix
-            self.grid = create.grid("ALUSimplex", constructor=constructor, dimgrid=2)
-            self.parts = graph.partition(self.grid, nparts=self.N,
-                    contig=True, iptype="node", objtype="vol")
-            if version == "metisVoronoi":
-                voronoi_points = numpy.zeros((self.N,2))
-                weights = numpy.zeros(self.N)
-                for en in self.grid.elements:
-                    index = self.parts[ self.grid.indexSet.index(en) ]
-                    voronoi_points[index] += en.geometry.center
-                    weights[index] += 1
-                for p,w in zip(voronoi_points,weights):
-                    p /= w
-                voronoi_kdtree = cKDTree(voronoi_points)
-                for en in self.grid.elements:
-                    p = en.geometry.center
-                    test_point_dist, test_point_regions = voronoi_kdtree.query([p], k=1)
-                    index = test_point_regions[0]
-                    self.parts[ self.grid.indexSet.index(en) ] = index
-                vor = Voronoi(voronoi_points)
-                voronoi_plot_2d(vor).savefig("metis_voronoi"+self.suffix+".pdf", bbox_inches='tight')
-        elif version == "voronoi":
-            self.suffix = "v" + self.suffix
-            numpy.random.seed(1234)
-            self.voronoi_points = numpy.random.rand(self.N, 2)
-            self.voronoi_kdtree = cKDTree(self.voronoi_points)
-            vor = Voronoi(self.voronoi_points)
-            voronoi_plot_2d(vor).savefig("agglomerate_voronoi"+self.suffix+".pdf", bbox_inches='tight')
-            if constructor == None:
-                bounding_box = numpy.array([0., 1., 0., 1.]) # [x_min, x_max, y_min, y_max]
-                points, triangles = triangulated_voronoi(self.voronoi_points, bounding_box)
-                self.grid = create.grid("ALUSimplex", {'vertices':points, 'simplices':triangles}, dimgrid=2)
-            else:
-                self.grid = create.grid("ALUSimplex", constructor=constructor, dimgrid=2)
-        else:
-            self.suffix = "c" + self.suffix
-            # self.grid = create.grid("ALUSimplex", constructor=constructor)
-            self.grid = create.grid("yasp", constructor=constructor)
-            self.division = constructor.division
-        self.ind = set()
-
-    def __call__(self,en):
-        if self.version == "metis" or self.version == "metisVoronoi":
-            index = self.parts[ self.grid.indexSet.index(en) ]
-        elif self.version == "voronoi":
-            p = en.geometry.center
-            test_point_dist, test_point_regions = self.voronoi_kdtree.query([p], k=1)
-            index = test_point_regions[0]
-        else:
-            idx = self.grid.indexSet.index(en)
-            nx = int(idx / self.division[1])
-            ny = int(idx % self.division[1])
-            # print("nx,ny",nx,ny,flush=True,end="\t")
-            nx = int(nx/self.division[0]*self.N[0])
-            ny = int(ny/self.division[1]*self.N[1])
-            index = nx*self.N[1]+ny
-            # print("    idx",idx,"Dx",self.division[0],"Dy",self.division[1],"nx,ny",nx,ny,flush=True, end="\t")
-            # print("     index",index,flush=True)
-        self.ind.add(index)
-        return index
-    def check(self):
-        return len(self.ind)==self.N[0]*self.N[1]
-
 parameters = {"newton.inear.absolutetol": 1e-8, "newton.linear.reductiontol": 1e-8,
               "newton.linear.verbose": "true",
               "newton.tolerance": 3e-5,
               "newton.maxiterations": 1,
               "newton.maxlinesearchiterations":50,
-              "newton.verbose": "true"
+              "newton.verbose": "true",
+              "penalty": 100
               }
+
+methods = [ # [space,scheme]
+            # ["vem","vem"],
+            ["bbdg","bbdg"],
+            # ["lagrange","h1"],
+            # ["dgonb","dg"]
+   ]
 
 h1errors = []
 l2errors = []
 
-def solve(grid,agglomerate,model,exact,name,space,scheme,order=1,penalty=None):
-    print("SOLVING: ",name,space,scheme,penalty,flush=True)
+def solve(polyGrid,model,exact,space,scheme,order=1,penalty=None):
+    try:
+        grid = polyGrid.grid
+    except AttributeError:
+        grid = polyGrid
+    print("SOLVING: ",space,scheme,penalty,flush=True)
     gf_exact = create.function("ufl",grid,"exact",4,exact)
-    if agglomerate:
-        spc = create.space(space, grid, agglomerate, dimrange=dimRange,
-                order=order, storage="fem")
-        assert agglomerate.check(), "missing or too many indices provided by agglomoration object. Should be "+str(agglomerate.N)+" was "+str(len(agglomerate.ind))
-    else:
-        spc = create.space(space, grid, dimrange=dimRange,
-                order=order, storage="fem")
-    interpol = spc.interpolate( gf_exact, "interpol_"+name )
+    try:
+        spc = create.space(space, polyGrid, dimrange=dimRange, order=order, storage="fem")
+    except AttributeError:
+        spc = create.space(space, grid, dimrange=dimRange, order=order, storage="fem")
+    interpol = spc.interpolate( gf_exact, "interpol_"+space )
     scheme = create.scheme(scheme, model, spc,
                         solver=("suitesparse","umfpack"),
                 parameters=parameters)
-    df = spc.interpolate([0],name=name)
+    df = spc.interpolate([0],name=space)
     info = scheme.solve(target=df)
     errors = error(grid,df,interpol,exact)
-    print("Computed",name+" size:",spc.size,
+    print("Computed",space," size:",spc.size,
           "L^2 (s,i):", [errors[0],errors[1]],
           "H^1 (s,i):", [errors[2],errors[3]],
           "linear and Newton iterations:",
@@ -165,19 +94,20 @@ def solve(grid,agglomerate,model,exact,name,space,scheme,order=1,penalty=None):
     h1errors += [errors[2],errors[3]]
     return interpol, df
 
-def compute(agglomerate,filename):
-    grid = agglomerate.grid
+def compute(polyGrid):
+    grid = polyGrid.grid
     uflSpace = dune.ufl.Space((grid.dimGrid, grid.dimWorld), dimRange, field="double")
     u = TrialFunction(uflSpace)
     v = TestFunction(uflSpace)
     x = SpatialCoordinate(uflSpace.cell())
 
     ### trivial Neuman bc
-    exact  = as_vector( [cos(pi*x[0])*cos(pi*x[1])] )
+    factor = 1 # change to 2 for higher order approx
+    exact  = as_vector( [cos(factor*pi*x[0])*cos(factor*pi*x[1])] )
     ### zero boundary conditions
     exact *= x[0]*x[1]*(2-x[0])*(2-x[1])
     ### non zero and non trivial Neuman boundary conditions
-    exact += as_vector( [sin(x[0]*x[1])] )
+    exact += as_vector( [sin(factor*x[0]*factor*x[1])] )
 
     H = lambda w: grad(grad(w))
     a = (inner(grad(u), grad(v)) + inner(u,v)) * dx
@@ -185,18 +115,19 @@ def compute(agglomerate,filename):
     model = create.model("elliptic", grid, a==b,
             *[dune.ufl.DirichletBC(uflSpace, exact, i+1) for i in range(4)]
             )
+    dfs = []
+    for m in methods:
+        dfs += solve(polyGrid,model,exact,*m,order=polOrder)
 
-    interpol_vem, df_vem = solve(grid,agglomerate,model,exact,
-                                     "vem","AgglomeratedVEM","vem",order=polOrder)
-    interpol_fem, df_fem = solve(grid,None,model,exact,
-                                     "fem","lagrange","h1",order=polOrder)
-
-    grid.writeVTK(filename+agglomerate.suffix,subsampling=polOrder-1,
-        pointdata=[ df_vem, interpol_vem, df_fem, interpol_fem ],
-        celldata =[ create.function("local",grid,"cells",1,lambda en,x: [agglomerate(en)]) ])
+    grid.writeVTK(polyGrid.agglomerate.suffix,
+        pointdata=dfs,
+        celldata =[ create.function("local",grid,"cells",1,lambda en,x: [polyGrid.agglomerate(en)]) ])
+    grid.writeVTK("s"+polyGrid.agglomerate.suffix,subsampling=polOrder-1,
+        pointdata=dfs,
+        celldata =[ create.function("local",grid,"cells",1,lambda en,x: [polyGrid.agglomerate(en)]) ])
 
 
-start = 4
+start = 2
 end   = 8
 for i in range(end-start):
     print("*******************************************************")
@@ -204,10 +135,24 @@ for i in range(end-start):
     N = 2*n
     print("Test: ",n,N)
     constructor = cartesianDomain([0,0],[2,2],[N,N])
-    compute(Agglomerate([n,n],version="cartesian",constructor=constructor), "cartesian")
+    # polyGrid = create.grid("polygrid",constructor,[n,n])
+    # polyGrid = create.grid("polygrid",constructor,n*n)
+    # polyGrid = create.grid("polygrid", voronoiCells(constructor,n*n))
+    polyGrid = create.grid("ALUConform",constructor)
+    class PolyGrid:
+        def __init__(self,polyGrid):
+            self.grid = polyGrid
+            self.agglomerate = self
+            self._includes = self.grid._includes
+            self.suffix = "original"
+        def __call__(self,en):
+            return self.grid.indexSet.index(en)
+    polyGrid = PolyGrid(polyGrid)
+    compute(polyGrid)
     if i>0:
-        for j in range(4):
-            l2eoc = math.log( l2errors[4*i+j]/l2errors[4*(i-1)+j] ) / math.log(0.5)
-            h1eoc = math.log( h1errors[4*i+j]/h1errors[4*(i-1)+j] ) / math.log(0.5)
-            print("eoc:",j,l2eoc,h1eoc)
+        l = len(methods)
+        for j in range(2*l):
+            l2eoc = math.log( l2errors[2*l*i+j]/l2errors[2*l*(i-1)+j] ) / math.log(0.5)
+            h1eoc = math.log( h1errors[2*l*i+j]/h1errors[2*l*(i-1)+j] ) / math.log(0.5)
+            print("EOC",methods[int(j/2)][0],j,l2eoc,h1eoc)
     print("*******************************************************")
