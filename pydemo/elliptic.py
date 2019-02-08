@@ -56,7 +56,7 @@ parameters = {"newton.inear.absolutetol": 1e-8, "newton.linear.reductiontol": 1e
               "penalty": 8*polOrder*polOrder
               }
 
-methods = [ [space,scheme]
+methods = [ # "[space,scheme]"
             ["vem","vem"],
             ["bbdg","bbdg"],
             ["lagrange","h1"],
