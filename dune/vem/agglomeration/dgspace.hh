@@ -228,10 +228,9 @@ namespace Dune
         std::cout << "    h=" << h << std::endl;
         return penalty_ / h;
         */
-        const double hInv = intersectionArea / std::min( area, nbArea );
+        // const double hInv = intersectionArea / std::min( area, nbArea );
+        const double hInv = intersectionArea / volume;
         return penalty_ * hInv;
-        // const double hInv = intersectionArea / volume;
-        // return penalty_ * hInv;
       }
       const double &factor() const { return penalty_; }
       private:

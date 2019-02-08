@@ -207,7 +207,7 @@ namespace Dune
       {
         assert( jacobians.size() >= size() );
         Fem::AssignFunctor< Jacobians, TransformedAssign< Transformation > > f( jacobians, transformation_ );
-        shapeFunctionSet_.jacobianEach( x , f );
+        shapeFunctionSet_.jacobianEach( position( x ), f );
       }
 
       template< class Quadrature, class DofVector, class Hessians >

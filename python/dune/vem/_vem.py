@@ -200,6 +200,14 @@ class CartesianAgglomerate:
         return index
     def check(self):
         return len(self.ind)==self.N[0]*self.N[1]
+class TrivialAgglomerate:
+    def __init__(self,constructor):
+        self.grid = dune.create.grid("ALUConform", constructor=constructor)
+        self.suffix = "simple"+str(self.grid.size(0))
+    def __call__(self,en):
+        return self.grid.indexSet.index(en)
+    def check(self):
+        return True
 # http://zderadicka.eu/voronoi-diagrams/
 from dune.vem.voronoi import triangulated_voronoi
 from scipy.spatial import Voronoi, voronoi_plot_2d, cKDTree
@@ -272,7 +280,11 @@ def polyGrid(constructor,N=None):
             if isinstance(N,int):
                 self.agglomerate = VoronoiAgglomerate(N,constructor)
             elif N is None:
-                self.agglomerate = PolyAgglomerate(constructor)
+                if isinstance(constructor,dict) and \
+                   constructor.get("polygons",None) is not None:
+                    self.agglomerate = PolyAgglomerate(constructor)
+                else:
+                    self.agglomerate = TrivialAgglomerate(constructor)
             else:
                 self.agglomerate = CartesianAgglomerate(N,constructor)
             self.grid = self.agglomerate.grid

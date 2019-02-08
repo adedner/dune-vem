@@ -53,14 +53,14 @@ parameters = {"newton.inear.absolutetol": 1e-8, "newton.linear.reductiontol": 1e
               "newton.maxiterations": 1,
               "newton.maxlinesearchiterations":50,
               "newton.verbose": "true",
-              "penalty": 100
+              "penalty": 8*polOrder*polOrder
               }
 
-methods = [ # [space,scheme]
-            # ["vem","vem"],
+methods = [ [space,scheme]
+            ["vem","vem"],
             ["bbdg","bbdg"],
-            # ["lagrange","h1"],
-            # ["dgonb","dg"]
+            ["lagrange","h1"],
+            ["dgonb","dg"]
    ]
 
 h1errors = []
@@ -102,7 +102,7 @@ def compute(polyGrid):
     x = SpatialCoordinate(uflSpace.cell())
 
     ### trivial Neuman bc
-    factor = 1 # change to 2 for higher order approx
+    factor = 2 # change to 2 for higher order approx
     exact  = as_vector( [cos(factor*pi*x[0])*cos(factor*pi*x[1])] )
     ### zero boundary conditions
     exact *= x[0]*x[1]*(2-x[0])*(2-x[1])
@@ -112,8 +112,8 @@ def compute(polyGrid):
     H = lambda w: grad(grad(w))
     a = (inner(grad(u), grad(v)) + inner(u,v)) * dx
     b = ( -(H(exact[0])[0,0]+H(exact[0])[1,1]) + exact[0] ) * v[0] * dx
-    model = create.model("elliptic", grid, a==b,
-            *[dune.ufl.DirichletBC(uflSpace, exact, i+1) for i in range(4)]
+    model = create.model("elliptic", grid, a==b
+            , *[dune.ufl.DirichletBC(uflSpace, exact, i+1) for i in range(4)]
             )
     dfs = []
     for m in methods:
@@ -137,17 +137,8 @@ for i in range(end-start):
     constructor = cartesianDomain([0,0],[2,2],[N,N])
     # polyGrid = create.grid("polygrid",constructor,[n,n])
     # polyGrid = create.grid("polygrid",constructor,n*n)
-    # polyGrid = create.grid("polygrid", voronoiCells(constructor,n*n))
-    polyGrid = create.grid("ALUConform",constructor)
-    class PolyGrid:
-        def __init__(self,polyGrid):
-            self.grid = polyGrid
-            self.agglomerate = self
-            self._includes = self.grid._includes
-            self.suffix = "original"
-        def __call__(self,en):
-            return self.grid.indexSet.index(en)
-    polyGrid = PolyGrid(polyGrid)
+    polyGrid = create.grid("polygrid", voronoiCells(constructor,n*n))
+    # polyGrid = create.grid("polygrid",constructor)
     compute(polyGrid)
     if i>0:
         l = len(methods)
