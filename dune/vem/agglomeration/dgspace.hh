@@ -246,17 +246,27 @@ namespace Dune
     static inline std::enable_if_t< std::is_convertible< GridFunction, HasLocalFunction >::value && Dune::Vem::IsAgglomerationDGSpace< typename DiscreteFunction::DiscreteFunctionSpaceType >::value >
     interpolate ( const GridFunction &u, DiscreteFunction &v, PartitionSet< partitions > ps )
     {
+      std::cout << "INTERPOLATION\n";
       // !!! a very crude implementation - should be done locally on each polygon
       v.clear();
-      DiscreteFunction rhs( v );
+      typedef AdaptiveDiscreteFunction<typename DiscreteFunction::DiscreteFunctionSpaceType> DF;
+      DF rhs( "rhs", v.space() );
+      DF vtmp( "sol", v.space() );
       rhs.clear();
       Dune::Vem::applyMass( u, rhs );
-      typedef Dune::Fem::SparseRowLinearOperator< DiscreteFunction, DiscreteFunction > LinearOperator;
+      typedef Dune::Fem::SparseRowLinearOperator< DF, DF > LinearOperator;
       LinearOperator assembledMassOp( "assembled mass operator", v.space(), v.space() );
       Dune::Vem::MassOperator< LinearOperator > massOp( v.space() );
-      massOp.jacobian( v, assembledMassOp );
-      Dune::Fem::CGInverseOperator< DiscreteFunction > invOp( assembledMassOp, 1e-8, 1e-8, v.space().size(), false );
-      invOp( rhs, v );
+      massOp.jacobian( vtmp, assembledMassOp );
+      auto param = Dune::Fem::parameterDict("fem.solver.", "verbose",false,
+          "preconditioning.method","jacobi",
+          "errorMeasure","absolute",
+          "tolerance",1e-10);
+      Dune::Fem::CGInverseOperator< DF > invOp(param);
+      invOp.bind(assembledMassOp);
+      vtmp.clear();
+      invOp( rhs, vtmp );
+      v.assign(vtmp);
     }
 
   } // namespace Fem

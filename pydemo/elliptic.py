@@ -1,23 +1,19 @@
 from __future__ import print_function
 
-import math, sys
-import numpy
-import numpy.linalg
-import scipy.sparse.linalg
+import math, sys, pickle
 
 from ufl import *
-
-from dune.grid import cartesianDomain
 import dune.ufl
-import dune.fem
-import dune.fem.function as gf
 
-import dune.create as create
-
+from dune import create
+from dune.grid import cartesianDomain
+from dune.fem import parameter
 from dune.vem import voronoiCells
 
 dimRange = 1
-polOrder = 4
+# polOrder, endEoc = 1,8
+polOrder, endEoc = 2,8
+# polOrder, endEoc = 4,6
 
 dune.fem.parameter.append({"fem.verboserank": 0})
 
@@ -47,24 +43,26 @@ def error(grid, df, interp, exact):
             ] ).integrate()
     return [ math.sqrt(e) for e in errors ]
 
-parameters = {"newton.inear.absolutetol": 1e-8, "newton.linear.reductiontol": 1e-8,
+parameters = {"newton.linear.tolerance": 1e-9,
               "newton.linear.verbose": "true",
-              "newton.tolerance": 3e-5,
-              "newton.maxiterations": 1,
+              "newton.tolerance": 1e-7,          # can't be smaller for high order
+              "newton.maxiterations": 20,
               "newton.maxlinesearchiterations":50,
               "newton.verbose": "true",
+              "newton.linear.preconditioning.method": "lu",
               "penalty": 8*polOrder*polOrder
               }
 
 methods = [ # "[space,scheme]"
+            ["lagrange","h1"],
             ["vem","vem"],
             ["bbdg","bbdg"],
-            ["lagrange","h1"],
             ["dgonb","dg"]
    ]
 
-h1errors = []
-l2errors = []
+h1errors  = []
+l2errors  = []
+spaceSize = []
 
 def solve(polyGrid,model,exact,space,scheme,order=1,penalty=None):
     try:
@@ -72,14 +70,16 @@ def solve(polyGrid,model,exact,space,scheme,order=1,penalty=None):
     except AttributeError:
         grid = polyGrid
     print("SOLVING: ",space,scheme,penalty,flush=True)
-    gf_exact = create.function("ufl",grid,"exact",4,exact)
     try:
-        spc = create.space(space, polyGrid, dimrange=dimRange, order=order, storage="fem")
+        spc = create.space(space, polyGrid, dimrange=dimRange, order=order,
+                storage="petsc")
     except AttributeError:
-        spc = create.space(space, grid, dimrange=dimRange, order=order, storage="fem")
-    interpol = spc.interpolate( gf_exact, "interpol_"+space )
+        spc = create.space(space, grid, dimrange=dimRange, order=order,
+                storage="petsc")
+    interpol = spc.interpolate( exact, "interpol_"+space )
     scheme = create.scheme(scheme, model, spc,
-                        solver=("suitesparse","umfpack"),
+                solver="cg",
+                #         ("suitesparse","umfpack"),
                 parameters=parameters)
     df = spc.interpolate([0],name=space)
     info = scheme.solve(target=df)
@@ -89,9 +89,10 @@ def solve(polyGrid,model,exact,space,scheme,order=1,penalty=None):
           "H^1 (s,i):", [errors[2],errors[3]],
           "linear and Newton iterations:",
           info["linear_iterations"], info["iterations"],flush=True)
-    global h1errors, l2errors
-    l2errors += [errors[0],errors[1]]
-    h1errors += [errors[2],errors[3]]
+    global h1errors, l2errors, spaceSize
+    l2errors  += [errors[0],errors[1]]
+    h1errors  += [errors[2],errors[3]]
+    spaceSize += [spc.size]
     return interpol, df
 
 def compute(polyGrid):
@@ -128,8 +129,7 @@ def compute(polyGrid):
 
 
 start = 2
-end   = 8
-for i in range(end-start):
+for i in range(endEoc-start):
     print("*******************************************************")
     n = 2**(i+start)
     N = 2*n
@@ -137,7 +137,7 @@ for i in range(end-start):
     constructor = cartesianDomain([0,0],[2,2],[N,N])
     # polyGrid = create.grid("polygrid",constructor,[n,n])
     # polyGrid = create.grid("polygrid",constructor,n*n)
-    polyGrid = create.grid("polygrid", voronoiCells(constructor,n*n))
+    polyGrid = create.grid("polygrid", voronoiCells(constructor,n*n,"voronoiseeds",True) )
     # polyGrid = create.grid("polygrid",constructor)
     compute(polyGrid)
     if i>0:
@@ -146,4 +146,6 @@ for i in range(end-start):
             l2eoc = math.log( l2errors[2*l*i+j]/l2errors[2*l*(i-1)+j] ) / math.log(0.5)
             h1eoc = math.log( h1errors[2*l*i+j]/h1errors[2*l*(i-1)+j] ) / math.log(0.5)
             print("EOC",methods[int(j/2)][0],j,l2eoc,h1eoc)
+    with open("errors_p"+str(polOrder)+".dump", 'wb') as f:
+        pickle.dump([spaceSize,l2errors,h1errors], f)
     print("*******************************************************")

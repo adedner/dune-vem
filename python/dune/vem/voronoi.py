@@ -4,7 +4,7 @@ import matplotlib.pyplot as pl
 import numpy as np
 import scipy as sp
 import scipy.spatial
-import sys
+import sys, os, pickle
 from scipy.spatial import Voronoi, voronoi_plot_2d, cKDTree
 import numpy
 
@@ -16,18 +16,37 @@ def in_box(towers, bounding_box):
                           np.logical_and(bounding_box[2] <= towers[:, 1],
                                          towers[:, 1] <= bounding_box[3]))
 
-def voronoiCells(constructor, towers):
+def voronoiCells(constructor, towers, fileName=None, load=False):
     lowerleft  = numpy.array(constructor.lower)
     upperright = numpy.array(constructor.upper)
     bounding_box = numpy.array(
             [lowerleft[0],upperright[0],lowerleft[1],upperright[1]] )
+
     if isinstance(towers,int):
-        numpy.random.seed(1234)
-        towers = numpy.array(
-                [ p*(upperright-lowerleft) + lowerleft
-                    for p in numpy.random.rand(towers, 2) ])
+        fileName = fileName + str(towers) + '.pickle'
+        if not load or not os.path.exists(fileName):
+            print("generating new seeds for voronoi grid")
+            numpy.random.seed(1234)
+            towers = numpy.array(
+                    [ p*(upperright-lowerleft) + lowerleft
+                        for p in numpy.random.rand(towers, 2) ])
+            if fileName is not None:
+                with open(fileName, 'wb') as f:
+                    pickle.dump(towers, f)
+        else:
+            assert fileName is not None
+            print("loading seeds for voronoi grid")
+            with open(fileName, 'rb') as f:
+                towers = pickle.load(f)
+
     # Select towers inside the bounding box
     i = in_box(towers, bounding_box)
+
+    vor = sp.spatial.Voronoi(towers[i,:])
+    if fileName is not None:
+        voronoi_plot_2d(vor,show_points=False,show_vertices=False).\
+            savefig(fileName+str(len(towers))+".pdf", bbox_inches='tight')
+
     # Mirror points
     points_center = towers[i, :]
     points_left = np.copy(points_center)
@@ -49,6 +68,7 @@ def voronoiCells(constructor, towers):
                        axis=0)
     # Compute Voronoi
     vor = sp.spatial.Voronoi(points)
+
     # Filter regions
     regions = []
     for region in vor.regions:
@@ -78,6 +98,7 @@ def voronoiCells(constructor, towers):
     newind = np.zeros(len(vor.vertices),int)
     for i in range(len(indices)):
         newind[indices[i]] = i
+
     return {"vertices":vorVertices, "polygons":[newind[r] for r in regions]}
 
 def triangulated_voronoi(constructor, towers):
@@ -91,8 +112,6 @@ def triangulated_voronoi(constructor, towers):
         for r in poly:
             indices.add( r )
         tri = sp.spatial.Delaunay(vert).simplices
-        # print("p,vert,tri",p,vert,tri)
-        # print("triangles",p[tri])
         triangles = np.concatenate(
                 (triangles, p[tri] ),
                 axis=0 )
