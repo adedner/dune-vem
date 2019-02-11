@@ -1,21 +1,15 @@
 from math import log
 import pickle, sys
 import matplotlib.pyplot as plt
-methods = [ # "[space,scheme]"
-            ["lagrange","h1"],
-            ["vem","vem"],
-            ["bbdg","bbdg"],
-            ["dgonb","dg"]
-          ]
-polOrder = 2
-
 plt.rc('text', usetex=True)
 plt.rc('font', family='serif')
 plt.rc('ps',   usedistiller='xpdf')
 plt.rc('savefig', format='eps')
 
+polOrder = 2
+
 with open("errors_p"+str(polOrder)+".dump", 'rb') as f:
-    spaceSize,l2errors,h1errors = pickle.load(f)
+    methods,spaceSize,l2errors,h1errors = pickle.load(f)
 
 def plot(errors,ylabel,sub):
     # plt.subplot(sub)

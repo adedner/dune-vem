@@ -51,6 +51,10 @@ namespace Dune
 
       const GridPartType &gridPart() const { return indexSet_.agglomeration().gridPart(); }
 
+      // carry out actual interpolation giving the three components, i.e.,
+      // for the vertex, edge, and inner parts.
+      // This calls these interpolation operators with the correct indices
+      // to fill the dof vector or the matrix components
       template< class Vertex, class Edge, class Inner>
       void operator() ( const ElementType &element,
           const Vertex &vertex, const Edge &edge, const Inner &inner) const
@@ -89,8 +93,11 @@ namespace Dune
           inner(poly,0,k,innerSize);
         }
       }
+
+      // perform interpolation for a single localized function
       template< class LocalFunction, class LocalDofVector >
-      void operator() ( const ElementType &element, const LocalFunction &localFunction, LocalDofVector &localDofVector ) const
+      void operator() ( const ElementType &element, const LocalFunction &localFunction,
+                        LocalDofVector &localDofVector ) const
       {
         typename LocalFunction::RangeType value;
         assert( value.dimension == 1 );
@@ -98,6 +105,7 @@ namespace Dune
         const auto &bbox = indexSet_.boundingBox(element);
         BoundingBoxShapeFunctionSet< ElementType, InnerShapeFunctionSetType > innerShapeFunctionSet( element, bbox, innerBFS_ );
 
+        // define the vertex,edge, and inner parts of the interpolation
         auto vertex = [&] (int poly,auto i,int k,int numDofs)
         {
           const auto &x = refElement.position( i, dimension );
@@ -153,19 +161,26 @@ namespace Dune
         };
         (*this)(element,vertex,edge,inner);
       }
+
+      // fill a mask vector providing the information which dofs are
+      // 'active' on the given element
       void operator() ( const ElementType &element, std::vector<bool> &mask) const
       {
         auto set = [&mask] (int poly,auto i,int k,int numDofs)
         { std::fill(mask.begin()+k,mask.begin()+k+numDofs,true); };
         (*this)(element,set,set,set);
       }
+      // preform interpolation of a full shape function set filling a transformation matrix
       template< class ShapeFunctionSet, class LocalDofMatrix >
-      void operator() ( const BoundingBoxShapeFunctionSet< ElementType, ShapeFunctionSet > &shapeFunctionSet, LocalDofMatrix &localDofMatrix ) const
+      void operator() ( const BoundingBoxShapeFunctionSet< ElementType, ShapeFunctionSet > &shapeFunctionSet,
+                       LocalDofMatrix &localDofMatrix ) const
       {
         const ElementType &element = shapeFunctionSet.entity();
         const auto &refElement = ReferenceElements< ctype, dimension >::general( element.type() );
         const auto &bbox = indexSet_.boundingBox(element);
         BoundingBoxShapeFunctionSet< ElementType, InnerShapeFunctionSetType > innerShapeFunctionSet( element, bbox, innerBFS_ );
+
+        // define the corresponding vertex,edge, and inner parts of the interpolation
         auto vertex = [&] (int poly,int i,int k,int numDofs)
         {
           const auto &x = refElement.position( i, dimension );
@@ -204,7 +219,6 @@ namespace Dune
             );
           }
         };
-
         auto inner = [&] (int poly,int i,int k,int numDofs)
         {
           assert(numDofs == innerShapeFunctionSet.size());
@@ -230,7 +244,9 @@ namespace Dune
         (*this)(element,vertex,edge,inner);
       }
 
+      ///////////////////////////////////////////////////////////////////////////
       // interpolation onto a single intersection
+      // (bool argument needed to distinguish from the method following this one)
       template< class Vertex, class Edge>
       void operator() ( const IntersectionType &intersection,
                         const Vertex &vertex, const Edge &edge,
@@ -270,6 +286,9 @@ namespace Dune
           }
         }
       }
+
+      // interpolate the full shape function set on intersection needed for
+      // the gradient projection matrix
       template< class ShapeFunctionSet >
       void operator() (const IntersectionType &intersection,
                        const ShapeFunctionSet &shapeFunctionSet, Dune::DynamicMatrix<double> &localDofMatrix,
@@ -288,6 +307,9 @@ namespace Dune
         bool noTwist = true; // left < right;
 #endif
 
+        // define the three relevant part of the interpolation, i.e.,
+        // vertices,edges - no inner needed since only doing interpolation
+        // on intersection
         auto vertex = [&] (int poly,int i,int k,int numDofs)
         {
           const auto &x = edgeGeo.local( refElement.position( i, dimension ) );
@@ -326,7 +348,7 @@ namespace Dune
         (*this)(intersection,vertex,edge,mask,false);
       }
 
-      // static std::initializer_list< std::pair< int, unsigned int > > dofsPerCodim ()
+      // return the number of dofs per codimension
       static std::vector< std::pair< int, unsigned int > > dofsPerCodim ()
       {
         const int eSize = Dune::Fem::OrthonormalShapeFunctions< GridPartType::dimension-1 >::size( std::max(polOrder-2,0) );

@@ -13,6 +13,7 @@ from dune.vem import voronoiCells
 dimRange = 1
 # polOrder, endEoc = 1,8
 polOrder, endEoc = 2,8
+# polOrder, endEoc = 3,6
 # polOrder, endEoc = 4,6
 
 dune.fem.parameter.append({"fem.verboserank": 0})
@@ -147,5 +148,5 @@ for i in range(endEoc-start):
             h1eoc = math.log( h1errors[2*l*i+j]/h1errors[2*l*(i-1)+j] ) / math.log(0.5)
             print("EOC",methods[int(j/2)][0],j,l2eoc,h1eoc)
     with open("errors_p"+str(polOrder)+".dump", 'wb') as f:
-        pickle.dump([spaceSize,l2errors,h1errors], f)
+        pickle.dump([methods,spaceSize,l2errors,h1errors], f)
     print("*******************************************************")
