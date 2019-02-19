@@ -7,5 +7,12 @@ setup(name="dune.vem",
     author="Andreas Dedner and Martin Nolte",
     packages = find_packages(),
     zip_safe = 0,
+    install_requires=[
+        'triangle',
+        'scipy',
+        'numpy',
+        'matplotlib',
+        'sortedcontainers'
+        ],
     package_data = {'': ['*.so']}
   )
