@@ -8,12 +8,11 @@ from dune.generator import Constructor, Method
 import dune.common.checkconfiguration as checkconfiguration
 import dune
 
-def bbdgSpace(viewagglomerate, order=1, dimrange=1, field="double", storage="adaptive", **unused):
+def bbdgSpace(view, order=1, dimrange=1, field="double", storage="adaptive", **unused):
     """create a discontinous galerkin space over an agglomerated grid
 
     Args:
         view: the underlying grid view
-        agglomerated: grouping of elements into polygons
         order: polynomial order of the finite element functions
         dimrange: dimension of the range space
         field: field of the range space
@@ -37,12 +36,7 @@ def bbdgSpace(viewagglomerate, order=1, dimrange=1, field="double", storage="ada
     if field == "complex":
         field = "std::complex<double>"
 
-    try:
-        view = viewagglomerate[0]
-        agglomerate = viewagglomerate[1]
-    except:
-        agglomerate = viewagglomerate.agglomerate
-        view = viewagglomerate.grid
+    agglomerate = view.hierarchicalGrid.agglomerate
 
     includes = [ "dune/vem/agglomeration/dgspace.hh" ] + view._includes
     dimw = view.dimWorld
@@ -70,7 +64,7 @@ def bbdgSpace(viewagglomerate, order=1, dimrange=1, field="double", storage="ada
                    ['"gridView"_a', '"agglomerate"_a',
                     'pybind11::keep_alive< 1, 2 >()'] )
 
-    spc = module(field, includes, typeName, constructor, storage=storage).Space(view, agglomerate)
+    spc = module(field, includes, typeName, constructor, storage=storage,ctorArgs=[view, agglomerate])
     addStorage(spc, storage)
     return spc.as_ufl()
 
@@ -80,12 +74,11 @@ def bbdgScheme(model, space, penalty=0, solver=None, parameters={}):
     penaltyClass = "Dune::Vem::BBDGPenalty<"+spaceType+">"
     return dg(model,space,penalty,solver,parameters,penaltyClass)
 
-def vemSpace(viewagglomerate, order=1, dimrange=1, field="double", storage="adaptive", **unused):
+def vemSpace(view, order=1, dimrange=1, conforming=True, field="double", storage="adaptive", **unused):
     """create a virtual element space over an agglomerated grid
 
     Args:
         view: the underlying grid view
-        agglomerated: grouping of elements into polygons
         order: polynomial order of the finite element functions
         dimrange: dimension of the range space
         field: field of the range space
@@ -109,21 +102,17 @@ def vemSpace(viewagglomerate, order=1, dimrange=1, field="double", storage="adap
     if field == "complex":
         field = "std::complex<double>"
 
-    try:
-        view = viewagglomerate[0]
-        agglomerate = viewagglomerate[1]
-    except:
-        agglomerate = viewagglomerate.agglomerate
-        view = viewagglomerate.grid
+    agglomerate = view.hierarchicalGrid.agglomerate
 
     includes = [ "dune/vem/space/agglomeration.hh" ] + view._includes
     dimw = view.dimWorld
     viewType = view._typeName
 
     gridPartName = "Dune::FemPy::GridPart< " + view._typeName + " >"
+    conforming = "true" if conforming else "false"
     typeName = "Dune::Vem::AgglomerationVEMSpace< " +\
       "Dune::Fem::FunctionSpace< double, " + field + ", " + str(dimw) + ", " + str(dimrange) + " >, " +\
-      gridPartName + ", " + str(order) + " >"
+      gridPartName + ", " + str(order) + ", " + conforming + " >"
 
     constructor = Constructor(
                    ['pybind11::object gridView',
@@ -142,7 +131,7 @@ def vemSpace(viewagglomerate, order=1, dimrange=1, field="double", storage="adap
                    ['"gridView"_a', '"agglomerate"_a',
                     'pybind11::keep_alive< 1, 2 >()'] )
 
-    spc = module(field, includes, typeName, constructor, storage=storage).Space(view, agglomerate)
+    spc = module(field, includes, typeName, constructor, storage=storage, ctorArgs=[view, agglomerate])
     addStorage(spc, storage)
     return spc.as_ufl()
 
@@ -182,6 +171,8 @@ def vemScheme(model, space, solver=None, parameters={}):
 
     return femschemeModule(space, model,includes,solver,operator,parameters=parameters)
 
+#################################################################
+
 class CartesianAgglomerate:
     def __init__(self,N,constructor):
         self.N = N
@@ -208,9 +199,43 @@ class TrivialAgglomerate:
         return self.grid.indexSet.index(en)
     def check(self):
         return True
+
+#################################################################
+
+def aluGrid(constructor, dimgrid=None, dimworld=None, elementType=None, **parameters):
+    if not dimgrid:
+        dimgrid = getDimgrid(constructor)
+    if dimworld is None:
+        dimworld = dimgrid
+    if elementType is None:
+        elementType = parameters.pop("type")
+    refinement = parameters["refinement"]
+    if refinement == "conforming":
+        refinement="Dune::conforming"
+    elif refinement == "nonconforming":
+        refinement="Dune::nonconforming"
+    if not (2 <= dimworld and dimworld <= 3):
+        raise KeyError("Parameter error in ALUGrid with dimworld=" + str(dimworld) + ": dimworld has to be either 2 or 3")
+    if not (2 <= dimgrid and dimgrid <= dimworld):
+        raise KeyError("Parameter error in ALUGrid with dimgrid=" + str(dimgrid) + ": dimgrid has to be either 2 or 3")
+    if refinement=="Dune::conforming" and elementType=="Dune::cube":
+        raise KeyError("Parameter error in ALUGrid with refinement=" + refinement + " and type=" + elementType + ": conforming refinement is only available with simplex element type")
+    typeName = "Dune::ALUGrid< " + str(dimgrid) + ", " + str(dimworld) + ", " + elementType + ", " + refinement + " >"
+    includes = ["dune/alugrid/grid.hh", "dune/alugrid/dgf.hh"]
+    gridModule = module(includes, typeName, dynamicAttr=True)
+    return gridModule.LeafGrid(gridModule.reader(constructor))
+def aluSimplexGrid(constructor, dimgrid=None, dimworld=None):
+    from dune.grid.grid_generator import module, getDimgrid
+    typeName = "Dune::Vem::Grid"
+    includes = ["dune/vem/misc/grid.hh"]
+    gridModule = module(includes, typeName, dynamicAttr=True)
+    return gridModule.LeafGrid(gridModule.reader(constructor))
+
+#################################################################
+
 # http://zderadicka.eu/voronoi-diagrams/
 from dune.vem.voronoi import triangulated_voronoi
-from scipy.spatial import Voronoi, voronoi_plot_2d, cKDTree
+from scipy.spatial import Voronoi, voronoi_plot_2d, cKDTree, Delaunay
 import numpy
 class VoronoiAgglomerate:
     def __init__(self,N,constructor):
@@ -226,7 +251,8 @@ class VoronoiAgglomerate:
         self.voronoi_kdtree = cKDTree(self.voronoi_points)
         vor = Voronoi(self.voronoi_points)
         points, triangles = triangulated_voronoi(constructor, self.voronoi_points)
-        self.grid = dune.create.grid("ALUSimplex", {'vertices':points, 'simplices':triangles}, dimgrid=2)
+        domain = {'vertices':points, 'simplices':triangles}
+        self.grid = aluSimplexGrid(self.domain, dimgrid=2)
         self.ind = set()
     def __call__(self,en):
         p = en.geometry.center
@@ -245,7 +271,7 @@ class PolyAgglomerate:
         self.suffix = "poly"+str(len(constructor["polygons"]))
         self.domain, self.index = self.construct(constructor["vertices"],
                                                  constructor["polygons"])
-        self.grid = dune.create.grid("ALUSimplex", self.domain)
+        self.grid = aluSimplexGrid(self.domain)
         self.ind = set()
     def __call__(self,en):
         bary = en.geometry.center
@@ -260,33 +286,36 @@ class PolyAgglomerate:
         index = SortedDict()
         for nr, p in enumerate(polygons):
             N = len(p)
-            e = [ [p[i],p[(i+1)%N]] for i in range(N) ]
-            domain = { "vertices":vertices,
-                       "segments":numpy.array(e) }
-            tr += [triangle.triangulate(domain,opts="p")]
+            if False: # use triangle
+                e = [ [p[i],p[(i+1)%N]] for i in range(N) ]
+                domain = { "vertices":vertices,
+                           "segments":numpy.array(e) }
+                tr += [triangle.triangulate(domain,opts="p")]
+            else: # use scipy
+                poly = numpy.append(p,[p[0]])
+                vert = vertices[p, :]
+                tri = Delaunay(vert).simplices
+                tr += [{"triangles":p[tri]}]
             bary = [ (vertices[p0]+vertices[p1]+vertices[p2])/3.
                      for p0,p1,p2 in tr[-1]["triangles"] ]
             for b in bary:
                 index[self.roundBary(b)] = nr
-            # triangle.plot.plot(plt.axes(), **tr[-1])
-        # plt.show()
+
         domain = {"vertices":  numpy.array(vertices),
                   "simplices": numpy.vstack([ t["triangles"] for t in tr ])}
         return domain, index
 
 def polyGrid(constructor,N=None):
-    class PolyGrid:
-        def __init__(self,constructor,N):
-            if isinstance(N,int):
-                self.agglomerate = VoronoiAgglomerate(N,constructor)
-            elif N is None:
-                if isinstance(constructor,dict) and \
-                   constructor.get("polygons",None) is not None:
-                    self.agglomerate = PolyAgglomerate(constructor)
-                else:
-                    self.agglomerate = TrivialAgglomerate(constructor)
-            else:
-                self.agglomerate = CartesianAgglomerate(N,constructor)
-            self.grid = self.agglomerate.grid
-            self._includes = self.grid._includes
-    return PolyGrid(constructor,N)
+    if isinstance(N,int):
+        agglomerate = VoronoiAgglomerate(N,constructor)
+    elif N is None:
+        if isinstance(constructor,dict) and \
+           constructor.get("polygons",None) is not None:
+            agglomerate = PolyAgglomerate(constructor)
+        else:
+            agglomerate = TrivialAgglomerate(constructor)
+    else:
+        agglomerate = CartesianAgglomerate(N,constructor)
+    grid = agglomerate.grid
+    grid.hierarchicalGrid.agglomerate = agglomerate
+    return grid

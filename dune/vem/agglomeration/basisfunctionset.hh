@@ -13,6 +13,7 @@
 #include <dune/fem/space/basisfunctionset/functor.hh>
 #include <dune/fem/space/shapefunctionset/vectorial.hh>
 
+#include <dune/vem/agglomeration/boundingbox.hh>
 #include <dune/vem/agglomeration/functor.hh>
 
 namespace Dune
@@ -24,13 +25,14 @@ namespace Dune
     // BoundingBoxBasisFunctionSet
     // ---------------------------
 
-    template< class Entity, class ShapeFunctionSet >
+    template< class GridPart, class ShapeFunctionSet >
     class BoundingBoxBasisFunctionSet
     {
-      typedef BoundingBoxBasisFunctionSet< Entity, ShapeFunctionSet > ThisType;
+      typedef BoundingBoxBasisFunctionSet< GridPart, ShapeFunctionSet > ThisType;
 
     public:
-      typedef Entity EntityType;
+      typedef typename GridPart::template Codim<0>::EntityType EntityType;
+      typedef BoundingBox<GridPart> BoundingBoxType;
 
       typedef typename ShapeFunctionSet::FunctionSpaceType FunctionSpaceType;
 
@@ -50,23 +52,25 @@ namespace Dune
       struct Transformation
       {
         Transformation() {}
-        explicit Transformation ( const std::pair< DomainType, DomainType > &bbox ) : extentInv_( bbox.second - bbox.first )
+        explicit Transformation ( const BoundingBoxType &bbox )
+        : extentInv_( bbox.second - bbox.first )
+        , bbox_(bbox)
         {
           std::transform(extentInv_.begin(),extentInv_.end(),extentInv_.begin(),
               [](const double &x){return 1./x;});
         }
 
-        JacobianRangeType operator() ( JacobianRangeType jacobian ) const
+        JacobianRangeType operator() ( JacobianRangeType jacobian, bool transpose=false ) const
         {
           for( int i = 0; i < RangeType::dimension; ++i )
-            applyScalar( jacobian[ i ] );
+            applyScalar( jacobian[ i ], transpose );
           return jacobian;
         }
 
         template< class ScalarJacobian >
-        Fem::MakeVectorialExpression< ScalarJacobian, JacobianRangeType > operator() ( Fem::MakeVectorialExpression< ScalarJacobian, JacobianRangeType > jacobian ) const
+        Fem::MakeVectorialExpression< ScalarJacobian, JacobianRangeType > operator() ( Fem::MakeVectorialExpression< ScalarJacobian, JacobianRangeType > jacobian, bool transpose=false ) const
         {
-          applyScalar( jacobian.scalar()[ 0 ] );
+          applyScalar( jacobian.scalar()[ 0 ], transpose );
           return jacobian;
         }
 
@@ -84,10 +88,14 @@ namespace Dune
           return hessian;
         }
 
-        void applyScalar ( FieldVector< RangeFieldType, dimDomain > &jacobian ) const
+        void applyScalar ( FieldVector< RangeFieldType, dimDomain > &jacobian, bool transpose=false ) const
         {
+#if 0
           for( int j = 0; j < dimDomain; ++j )
             jacobian[ j ] *= extentInv_[ j ];
+#else
+          bbox_.gradientTransform(jacobian,transpose);
+#endif
         }
 
         void applyScalar ( FieldMatrix< RangeFieldType, dimDomain, dimDomain > &hessian ) const
@@ -98,6 +106,7 @@ namespace Dune
         }
 
         DomainType extentInv_;
+        BoundingBoxType bbox_;
       };
 
     public:
@@ -105,7 +114,7 @@ namespace Dune
       : entity_(nullptr)
       { }
 
-      BoundingBoxBasisFunctionSet ( const EntityType &entity, std::pair< DomainType, DomainType > bbox,
+      BoundingBoxBasisFunctionSet ( const EntityType &entity, const BoundingBoxType &bbox,
                                     ShapeFunctionSet shapeFunctionSet = ShapeFunctionSet() )
         : entity_( &entity ), shapeFunctionSet_( std::move( shapeFunctionSet ) ), bbox_( std::move( bbox ) ),
           transformation_(bbox_)
@@ -149,7 +158,7 @@ namespace Dune
       template< class Point, class DofVector >
       void axpy ( const Point &x, const JacobianRangeType &jacobianFactor, DofVector &dofs ) const
       {
-        const JacobianRangeType transformedFactor = transformation_( jacobianFactor );
+        const JacobianRangeType transformedFactor = transformation_( jacobianFactor,true );
         Fem::FunctionalAxpyFunctor< JacobianRangeType, DofVector > f( transformedFactor, dofs );
         shapeFunctionSet_.jacobianEach( position( x ), f );
       }
@@ -235,21 +244,47 @@ namespace Dune
         shapeFunctionSet_.hessianEach( position( x ), f );
       }
 
+      template< class Point, class Functor >
+      void evaluateEach ( const Point &x, Functor functor ) const
+      {
+        shapeFunctionSet_.evaluateEach( position( x ), functor );
+      }
+
+      template< class Point, class Functor >
+      void jacobianEach ( const Point &x, Functor functor ) const
+      {
+        shapeFunctionSet_.jacobianEach( position( x ),
+            [ & ] ( std::size_t beta, JacobianRangeType psi )
+            { functor(beta, transformation_(psi)); } );
+      }
+
+#if 0
+      template< class Point, class Functor >
+      void hessianEach ( const Point &x, Functor functor ) const
+      {
+        shapeFunctionSet_.hessianEach( position( x ), functor );
+      }
+#endif
+
       const EntityType &entity () const { assert( entity_ ); return *entity_; }
 
     private:
       template< class Point >
       DomainType position ( const Point &x ) const
       {
+#if 0
         DomainType y = entity().geometry().global( Fem::coordinate( x ) ) - bbox_.first;
         for( int k = 0; k < dimDomain; ++k )
           y[ k ] /= (bbox_.second[ k ] - bbox_.first[ k ]);
         return y;
+#else
+        return bbox_.transform( entity().geometry().global( Fem::coordinate( x ) ) );
+#endif
       }
 
       const EntityType *entity_ = nullptr;
       ShapeFunctionSet shapeFunctionSet_;
-      std::pair< DomainType, DomainType > bbox_;
+      BoundingBoxType bbox_;
       Transformation transformation_;
     };
 

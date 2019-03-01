@@ -226,10 +226,13 @@ namespace Dune
       template< class Point >
       DomainType position ( const Point &x ) const
       {
+        return Fem::coordinate(x);
+#if 0
         DomainType y = entity().geometry().global( Fem::coordinate( x ) ) - bbox_.first;
         for( int k = 0; k < dimDomain; ++k )
           y[ k ] /= (bbox_.second[ k ] - bbox_.first[ k ]);
         return y;
+#endif
       }
 
       const EntityType *entity_ = nullptr;

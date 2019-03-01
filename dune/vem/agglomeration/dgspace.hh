@@ -107,7 +107,7 @@ namespace Dune
       typedef ScalarShapeFunctionSet ScalarShapeFunctionSetType;
       typedef Fem::VectorialShapeFunctionSet< Fem::ShapeFunctionSetProxy< ScalarShapeFunctionSetType >, typename FunctionSpaceType::RangeType > ShapeFunctionSetType;
 
-      typedef BoundingBoxBasisFunctionSet< EntityType, ShapeFunctionSetType > BasisFunctionSetType;
+      typedef BoundingBoxBasisFunctionSet< GridPartType, ShapeFunctionSetType > BasisFunctionSetType;
 
       // static const std::size_t localBlockSize = FunctionSpaceType::dimRange * StaticPower< polOrder+1, GridPartType::dimension >::power;
       typedef Hybrid::IndexRange< int, FunctionSpaceType::dimRange * ScalarShapeFunctionSet::numberShapeFunctions > LocalBlockIndices;
@@ -203,13 +203,13 @@ namespace Dune
       {
         const auto &bbIn = space_.boundingBox(intersection.inside());
         auto delta = bbIn.second - bbIn.first;
-        auto volume = bbIn.volume;
+        auto volume = bbIn.volume();
         if (intersection.neighbor())
         {
           const auto &bbOut  = space_.boundingBox(intersection.outside());
           delta[0] = std::min(delta[0], bbOut.second[0]-bbOut.first[0]);
           delta[1] = std::min(delta[1], bbOut.second[1]-bbOut.first[1]);
-          volume = std::min(volume,bbOut.volume);
+          volume = std::min(volume,bbOut.volume());
         }
         /*
         auto normal = intersection.unitOuterNormal({0.5});
@@ -246,7 +246,6 @@ namespace Dune
     static inline std::enable_if_t< std::is_convertible< GridFunction, HasLocalFunction >::value && Dune::Vem::IsAgglomerationDGSpace< typename DiscreteFunction::DiscreteFunctionSpaceType >::value >
     interpolate ( const GridFunction &u, DiscreteFunction &v, PartitionSet< partitions > ps )
     {
-      std::cout << "INTERPOLATION\n";
       // !!! a very crude implementation - should be done locally on each polygon
       v.clear();
       typedef AdaptiveDiscreteFunction<typename DiscreteFunction::DiscreteFunctionSpaceType> DF;
