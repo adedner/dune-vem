@@ -11,10 +11,11 @@ from dune.fem import parameter
 from dune.vem import voronoiCells
 
 dimRange = 1
+start    = 4
 # polOrder, endEoc = 1,8
-# polOrder, endEoc = 2,7
+polOrder, endEoc = 2,7
 # polOrder, endEoc = 3,6
-polOrder, endEoc = 4,5
+# polOrder, endEoc = 4,5
 # polOrder, endEoc = 5,4
 # polOrder, endEoc = 6,4 # not working
 methods = [ # "[space,scheme,spaceKwrags]"
@@ -128,7 +129,6 @@ def compute(grid):
             [grid.hierarchicalGrid.agglomerate(en)]) ])
 
 
-start = 4
 for i in range(endEoc-start):
     print("*******************************************************")
     n = 2**(i+start)
