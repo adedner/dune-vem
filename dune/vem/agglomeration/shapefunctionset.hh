@@ -9,6 +9,8 @@
 #include <dune/fem/quadrature/quadrature.hh>
 #include <dune/fem/space/shapefunctionset/vectorial.hh>
 
+#error SHOULD NOT BE USED
+#if 0
 namespace Dune
 {
 
@@ -87,5 +89,6 @@ namespace Dune
   } // namespace Vem
 
 } // namespace Dune
+#endif
 
 #endif // #ifndef DUNE_VEM_AGGLOMERATION_SHAPEFUNCTIONSET_HH

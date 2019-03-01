@@ -45,13 +45,14 @@ namespace Dune
 
       typedef typename DiscreteFunction::DiscreteFunctionSpaceType::AgglomerationIndexSetType IndexSetType;
       const int polOrder = DiscreteFunction::DiscreteFunctionSpaceType::polynomialOrder;
+      const bool conforming = DiscreteFunction::DiscreteFunctionSpaceType::conforming;
       typedef typename DiscreteFunction::GridPartType GridPartType;
       typedef typename GridPartType::template Codim< 0 >::EntitySeedType ElementSeedType;
       std::vector< std::vector< ElementSeedType > > entitySeeds( agglomeration.size() );
       for( const auto &element : elements( static_cast< typename GridPartType::GridViewType >( v.gridPart() ), ps ) )
         entitySeeds[ agglomeration.index( element ) ].push_back( element.seed() );
 
-      auto interpolation = Dune::Vem::agglomerationVEMInterpolation<polOrder>( mapper.indexSet() );
+      auto interpolation = Dune::Vem::agglomerationVEMInterpolation<polOrder,conforming>( mapper.indexSet() );
 
       Dune::Fem::ConstLocalFunction<GridFunction> uLocal(u);
       for( std::size_t agglomerate = 0; agglomerate < agglomeration.size(); ++agglomerate )

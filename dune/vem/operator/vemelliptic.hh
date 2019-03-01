@@ -295,8 +295,7 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model>
     model().init(entity);
     RangeLocalFunctionType wLocal = w.localFunction(entity);
     const DomainLocalFunctionType uLocal = u.localFunction(entity);
-    const std::size_t agglomerate = dfSpace.agglomeration().index(
-        entity);
+    const std::size_t agglomerate = dfSpace.agglomeration().index( entity);
     if (!stabilization[dfSpace.agglomeration().index(entity)])
     {
       const auto &stabMatrix = dfSpace.stabilization(entity);
@@ -517,6 +516,17 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
 
   // the second element loop to add the stabilisation term
   // std::cout << "   in assembly: second element loop    " << timer.elapsed() << std::endl;;
+
+  std::vector<double> localmeshsizevec(rangeSpace.agglomeration().size(),0.0);
+  for (int i = 0; i < rangeSpace.agglomeration().size(); ++i) {
+    localmeshsizevec[i] = std::pow(polygonareas[i],
+        1.0 / GridPartType::dimension);
+  }
+  double averagemeshsize = 0.0;
+  for (int i = 0; i < rangeSpace.agglomeration().size(); ++i)
+    averagemeshsize += localmeshsizevec[i]
+      / rangeSpace.agglomeration().size();
+
   std::vector<bool> stabilization(agglomeration.size(), false);
   for (const auto &entity : Dune::elements(
         static_cast<typename GridPartType::GridViewType>(gridPart),
@@ -553,15 +563,6 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
       stabilization[agglomerate] = true;
     }
   }
-  std::vector<double> localmeshsizevec(rangeSpace.agglomeration().size(),0.0);
-  for (int i = 0; i < rangeSpace.agglomeration().size(); ++i) {
-    localmeshsizevec[i] = std::pow(polygonareas[i],
-        1.0 / GridPartType::dimension);
-  }
-  double averagemeshsize = 0.0;
-  for (int i = 0; i < rangeSpace.agglomeration().size(); ++i)
-    averagemeshsize += localmeshsizevec[i]
-      / rangeSpace.agglomeration().size();
   jOp.communicate();
   std::cout << "   in assembly: final    " << timer.elapsed() << std::endl;;
 }

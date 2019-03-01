@@ -42,10 +42,10 @@ def voronoiCells(constructor, towers, fileName=None, load=False):
     # Select towers inside the bounding box
     i = in_box(towers, bounding_box)
 
-    vor = sp.spatial.Voronoi(towers[i,:])
+    vor = sp.spatial.Voronoi(towers[i,:],incremental=True)
     if fileName is not None:
         voronoi_plot_2d(vor,show_points=False,show_vertices=False).\
-            savefig(fileName+str(len(towers))+".pdf", bbox_inches='tight')
+            savefig(fileName+"inc"+str(len(towers))+".pdf", bbox_inches='tight')
 
     # Mirror points
     points_center = towers[i, :]

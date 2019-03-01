@@ -12,9 +12,29 @@ from dune.vem import voronoiCells
 
 dimRange = 1
 # polOrder, endEoc = 1,8
-polOrder, endEoc = 1,8
+# polOrder, endEoc = 2,7
 # polOrder, endEoc = 3,6
-# polOrder, endEoc = 4,6
+polOrder, endEoc = 4,5
+# polOrder, endEoc = 5,4
+# polOrder, endEoc = 6,4 # not working
+methods = [ # "[space,scheme,spaceKwrags]"
+            ["lagrange","h1",{}],
+            ["vem","vem",{"conforming":True}],
+            ["vem","vem",{"conforming":False}],
+            ["bbdg","bbdg",{}],
+            ["dgonb","dg",{}]
+   ]
+parameters = {"newton.linear.tolerance": 1e-12,
+              "newton.linear.verbose": False,
+              "newton.tolerance": 1e-10,
+              "newton.maxiterations": 3, # should finish in 1
+              "newton.maxlinesearchiterations":50,
+              "newton.verbose": True,
+              "newton.linear.preconditioning.method": "lu",
+              "penalty": 8*polOrder*polOrder
+              }
+
+
 
 dune.fem.parameter.append({"fem.verboserank": 0})
 
@@ -44,48 +64,22 @@ def error(grid, df, interp, exact):
             ] ).integrate()
     return [ math.sqrt(e) for e in errors ]
 
-parameters = {"newton.linear.tolerance": 1e-9,
-              "newton.linear.verbose": "true",
-              "newton.tolerance": 1e-7,          # can't be smaller for high order
-              "newton.maxiterations": 20,
-              "newton.maxlinesearchiterations":50,
-              "newton.verbose": "true",
-              "newton.linear.preconditioning.method": "lu",
-              "penalty": 8*polOrder*polOrder
-              }
-
-methods = [ # "[space,scheme]"
-            #["lagrange","h1"],
-            ["vem","vem"],
-            #["bbdg","bbdg"],
-            #["dgonb","dg"]
-   ]
-
 h1errors  = []
 l2errors  = []
 spaceSize = []
 
-def solve(polyGrid,model,exact,space,scheme,order=1,penalty=None):
-    try:
-        grid = polyGrid.grid
-    except AttributeError:
-        grid = polyGrid
-    print("SOLVING: ",space,scheme,penalty,flush=True)
-    try:
-        spc = create.space(space, polyGrid, dimrange=dimRange, order=order,
-                storage="petsc")
-    except AttributeError:
-        spc = create.space(space, grid, dimrange=dimRange, order=order,
-                storage="petsc")
-    interpol = spc.interpolate( exact, "interpol_"+space )
+def solve(grid,model,exact,space,scheme,spaceKwargs,order):
+    print("SOLVING: ",space,scheme,spaceKwargs,flush=True)
+    spc = create.space(space, grid, dimrange=dimRange, order=order, storage="petsc", **spaceKwargs)
+    name = space + "_".join(['']+[str(v) for v in spaceKwargs.values()])
+    interpol = spc.interpolate( exact, "interpol_"+name )
     scheme = create.scheme(scheme, model, spc,
                 solver="cg",
-                #         ("suitesparse","umfpack"),
                 parameters=parameters)
-    df = spc.interpolate([0],name=space)
+    df = spc.interpolate([0],name=name)
     info = scheme.solve(target=df)
     errors = error(grid,df,interpol,exact)
-    print("Computed",space," size:",spc.size,
+    print("Computed",name," size:",spc.size,
           "L^2 (s,i):", [errors[0],errors[1]],
           "H^1 (s,i):", [errors[2],errors[3]],
           "linear and Newton iterations:",
@@ -96,8 +90,7 @@ def solve(polyGrid,model,exact,space,scheme,order=1,penalty=None):
     spaceSize += [spc.size]
     return interpol, df
 
-def compute(polyGrid):
-    grid = polyGrid.grid
+def compute(grid):
     uflSpace = dune.ufl.Space((grid.dimGrid, grid.dimWorld), dimRange, field="double")
     u = TrialFunction(uflSpace)
     v = TestFunction(uflSpace)
@@ -123,14 +116,16 @@ def compute(polyGrid):
             )
     dfs = []
     for m in methods:
-        dfs += solve(polyGrid,model,exact,*m,order=polOrder)
+        dfs += solve(grid,model,exact,*m,order=polOrder)
 
-    grid.writeVTK(polyGrid.agglomerate.suffix,
+    grid.writeVTK(grid.hierarchicalGrid.agglomerate.suffix,
         pointdata=dfs,
-        celldata =[ create.function("local",grid,"cells",1,lambda en,x: [polyGrid.agglomerate(en)]) ])
-    grid.writeVTK("s"+polyGrid.agglomerate.suffix,subsampling=polOrder-1,
+        celldata =[ create.function("local",grid,"cells",1,lambda en,x:
+            [grid.hierarchicalGrid.agglomerate(en)]) ])
+    grid.writeVTK("s"+grid.hierarchicalGrid.agglomerate.suffix,subsampling=polOrder-1,
         pointdata=dfs,
-        celldata =[ create.function("local",grid,"cells",1,lambda en,x: [polyGrid.agglomerate(en)]) ])
+        celldata =[ create.function("local",grid,"cells",1,lambda en,x:
+            [grid.hierarchicalGrid.agglomerate(en)]) ])
 
 
 start = 4

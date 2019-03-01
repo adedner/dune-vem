@@ -1,12 +1,15 @@
 from math import log
-import pickle, sys
+import pickle, sys, itertools
 import matplotlib.pyplot as plt
 plt.rc('text', usetex=True)
 plt.rc('font', family='serif')
 plt.rc('ps',   usedistiller='xpdf')
 plt.rc('savefig', format='eps')
 
-polOrder = 2
+colors = itertools.cycle(['blue','red','green','yellow','cyan']) # ,'purple','cyan','olive'])
+markers = itertools.cycle(['D','<','>','s','o']) #, 'B','^','v'])
+
+polOrder = 5
 
 with open("errors_p"+str(polOrder)+".dump", 'rb') as f:
     methods,spaceSize,l2errors,h1errors = pickle.load(f)
@@ -14,7 +17,18 @@ with open("errors_p"+str(polOrder)+".dump", 'rb') as f:
 def plot(errors,ylabel,sub):
     # plt.subplot(sub)
     for i in range(len(methods)):
-        plt.plot(spaceSize[i::len(methods)],errors[2*i::2*len(methods)], 'o-',linewidth=4., label=methods[i][0])
+        c = next(colors)
+        name = methods[i][0]
+        try:
+            if not methods[i][2]["conforming"]:
+                name = name + "-CR"
+        except KeyError:
+            pass
+        plt.plot(spaceSize[i::len(methods)],errors[2*i::2*len(methods)],
+                marker=next(markers),markersize=12.,markeredgewidth=2.,
+                markeredgecolor=c, fillstyle='none',
+                linestyle='--', linewidth=4., color=c,
+                label=name)
     plt.legend(loc=3)
     plt.grid(b=True, which='major', color='0', linestyle='-',linewidth=2.)
     plt.grid(b=True, which='minor', color='0', linestyle='--')
