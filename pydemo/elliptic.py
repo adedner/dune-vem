@@ -96,22 +96,24 @@ def compute(grid):
     u = TrialFunction(uflSpace)
     v = TestFunction(uflSpace)
     x = SpatialCoordinate(uflSpace.cell())
-    # problem 1
-    ### trivial Neuman bc
-    #factor = 2 # change to 2 for higher order approx
-    #exact  = as_vector( [cos(factor*pi*x[0])*cos(factor*pi*x[1])] )
-    #### zero boundary conditions
-    #exact *= x[0]*x[1]*(2-x[0])*(2-x[1])
-    #### non zero and non trivial Neuman boundary conditions
-    #exact += as_vector( [sin(factor*x[0]*factor*x[1])] )
-    #H = lambda w: grad(grad(w))
-    #a = (inner(grad(u), grad(v)) + inner(u,v)) * dx
-    #b = ( -(H(exact[0])[0,0]+H(exact[0])[1,1]) + exact[0] ) * v[0] * dx
-    ## problem 2: dummy quasilinear problem:
-    exact = as_vector ( [  (x[0] - x[0]*x[0] ) * (x[1] - x[1]*x[1] ) ] )
-    Dcoeff = lambda u: 1.0 + u[0]**2
-    a = (Dcoeff(u)* inner(grad(u), grad(v)) ) * dx
-    b = -div( Dcoeff(u) * grad(exact[0]) ) * v[0] * dx
+    if False:
+        ##### problem 1
+        ### trivial Neuman bc
+        factor = 2 # change to 2 for higher order approx
+        exact  = as_vector( [cos(factor*pi*x[0])*cos(factor*pi*x[1])] )
+        #### zero boundary conditions
+        exact *= x[0]*x[1]*(2-x[0])*(2-x[1])
+        #### non zero and non trivial Neuman boundary conditions
+        exact += as_vector( [sin(factor*x[0]*factor*x[1])] )
+        H = lambda w: grad(grad(w))
+        a = (inner(grad(u), grad(v)) + inner(u,v)) * dx
+        b = ( -(H(exact[0])[0,0]+H(exact[0])[1,1]) + exact[0] ) * v[0] * dx
+    else:
+        ##### problem 2: dummy quasilinear problem:
+        exact = as_vector ( [  (x[0] - x[0]*x[0] ) * (x[1] - x[1]*x[1] ) ] )
+        Dcoeff = lambda u: 1.0 + u[0]**2
+        a = (Dcoeff(u)* inner(grad(u), grad(v)) ) * dx
+        b = -div( Dcoeff(u) * grad(exact[0]) ) * v[0] * dx
     model = create.model("elliptic", grid, a==b
             , *[dune.ufl.DirichletBC(uflSpace, exact, i+1) for i in range(4)]
             )
