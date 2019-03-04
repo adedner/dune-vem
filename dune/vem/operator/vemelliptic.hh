@@ -211,7 +211,13 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model>
         uLocal.jacobian(LocalPoint, dvu);
 
         //!!!! model().diffusionCoefficient( LocalPoint, vu, dvu, Dcoeff);
-        Dcoeff[0] = 1.;
+        DomainJacobianRangeType grad1;
+        grad1[0][0] = 1.;
+        grad1[0][1] = 0.;
+        RangeJacobianRangeType a(0);
+        model().diffusiveFlux(GlobalPoint, vu, grad1, a);
+        Dcoeff[0] = a[0][0];
+
         double factor = 1. / (2.0 * numVertices);
         VectorOfAveragedDiffusionCoefficients[agglomerate].axpy(factor,Dcoeff);
       }
@@ -360,6 +366,7 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
   //     rangeSpace.agglomeration());
   const auto &agIndexSet    = rangeSpace.blockMapper().indexSet();
   const auto &agglomeration = rangeSpace.agglomeration();
+  std::cout << "   using new vemelliptic.." << std::endl;
   std::cout << "   in assembly: start element loop size=" << rangeSpace.gridPart().grid().size(0) << " time=  " << timer.elapsed() << std::endl;;
   for (const auto &entity : Dune::elements(
         static_cast<typename GridPartType::GridViewType>(gridPart),
@@ -398,22 +405,24 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
         //!!! model().diffusionCoefficient(LocalPoint, vu, dvu, Dcoeff);
         //!!! model().lindiffusionCoefficient(LocalPoint, vu, dvu, LinDcoeff);
         //!!! hack for accessing diffusion coefficient:
-        //!!! assuming a scalar diffusion coefficient of the form
-        //!!! a(x,u).grad u
-        //!!! diffusiveFlux(x,v,dv,ret)
-        //!!! returns D(x,v,dv) = a(x,u).grad u
         DomainJacobianRangeType grad1;
         grad1[0][0] = 1.;
         grad1[0][1] = 0.;
         RangeJacobianRangeType a(0);
-        model().diffusiveFlux(LocalPoint, vu, grad1, a);
+        model().diffusiveFlux(GlobalPoint, vu, grad1, a);
         Dcoeff[0] = a[0][0];
+        //std::cout << "Dcoeff= " << Dcoeff[0] << std::endl;
         //!!! hack for accessing derivative of diffusion coefficient:
-        //!!! assuming a scalar diffusion coefficient
-        //!!! linDiffusiveFlux(u,du,x,v,dv,ret)
-        //!!! returns d/du D(u,du,x).dv = d/du a(x,u).grad v
-        model().linDiffusiveFlux(vu, dvu, LocalPoint, vu, grad1, a);
-        LinDcoeff[0] = a[0][0];
+        DomainRangeType v(1.);
+        DomainJacobianRangeType da(0);
+        DomainJacobianRangeType gradbar1;
+        DomainJacobianRangeType dval;
+        gradbar1[0][0] = 1.;
+        gradbar1[0][1] = 0.;
+        dval[0][0] = 0;
+        dval[0][1] = 0;
+        model().linDiffusiveFlux(vu, gradbar1, GlobalPoint, v, dval, da);
+        LinDcoeff[0] = da[0][0];
         //std::cout << "LinDcoeff= " << LinDcoeff[0] << std::endl;
         // Each vertex visited twice in looping around the edges, so we divide by 2
         double factor = 1./(2. * numVertices);
@@ -535,27 +544,13 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
       LocalMatrixType jLocal = jOp.localMatrix(entity, entity);
       for (std::size_t r = 0; r < stabMatrix.rows(); ++r)
         for (std::size_t c = 0; c < stabMatrix.cols(); ++c)
-        {
-          auto a = VectorOfAveragedDiffusionCoefficients[agglomerate][0];
-          auto b = stabMatrix[r][c];
-          if (!a==a) std::cout << "a=" << a << std::endl;
-          if (!b==b) std::cout << "b=" << b << std::endl;
           jLocal.add(r, c, VectorOfAveragedDiffusionCoefficients[agglomerate][0]  * stabMatrix[r][c]);
-        }
       const int nE = agIndexSet.numPolyVertices(entity, GridPartType::dimension);
       const DomainLocalFunctionType uLocal = u.localFunction(entity);
       for (std::size_t c = 0; c < stabMatrix.cols(); ++c)
         for (std::size_t r = 0; r < stabMatrix.rows(); ++r)
           for (std::size_t ccc = 0; ccc < stabMatrix.cols(); ++ccc)
-          {
-            auto a = VectorOfAveragedLinearlisedDiffusionCoefficients [agglomerate][0];
-            auto b = stabMatrix[r][ccc];
-            auto c = uLocal[ccc] / (nE);
-            if (!a==a) std::cout << "a=" << a << std::endl;
-            if (!b==b) std::cout << "b=" << b << std::endl;
-            if (!c==c) std::cout << "c=" << c << std::endl;
             jLocal.add(r, c,VectorOfAveragedLinearlisedDiffusionCoefficients [agglomerate][0]  * stabMatrix[r][ccc] * uLocal[ccc] / (nE));
-          }
       stabilization[agglomerate] = true;
     }
   }
