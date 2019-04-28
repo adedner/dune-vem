@@ -23,21 +23,24 @@ def voronoiCells(constructor, towers, fileName=None, load=False):
             [lowerleft[0],upperright[0],lowerleft[1],upperright[1]] )
 
     if isinstance(towers,int):
-        fileName = fileName + str(towers) + '.pickle'
-        if not load or not os.path.exists(fileName):
-            print("generating new seeds for voronoi grid")
-            numpy.random.seed(1234)
+        if fileName:
+            fileName = fileName + str(towers) + '.pickle'
+            if not load or not os.path.exists(fileName):
+                print("generating new seeds for voronoi grid")
+                numpy.random.seed(1234)
+                towers = numpy.array(
+                        [ p*(upperright-lowerleft) + lowerleft
+                            for p in numpy.random.rand(towers, 2) ])
+                with open(fileName, 'wb') as f:
+                    pickle.dump(towers, f)
+            else:
+                print("loading seeds for voronoi grid")
+                with open(fileName, 'rb') as f:
+                    towers = pickle.load(f)
+        else:
             towers = numpy.array(
                     [ p*(upperright-lowerleft) + lowerleft
                         for p in numpy.random.rand(towers, 2) ])
-            if fileName is not None:
-                with open(fileName, 'wb') as f:
-                    pickle.dump(towers, f)
-        else:
-            assert fileName is not None
-            print("loading seeds for voronoi grid")
-            with open(fileName, 'rb') as f:
-                towers = pickle.load(f)
 
     # Select towers inside the bounding box
     i = in_box(towers, bounding_box)
