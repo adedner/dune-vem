@@ -22,6 +22,7 @@ add_subdirectory("src")
 add_subdirectory("dune")
 add_subdirectory("doc")
 add_subdirectory("cmake/modules")
+add_subdirectory("lib")
 
 if(dune-python_FOUND)
   add_subdirectory(python)
