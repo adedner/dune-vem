@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 2.8.12)
+
 project(dune-vem CXX)
 
 if(NOT (dune-common_DIR OR dune-common_ROOT OR
@@ -7,9 +8,8 @@ if(NOT (dune-common_DIR OR dune-common_ROOT OR
       ${PROJECT_BINARY_DIR})
 endif()
 
-#find dune-common and set the module path
 find_package(dune-common REQUIRED)
-list(APPEND CMAKE_MODULE_PATH ${dune-common_MODULE_PATH})
+list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/modules" ${dune-common_MODULE_PATH})
 
 #include the dune macros
 include(DuneMacros)
@@ -17,6 +17,7 @@ include(DuneMacros)
 # start a dune project with information from dune.module
 dune_project()
 dune_enable_all_packages()
+
 add_subdirectory("src")
 add_subdirectory("dune")
 add_subdirectory("doc")
