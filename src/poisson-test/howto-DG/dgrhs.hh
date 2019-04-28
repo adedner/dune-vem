@@ -101,7 +101,8 @@ void assembleDGRHS ( const Model &model, DiscreteFunction &rhs )
       const IntersectionType &intersection = *iit;
       if ( ! intersection.boundary() ) // i.e. if intersection is on boundary: nothing to be done for Neumann zero b.c.
         continue;                      // since [u] = 0  and grad u.n = 0
-      if ( ! model.isDirichletIntersection( intersection ) )
+      Dune::FieldVector< int, RangeType::dimension > components( 1 );
+      if ( ! model.isDirichletIntersection( intersection, components ) )
         continue;
 
       typedef typename IntersectionType::Geometry  IntersectionGeometryType;
@@ -135,7 +136,8 @@ void assembleDGRHS ( const Model &model, DiscreteFunction &rhs )
           for (int d=0;d<dimDomain;++d)
             dvalue[r][d] = -0.5 * normal[d] * vuOut[r];
 
-        model.diffusiveFlux( entity, quadInside[ pt ], vuOut, dvalue, advalue );
+        model.init(entity);
+        model.diffusiveFlux( quadInside[ pt ], vuOut, dvalue, advalue );
 
         value *= weight;
         advalue *= weight;

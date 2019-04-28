@@ -12,6 +12,7 @@
 #include <dune/fem/operator/common/differentiableoperator.hh>
 
 #include <dune/vem/operator/constraints/dirichlet.hh>
+#include <dune/fem/io/parameter.hh>
 
 
 namespace Dune
@@ -52,9 +53,23 @@ namespace Dune
       typedef Dune::Fem::ElementQuadrature< GridPartType, 1 > FaceQuadratureType;
 
     public:
-      EllipticOperator ( const ModelType &model, const RangeDiscreteFunctionSpaceType &rangeSpace )
+      EllipticOperator ( const RangeDiscreteFunctionSpaceType &rangeSpace,
+                         ModelType &model,
+                         const Dune::Fem::ParameterReader &parameter = Dune::Fem::Parameter::container() )
         : model_( model ), constraints_( model, rangeSpace )
       {}
+
+      // prepare the solution vector
+      void prepare( RangeDiscreteFunctionType &u ) const
+      {
+        // set boundary values for solution
+        // constraints()( u );
+      }
+      void prepare( const RangeDiscreteFunctionType &u, RangeDiscreteFunctionType &w ) const
+      {
+        // set boundary values for solution
+        // constraints()( u, w );
+      }
 
       virtual void operator() ( const DomainDiscreteFunctionType &u, RangeDiscreteFunctionType &w ) const;
 
@@ -62,7 +77,7 @@ namespace Dune
       const ConstraintsType &constraints () const { return constraints_; }
 
     private:
-      ModelType model_;
+      const ModelType &model_;
       ConstraintsType constraints_;
     };
 
@@ -104,10 +119,13 @@ namespace Dune
       typedef typename BaseType::FaceQuadratureType FaceQuadratureType;
 
     public:
-      DifferentiableEllipticOperator ( const ModelType &model, const RangeDiscreteFunctionSpaceType &space )
-        : BaseType( model, space )
+      DifferentiableEllipticOperator ( const RangeDiscreteFunctionSpaceType &rangeSpace,
+                         ModelType &model,
+                         const Dune::Fem::ParameterReader &parameter = Dune::Fem::Parameter::container() )
+        : BaseType( rangeSpace, model )
       {}
 
+      //! method to setup the jacobian of the operator for storage in a matrix
       void jacobian ( const DomainDiscreteFunctionType &u, JacobianOperatorType &jOp ) const;
 
       using BaseType::model;
@@ -120,7 +138,8 @@ namespace Dune
     // ----------------------------------
 
     template< class DomainDiscreteFunction, class RangeDiscreteFunction, class Model, class Constraints >
-    void EllipticOperator< DomainDiscreteFunction, RangeDiscreteFunction, Model, Constraints >::operator() ( const DomainDiscreteFunctionType &u, RangeDiscreteFunctionType &w ) const
+    void EllipticOperator< DomainDiscreteFunction, RangeDiscreteFunction, Model, Constraints >
+    ::operator()( const DomainDiscreteFunction &u, RangeDiscreteFunctionType &w ) const
     {
       w.clear();
       const RangeDiscreteFunctionSpaceType &dfSpace = w.space();
@@ -130,9 +149,10 @@ namespace Dune
       const GridPartType &gridPart = w.gridPart();
       for( const auto &entity : Dune::elements( static_cast< typename GridPartType::GridViewType >( gridPart ), Dune::Partitions::interiorBorder ) )
       {
+        model().init(entity);
         const auto geometry = entity.geometry();
 
-        const DomainLocalFunctionType uLocal = u.localFunction( entity );
+        const auto uLocal = u.localFunction( entity );
         RangeLocalFunctionType wLocal = w.localFunction( entity );
 
         if( !stabilization[ dfSpace.agglomeration().index( entity ) ] )
@@ -160,11 +180,11 @@ namespace Dune
             uLocal.jacobian( quadrature[ pt ], du );
 
             RangeRangeType avu( 0 );
-            model().source( entity, quadrature[ pt ], vu, du, avu );
+            model().source( quadrature[ pt ], vu, du, avu );
             avu *= weight;
 
             RangeJacobianRangeType adu( 0 );
-            model().diffusiveFlux( entity, quadrature[ pt ], vu, du, adu );
+            model().diffusiveFlux( quadrature[ pt ], vu, du, adu );
             adu *= weight;
 
             wLocal.axpy( quadrature[ pt ], avu, adu );
@@ -178,7 +198,7 @@ namespace Dune
             if( !intersection.boundary() )
               continue;
 
-            Dune::FieldVector< bool, RangeRangeType::dimension > components( true );
+            Dune::FieldVector< int, RangeRangeType::dimension > components( 0 );
             bool hasDirichletComponent = model().isDirichletIntersection( intersection, components );
 
             const auto intersectionGeometry = intersection.geometry();
@@ -191,7 +211,7 @@ namespace Dune
               DomainRangeType vu;
               uLocal.evaluate( quadInside[ pt ], vu );
               RangeRangeType alpha( 0 );
-              model().alpha( entity, quadInside[ pt ], vu, alpha );
+              model().alpha( quadInside[ pt ], vu, alpha );
               alpha *= weight;
               for( int k = 0; k < RangeRangeType::dimension; ++k )
                 if( hasDirichletComponent && components[ k ] )
@@ -204,7 +224,7 @@ namespace Dune
 
       w.communicate();
 
-      constraints()( u, w );
+      // constraints()( u, w );
     }
 
 
@@ -213,7 +233,8 @@ namespace Dune
     // ------------------------------------------------
 
     template< class JacobianOperator, class Model, class Constraints >
-    void DifferentiableEllipticOperator< JacobianOperator, Model, Constraints >::jacobian ( const DomainDiscreteFunctionType &u, JacobianOperator &jOp ) const
+    void DifferentiableEllipticOperator< JacobianOperator, Model, Constraints >
+      ::jacobian ( const DomainDiscreteFunctionType &u, JacobianOperator &jOp ) const
     {
       typedef typename JacobianOperator::LocalMatrixType LocalMatrixType;
       typedef typename DomainDiscreteFunctionSpaceType::BasisFunctionSetType DomainBasisFunctionSetType;
@@ -239,9 +260,10 @@ namespace Dune
       const GridPartType &gridPart = rangeSpace.gridPart();
       for( const auto &entity : Dune::elements( static_cast< typename GridPartType::GridViewType >( gridPart ), Dune::Partitions::interiorBorder ) )
       {
+        model().init(entity);
         const auto geometry = entity.geometry();
 
-        const DomainLocalFunctionType uLocal = u.localFunction( entity );
+        const auto uLocal = u.localFunction( entity );
         LocalMatrixType jLocal = jOp.localMatrix( entity, entity );
 
         if( !stabilization[ rangeSpace.agglomeration().index( entity ) ] )
@@ -279,8 +301,8 @@ namespace Dune
           RangeJacobianRangeType adphi( 0 );
           for( unsigned int localCol = 0; localCol < domainNumBasisFunctions; ++localCol )
           {
-            model().linSource( u0, jacU0, entity, quadrature[ pt ], phi[ localCol ], dphi[ localCol ], aphi );
-            model().linDiffusiveFlux( u0, jacU0, entity, quadrature[ pt ], phi[ localCol ], dphi[ localCol ], adphi );
+            model().linSource( u0, jacU0, quadrature[ pt ], phi[ localCol ], dphi[ localCol ], aphi );
+            model().linDiffusiveFlux( u0, jacU0, quadrature[ pt ], phi[ localCol ], dphi[ localCol ], adphi );
             jLocal.column( localCol ).axpy( rphi, rdphi, aphi, adphi, weight );
           }
         }
@@ -292,7 +314,7 @@ namespace Dune
             if( !intersection.boundary() )
               continue;
 
-            Dune::FieldVector< bool, RangeRangeType::dimension > components( true );
+            Dune::FieldVector< int, RangeRangeType::dimension > components( 0 );
             bool hasDirichletComponent = model().isDirichletIntersection( intersection, components );
 
             const auto intersectionGeometry = intersection.geometry();
@@ -308,7 +330,7 @@ namespace Dune
               for( unsigned int localCol = 0; localCol < domainNumBasisFunctions; ++localCol )
               {
                 RangeRangeType alpha( 0 );
-                model().linAlpha( u0, entity, quadInside[ pt ], phi[ localCol ], alpha );
+                model().linAlpha( u0, quadInside[ pt ], phi[ localCol ], alpha );
                 for( int k = 0; k < RangeRangeType::dimension; ++k )
                   if( hasDirichletComponent && components[ k ] )
                     alpha[ k ] = 0;
@@ -319,7 +341,7 @@ namespace Dune
         }
       }
 
-      constraints().applyToOperator( jOp );
+      // constraints().applyToOperator( jOp );
 
       jOp.communicate();
     }

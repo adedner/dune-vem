@@ -23,9 +23,6 @@
 #include <dune/fem/solver/istlsolver.hh>
 #include <dune/fem/solver/cginverseoperator.hh>
 
-// lagrange interpolation
-#include <dune/fem/operator/lagrangeinterpolation.hh>
-
 /*********************************************************/
 
 // include norms
@@ -118,11 +115,11 @@ public:
   //! define Laplace operator
   typedef DifferentiableVEMEllipticOperator< LinearOperatorType, ModelType > EllipticOperatorType;
 
-  VemScheme( GridPartType &gridPart, const ModelType& implicitModel, const AgglomerationType& agglomeration )
+  VemScheme( GridPartType &gridPart, const ModelType& implicitModel, AgglomerationType& agglomeration )
     : implicitModel_( implicitModel ),
       gridPart_( gridPart ),
-    indexSet_( agglomeration ),
-    discreteSpace_( gridPart_, indexSet_ ),
+      indexSet_( agglomeration ),
+      discreteSpace_( agglomeration ),
       solution_( "solution", discreteSpace_ ),
       rhs_( "rhs", discreteSpace_ ),
       // the elliptic operator (implicit)

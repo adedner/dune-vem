@@ -3,9 +3,16 @@ from setuptools import setup, find_packages
 setup(name="dune.vem",
     namespace_packages=['dune'],
     description="Python lib for dune: virtual element implementation",
-    version="2.4",
+    version="2.5",
     author="Andreas Dedner and Martin Nolte",
     packages = find_packages(),
     zip_safe = 0,
+    install_requires=[
+        'triangle',
+        'scipy',
+        'numpy',
+        'matplotlib',
+        'sortedcontainers'
+        ],
     package_data = {'': ['*.so']}
   )

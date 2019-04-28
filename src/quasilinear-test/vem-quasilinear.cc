@@ -77,7 +77,7 @@ double algorithm ( Grid &grid, AgglomerationType &agglomeration )
   GridExactSolutionType gridExactSolution("exact solution", problem, gridPart, 5 );
 
   //! input/output tuple and setup datawritter
-  typedef Dune::tuple< const typename VemSchemeType::DiscreteFunctionType *, GridExactSolutionType * > IOTupleType;
+  typedef std::tuple< const typename VemSchemeType::DiscreteFunctionType *, GridExactSolutionType * > IOTupleType;
   typedef Dune::Fem::DataOutput< Grid, IOTupleType > DataOutputType;
   IOTupleType ioTuple( &(vemscheme.solution()), &gridExactSolution) ; // tuple with pointers
   DataOutputType dataOutput( grid, ioTuple, DataOutputParameters( step ) );
@@ -112,7 +112,7 @@ double algorithm ( Grid &grid, AgglomerationType &agglomeration )
 
   const double errorL2 = normL2.distance( gridExactSolution, vemscheme.solution() );
   const double errorH1 = normH1.distance( gridExactSolution, vemscheme.solution() );
-  
+
   std::cout << "Vem: " << vemscheme.solution().size() << " " << errorL2 << " " << errorH1 << std::endl;
   resultfile << vemscheme.solution().size() << " " << errorL2 << " " << errorH1 << std::endl;
   }
@@ -141,7 +141,7 @@ try
   for( int i = 1; i < argc; ++i )
     Dune::Fem::Parameter::append( argv[ i ] );
 
-  // append default parameter file  
+  // append default parameter file
   Dune::Fem::Parameter::append( "./data/vem-parameter");
 
   //

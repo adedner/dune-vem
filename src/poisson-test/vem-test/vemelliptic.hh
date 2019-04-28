@@ -161,8 +161,6 @@ template< class DomainDiscreteFunction, class RangeDiscreteFunction, class Model
 void VEMEllipticOperator< DomainDiscreteFunction, RangeDiscreteFunction, Model, Constraints >
 ::operator() ( const DomainDiscreteFunctionType &u, RangeDiscreteFunctionType &w ) const
 {
-  using Dune::Vem::make_entity;
-
   w.clear();
   // get discrete function space
   const RangeDiscreteFunctionSpaceType &dfSpace = w.space();
@@ -178,6 +176,7 @@ void VEMEllipticOperator< DomainDiscreteFunction, RangeDiscreteFunction, Model, 
   {
     // get elements geometry
     const GeometryType &geometry = entity.geometry();
+    model().init(entity);
 
     // get local representation of the discrete functions
     const DomainLocalFunctionType uLocal = u.localFunction( entity );
@@ -190,7 +189,7 @@ void VEMEllipticOperator< DomainDiscreteFunction, RangeDiscreteFunction, Model, 
 
     for( const auto &intersection : intersections( static_cast< typename GridPartType::GridViewType >( gridPart ), entity ) )
     {
-      if( !intersection.boundary() && (dfSpace.agglomeration().index( make_entity( intersection.outside() ) ) == agglomerate) )
+      if( !intersection.boundary() && (dfSpace.agglomeration().index( intersection.outside() ) == agglomerate) )
         continue;
 
       const int faceIndex = intersection.indexInInside();
@@ -205,7 +204,7 @@ void VEMEllipticOperator< DomainDiscreteFunction, RangeDiscreteFunction, Model, 
         uLocal.evaluate( refElement.position( j, GridPartType::dimension ), vu );
 
         RangeRangeType Dcoeff = 0;
-        model().diffusionCoefficient( entity, refElement.position( j, GridPartType::dimension ), vu, Dcoeff );
+        model().diffusionCoefficient( refElement.position( j, GridPartType::dimension ), vu, Dcoeff );
 
         // each vertex visited twice in looping around the edges, so we divide by 2
         VectorOfAveragedDiffusionCoefficients[ agglomerate ] += Dcoeff / (2.0 * numVertices);
@@ -240,13 +239,13 @@ void VEMEllipticOperator< DomainDiscreteFunction, RangeDiscreteFunction, Model, 
 
         // compute mass contribution (studying linear case so linearizing around zero)
         RangeRangeType avu( 0 );
-        model().source( entity, quadrature[ pt ], vu, du, avu );
+        model().source( quadrature[ pt ], vu, du, avu );
         avu *= weight;
         // add to local functional wLocal.axpy( quadrature[ pt ], avu );
 
         RangeJacobianRangeType adu( 0 );
         // apply diffusive flux
-        model().diffusiveFlux( entity, quadrature[ pt ], vu, du, adu );
+        model().diffusiveFlux( quadrature[ pt ], vu, du, adu );
         adu *= weight;
 
         // add to local function
@@ -265,7 +264,7 @@ void VEMEllipticOperator< DomainDiscreteFunction, RangeDiscreteFunction, Model, 
         const IntersectionType &intersection = *iit;
         if( !intersection.boundary() )
           continue;
-        Dune::FieldVector< bool, RangeRangeType::dimension > components( true );
+        Dune::FieldVector< int, RangeRangeType::dimension > components( 1 );
         bool hasDirichletComponent = model().isDirichletIntersection( intersection, components );
 
         const typename IntersectionType::Geometry &intersectionGeometry = intersection.geometry();
@@ -278,7 +277,7 @@ void VEMEllipticOperator< DomainDiscreteFunction, RangeDiscreteFunction, Model, 
           DomainRangeType vu;
           uLocal.evaluate( quadInside[ pt ], vu );
           RangeRangeType alpha( 0 );
-          model().alpha( entity, quadInside[ pt ], vu, alpha );
+          model().alpha( quadInside[ pt ], vu, alpha );
           alpha *= weight;
           for( int k = 0; k < RangeRangeType::dimension; ++k )
             if( hasDirichletComponent && components[ k ] )
@@ -303,8 +302,6 @@ void DifferentiableVEMEllipticOperator< JacobianOperator, Model, Constraints >
   typedef typename JacobianOperator::LocalMatrixType LocalMatrixType;
   typedef typename DomainDiscreteFunctionSpaceType::BasisFunctionSetType DomainBasisFunctionSetType;
   typedef typename RangeDiscreteFunctionSpaceType::BasisFunctionSetType RangeBasisFunctionSetType;
-
-  using Dune::Vem::make_entity;
 
   const DomainDiscreteFunctionSpaceType &domainSpace = jOp.domainSpace();
   const RangeDiscreteFunctionSpaceType  &rangeSpace = jOp.rangeSpace();
@@ -332,6 +329,7 @@ void DifferentiableVEMEllipticOperator< JacobianOperator, Model, Constraints >
   for( const auto &entity : Dune::elements( static_cast< typename GridPartType::GridViewType >( gridPart ), Dune::Partitions::interiorBorder ) )
   {
     const GeometryType &geometry = entity.geometry();
+    model().init(entity);
 
     const DomainLocalFunctionType uLocal = u.localFunction( entity );
     LocalMatrixType jLocal = jOp.localMatrix( entity, entity );
@@ -343,7 +341,7 @@ void DifferentiableVEMEllipticOperator< JacobianOperator, Model, Constraints >
 
     for( const auto &intersection : intersections( static_cast< typename GridPartType::GridViewType >( gridPart ), entity ) )
     {
-      if( !intersection.boundary() && (rangeSpace.agglomeration().index( make_entity( intersection.outside() ) ) == agglomerate) )
+      if( !intersection.boundary() && (rangeSpace.agglomeration().index( intersection.outside() ) == agglomerate) )
         continue;
 
       const int faceIndex = intersection.indexInInside();
@@ -358,7 +356,7 @@ void DifferentiableVEMEllipticOperator< JacobianOperator, Model, Constraints >
         uLocal.evaluate( refElement.position( j, GridPartType::dimension ), vu );
 
         RangeRangeType Dcoeff = 0;
-        model().diffusionCoefficient( entity, refElement.position( j, GridPartType::dimension ), vu, Dcoeff );
+        model().diffusionCoefficient( refElement.position( j, GridPartType::dimension ), vu, Dcoeff );
 
         // each vertex visited twice in looping around the edges, so we divide by 2
         VectorOfAveragedDiffusionCoefficients[ agglomerate ] += Dcoeff / (2.0 * numVertices);
@@ -407,10 +405,10 @@ void DifferentiableVEMEllipticOperator< JacobianOperator, Model, Constraints >
       for( unsigned int localCol = 0; localCol < domainNumBasisFunctions; ++localCol )
       {
         // if mass terms or right hand side is present
-        model().linSource( u0, jacU0, entity, quadrature[ pt ], phi[ localCol ], dphi[ localCol ], aphi );
+        model().linSource( u0, jacU0, quadrature[ pt ], phi[ localCol ], dphi[ localCol ], aphi );
 
         // if gradient term is present
-        model().linDiffusiveFlux( u0, jacU0, entity, quadrature[ pt ], phi[ localCol ], dphi[ localCol ], adphi );
+        model().linDiffusiveFlux( u0, jacU0, quadrature[ pt ], phi[ localCol ], dphi[ localCol ], adphi );
 
         // get column object and call axpy method
         jLocal.column( localCol ).axpy( rphi, rdphi, aphi, adphi, weight );
@@ -425,7 +423,7 @@ void DifferentiableVEMEllipticOperator< JacobianOperator, Model, Constraints >
         if( !intersection.boundary() )
           continue;
 
-        Dune::FieldVector< bool, RangeRangeType::dimension > components( true );
+        Dune::FieldVector< int, RangeRangeType::dimension > components( 1 );
         bool hasDirichletComponent = model().isDirichletIntersection( intersection, components );
 
         const typename IntersectionType::Geometry &intersectionGeometry = intersection.geometry();
@@ -441,7 +439,7 @@ void DifferentiableVEMEllipticOperator< JacobianOperator, Model, Constraints >
           for( unsigned int localCol = 0; localCol < domainNumBasisFunctions; ++localCol )
           {
             RangeRangeType alpha( 0 );
-            model().linAlpha( u0, entity, quadInside[ pt ], phi[ localCol ], alpha );
+            model().linAlpha( u0, quadInside[ pt ], phi[ localCol ], alpha );
             for( int k = 0; k < RangeRangeType::dimension; ++k )
             {
               if( hasDirichletComponent && components[ k ] )

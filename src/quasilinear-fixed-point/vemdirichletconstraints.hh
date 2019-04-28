@@ -27,11 +27,6 @@ namespace Dune
 
     typedef typename DiscreteFunctionSpaceType::BlockMapperType BlockMapperType;
 
-    typedef Fem::SlaveDofs< DiscreteFunctionSpaceType, BlockMapperType > SlaveDofsType;
-    typedef typename SlaveDofsType::SingletonKey SlaveDofsKeyType;
-    typedef Fem::SingletonList< SlaveDofsKeyType, SlaveDofsType >
-      SlaveDofsProviderType;
-
     static const int localBlockSize = DiscreteFunctionSpaceType::localBlockSize;
     static_assert( localBlockSize == DiscreteFunctionSpaceType::FunctionSpaceType::dimRange,
                    "local block size of the space must be identical to the dimension of the range of the function space." );
@@ -41,7 +36,7 @@ namespace Dune
                    "local block size of the space must be less or equahl to the dimension of the range of the model." );
 
     DirichletConstraints ( const ModelType &model, const DiscreteFunctionSpaceType &space )
-      : model_( model ), space_( space ), slaveDofs_( getSlaveDofs( space_ ) )
+      : model_( model ), space_( space )
     {}
 
     /*! treatment of Dirichlet-DoFs for given discrete function
@@ -147,7 +142,7 @@ namespace Dune
     void dirichletDofsCorrectOnEntity ( LinearOperator &linearOperator, const EntityType &entity ) const
     {
       // get slave dof structure (for parallel runs)   /*@LST0S@*/
-      SlaveDofsType &slaveDofs = this->slaveDofs();
+      const auto &slaveDofs = linearOperator.rangeSpace().slaveDofs();
 
       typedef typename LinearOperator::LocalMatrixType LocalMatrixType;
 
@@ -197,21 +192,21 @@ namespace Dune
       std::vector< double > values( localBlocks*localBlockSize );
       // 18 nov 2017
             // vector to store flag whether the node belongs to the subelement entity();
-            std::vector< int > doftoassm (localBlocks);            
-			const auto &refElement = Dune::ReferenceElements< double, GridPartType::dimension >::general( entity.type() );
-			//std::cout << "c() = " << entity.geometry().center();
-			std::fill(doftoassm.begin(), doftoassm.end(), -1);
-			const Dune::Vem::AgglomerationIndexSet<GridPartType> agIndexSet(
+            std::vector< int > doftoassm (localBlocks);
+      const auto &refElement = Dune::ReferenceElements< double, GridPartType::dimension >::general( entity.type() );
+      //std::cout << "c() = " << entity.geometry().center();
+      std::fill(doftoassm.begin(), doftoassm.end(), -1);
+      const Dune::Vem::AgglomerationIndexSet<GridPartType> agIndexSet(
             space_.agglomeration());
-			for( int i = 0; i < refElement.size( GridPartType::dimension ); ++i )
-			{
-			const int k = agIndexSet.localIndex( entity, i, GridPartType::dimension );				
-				if( k != -1 ) 
-				{
-					doftoassm[k] = k;
-				}				
-			}
-      agglomerationVEMInterpolation( space_.blockMapper().indexSet() )( uLocal, values );
+      for( int i = 0; i < refElement.size( GridPartType::dimension ); ++i )
+      {
+      const int k = agIndexSet.localIndex( entity, i, GridPartType::dimension );
+        if( k != -1 )
+        {
+          doftoassm[k] = k;
+        }
+      }
+      agglomerationVEMInterpolation( space_.blockMapper().indexSet() )( entity, uLocal, values );
 
       int localDof = 0;
 
@@ -226,7 +221,7 @@ namespace Dune
             assert( (unsigned int)localDof < wLocal.size() );
             if (doftoassm[localDof] != -1 ) {
             wLocal[ localDof ] = values[ localDof ];
-		}
+    }
           }
       }
     }
@@ -343,25 +338,11 @@ namespace Dune
       return hasDirichletBoundary;
     }
 
-    // return slave dofs
-    static SlaveDofsType *getSlaveDofs ( const DiscreteFunctionSpaceType &space )
-    {
-      SlaveDofsKeyType key( space, space.blockMapper() );
-      return &( SlaveDofsProviderType::getObject( key ));
-    }
-
-    // return reference to slave dofs
-    SlaveDofsType &slaveDofs () const
-    {
-      slaveDofs_->rebuild();
-      return *slaveDofs_;
-    }
     class DirichletBuilder;
 
     //! pointer to slave dofs
     const ModelType &model_;
     const DiscreteFunctionSpaceType &space_;
-    SlaveDofsType *const slaveDofs_;
     mutable std::vector< DirichletBlock > dirichletBlocks_;
     mutable bool hasDirichletDofs_ = false;
     mutable int sequence_ = -1;

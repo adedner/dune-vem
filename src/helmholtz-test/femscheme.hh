@@ -22,9 +22,6 @@
 #include <dune/fem/solver/istlsolver.hh>
 #include <dune/fem/solver/cginverseoperator.hh>
 
-// lagrange interpolation
-#include <dune/fem/operator/lagrangeinterpolation.hh>
-
 /*********************************************************/
 
 // include norms

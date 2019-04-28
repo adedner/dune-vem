@@ -77,7 +77,7 @@ double algorithm ( Grid &grid, AgglomerationType &agglomeration )
   GridExactSolutionType gridExactSolution("exact solution", problem, gridPart, 5 );
 
   //! input/output tuple and setup datawritter
-  typedef Dune::tuple< const typename VemSchemeType::DiscreteFunctionType *, GridExactSolutionType * > IOTupleType;
+  typedef std::tuple< const typename VemSchemeType::DiscreteFunctionType *, GridExactSolutionType * > IOTupleType;
   typedef Dune::Fem::DataOutput< Grid, IOTupleType > DataOutputType;
   IOTupleType ioTuple( &(vemscheme.solution()), &gridExactSolution) ; // tuple with pointers
   DataOutputType dataOutput( grid, ioTuple, DataOutputParameters( step ) );
@@ -127,7 +127,7 @@ try
 {
   // initialize MPI, if necessary
   Dune::Fem::MPIManager::initialize( argc, argv );
-  
+
   if( argc <= 1 )
   {
     std::cerr << "Usage: " << argv[ 0 ] << " <msh file>" << std::endl;
@@ -141,7 +141,7 @@ try
   for( int i = 1; i < argc; ++i )
     Dune::Fem::Parameter::append( argv[ i ] );
 
-  // append default parameter file  
+  // append default parameter file
   Dune::Fem::Parameter::append( "./data/vem-parameter");
 
   //

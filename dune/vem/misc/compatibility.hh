@@ -14,25 +14,6 @@ namespace Dune
   namespace Vem
   {
 
-    // make_entity
-    // -----------
-
-#if !DUNE_VERSION_NEWER(DUNE_GRID, 2, 6)
-    template< class Grid, class Implementation >
-    typename Dune::EntityPointer< Grid, Implementation >::Entity
-    make_entity ( const Dune::EntityPointer< Grid, Implementation > &entityPointer )
-    {
-      return *entityPointer;
-    }
-#endif // #if !DUNE_VERSION_NEWER(DUNE_GRID, 2, 6)
-
-    template< int codim, int dim, class Grid, template< int, int, class > class Implementation >
-    typename Dune::Entity< codim, dim, Grid, Implementation >
-    make_entity ( Dune::Entity< codim, dim, Grid, Implementation > entity )
-    {
-      return std::move( entity );
-    }
-
   } // namespace Vem
 
 } // namespace Dune

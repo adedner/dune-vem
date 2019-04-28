@@ -173,7 +173,7 @@ public:
   : implicitModel_( implicitModel ),
     gridPart_( gridPart ),
     agglomeration_(agglomeration),
-    discreteSpace_( gridPart_, agglomeration),
+    discreteSpace_( agglomeration),
     solution_( "solution", discreteSpace_ ),
     rhs_( "rhs", discreteSpace_ ),
     // the elliptic operator (implicit)

@@ -47,6 +47,7 @@ namespace Dune
       typedef typename FunctionSpaceType::HessianRangeType HessianRangeType;
 
       static constexpr int dimDomain = DomainType::dimension;
+      static constexpr int dimRange  = RangeType::dimension;
 
       typedef ReferenceElement< typename DomainType::field_type, dimDomain > ReferenceElementType;
 
@@ -62,12 +63,13 @@ namespace Dune
           shapeFunctionSet_( std::move( shapeFunctionSet ) ),
           valueProjection_( std::move( valueProjection ) ),
           jacobianProjection_( std::move( jacobianProjection ) ),
-          bbox_( std::move( bbox ) )
+          bbox_( std::move( bbox ) ),
+          size_( valueProjection_[0].size() * dimRange)
       {}
 
       int order () const { return shapeFunctionSet_.order(); }
 
-      std::size_t size () const { return valueProjection_[0].size(); }
+      std::size_t size () const { return size_; }
 
       const ReferenceElementType &referenceElement () const
       {
@@ -136,7 +138,10 @@ namespace Dune
         value = RangeType( 0 );
         shapeFunctionSet_.evaluateEach( position( x ), [ this, &dofs, &value ] ( std::size_t alpha, RangeType phi_alpha ) {
             for( std::size_t j = 0; j < size(); ++j )
+            {
+              double v = valueProjection_[ alpha ][ j ];
               value.axpy( valueProjection_[ alpha ][ j ]*dofs[ j ], phi_alpha );
+            }
           } );
       }
 
@@ -145,7 +150,7 @@ namespace Dune
       {
         assert( values.size() >= size() );
         std::fill( values.begin(), values.end(), RangeType( 0 ) );
-        shapeFunctionSet_.evaluateEach( position( x ), [ this, &values ] ( std::size_t alpha, RangeType phi_alpha ) {
+        shapeFunctionSet_.evaluateEach( position(x), [ this, &values ] ( std::size_t alpha, RangeType phi_alpha ) {
             for( std::size_t j = 0; j < size(); ++j )
               values[ j ].axpy( valueProjection_[ alpha ][ j ], phi_alpha );
           } );
@@ -167,11 +172,14 @@ namespace Dune
         jacobian = JacobianRangeType( 0 );
         shapeFunctionSet_.evaluateEach( position( x ), [ this, &dofs, &jacobian ] ( std::size_t alpha, RangeType phi_alpha ) {
             for( std::size_t j = 0; j < size(); ++j )
+            {
               for( int k = 0; k < dimDomain; ++k )
               {
+                double v = jacobianProjection_[ alpha ][ j ][ k ];
                 FieldMatrixColumn< JacobianRangeType > jacobian_k( jacobian, k );
                 jacobian_k.axpy( jacobianProjection_[ alpha ][ j ][ k ]*dofs[ j ], phi_alpha );
               }
+            }
           } );
       }
 
@@ -180,13 +188,17 @@ namespace Dune
       {
         assert( jacobians.size() >= size() );
         std::fill( jacobians.begin(), jacobians.end(), JacobianRangeType( 0 ) );
-        shapeFunctionSet_.evaluateEach( position( x ), [ this, &jacobians ] ( std::size_t alpha, RangeType phi_alpha ) {
+        shapeFunctionSet_.evaluateEach( position(x), [ this, &jacobians ] ( std::size_t alpha, RangeType phi_alpha ) {
+            const auto &jacobianProjectionAlpha = jacobianProjection_[alpha];
             for( std::size_t j = 0; j < size(); ++j )
+            {
+              const auto &jacobianProjectionAlphaJ = jacobianProjectionAlpha[j];
               for( int k = 0; k < dimDomain; ++k )
               {
                 FieldMatrixColumn< JacobianRangeType > jacobian_jk( jacobians[ j ], k );
-                jacobian_jk.axpy( jacobianProjection_[ alpha ][ j ][ k ], phi_alpha );
+                jacobian_jk.axpy( jacobianProjectionAlphaJ[ k ], phi_alpha );
               }
+            }
         } );
       }
 
@@ -210,14 +222,45 @@ namespace Dune
 
       const EntityType &entity () const { assert( entity_ ); return *entity_; }
 
+#if 0 // probably not needed
+      /*******************************************************/
+      // required method to use this as shape function
+      /*******************************************************/
+      template< class Point, class Functor >
+      void evaluateEach ( const Point &x, Functor functor ) const
+      {
+        std::vector<RangeType> values(size());
+        evaluateAll(x,values);
+        for (std::size_t i=0;i<size();++i)
+          functor(i,values[i]);
+      }
+      template< class Point, class Functor >
+      void jacobianEach ( const Point &x, Functor functor ) const
+      {
+        std::vector<JacobianRangeType> values(size());
+        jacobianAll(x,values);
+        for (std::size_t i=0;i<size();++i)
+          functor(i,values[i]);
+      }
+      template< class Point, class Functor >
+      void hessianEach ( const Point &x, Functor functor ) const
+      {
+        DUNE_THROW( NotImplemented, "hessians not implemented for VEMBasisFunctionSet" );
+      }
+      /**********************************************************/
+#endif
+
     private:
       template< class Point >
       DomainType position ( const Point &x ) const
       {
+        return Fem::coordinate(x);
+#if 0
         DomainType y = entity().geometry().global( Fem::coordinate( x ) ) - bbox_.first;
         for( int k = 0; k < dimDomain; ++k )
           y[ k ] /= (bbox_.second[ k ] - bbox_.first[ k ]);
         return y;
+#endif
       }
 
       const EntityType *entity_ = nullptr;
@@ -225,6 +268,7 @@ namespace Dune
       ValueProjection valueProjection_;
       JacobianProjection jacobianProjection_;
       std::pair< DomainType, DomainType > bbox_;
+      size_t size_;
     };
 
   } // namespace Vem

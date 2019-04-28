@@ -38,28 +38,36 @@ namespace Dune
     {
       const auto &mapper = v.space().blockMapper();
       const auto &agglomeration = mapper.agglomeration();
+      const int blockSize = DiscreteFunction::DiscreteFunctionSpaceType::localBlockSize;
 
       // reserve memory for local dof vector
       std::vector< typename DiscreteFunction::RangeFieldType > ldv;
-      ldv.reserve( mapper.maxNumDofs() * DiscreteFunction::DiscreteFunctionSpaceType::localBlockSize );
+      ldv.reserve( mapper.maxNumDofs() * blockSize );
 
+      typedef typename DiscreteFunction::DiscreteFunctionSpaceType::AgglomerationIndexSetType IndexSetType;
+      const int polOrder = DiscreteFunction::DiscreteFunctionSpaceType::polynomialOrder;
+      const bool conforming = DiscreteFunction::DiscreteFunctionSpaceType::conforming;
       typedef typename DiscreteFunction::GridPartType GridPartType;
       typedef typename GridPartType::template Codim< 0 >::EntitySeedType ElementSeedType;
       std::vector< std::vector< ElementSeedType > > entitySeeds( agglomeration.size() );
       for( const auto &element : elements( static_cast< typename GridPartType::GridViewType >( v.gridPart() ), ps ) )
         entitySeeds[ agglomeration.index( element ) ].push_back( element.seed() );
 
-      auto interpolation = agglomerationVEMInterpolation( mapper.indexSet() );
+      auto interpolation = Dune::Vem::agglomerationVEMInterpolation<polOrder,conforming>( mapper.indexSet() );
+
+      Dune::Fem::ConstLocalFunction<GridFunction> uLocal(u);
       for( std::size_t agglomerate = 0; agglomerate < agglomeration.size(); ++agglomerate )
       {
         if( entitySeeds[ agglomerate ].empty() )
           continue;
 
-        ldv.resize( mapper.numDofs( agglomerate ) );
+        ldv.resize( mapper.numDofs( agglomerate ) * blockSize );
+        std::fill(ldv.begin(),ldv.end(),0);
         for( const ElementSeedType &entitySeed : entitySeeds[ agglomerate ] )
         {
           const auto &element = v.gridPart().entity( entitySeed );
-          interpolation( u.localFunction( element ), ldv );
+          uLocal.bind(element);
+          interpolation( element, uLocal, ldv );
         }
         v.setLocalDofs( v.gridPart().entity( entitySeeds[ agglomerate ].front() ), ldv );
       }

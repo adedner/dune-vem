@@ -12,6 +12,7 @@
 #include <dune/grid/common/rangegenerators.hh>
 
 #include <dune/vem/agglomeration/agglomeration.hh>
+#include <dune/vem/agglomeration/boundingbox.hh>
 
 namespace Dune
 {
@@ -141,16 +142,29 @@ namespace Dune
       const AgglomerationType &agglomeration () const { return agglomeration_; }
       const GridPartType &gridPart () const { return agglomeration().gridPart(); }
 
+      double volume( std::size_t index ) const { return volumes_[index]; }
+      double volume( const ElementType &element ) const
+      {
+        return volume( index( element ) );
+      }
+      const BoundingBox<GridPart>& boundingBox( std::size_t index ) const { return boundingBoxes_[index]; }
+      const BoundingBox<GridPart>& boundingBox( const ElementType &element ) const
+      {
+        return boundingBox( index( element ) );
+      }
+
     private:
       const Agglomerate &agglomerate ( std::size_t agglomerateIndex ) const { return agglomerates_[ agglomerateIndex ]; }
       const Agglomerate &agglomerate ( const ElementType &element ) const { return agglomerate( index( element ) ); }
 
       const AgglomerationType &agglomeration_;
+      std::vector< BoundingBox< GridPart > > boundingBoxes_;
       AllocatorType allocator_;
       std::vector< Agglomerate > agglomerates_;
       std::array< std::size_t, dimension+1 > size_;
       std::array< std::size_t, dimension+1 > maxSubAgglomerates_;
       std::vector< std::vector< int > > globalIndex_;
+      std::vector< double > volumes_;
     };
 
 
@@ -239,8 +253,9 @@ namespace Dune
 
     template< class GridPart, class Allocator >
     inline AgglomerationIndexSet< GridPart, Allocator >::AgglomerationIndexSet ( const AgglomerationType &agglomeration, AllocatorType allocator )
-      : agglomeration_( agglomeration ),
-      allocator_( std::move( allocator ) )
+      : agglomeration_( agglomeration )
+      , boundingBoxes_( boundingBoxes( agglomeration ) )
+      , allocator_( std::move( allocator ) )
     {
       const typename GridPartType::IndexSetType indexSet = agglomeration_.gridPart().indexSet();
       std::vector< std::vector< typename GridPartType::IndexSetType::IndexType > > subAgglomerates( GlobalGeometryTypeIndex::size( dimension-1 ) );
@@ -305,6 +320,8 @@ namespace Dune
       maxSubAgglomerates_[ dimension ] = 1;
       size_[ dimension ] = agglomeration.size();
       std::vector< std::array< std::vector< std::size_t >, dimension > > connectivity( size_[ dimension ] );
+      volumes_.resize( agglomeration.size() );
+      std::fill(volumes_.begin(), volumes_.end(), 0.);
 
       for( const auto element : elements( static_cast< typename GridPart::GridViewType >( agglomeration_.gridPart() ), Partitions::interiorBorder ) )
       {
@@ -333,6 +350,7 @@ namespace Dune
             }
           }
         }
+        volumes_[agIndex] += element.geometry().volume();
       }
 
       // compress connectivity

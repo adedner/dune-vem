@@ -4,6 +4,7 @@
 #include <utility>
 
 #include <dune/common/power.hh>
+#include <dune/common/version.hh>
 
 #if DUNE_VERSION_NEWER(DUNE_FEM, 2, 6)
 #include <dune/fem/common/hybrid.hh>
@@ -69,20 +70,47 @@ namespace Dune
     private:
       typedef typename GridPartType::template Codim< codimension >::EntityType EntityType;
 
+      /*
       typedef typename Fem::FunctionSpace< typename FunctionSpaceType::DomainFieldType, typename FunctionSpaceType::RangeFieldType, FunctionSpaceType::dimDomain, 1 > ScalarFunctionSpaceType;
       // typedef Fem::LegendreShapeFunctionSet< ScalarFunctionSpaceType > ScalarShapeFunctionSetType;
-      typedef Fem::OrthonormalShapeFunctionSet< ScalarFunctionSpaceType, polOrder > ScalarShapeFunctionSetType;
-      typedef Fem::VectorialShapeFunctionSet< Fem::ShapeFunctionSetProxy< ScalarShapeFunctionSetType >, typename FunctionSpaceType::RangeType > ShapeFunctionSetType;
+      typedef Fem::OrthonormalShapeFunctionSet< ScalarFunctionSpaceType > ScalarShapeFunctionSetType;
+      */
 
     public:
-      typedef BoundingBoxBasisFunctionSet< EntityType, ShapeFunctionSetType > BasisFunctionSetType;
+      typedef Dune::Fem::FunctionSpace<
+          typename FunctionSpace::DomainFieldType, typename FunctionSpace::RangeFieldType,
+           GridPartType::dimension, 1
+        > ScalarShapeFunctionSpaceType;
+
+      struct ScalarShapeFunctionSet
+        : public Dune::Fem::OrthonormalShapeFunctionSet< ScalarShapeFunctionSpaceType >
+      {
+        typedef Dune::Fem::OrthonormalShapeFunctionSet< ScalarShapeFunctionSpaceType >   BaseType;
+
+        static constexpr int numberShapeFunctions =
+              Dune::Fem::OrthonormalShapeFunctions< ScalarShapeFunctionSpaceType::dimDomain >::size(polOrder);
+      public:
+        explicit ScalarShapeFunctionSet ( Dune::GeometryType type )
+          : BaseType( type, polOrder )
+        {
+          assert( size() == BaseType::size() );
+        }
+        explicit ScalarShapeFunctionSet ( Dune::GeometryType type, int p )
+          : BaseType( type, p )
+        {
+          assert( size() == BaseType::size() );
+        }
+
+        // overload size method because it's a static value
+        static constexpr unsigned int size() { return numberShapeFunctions; }
+      };
+      typedef ScalarShapeFunctionSet ScalarShapeFunctionSetType;
+      typedef Fem::VectorialShapeFunctionSet< Fem::ShapeFunctionSetProxy< ScalarShapeFunctionSetType >, typename FunctionSpaceType::RangeType > ShapeFunctionSetType;
+
+      typedef BoundingBoxBasisFunctionSet< GridPartType, ShapeFunctionSetType > BasisFunctionSetType;
 
       // static const std::size_t localBlockSize = FunctionSpaceType::dimRange * StaticPower< polOrder+1, GridPartType::dimension >::power;
-#if DUNE_VERSION_NEWER(DUNE_FEM, 2, 6)
-      typedef Hybrid::IndexRange< int, FunctionSpaceType::dimRange * Fem::OrthonormalShapeFunctionSetSize< ScalarFunctionSpaceType, polOrder >::v > LocalBlockIndices;
-#else // #if DUNE_VERSION_NEWER(DUNE_FEM, 2, 6)
-      static const int localBlockSize = FunctionSpaceType::dimRange * Fem::OrthonormalShapeFunctionSetSize< ScalarFunctionSpaceType, polOrder >::v;
-#endif // #else // #if DUNE_VERSION_NEWER(DUNE_FEM, 2, 6)
+      typedef Hybrid::IndexRange< int, FunctionSpaceType::dimRange * ScalarShapeFunctionSet::numberShapeFunctions > LocalBlockIndices;
       typedef AgglomerationDGMapper< GridPartType > BlockMapperType;
 
       template< class DiscreteFunction, class Operation = Fem::DFCommunicationOperation::Copy >
@@ -119,14 +147,19 @@ namespace Dune
 
       enum { hasLocalInterpolate = false };
 
-      AgglomerationDGSpace ( AgglomerationType &agglomeration )
+      AgglomerationDGSpace ( const AgglomerationType &agglomeration )
         : BaseType( agglomeration.gridPart() ),
           blockMapper_( agglomeration ),
           boundingBoxes_( boundingBoxes( agglomeration ) ),
           // scalarShapeFunctionSet_( polOrder )
           scalarShapeFunctionSet_(
-              Dune::GeometryType(Dune::GeometryType::cube,GridPart::dimension) )
+              Dune::GeometryType(Dune::GeometryType::cube,GridPart::dimension), polOrder )
       {}
+
+      const BoundingBox< GridPart >& boundingBox( const EntityType &entity ) const
+      {
+        return boundingBoxes_[ agglomeration().index( entity ) ];
+      }
 
       const BasisFunctionSetType basisFunctionSet ( const EntityType &entity ) const
       {
@@ -157,6 +190,54 @@ namespace Dune
       typename Traits::ScalarShapeFunctionSetType scalarShapeFunctionSet_;
     };
 
+    template <class DFSpace>
+    struct BBDGPenalty
+    {
+      BBDGPenalty(const DFSpace &space, double penalty)
+      : space_(space)
+      , penalty_(penalty)
+      {}
+      template <class Intersection>
+      double operator()(const Intersection &intersection,
+                        double intersectionArea, double area, double nbArea) const
+      {
+        const auto &bbIn = space_.boundingBox(intersection.inside());
+        auto delta = bbIn.second - bbIn.first;
+        auto volume = bbIn.volume();
+        if (intersection.neighbor())
+        {
+          const auto &bbOut  = space_.boundingBox(intersection.outside());
+          delta[0] = std::min(delta[0], bbOut.second[0]-bbOut.first[0]);
+          delta[1] = std::min(delta[1], bbOut.second[1]-bbOut.first[1]);
+          volume = std::min(volume,bbOut.volume());
+        }
+        /*
+        auto normal = intersection.unitOuterNormal({0.5});
+        normal[0] = std::abs(normal[0]);
+        normal[1] = std::abs(normal[1]);
+        double h = 0;
+        if (normal[0]<1e-10)
+          h = delta[1];
+        else if (normal[1]<1e-10)
+          h = delta[0];
+        else
+          h = std::min(delta[0]/normal[0], delta[1]/normal[1]);
+        std::cout << "n=" << normal[0] << "," << normal[1];
+        std::cout << "    bbox=" << bbIn.first << "," << bbIn.second;
+        std::cout << "    delta=" << delta[0] << " " << delta[1];
+        std::cout << "    h=" << h << std::endl;
+        return penalty_ / h;
+        */
+        // const double hInv = intersectionArea / std::min( area, nbArea );
+        const double hInv = intersectionArea / volume;
+        return penalty_ * hInv;
+      }
+      const double &factor() const { return penalty_; }
+      private:
+      const DFSpace &space_;
+      double penalty_;
+    };
+
   } // namespace Vem
 
   namespace Fem
@@ -166,15 +247,27 @@ namespace Dune
     interpolate ( const GridFunction &u, DiscreteFunction &v, PartitionSet< partitions > ps )
     {
       // !!! a very crude implementation - should be done locally on each polygon
-      DiscreteFunction rhs( v );
+      v.clear();
+      typedef AdaptiveDiscreteFunction<typename DiscreteFunction::DiscreteFunctionSpaceType> DF;
+      DF rhs( "rhs", v.space() );
+      DF vtmp( "sol", v.space() );
+      rhs.clear();
       Dune::Vem::applyMass( u, rhs );
-      typedef Dune::Fem::SparseRowLinearOperator< DiscreteFunction, DiscreteFunction > LinearOperator;
+      typedef Dune::Fem::SparseRowLinearOperator< DF, DF > LinearOperator;
       LinearOperator assembledMassOp( "assembled mass operator", v.space(), v.space() );
       Dune::Vem::MassOperator< LinearOperator > massOp( v.space() );
-      massOp.jacobian( v, assembledMassOp );
-      Dune::Fem::CGInverseOperator< DiscreteFunction > invOp( assembledMassOp, 1e-8, 1e-8 );
-      invOp( rhs, v );
+      massOp.jacobian( vtmp, assembledMassOp );
+      auto param = Dune::Fem::parameterDict("fem.solver.", "verbose",false,
+          "preconditioning.method","jacobi",
+          "errorMeasure","absolute",
+          "tolerance",1e-10);
+      Dune::Fem::CGInverseOperator< DF > invOp(param);
+      invOp.bind(assembledMassOp);
+      vtmp.clear();
+      invOp( rhs, vtmp );
+      v.assign(vtmp);
     }
+
   } // namespace Fem
 
 } // namespace Dune

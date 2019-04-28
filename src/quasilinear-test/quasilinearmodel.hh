@@ -76,10 +76,10 @@ struct NonLinearModel
       //u(x,uVal);
 
       //if (uVal < 1.0 ) {
-      //phi = 2*(xmx2_times40)*((ymy2_sq*xmx2_times40_sq)/2.0 - (ymy2_cube*xmx2_times40_cube)/8.0 - (7*ymy2*xmx2_times40)/8.0 + 1.0) + 
-      //80.0*ymy2*((ymy2_sq*xmx2_times40_sq)/2.0 - (ymy2_cube*xmx2_times40_cube)/8.0 - (7.0*ymy2*xmx2_times40)/8.0 + 1.0) 
-      //+ (2.0*x[1] - 1.0)*xmx2_times40*((7.0*(2.0*x[1] - 1.0)*xmx2_times40)/8.0 - ymy2*(2.0*x[1] - 1.0)*xmx2_times40_sq + (3.0*ymy2_sq*(2.0*x[1] - 1)*xmx2_times40_cube)/8.0) + 
-      //ymy2*(80.0*x[0] - 40.0)*((7.0*ymy2*(80.0*x[0] - 40.0))/8.0 - 
+      //phi = 2*(xmx2_times40)*((ymy2_sq*xmx2_times40_sq)/2.0 - (ymy2_cube*xmx2_times40_cube)/8.0 - (7*ymy2*xmx2_times40)/8.0 + 1.0) +
+      //80.0*ymy2*((ymy2_sq*xmx2_times40_sq)/2.0 - (ymy2_cube*xmx2_times40_cube)/8.0 - (7.0*ymy2*xmx2_times40)/8.0 + 1.0)
+      //+ (2.0*x[1] - 1.0)*xmx2_times40*((7.0*(2.0*x[1] - 1.0)*xmx2_times40)/8.0 - ymy2*(2.0*x[1] - 1.0)*xmx2_times40_sq + (3.0*ymy2_sq*(2.0*x[1] - 1)*xmx2_times40_cube)/8.0) +
+      //ymy2*(80.0*x[0] - 40.0)*((7.0*ymy2*(80.0*x[0] - 40.0))/8.0 -
       //ymy2_sq*(80.0*x[0] - 40.0)*xmx2_times40 + (3.0*ymy2_cube*(80.0*x[0] - 40.0)*xmx2_times40_sq)/8.0) ;
       //}
       //else
@@ -87,7 +87,7 @@ struct NonLinearModel
       //phi = (80.0 * ymy2)/ymy2_xmx2_times40_plus_1 +
       //(2.0* xmx2_times40)/ymy2_xmx2_times40_plus_1
       //+ (ymy2_sq*(80.0*x[0] - 40.0) * (80.0*x[0] - 40.0))/ymy2_xmx2_times40_plus_1_sq
-      //+ ((2.0*x[1] - 1.0) * (2.0*x[1] - 1.0)*xmx2_times40_sq)/ymy2_xmx2_times40_plus_1_sq;      
+      //+ ((2.0*x[1] - 1.0) * (2.0*x[1] - 1.0)*xmx2_times40_sq)/ymy2_xmx2_times40_plus_1_sq;
       //}
       // ---------------------------------------------------------------
       // Problem 3 rhs
@@ -96,7 +96,7 @@ struct NonLinearModel
         //double xto6by5 = std::pow(x[0],6.0/5.0);
         ////
         //phi = - (24.0*(xto8by5 + 1.0))/(25.0*xto2by5) - (64.0*xto6by5)/25.0;
-             
+
     }
 
     //! the exact solution
@@ -109,13 +109,13 @@ struct NonLinearModel
       double xmx2 = x[0] - x[0] * x[0];
       double ymy2 = x[1] - x[1] * x[1];
       phi *= xmx2 * ymy2;
-      
+
       // Problem 2 exact solution
       //phi = 40.0;
       //double xmx2 = x[0] - x[0] * x[0];
       //double ymy2 = x[1] - x[1] * x[1];
       //phi *= xmx2 * ymy2;
-      
+
       // Problem 3 exact solution
       //phi = std::pow(x[0], 1.6);
 
@@ -132,14 +132,14 @@ struct NonLinearModel
         // Problem 1 jacobians
         ret[r][0] = ymy2 *(1.0 - 2.*x[0]) ;
         ret[r][1] = xmx2 *(1.0 - 2.*x[1]);
-        
+
         // Problem 2 jacobians
         //ret[r][0] = 40.0 * ymy2 *(1.0 - 2.*x[0]) ;
         //ret[r][1] = 40.0 * xmx2 *(1.0 - 2.*x[1]);
-        
+
         // Problem 3 jacobians
         //double xto3by5 = std::pow(x[0], 3.0/5.0);
-        
+
         //ret[r][0] = (8.0*xto3by5)/5.0;
         //ret[r][1] = 0.0;
       }
@@ -192,7 +192,7 @@ struct NonLinearModel
   template< class Entity, class Point >
     void diffusionCoefficient ( const Entity &entity,
         const Point &x,
-        const RangeType &value,        
+        const RangeType &value,
         RangeType &Dcoeff ) const
     {
       // Problem 1 dcoeff
@@ -209,7 +209,7 @@ struct NonLinearModel
       //{
         //Dcoeff = 1.0 / ( ( 1.0 + value[0] ) );
       //}
-      
+
       // Problem 3 dcoeff
       //Dcoeff = 1.0 + value[0];
     }
@@ -217,14 +217,14 @@ struct NonLinearModel
   template< class Entity, class Point >
     void lindiffusionCoefficient ( const Entity &entity,
         const Point &x,
-        const RangeType &value,        
+        const RangeType &value,
         RangeType &LinDcoeff ) const
     {
       // Problem 1 dcoeff
       // Dcoeff = 1.0 / ( ( 1.0 + value[0] ) * ( 1.0 + value[0] ) );
       LinDcoeff = -2.0/( (value[0] + 1) * (value[0] + 1) * (value[0] + 1) );
       //Dcoeff = 1.0 /  ( 1.0 + 0.8 * std::sin(4.0 * value[0]) * std::sin(4.0 * value[0]) ) ;
-      
+
       // Problem 2 dcoeff
       //if (value[0]<1.0)
       //{
@@ -234,7 +234,7 @@ struct NonLinearModel
       //{
         //Dcoeff = 1.0 / ( ( 1.0 + value[0] ) );
       //}
-      
+
       // Problem 3 dcoeff
       //Dcoeff = 1.0 + value[0];
     }
@@ -262,7 +262,7 @@ struct NonLinearModel
       //{
         //flux *= 1.0 / ( ( 1.0 + value[0] ) );
       //}
-      
+
       // problem 3
       //flux *= 1.0 + value[0];
     }
@@ -287,17 +287,17 @@ struct NonLinearModel
       //Dcoeff = 1.0 /  ( 1.0 + 0.8 * std::sin(4.0 * value[0]) * std::sin(4.0 * value[0]) ) ;
       //
       // problem 2 lindiffusiveflux
-      //if (uBar < 1.0 ) 
+      //if (uBar < 1.0 )
       //{
         //flux.axpy ((-3.0 * uBar[0] * uBar[0] + 8.0 * uBar[0] - 7.0 ) * value[0], gradientBar);
       //}
-      //else 
+      //else
       //{
         //flux.axpy ((-1.0 / ((1. + uBar[0]) * (1. + uBar[0]))) * value[0], gradientBar);
       //}
-      
+
       // Problem 3 lindiffusiveflux
-      //flux.axpy( 1.0 * value[0], gradientBar);      
+      //flux.axpy( 1.0 * value[0], gradientBar);
     }
 
   template< class Entity, class Point >

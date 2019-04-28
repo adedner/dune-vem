@@ -173,6 +173,7 @@ void VEMEllipticOperator< DomainDiscreteFunction, RangeDiscreteFunction, Model, 
   {
     // get elements geometry
     const GeometryType &geometry = entity.geometry();
+    model().init(entity);
 
     // get local representation of the discrete functions
     const DomainLocalFunctionType uLocal = u.localFunction( entity );
@@ -206,13 +207,13 @@ void VEMEllipticOperator< DomainDiscreteFunction, RangeDiscreteFunction, Model, 
 
         // compute mass contribution (studying linear case so linearizing around zero)
         RangeRangeType avu( 0 );
-        model().source( entity, quadrature[ pt ], vu, du, avu );
+        model().source( quadrature[ pt ], vu, du, avu );
         avu *= weight;
         // add to local functional wLocal.axpy( quadrature[ pt ], avu );
 
         RangeJacobianRangeType adu( 0 );
         // apply diffusive flux
-        model().diffusiveFlux( entity, quadrature[ pt ], vu, du, adu );
+        model().diffusiveFlux( quadrature[ pt ], vu, du, adu );
         adu *= weight;
 
         // add to local function
@@ -231,7 +232,7 @@ void VEMEllipticOperator< DomainDiscreteFunction, RangeDiscreteFunction, Model, 
         const IntersectionType &intersection = *iit;
         if( !intersection.boundary() )
           continue;
-        Dune::FieldVector< bool, RangeRangeType::dimension > components( true );
+        Dune::FieldVector< int, RangeRangeType::dimension > components( 1 );
         bool hasDirichletComponent = model().isDirichletIntersection( intersection, components );
 
         const typename IntersectionType::Geometry &intersectionGeometry = intersection.geometry();
@@ -244,7 +245,7 @@ void VEMEllipticOperator< DomainDiscreteFunction, RangeDiscreteFunction, Model, 
           DomainRangeType vu;
           uLocal.evaluate( quadInside[ pt ], vu );
           RangeRangeType alpha( 0 );
-          model().alpha( entity, quadInside[ pt ], vu, alpha );
+          model().alpha( quadInside[ pt ], vu, alpha );
           alpha *= weight;
           for( int k = 0; k < RangeRangeType::dimension; ++k )
             if( hasDirichletComponent && components[ k ] )
@@ -291,6 +292,7 @@ void DifferentiableVEMEllipticOperator< JacobianOperator, Model, Constraints >
   for( const auto &entity : Dune::elements( static_cast< typename GridPartType::GridViewType >( gridPart ), Dune::Partitions::interiorBorder ) )
   {
     const GeometryType &geometry = entity.geometry();
+    model().init(entity);
 
     const DomainLocalFunctionType uLocal = u.localFunction( entity );
     LocalMatrixType jLocal = jOp.localMatrix( entity, entity );
@@ -335,10 +337,10 @@ void DifferentiableVEMEllipticOperator< JacobianOperator, Model, Constraints >
       for( unsigned int localCol = 0; localCol < domainNumBasisFunctions; ++localCol )
       {
         // if mass terms or right hand side is present
-        model().linSource( u0, jacU0, entity, quadrature[ pt ], phi[ localCol ], dphi[ localCol ], aphi );
+        model().linSource( u0, jacU0, quadrature[ pt ], phi[ localCol ], dphi[ localCol ], aphi );
 
         // if gradient term is present
-        model().linDiffusiveFlux( u0, jacU0, entity, quadrature[ pt ], phi[ localCol ], dphi[ localCol ], adphi );
+        model().linDiffusiveFlux( u0, jacU0, quadrature[ pt ], phi[ localCol ], dphi[ localCol ], adphi );
 
         // get column object and call axpy method
         jLocal.column( localCol ).axpy( rphi, rdphi, aphi, adphi, weight );
@@ -353,7 +355,7 @@ void DifferentiableVEMEllipticOperator< JacobianOperator, Model, Constraints >
         if( !intersection.boundary() )
           continue;
 
-        Dune::FieldVector< bool, RangeRangeType::dimension > components( true );
+        Dune::FieldVector< int, RangeRangeType::dimension > components( 1 );
         bool hasDirichletComponent = model().isDirichletIntersection( intersection, components );
 
         const typename IntersectionType::Geometry &intersectionGeometry = intersection.geometry();
@@ -369,7 +371,7 @@ void DifferentiableVEMEllipticOperator< JacobianOperator, Model, Constraints >
           for( unsigned int localCol = 0; localCol < domainNumBasisFunctions; ++localCol )
           {
             RangeRangeType alpha( 0 );
-            model().linAlpha( u0, entity, quadInside[ pt ], phi[ localCol ], alpha );
+            model().linAlpha( u0, quadInside[ pt ], phi[ localCol ], alpha );
             for( int k = 0; k < RangeRangeType::dimension; ++k )
             {
               if( hasDirichletComponent && components[ k ] )

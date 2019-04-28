@@ -36,20 +36,17 @@ namespace Dune
 
       typedef typename DiscreteFunctionSpaceType::BlockMapperType BlockMapperType;
 
-      typedef Fem::SlaveDofs< DiscreteFunctionSpaceType, BlockMapperType > SlaveDofsType;
-      typedef typename SlaveDofsType::SingletonKey SlaveDofsKeyType;
-      typedef Fem::SingletonList< SlaveDofsKeyType, SlaveDofsType > SlaveDofsProviderType;
-
+      static const int dimRange = DiscreteFunctionSpaceType::FunctionSpaceType::dimRange;
       static const int localBlockSize = DiscreteFunctionSpaceType::localBlockSize;
-      static_assert( localBlockSize == DiscreteFunctionSpaceType::FunctionSpaceType::dimRange,
+      static_assert( localBlockSize == dimRange,
                      "local block size of the space must be identical to the dimension of the range of the function space." );
       typedef FieldVector< bool, localBlockSize > DirichletBlock;
-      typedef FieldVector< bool, ModelType::dimRange > ModelDirichletBlock;
-      static_assert( ModelType::dimRange >= localBlockSize,
+      typedef FieldVector< int, dimRange > ModelDirichletBlock;
+      static_assert( dimRange >= localBlockSize,
                      "local block size of the space must be less or equahl to the dimension of the range of the model." );
 
       DirichletConstraints ( const ModelType &model, const DiscreteFunctionSpaceType &space )
-        : model_( model ), space_( space ), slaveDofs_( getSlaveDofs( space_ ) )
+        : model_( model ), space_( space )
       {}
 
       /*! treatment of Dirichlet-DoFs for given discrete function
@@ -155,7 +152,7 @@ namespace Dune
       void dirichletDofsCorrectOnEntity ( LinearOperator &linearOperator, const EntityType &entity ) const
       {
         // get slave dof structure (for parallel runs)   /*@LST0S@*/
-        SlaveDofsType &slaveDofs = this->slaveDofs();
+        const auto &slaveDofs = linearOperator.rangeSpace().slaveDofs();
 
         typedef typename LinearOperator::LocalMatrixType LocalMatrixType;
 
@@ -204,7 +201,7 @@ namespace Dune
         space_.blockMapper().map( entity, globalBlockDofs );
         std::vector< double > values( localBlocks*localBlockSize );
 
-        agglomerationVEMInterpolation( space_.blockMapper().indexSet() )( uLocal, values );
+        agglomerationVEMInterpolation( space_.blockMapper().indexSet() )( entity, uLocal, values );
 
         int localDof = 0;
 
@@ -308,7 +305,7 @@ namespace Dune
           if( intersection.boundary() )
           {
             // get dirichlet information from model
-            ModelDirichletBlock block( true );
+            ModelDirichletBlock block( 1 );
             const bool isDirichletIntersection = model.isDirichletIntersection( intersection, block );
             if( isDirichletIntersection )
             {
@@ -333,25 +330,11 @@ namespace Dune
         return hasDirichletBoundary;
       }
 
-      // return slave dofs
-      static SlaveDofsType *getSlaveDofs ( const DiscreteFunctionSpaceType &space )
-      {
-        SlaveDofsKeyType key( space, space.blockMapper() );
-        return &( SlaveDofsProviderType::getObject( key ));
-      }
-
-      // return reference to slave dofs
-      SlaveDofsType &slaveDofs () const
-      {
-        slaveDofs_->rebuild();
-        return *slaveDofs_;
-      }
       class DirichletBuilder;
 
       //! pointer to slave dofs
       const ModelType &model_;
       const DiscreteFunctionSpaceType &space_;
-      SlaveDofsType *const slaveDofs_;
       mutable std::vector< DirichletBlock > dirichletBlocks_;
       mutable bool hasDirichletDofs_ = false;
       mutable int sequence_ = -1;

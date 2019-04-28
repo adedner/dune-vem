@@ -83,8 +83,8 @@ protected:
 public:
   //! contructor
   DGEllipticOperator ( const ModelType &model, const DiscreteFunctionSpaceType &space)
-: model_( model )
-{}
+  : model_( model )
+  {}
 
   // prepare the solution vector
   template <class Function>
@@ -187,6 +187,7 @@ void DGEllipticOperator< DiscreteFunction, Model >
   {
     // get entity (here element)
     const EntityType &entity = *it;
+    model().init(entity);
     // get elements geometry
     const GeometryType &geometry = entity.geometry();
 
@@ -212,13 +213,13 @@ void DGEllipticOperator< DiscreteFunction, Model >
 
         // compute mass contribution (studying linear case so linearizing around zero)
         RangeType avu( 0 );
-        model().source( entity, quadrature[ pt ], vu, du, avu );
+        model().source( quadrature[ pt ], vu, du, avu );
         avu *= weight;
         // add to local functional wLocal.axpy( quadrature[ pt ], avu );
 
         JacobianRangeType adu( 0 );
         // apply diffusive flux
-        model().diffusiveFlux( entity, quadrature[ pt ], vu, du, adu );
+        model().diffusiveFlux( quadrature[ pt ], vu, du, adu );
         adu *= weight;
 
         // add to local function
@@ -235,7 +236,7 @@ void DGEllipticOperator< DiscreteFunction, Model >
         const IntersectionType &intersection = *iit;
         if ( intersection.neighbor() )
         {
-          const EntityType outside = Dune::Fem::make_entity( intersection.outside() );
+          const EntityType outside = intersection.outside();
 
           typedef typename IntersectionType::Geometry  IntersectionGeometryType;
           const IntersectionGeometryType &intersectionGeometry = intersection.geometry();
@@ -266,11 +267,13 @@ void DGEllipticOperator< DiscreteFunction, Model >
             JacobianRangeType duIn, aduIn, duOut, aduOut;
             uLocal.evaluate( quadInside[ pt ], vuIn );
             uLocal.jacobian( quadInside[ pt ], duIn );
-            model_.diffusiveFlux( entity, quadInside[ pt ], vuIn, duIn, aduIn );
+            model().diffusiveFlux( quadInside[ pt ], vuIn, duIn, aduIn );
             uOutLocal.evaluate( quadOutside[ pt ], vuOut );
             uOutLocal.jacobian( quadOutside[ pt ], duOut );
-            model_.diffusiveFlux( entity, quadInside[ pt ], jump, dvalue, advalue );
-            model_.diffusiveFlux( outside, quadOutside[ pt ], vuOut, duOut, aduOut );
+            model().diffusiveFlux( quadInside[ pt ], jump, dvalue, advalue );
+            model().init(outside);
+            model().diffusiveFlux( quadOutside[ pt ], vuOut, duOut, aduOut );
+            model().init(entity);
             //! [Compute skeleton terms: obtain required values on the intersection]
 
 
@@ -299,7 +302,7 @@ void DGEllipticOperator< DiscreteFunction, Model >
         }
         else if( intersection.boundary() )
         {
-          Dune::FieldVector< bool, RangeType::dimension > components( true );
+          Dune::FieldVector< int, RangeType::dimension > components( 1 );
           if ( ! model().isDirichletIntersection( intersection, components ) )
             continue;
 
@@ -326,7 +329,7 @@ void DGEllipticOperator< DiscreteFunction, Model >
             JacobianRangeType duIn, aduIn;
             uLocal.evaluate( quadInside[ pt ], vuIn );
             uLocal.jacobian( quadInside[ pt ], duIn );
-            model_.diffusiveFlux( entity, quadInside[ pt ], vuIn, duIn, aduIn );
+            model().diffusiveFlux( quadInside[ pt ], vuIn, duIn, aduIn );
 
             jump = vuIn;
 
@@ -343,7 +346,7 @@ void DGEllipticOperator< DiscreteFunction, Model >
               for (int d=0;d<dimDomain;++d)
                 dvalue[r][d] = -0.5 * normal[d] * jump[r];
 
-            model_.diffusiveFlux( entity, quadInside[ pt ], jump, dvalue, advalue );
+            model().diffusiveFlux( quadInside[ pt ], jump, dvalue, advalue );
 
             value *= weight;
             advalue *= weight;
@@ -405,7 +408,7 @@ void DifferentiableDGEllipticOperator< JacobianOperator, Model >
   for( IteratorType it = dfSpace.begin(); it != end; ++it )
   {
     const EntityType &entity = *it;
-
+    model().init(entity);
 
     // gcd3 added 15-Nov-15
     typedef typename GridPartType::IndexSetType LeafIndexSet;
@@ -415,8 +418,6 @@ void DifferentiableDGEllipticOperator< JacobianOperator, Model >
     const int LeafElementIndex = lset.index(entity); // Global element number of the current element
     const int currentPolygon = agglomeration.index(*it); // the polygon we are integrating
     myElem++;
-
-
 
     const GeometryType geometry = entity.geometry();
     const LocalFunctionType uLocal = u.localFunction( entity );
@@ -459,10 +460,10 @@ void DifferentiableDGEllipticOperator< JacobianOperator, Model >
       for( unsigned int localCol = 0; localCol < numBaseFunctions; ++localCol )
       {
         // if mass terms or right hand side is present
-        model().linSource( u0, jacU0, entity, quadrature[ pt ], phi[ localCol ], dphi[ localCol ], aphi );
+        model().linSource( u0, jacU0, quadrature[ pt ], phi[ localCol ], dphi[ localCol ], aphi );
 
         // if gradient term is present
-        model().linDiffusiveFlux( u0, jacU0, entity, quadrature[ pt ], phi[ localCol ], dphi[ localCol ], adphi );
+        model().linDiffusiveFlux( u0, jacU0, quadrature[ pt ], phi[ localCol ], dphi[ localCol ], adphi );
 
         // get column object and call axpy method
         jLocal.column( localCol ).axpy( phi, dphi, aphi, adphi, weight );
@@ -482,7 +483,7 @@ void DifferentiableDGEllipticOperator< JacobianOperator, Model >
 
       if( intersection.neighbor()  )
       {
-        EntityType neighbor = Dune::Fem::make_entity( intersection.outside() );
+        EntityType neighbor = intersection.outside();
         const int neighborPolygon = agglomeration.index(neighbor);
         typedef typename IntersectionType::Geometry  IntersectionGeometryType;
         const IntersectionGeometryType &intersectionGeometry = intersection.geometry();
@@ -552,8 +553,10 @@ void DifferentiableDGEllipticOperator< JacobianOperator, Model >
             {
               JacobianRangeType adphiEn = dphi[ i ];
               JacobianRangeType adphiNb = dphiNb[ i ];
-              model().linDiffusiveFlux( u0En, u0EnJac, entity,   faceQuadInside[ pt ], phi[i], adphiEn, dphi[ i ] );
-              model().linDiffusiveFlux( u0En, u0EnJac, neighbor,   faceQuadOutside[ pt ], phiNb[i], adphiNb, dphiNb[ i ] );
+              model().linDiffusiveFlux( u0En, u0EnJac, faceQuadInside[ pt ], phi[i], adphiEn, dphi[ i ] );
+              model().init(neighbor);
+              model().linDiffusiveFlux( u0En, u0EnJac, faceQuadOutside[ pt ], phiNb[i], adphiNb, dphiNb[ i ] );
+              model().init(entity);
             }
             //! [Assemble skeleton terms: obtain values om quadrature point]
 
@@ -593,7 +596,7 @@ void DifferentiableDGEllipticOperator< JacobianOperator, Model >
       }
       else if( intersection.boundary() )
       {
-        Dune::FieldVector< bool, RangeType::dimension > components( true );
+        Dune::FieldVector< int, RangeType::dimension > components( 1 );
         if ( ! model().isDirichletIntersection( intersection, components ) )
           continue;
 
@@ -639,7 +642,7 @@ void DifferentiableDGEllipticOperator< JacobianOperator, Model >
           for( unsigned int i = 0; i < numBaseFunctions; ++i )
           {
             JacobianRangeType adphiEn = dphi[ i ];
-            model().linDiffusiveFlux( u0En, u0EnJac, entity,   faceQuadInside[ pt ], phi[i], adphiEn, dphi[ i ] );
+            model().linDiffusiveFlux( u0En, u0EnJac, faceQuadInside[ pt ], phi[i], adphiEn, dphi[ i ] );
           }
 
           for( unsigned int localCol = 0; localCol < numBaseFunctions; ++localCol )

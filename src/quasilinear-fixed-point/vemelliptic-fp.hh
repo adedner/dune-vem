@@ -198,13 +198,13 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model,
 
       RangeRangeType Dcoeff = 0;
       const std::size_t agglomerate = dfSpace.agglomeration().index(
-          entity);		
+          entity);
 
       // ====
       for (const auto &intersection : Dune::intersections(
             static_cast<typename GridPartType::GridViewType>(gridPart),
             entity)) {
-        if( !intersection.boundary() && (dfSpace.agglomeration().index( Dune::Fem::make_entity( intersection.outside() ) ) == agglomerate) )
+        if( !intersection.boundary() && (dfSpace.agglomeration().index( intersection.outside() ) == agglomerate) )
           continue;
         //
         const int faceIndex = intersection.indexInInside();
@@ -321,7 +321,7 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model,
       RangeLocalFunctionType wLocal = w.localFunction(entity);
       const DomainLocalFunctionType uLocal = u.localFunction(entity);
       const std::size_t agglomerate = dfSpace.agglomeration().index(
-          entity);	
+          entity);
       if (!stabilization[dfSpace.agglomeration().index(entity)]) {
         const auto &stabMatrix = dfSpace.stabilization(entity);
         for (std::size_t r = 0; r < stabMatrix.rows(); ++r)
@@ -406,7 +406,7 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model, Constraints>::ja
         entity.type());
     //
     if (oldPolygon!=currentPolygon)
-    {		
+    {
       avgDiffusionCoefficient = 0;
       oldPolygon = currentPolygon;
     }
@@ -414,7 +414,7 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model, Constraints>::ja
     for (const auto &intersection : Dune::intersections(
           static_cast<typename GridPartType::GridViewType>(gridPart),
           entity)) {
-      if( !intersection.boundary() && (rangeSpace.agglomeration().index( Dune::Fem::make_entity( intersection.outside() ) ) == currentPolygon) )
+      if( !intersection.boundary() && (rangeSpace.agglomeration().index( intersection.outside() ) == currentPolygon) )
         continue;
       //
       const int faceIndex = intersection.indexInInside();
@@ -439,16 +439,16 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model, Constraints>::ja
         //model().lindiffusionCoefficient(entity,LocalPoint, vu, LinDcoeff);
         // Each vertex visited twice in looping around the edges, so we divide by 2
         avgDiffusionCoefficient += Dcoeff / (2.0 * numVertices);
-        VectorOfAveragedDiffusionCoefficients[agglomerate] += Dcoeff/ (2.0 * numVertices);     
+        VectorOfAveragedDiffusionCoefficients[agglomerate] += Dcoeff/ (2.0 * numVertices);
       }
     }
-    
+
     //
     polygonareas[currentPolygon] += geometry.volume();
     // For Stabilisation..
     //std::cout << avgDiffusionCoefficient << std::endl;
     valueProjections_.resize(rangeSpace.agglomeration().size());
-    const auto &valueProjection = valueProjections_[agglomerate];  
+    const auto &valueProjection = valueProjections_[agglomerate];
 
     const DomainBasisFunctionSetType &domainBaseSet =
       jLocal.domainBasisFunctionSet();
@@ -545,10 +545,10 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model, Constraints>::ja
   for (const auto &entity : Dune::elements(
         static_cast<typename GridPartType::GridViewType>(gridPart),
         Dune::Partitions::interiorBorder)) {
-    const GeometryType &geometry = entity.geometry();   
+    const GeometryType &geometry = entity.geometry();
     auto asmFlag = stabilization[rangeSpace.agglomeration().index(entity)] ;
     if (!stabilization[rangeSpace.agglomeration().index(entity)])
-    {     
+    {
       const auto &stabMatrix = rangeSpace.stabilization(entity);
       LocalMatrixType jLocal = jOp.localMatrix(entity, entity);
       const std::size_t agglomerate = rangeSpace.agglomeration().index(
@@ -562,7 +562,7 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model, Constraints>::ja
       //jLocal.add(r, c,
       //1 * stabMatrix[r][c]);
       //jLocal.add( r, c, 1 * stabMatrix[ r ][ c ] );
-      stabilization[rangeSpace.agglomeration().index(entity)] = true;   
+      stabilization[rangeSpace.agglomeration().index(entity)] = true;
     }
 
     //}

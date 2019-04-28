@@ -5,27 +5,29 @@
 
 #include <utility>
 
-#if DUNE_VERSION_NEWER(DUNE_FEM, 2, 6)
 #include <dune/fem/common/hybrid.hh>
-#endif // #if DUNE_VERSION_NEWER(DUNE_FEM, 2, 6)
 
 #include <dune/fem/quadrature/elementquadrature.hh>
 #include <dune/fem/space/common/commoperations.hh>
 #include <dune/fem/space/common/defaultcommhandler.hh>
 #include <dune/fem/space/common/discretefunctionspace.hh>
 #include <dune/fem/space/common/functionspace.hh>
+#include <dune/fem/space/basisfunctionset/vectorial.hh>
 #include <dune/fem/space/shapefunctionset/orthonormal.hh>
 #include <dune/fem/space/shapefunctionset/proxy.hh>
 #include <dune/fem/space/shapefunctionset/vectorial.hh>
+#include <dune/fem/space/common/capabilities.hh>
 
-#include <dune/vem/agglomeration/boundingbox.hh>
 #include <dune/vem/agglomeration/dofmapper.hh>
-#include <dune/vem/agglomeration/shapefunctionset.hh>
+// #include <dune/vem/agglomeration/shapefunctionset.hh>
 #include <dune/vem/misc/compatibility.hh>
 #include <dune/vem/misc/pseudoinverse.hh>
+#include <dune/vem/agglomeration/dgspace.hh>
 #include <dune/vem/space/basisfunctionset.hh>
 #include <dune/vem/space/interpolation.hh>
 #include <dune/vem/space/interpolate.hh>
+
+#include <dune/vem/space/test.hh>
 
 namespace Dune
 {
@@ -36,7 +38,7 @@ namespace Dune
     // Internal Forward Declarations
     // -----------------------------
 
-    template< class FunctionSpace, class GridPart, int polOrder >
+    template< class FunctionSpace, class GridPart, int polOrder, bool conforming >
     class AgglomerationVEMSpace;
 
 
@@ -49,8 +51,8 @@ namespace Dune
       : std::integral_constant< bool, false >
     {};
 
-    template< class FunctionSpace, class GridPart, int order >
-    struct IsAgglomerationVEMSpace< AgglomerationVEMSpace< FunctionSpace, GridPart, order > >
+    template< class FunctionSpace, class GridPart, int order, bool conforming >
+    struct IsAgglomerationVEMSpace< AgglomerationVEMSpace< FunctionSpace, GridPart, order, conforming > >
       : std::integral_constant< bool, true >
     {};
 
@@ -59,12 +61,12 @@ namespace Dune
     // AgglomerationVEMSpaceTraits
     // ---------------------------
 
-    template< class FunctionSpace, class GridPart, int polOrder >
+    template< class FunctionSpace, class GridPart, int polOrder, bool conforming >
     struct AgglomerationVEMSpaceTraits
     {
-      friend class AgglomerationVEMSpace< FunctionSpace, GridPart, polOrder >;
+      friend class AgglomerationVEMSpace< FunctionSpace, GridPart, polOrder, conforming >;
 
-      typedef AgglomerationVEMSpace< FunctionSpace, GridPart, polOrder > DiscreteFunctionSpaceType;
+      typedef AgglomerationVEMSpace< FunctionSpace, GridPart, polOrder, conforming > DiscreteFunctionSpaceType;
 
       typedef FunctionSpace FunctionSpaceType;
       typedef GridPart GridPartType;
@@ -74,18 +76,20 @@ namespace Dune
     private:
       typedef typename GridPartType::template Codim< codimension >::EntityType EntityType;
 
-      typedef typename Fem::FunctionSpace< typename FunctionSpaceType::DomainFieldType, typename FunctionSpaceType::RangeFieldType, FunctionSpaceType::dimDomain, 1 > ScalarFunctionSpaceType;
-      typedef Fem::OrthonormalShapeFunctionSet< ScalarFunctionSpaceType, polOrder > ScalarShapeFunctionSetType;
-      typedef Fem::VectorialShapeFunctionSet< Fem::ShapeFunctionSetProxy< ScalarShapeFunctionSetType >, typename FunctionSpaceType::RangeType > ShapeFunctionSetType;
-
     public:
-      typedef VEMBasisFunctionSet< EntityType, ShapeFunctionSetType > BasisFunctionSetType;
+      typedef Dune::Fem::FunctionSpace<
+          typename FunctionSpace::DomainFieldType, typename FunctionSpace::RangeFieldType,
+           GridPartType::dimension, 1
+        > ScalarShapeFunctionSpaceType;
+      typedef AgglomerationDGSpaceTraits< ScalarShapeFunctionSpaceType, GridPart, polOrder > DGTraitsType;
+      typedef typename DGTraitsType::ScalarShapeFunctionSetType ScalarShapeFunctionSetType;
+      typedef typename DGTraitsType::BasisFunctionSetType ScalarBBBasisFunctionSetType;
+      typedef VEMBasisFunctionSet< EntityType, ScalarBBBasisFunctionSetType > ScalarBasisFunctionSetType;
+      // typedef Fem::VectorialShapeFunctionSet< Fem::SmartShapeFunctionSetProxy< ScalarBasisFunctionSetType >, typename FunctionSpaceType::RangeType > ShapeFunctionSetType;
+      // typedef Dune::Fem::SimpleDefaultBasisFunctionSet< EntityType, ShapeFunctionSetType > BasisFunctionSetType;
+      typedef Fem::VectorialBasisFunctionSet< ScalarBasisFunctionSetType, typename FunctionSpaceType::RangeType > BasisFunctionSetType;
 
-#if DUNE_VERSION_NEWER(DUNE_FEM, 2, 6)
       typedef Hybrid::IndexRange< int, FunctionSpaceType::dimRange > LocalBlockIndices;
-#else // #if DUNE_VERSION_NEWER(DUNE_FEM, 2, 6)
-      static const std::size_t localBlockSize = FunctionSpaceType::dimRange;
-#endif // #else // #if DUNE_VERSION_NEWER(DUNE_FEM, 2, 6)
       typedef AgglomerationDofMapper< GridPartType > BlockMapperType;
 
       template< class DiscreteFunction, class Operation = Fem::DFCommunicationOperation::Copy >
@@ -101,12 +105,12 @@ namespace Dune
     // AgglomerationVEMSpace
     // ---------------------
 
-    template< class FunctionSpace, class GridPart, int polOrder >
+    template< class FunctionSpace, class GridPart, int polOrder, bool conf >
     class AgglomerationVEMSpace
-      : public Fem::DiscreteFunctionSpaceDefault< AgglomerationVEMSpaceTraits< FunctionSpace, GridPart, polOrder > >
+      : public Fem::DiscreteFunctionSpaceDefault< AgglomerationVEMSpaceTraits< FunctionSpace, GridPart, polOrder, conf > >
     {
-      typedef AgglomerationVEMSpace< FunctionSpace, GridPart, polOrder > ThisType;
-      typedef Fem::DiscreteFunctionSpaceDefault< AgglomerationVEMSpaceTraits< FunctionSpace, GridPart, polOrder > > BaseType;
+      typedef AgglomerationVEMSpace< FunctionSpace, GridPart, polOrder, conf > ThisType;
+      typedef Fem::DiscreteFunctionSpaceDefault< AgglomerationVEMSpaceTraits< FunctionSpace, GridPart, polOrder, conf > > BaseType;
 
     public:
       typedef typename BaseType::Traits Traits;
@@ -115,7 +119,7 @@ namespace Dune
       typedef AgglomerationIndexSet< GridPart > AgglomerationIndexSetType;
 
     private:
-      typedef AgglomerationVEMInterpolation< AgglomerationIndexSetType > AgglomerationInterpolationType;
+      typedef AgglomerationVEMInterpolation< AgglomerationIndexSetType, polOrder, conf > AgglomerationInterpolationType;
       typedef typename Traits::ScalarShapeFunctionSetType ScalarShapeFunctionSetType;
 
     public:
@@ -125,31 +129,59 @@ namespace Dune
 
       typedef typename BaseType::EntityType EntityType;
       typedef typename BaseType::GridPartType GridPartType;
+      typedef Dune::Fem::FunctionSpace<double,double,GridPartType::dimensionworld-1,1> EdgeFSType;
+      typedef Dune::Fem::OrthonormalShapeFunctionSet<EdgeFSType> EdgeShapeFunctionSetType;
 
       typedef DynamicMatrix< typename BasisFunctionSetType::DomainFieldType > Stabilization;
 
       using BaseType::gridPart;
 
       enum { hasLocalInterpolate = false };
+      static const int polynomialOrder = polOrder;
+      static const bool conforming = conf;
+
+      // for interpolation
+      struct InterpolationType
+      {
+        InterpolationType( const AgglomerationIndexSetType &indexSet, const EntityType &element ) noexcept
+        : inter_(indexSet), element_(element) {}
+        template <class U,class V>
+        void operator()(const U& u, V& v)
+        { inter_(element_, u,v); }
+        AgglomerationInterpolationType inter_;
+        const EntityType &element_;
+      };
 
       explicit AgglomerationVEMSpace ( AgglomerationType &agglomeration )
         : BaseType( agglomeration.gridPart() ),
           agIndexSet_( agglomeration ),
           blockMapper_( agIndexSet_, AgglomerationInterpolationType::dofsPerCodim() ),
-          boundingBoxes_( boundingBoxes( agIndexSet_.agglomeration() ) ),
-          scalarShapeFunctionSet_( Dune::GeometryType( Dune::GeometryType::cube, GridPart::dimension ) )
+          scalarShapeFunctionSet_( Dune::GeometryType( Dune::GeometryType::cube, GridPart::dimension ) ),
+          edgeShapeFunctionSet_(   Dune::GeometryType( Dune::GeometryType::cube, GridPart::dimension-1 ),
+              AgglomerationInterpolationType::testSpaces()[1] +       // edge order
+                (AgglomerationInterpolationType::testSpaces()[0]+1)*2 // vertex order * number of vertices on edge
+              )
       {
         buildProjections();
       }
 
       const BasisFunctionSetType basisFunctionSet ( const EntityType &entity ) const
       {
-        typename Traits::ShapeFunctionSetType shapeFunctionSet( &scalarShapeFunctionSet_ );
         const std::size_t agglomerate = agglomeration().index( entity );
-        const auto &bbox = boundingBoxes_[ agglomerate ];
         const auto &valueProjection = valueProjections_[ agglomerate ];
         const auto &jacobianProjection = jacobianProjections_[ agglomerate ];
-        return BasisFunctionSetType( entity, bbox, valueProjection, jacobianProjection, std::move( shapeFunctionSet ) );
+        const auto &bbox = blockMapper_.indexSet().boundingBox(agglomerate);
+        // scalar ONB Basis proxy
+        typename Traits::DGTraitsType::ShapeFunctionSetType scalarShapeFunctionSet( &scalarShapeFunctionSet_ );
+        // scalar BB Basis
+        typename Traits::ScalarBBBasisFunctionSetType bbScalarBasisFunctionSet( entity, bbox, std::move( scalarShapeFunctionSet ) );
+        // vectorial extended VEM Basis
+        /*
+        typename Traits::ShapeFunctionSetType shapeFunctionSet( entity, bbox, valueProjection, jacobianProjection, std::move( bbScalarBasisFunctionSet ) );
+        return BasisFunctionSetType( entity, std::move( shapeFunctionSet ) );
+        */
+        typename Traits::ScalarBasisFunctionSetType scalarBFS( entity, bbox, valueProjection, jacobianProjection, std::move( bbScalarBasisFunctionSet ) );
+        return BasisFunctionSetType( std::move( scalarBFS ) );
       }
 
       BlockMapperType &blockMapper () const { return blockMapper_; }
@@ -171,16 +203,29 @@ namespace Dune
 
       const Stabilization &stabilization ( const EntityType &entity ) const { return stabilizations_[ agglomeration().index( entity ) ]; }
 
+#if 1 // for interpolation
+      //////////////////////////////////////////////////////////
+      // Non-interface methods (used in DirichletConstraints) //
+      //////////////////////////////////////////////////////////
+      /** \brief return local interpolation for given entity
+       *
+       *  \param[in]  entity  grid part entity
+       */
+      InterpolationType interpolation ( const EntityType &entity ) const
+      {
+        return InterpolationType( blockMapper().indexSet(), entity );
+      }
+#endif
     private:
       void buildProjections ();
 
       AgglomerationIndexSetType agIndexSet_;
       mutable BlockMapperType blockMapper_;
-      std::vector< BoundingBox< GridPart > > boundingBoxes_;
-      std::vector< typename BasisFunctionSetType::ValueProjection > valueProjections_;
-      std::vector< typename BasisFunctionSetType::JacobianProjection > jacobianProjections_;
+      std::vector< typename Traits::ScalarBasisFunctionSetType::ValueProjection > valueProjections_;
+      std::vector< typename Traits::ScalarBasisFunctionSetType::JacobianProjection > jacobianProjections_;
       std::vector< Stabilization > stabilizations_;
       ScalarShapeFunctionSetType scalarShapeFunctionSet_;
+      EdgeShapeFunctionSetType edgeShapeFunctionSet_;
     };
 
 
@@ -188,121 +233,254 @@ namespace Dune
     // Implementation of AgglomerationVEMSpace
     // ---------------------------------------
 
-    template< class FunctionSpace, class GridPart, int polOrder >
-    inline void AgglomerationVEMSpace< FunctionSpace, GridPart, polOrder >::buildProjections ()
+    template< class FunctionSpace, class GridPart, int polOrder, bool conforming >
+    inline void AgglomerationVEMSpace< FunctionSpace, GridPart, polOrder, conforming >::buildProjections ()
     {
       typedef typename BasisFunctionSetType::DomainFieldType DomainFieldType;
       typedef typename BasisFunctionSetType::DomainType DomainType;
       typedef typename GridPart::template Codim< 0 >::EntityType ElementType;
       typedef typename GridPart::template Codim< 0 >::EntitySeedType ElementSeedType;
 
+      // want to iterate over each polygon separately
       std::vector< std::vector< ElementSeedType > > entitySeeds( agglomeration().size() );
       for( const ElementType &element : elements( static_cast< typename GridPart::GridViewType >( gridPart() ), Partitions::interiorBorder ) )
         entitySeeds[ agglomeration().index( element ) ].push_back( element.seed() );
 
       const std::size_t numShapeFunctions = scalarShapeFunctionSet_.size();
-      DynamicMatrix< DomainFieldType > D;
+      const std::size_t numShapeFunctionsMinus1 =
+              Dune::Fem::OrthonormalShapeFunctions< DomainType::dimension >::size(polOrder-1);
+      const std::size_t numShapeFunctionsMinus2 = polOrder==1?0:
+              Dune::Fem::OrthonormalShapeFunctions< DomainType::dimension >::size(polOrder-2);
+
+      DynamicMatrix< DomainFieldType > D, C, Hp, HpMinus1;
+      DynamicMatrix< DomainType > G, R;
+      DynamicMatrix< DomainFieldType > edgePhi; // compute Phi_i on the edge
+
       LeftPseudoInverse< DomainFieldType > pseudoInverse( numShapeFunctions );
-      std::vector< DomainType > pi0XT;
 
       valueProjections_.resize( agglomeration().size() );
       jacobianProjections_.resize( agglomeration().size() );
       stabilizations_.resize( agglomeration().size() );
 
       AgglomerationInterpolationType interpolation( blockMapper().indexSet() );
+
       for( std::size_t agglomerate = 0; agglomerate < agglomeration().size(); ++agglomerate )
       {
-        const auto &bbox = boundingBoxes_[ agglomerate ];
+        const auto &bbox = blockMapper_.indexSet().boundingBox(agglomerate);
+        auto extend = bbox.second;
+        extend -= bbox.first;
 
         const std::size_t numDofs = blockMapper().numDofs( agglomerate );
-        D.resize( numDofs, numShapeFunctions );
-        pi0XT.resize( numDofs );
 
-        DomainFieldType H0 = 0;
-        std::fill( pi0XT.begin(), pi0XT.end(), DomainType( 0 ) );
+        D.resize( numDofs, numShapeFunctions, 0 );
+        C.resize( numShapeFunctions, numDofs, 0 );
+        Hp.resize( numShapeFunctions, numShapeFunctions, 0 );
+        HpMinus1.resize( numShapeFunctionsMinus1, numShapeFunctionsMinus1, 0 );
+        G.resize( numShapeFunctionsMinus1, numShapeFunctionsMinus1, DomainType(0) );
+        R.resize( numShapeFunctionsMinus1, numDofs, DomainType(0) );
+
         for( const ElementSeedType &entitySeed : entitySeeds[ agglomerate ] )
         {
           const ElementType &element = gridPart().entity( entitySeed );
           const auto geometry = element.geometry();
+          const auto &refElement = ReferenceElements< typename GridPart::ctype, GridPart::dimension >::general( element.type() );
 
-          BoundingBoxShapeFunctionSet< ElementType, ScalarShapeFunctionSetType > shapeFunctionSet( element, bbox, scalarShapeFunctionSet_ );
-
-          Fem::ElementQuadrature< GridPart, 0 > quadrature( element, 0 );
-          for( std::size_t qp = 0; qp < quadrature.nop(); ++qp )
-          {
-            const DomainFieldType weight = geometry.integrationElement( quadrature.point( qp ) ) * quadrature.weight( qp );
-            shapeFunctionSet.evaluateEach( quadrature[ qp ], [ &H0, weight ] ( std::size_t alpha, FieldVector< DomainFieldType, 1 > phi ) {
-                if( alpha == 0 )
-                  H0 += weight * phi[ 0 ];
-              } );
-          }
-
+          BoundingBoxBasisFunctionSet< GridPart, ScalarShapeFunctionSetType > shapeFunctionSet( element, bbox, scalarShapeFunctionSet_ );
           interpolation( shapeFunctionSet, D );
 
-#if 0
-          if( polOrder > 1 )
+          if (polOrder > 1)
           {
-            const auto &idSet = agglomeration().gridPart().grid().globalIdSet();
-            for( int i = 0; i < refElement.size( GridPart::dimension-1 ); ++i )
+            // compute mass matrices Hp, HpMinus1, and the gradient matrices G^l
+            Fem::ElementQuadrature< GridPart, 0 > quadrature( element, 2*polOrder );
+            for( std::size_t qp = 0; qp < quadrature.nop(); ++qp )
             {
-              const int k = blockMapper().indexSet().localIndex( element, i, 1 );
-              if( k == -1 )
-                continue;
+              const DomainFieldType weight = geometry.integrationElement( quadrature.point( qp ) ) * quadrature.weight( qp );
+              shapeFunctionSet.evaluateEach( quadrature[ qp ], [ & ] ( std::size_t alpha, FieldVector< DomainFieldType, 1 > phi ) {
+                  shapeFunctionSet.evaluateEach( quadrature[ qp ], [ & ] ( std::size_t beta, FieldVector< DomainFieldType, 1 > psi ) {
+                      if (alpha<numShapeFunctionsMinus1 &&
+                          beta<numShapeFunctionsMinus1) // basis set is hierarchic so we can compute HpMinus1 using the order p shapeFunctionSet
+                        HpMinus1[alpha][beta] += phi[0]*psi[0]*weight;
+                      Hp[alpha][beta] += phi[0]*psi[0]*weight;
+                    } );
+                  if (alpha<numShapeFunctionsMinus1)
+                    shapeFunctionSet.jacobianEach( quadrature[ qp ], [ & ] ( std::size_t beta, typename ScalarShapeFunctionSetType::JacobianRangeType psi ) {
+                        // psi[0][0] /= extend[0]; // need correct scalling here
+                        // psi[0][1] /= extend[1];
+                        if (beta<numShapeFunctionsMinus1)
+                          G[alpha][beta].axpy(phi[0]*weight, psi[0]);
+                      } );
+                } );
+            } // quadrature loop
+          } // polOrder > 1
 
-              const auto left = idSet.subId( element, refElement.subEntity( i, dimension-1, 0, dimension ), dimension );
-              const auto right = idSet.subId( element, refElement.subEntity( i, dimension-1, 1, dimension ), dimension );
-
-              const auto subEntity = element.template subEntity< GridPart::dimension-1 >( i );
-              const auto geometry = subEntity.geometry();
-
-              for( std::size_t alpha = 0; alpha < numShapeFunctions; ++alpha )
-                DT[ alpha ][ k ] = 0;
-
-              typedef Dune::QuadratureRules< typename GridPart::ctype, 1 > QuadratureRules;
-              for( const auto &qp : QuadratureRules::rule( refElement.type( i, GridPart::dimension-1 ) ), order )
-              {
-                typedef typename decltype( geometry )::LocalCoordinate LocalCoordinate;
-                LocalCoordinate z = (left < right ? qp.position() : LocalCoordinate{ 1 } - qp.position());
-                DomainType x = geometry.global( z ) - bbox.first;
-                for( int k = 0; k < GridPartType::dimensionworld; ++k )
-                  x[ k ] /= (bbox.second[ k ] - bbox.first[ k ]);
-
-                DomainFieldType weight = qp.weight() * geometry.integrationElement( z );
-                scalarShapeFunctionSet_.evaluateEach( x, [ &DT, k, weight ] ( std::size_t alpha, FieldVector< DomainFieldType, 1 > phi ) {
-                    DT[ alpha ][ k ] += weight * phi[ 0 ];
-                  } );
-              }
-
-              for( std::size_t alpha = 0; alpha < numShapeFunctions; ++alpha )
-                DT[ alpha ][ k ] *= DomainFieldType( 1 ) / geometry.volume();
-            }
-          }
-  #endif
-
-          const auto &refElement = ReferenceElements< typename GridPart::ctype, GridPart::dimension >::general( element.type() );
+          // compute the boundary terms for the gradient projection
           for( const auto &intersection : intersections( static_cast< typename GridPart::GridViewType >( gridPart() ), element ) )
           {
-            if( !intersection.boundary() && (agglomeration().index( make_entity( intersection.outside() ) ) == agglomerate) )
+            if( !intersection.boundary() && (agglomeration().index( intersection.outside() ) == agglomerate) )
               continue;
             assert( intersection.conforming() );
-
-            const int faceIndex = intersection.indexInInside();
-            const int numEdgeVertices = refElement.size( faceIndex, 1, GridPart::dimension );
-            const DomainFieldType iVolume = intersection.geometry().volume();
-            const DomainType outerNormal = intersection.centerUnitOuterNormal();
-            for( int i = 0; i < numEdgeVertices; ++i )
-            {
-              const int j = refElement.subEntity( faceIndex, 1, i, GridPart::dimension );
-              const int k = blockMapper().indexSet().localIndex( element, j, GridPart::dimension );
-              assert( k >= 0 );
-              pi0XT[ k ].axpy( 0.5*iVolume, outerNormal );
+            auto normal = intersection.centerUnitOuterNormal();
+            std::vector<int> mask; // contains indices with Phi_mask[i] has support on edge
+            edgePhi.resize(edgeShapeFunctionSet_.size(),edgeShapeFunctionSet_.size(),0);
+            interpolation( intersection, edgeShapeFunctionSet_, edgePhi, mask );
+            edgePhi.invert();
+            { // test edgePhi
+              assert( mask.size() == edgeShapeFunctionSet_.size() );
+              std::vector<double> lambda(numDofs);
+#if 1 // terrible hack!
+              bool succ = true;
+              for (int i=0;i<mask.size();++i)
+              {
+                std::fill(lambda.begin(),lambda.end(),0);
+                PhiEdge<GridPartType, Dune::DynamicMatrix<double>,EdgeShapeFunctionSetType>
+                  phiEdge(gridPart(),intersection,edgePhi,edgeShapeFunctionSet_,i); // behaves like Phi_mask[i] restricted to edge
+                interpolation(element,phiEdge,lambda);
+                for (int k=0;k<numDofs;++k) // lambda should be 1 for k=mask[i] otherwise 0
+                  succ &= ( mask[i]==k? std::abs(lambda[k]-1)<1e-10: std::abs(lambda[k])<1e-10 );
+              }
+              if (!succ) std::swap(mask[0],mask[1]);
+#endif
+              for (int i=0;i<mask.size();++i)
+              {
+                std::fill(lambda.begin(),lambda.end(),0);
+                PhiEdge<GridPartType, Dune::DynamicMatrix<double>,EdgeShapeFunctionSetType>
+                  phiEdge(gridPart(),intersection,edgePhi,edgeShapeFunctionSet_,i); // behaves like Phi_mask[i] restricted to edge
+                interpolation(element,phiEdge,lambda);
+                for (int k=0;k<numDofs;++k) // lambda should be 1 for k=mask[i] otherwise 0
+                  assert( mask[i]==k? std::abs(lambda[k]-1)<1e-10: std::abs(lambda[k])<1e-10 );
+              }
             }
-          }
-        }
+            // now compute int_e Phi_mask[i] m_alpha
+            typedef Fem::ElementQuadrature< GridPart, 1 > EdgeQuadratureType;
+            EdgeQuadratureType quadrature( gridPart(), intersection, 2*polOrder-1, EdgeQuadratureType::INSIDE );
+            for( std::size_t qp = 0; qp < quadrature.nop(); ++qp )
+            {
+              auto x = quadrature.localPoint(qp);
+              auto y = intersection.geometryInInside().global(x);
+              const DomainFieldType weight = intersection.geometry().integrationElement( x ) * quadrature.weight( qp );
+              shapeFunctionSet.evaluateEach( y, [ & ] ( std::size_t alpha, FieldVector< DomainFieldType, 1 > phi ) {
+                 if (alpha<numShapeFunctionsMinus1)
+                    edgeShapeFunctionSet_.evaluateEach( x, [ & ] ( std::size_t beta, FieldVector< DomainFieldType, 1 > psi ) {
+                        for (int s=0;s<mask.size();++s) // note that edgePhi is the transposed of the basis transform matrix
+                          R[alpha][mask[s]].axpy( edgePhi[beta][s]*psi[0]*phi[0]*weight, normal);
+                    } );
+              } );
+            } // quadrature loop
+          } // loop over intersections
+        } // loop over triangles in agglomerate
+        // finished agglomerating all auxiliary matrices
+        // now compute projection matrices and stabilization
 
-        auto &valueProjection = valueProjections_[ agglomerate ];
+        // volume
+        DomainFieldType H0 = blockMapper_.indexSet().volume(agglomerate);
+
+        auto &valueProjection    = valueProjections_[ agglomerate ];
+        auto &jacobianProjection = jacobianProjections_[ agglomerate ];
+        jacobianProjection.resize( numShapeFunctions );
+        for( std::size_t alpha = 0; alpha < numShapeFunctions; ++alpha )
+          jacobianProjection[ alpha ].resize( numDofs, DomainType( 0 ) );
+
         pseudoInverse( D, valueProjection );
 
+        if (polOrder > 1)
+        {
+          // modify C for inner dofs
+          std::size_t alpha=0;
+          for (; alpha<numShapeFunctionsMinus2; ++alpha)
+            C[alpha][alpha+numDofs-numShapeFunctionsMinus2] = H0;
+          for (; alpha<numShapeFunctions; ++alpha)
+            for (std::size_t i=0; i<numDofs; ++i)
+              for (std::size_t beta=0; beta<numShapeFunctions; ++beta)
+                C[alpha][i] += Hp[alpha][beta]*valueProjection[beta][i];
+
+          Hp.invert();
+          HpMinus1.invert();
+
+          auto Gtmp = G;
+          for (std::size_t alpha=0; alpha<numShapeFunctionsMinus1; ++alpha)
+          {
+            for (std::size_t beta=0; beta<numShapeFunctionsMinus1; ++beta)
+            {
+              G[alpha][beta] = DomainType(0);
+              for (std::size_t gamma=0; gamma<numShapeFunctionsMinus1; ++gamma)
+                G[alpha][beta].axpy(HpMinus1[alpha][gamma],Gtmp[gamma][beta]);
+            }
+          }
+
+          { // test G matrix
+            for( const ElementSeedType &entitySeed : entitySeeds[ agglomerate ] )
+            {
+              const ElementType &element = gridPart().entity( entitySeed );
+              BoundingBoxBasisFunctionSet< GridPart, ScalarShapeFunctionSetType > shapeFunctionSet( element, bbox, scalarShapeFunctionSet_ );
+              Fem::ElementQuadrature< GridPart, 0 > quad( element, 2*polOrder );
+              for( std::size_t qp = 0; qp < quad.nop(); ++qp )
+              {
+                shapeFunctionSet.jacobianEach( quad[qp], [ & ] ( std::size_t alpha, FieldMatrix< DomainFieldType, 1,2 > phi ) {
+                  if (alpha<numShapeFunctionsMinus1)
+                  {
+                    Dune::FieldVector<double,2> d;
+                    Derivative<GridPartType, Dune::DynamicMatrix<DomainType>,decltype(shapeFunctionSet)>
+                        derivative(gridPart(),G,shapeFunctionSet,alpha); // used G matrix to compute gradients of monomials
+                    derivative.evaluate(quad[qp],d);
+                    d -= phi[0];
+                    assert(d.two_norm() < 1e-10);
+                  }
+                });
+              }
+            }
+          } // test G matrix
+
+          // add interior integrals for gradient projection
+          for (std::size_t alpha=0; alpha<numShapeFunctionsMinus1; ++alpha)
+            for (std::size_t beta=0; beta<numShapeFunctionsMinus2; ++beta)
+              R[alpha][beta+numDofs-numShapeFunctionsMinus2].axpy(-H0, G[beta][alpha]);
+
+          // now compute projection by multiplying with inverse mass matrix
+          for (std::size_t alpha=0; alpha<numShapeFunctions; ++alpha)
+          {
+            for (std::size_t i=0; i<numDofs; ++i)
+            {
+              valueProjection[alpha][i] = 0;
+              for (std::size_t beta=0; beta<numShapeFunctions; ++beta)
+                valueProjection[alpha][i] += Hp[alpha][beta]*C[beta][i];
+              if (alpha<numShapeFunctionsMinus1)
+                for (std::size_t beta=0; beta<numShapeFunctionsMinus1; ++beta)
+                  jacobianProjection[alpha][i].axpy(HpMinus1[alpha][beta],R[beta][i]);
+            }
+          }
+        } // polOrder> 0
+        else
+        { // for p=1 we didn't compute the inverse of the mass matrix H_{p-1} -
+          // it's simply 1/H0 so we implement the p=1 case separately
+          for (std::size_t i=0; i<numDofs; ++i)
+            jacobianProjection[0][i].axpy(1./H0, R[0][i]);
+        }
+
+#if 0
+        // compute energy norm stability scalling
+        std::vector<double> stabScaling(numDofs, 0);
+        std::vector<typename BasisFunctionSetType::JacobianRangeType> dphi(numDofs);
+        for( const ElementSeedType &entitySeed : entitySeeds[ agglomerate ] )
+        {
+          const ElementType &element = gridPart().entity( entitySeed );
+          const auto geometry = element.geometry();
+          const BasisFunctionSetType vemBaseSet = basisFunctionSet ( element );
+          Fem::ElementQuadrature< GridPart, 0 > quadrature( element, 2*polOrder );
+          for( std::size_t qp = 0; qp < quadrature.nop(); ++qp )
+          {
+            vemBaseSet.jacobianAll(quadrature[qp], dphi);
+            const auto &x = quadrature.point(qp);
+            const double weight = quadrature.weight(qp) * geometry.integrationElement(x);
+            for (int i=0;i<numDofs;++i)
+              stabScaling[i] += weight*(dphi[i][0]*dphi[i][0]);
+          }
+        }
+        std::cout << "stabscaling= " << std::flush;
+        for( std::size_t i = 0; i < numDofs; ++i )
+          std::cout << stabScaling[i] << " ";
+        std::cout << std::endl;
+#endif
+        // stabilization matrix
         Stabilization S( numDofs, numDofs, 0 );
         for( std::size_t i = 0; i < numDofs; ++i )
           S[ i ][ i ] = DomainFieldType( 1 );
@@ -312,21 +490,13 @@ namespace Dune
               S[ i ][ j ] -= D[ i ][ alpha ] * valueProjection[ alpha ][ j ];
         Stabilization &stabilization = stabilizations_[ agglomerate ];
         stabilization.resize( numDofs, numDofs, 0 );
-        for( std::size_t k = 0; k < numDofs; ++k )
-          for( std::size_t i = 0; i < numDofs; ++i )
-            for( std::size_t j = 0; j < numDofs; ++j )
+        for( std::size_t i = 0; i < numDofs; ++i )
+          for( std::size_t j = 0; j < numDofs; ++j )
+            for( std::size_t k = 0; k < numDofs; ++k )
               stabilization[ i ][ j ] += S[ k ][ i ] * S[ k ][ j ];
-
-        // Warning: This is a dirty hack
-        auto &jacobianProjection = jacobianProjections_[ agglomerate ];
-        jacobianProjection.resize( numShapeFunctions );
-        jacobianProjection[ 0 ] = pi0XT;
-        std::transform( jacobianProjection[ 0 ].begin(), jacobianProjection[ 0 ].end(), jacobianProjection[ 0 ].begin(),
-                        [ H0 ] ( DomainType x ) { return x *= (1 / H0); } );
-        for( std::size_t alpha = 1; alpha < numShapeFunctions; ++alpha )
-          jacobianProjection[ alpha ].resize( numDofs, DomainType( 0 ) );
-      }
-    }
+              // stabilization[ i ][ j ] += S[ k ][ i ] * std::max(1.,stabScaling[k]) * S[ k ][ j ];
+      }  // loop over agglomerates
+    } // build projections
 
   } // namespace Vem
 
@@ -352,13 +522,23 @@ namespace Dune
     // ---------------------------------------------------
 
 #if HAVE_DUNE_ISTL
-    template< class Matrix, class FunctionSpace, class GridPart, int polOrder >
-    struct ISTLParallelMatrixAdapter< Matrix, Vem::AgglomerationVEMSpace< FunctionSpace, GridPart, polOrder > >
+    template< class Matrix, class FunctionSpace, class GridPart, int polOrder, bool conforming >
+    struct ISTLParallelMatrixAdapter< Matrix, Vem::AgglomerationVEMSpace< FunctionSpace, GridPart, polOrder, conforming > >
     {
       typedef LagrangeParallelMatrixAdapter< Matrix > Type;
     };
 #endif // #if HAVE_DUNE_ISTL
 
+#if 1 // for interpolation
+    namespace Capabilities
+    {
+      template< class FunctionSpace, class GridPart, int polOrder, bool conforming >
+      struct hasInterpolation< Vem::AgglomerationVEMSpace< FunctionSpace, GridPart, polOrder, conforming > >
+      {
+        static const bool v = false;
+      };
+    }
+#endif
   } // namespace Fem
 
 } // namespace Dune

@@ -52,7 +52,8 @@ namespace Dune
       template< class Iterator >
       AgglomerationDofMapper ( const IndexSetType &indexSet, Iterator begin, Iterator end );
 
-      AgglomerationDofMapper ( const IndexSetType &indexSet, std::initializer_list< std::pair< int, unsigned int > > dofsPerCodim )
+      AgglomerationDofMapper ( const IndexSetType &indexSet, const std::vector<std::pair<int,unsigned int>> &dofsPerCodim )
+//          std::initializer_list< std::pair< int, unsigned int > > dofsPerCodim )
         : AgglomerationDofMapper( indexSet, dofsPerCodim.begin(), dofsPerCodim.end() )
       {}
 
@@ -206,7 +207,8 @@ namespace Dune
         {
           int idx = indexSet().localIndex( element, refElement.subEntity( i, c, k, info.codim ), info.codim );
           if( idx >= 0 )
-            filter[ localOfs + idx ] = true;
+            for (int l=0;l<info.numDofs;++l)
+              filter[ localOfs + idx*info.numDofs + l ] = true;
         }
         localOfs += info.numDofs * indexSet().subAgglomerates( element, info.codim );
       }
