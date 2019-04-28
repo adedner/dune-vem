@@ -24,10 +24,10 @@ methods = [ ### "[space,scheme,spaceKwrags]"
             ["vem","vem",{"conforming":True}],
             ["vem","vem",{"conforming":False}],
             ["bbdg","bbdg",{}],
-            ["dgonb","dg",{}], # dg does not converge
+            # ["dgonb","dg",{}], # dg does not converge
    ]
 parameters = {"newton.linear.tolerance": 1e-12,
-              "newton.linear.verbose": False,
+              "newton.linear.verbose":True,
               "newton.tolerance": 1e-10,
               "newton.maxiterations": 10, # should finish in 1 for linear
               "newton.maxlinesearchiterations":50,
