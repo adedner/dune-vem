@@ -4,6 +4,7 @@ import sys
 import logging
 logger = logging.getLogger(__name__)
 
+from ufl.equation import Equation
 from dune.generator import Constructor, Method
 import dune.common.checkconfiguration as checkconfiguration
 import dune
@@ -153,6 +154,22 @@ def vemScheme(model, space, solver=None, parameters={}):
     # from dune.fem.space import module
     from dune.fem.scheme import module
     from dune.fem.scheme import femschemeModule
+
+    if isinstance(model, (list, tuple)):
+        modelParam = model[1:]
+        model = model[0]
+    if isinstance(model,Equation):
+        if space == None:
+            try:
+                space = model.lhs.arguments()[0].ufl_function_space()
+            except AttributeError:
+                raise ValueError("no space provided and could not deduce from form provided")
+        from dune.fem.model._models import elliptic
+        if modelParam:
+            model = elliptic(space.grid,model,*modelParam)
+        else:
+            model = elliptic(space.grid,model)
+
     # from . import module
     includes = [ "dune/vem/operator/vemelliptic.hh" ]
 
