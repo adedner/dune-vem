@@ -38,10 +38,11 @@ namespace Dune
     {
       const auto &mapper = v.space().blockMapper();
       const auto &agglomeration = mapper.agglomeration();
+      const int blockSize = DiscreteFunction::DiscreteFunctionSpaceType::localBlockSize;
 
       // reserve memory for local dof vector
       std::vector< typename DiscreteFunction::RangeFieldType > ldv;
-      ldv.reserve( mapper.maxNumDofs() * DiscreteFunction::DiscreteFunctionSpaceType::localBlockSize );
+      ldv.reserve( mapper.maxNumDofs() * blockSize );
 
       typedef typename DiscreteFunction::DiscreteFunctionSpaceType::AgglomerationIndexSetType IndexSetType;
       const int polOrder = DiscreteFunction::DiscreteFunctionSpaceType::polynomialOrder;
@@ -60,14 +61,13 @@ namespace Dune
         if( entitySeeds[ agglomerate ].empty() )
           continue;
 
-        ldv.resize( mapper.numDofs( agglomerate ) );
+        ldv.resize( mapper.numDofs( agglomerate ) * blockSize );
         std::fill(ldv.begin(),ldv.end(),0);
         for( const ElementSeedType &entitySeed : entitySeeds[ agglomerate ] )
         {
           const auto &element = v.gridPart().entity( entitySeed );
           uLocal.bind(element);
           interpolation( element, uLocal, ldv );
-          // interpolation( u.localFunction( element ), ldv );
         }
         v.setLocalDofs( v.gridPart().entity( entitySeeds[ agglomerate ].front() ), ldv );
       }

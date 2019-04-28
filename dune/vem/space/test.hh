@@ -38,6 +38,7 @@ struct Derivative : public Dune::Fem::BindableGridFunction< GridPart, Dune::Dim<
 template <class GridPart, class Matrix, class SFS>
 struct PhiEdge : public Dune::Fem::BindableGridFunction< GridPart, Dune::Dim<1> >
 {
+  static const int dimRange = 1;
   typedef Dune::Fem::BindableGridFunction<GridPart, Dune::Dim<1> > Base;
   using Base::Base;
   typedef typename GridPart::IntersectionType IntersectionType;

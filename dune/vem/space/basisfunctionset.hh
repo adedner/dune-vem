@@ -222,6 +222,34 @@ namespace Dune
 
       const EntityType &entity () const { assert( entity_ ); return *entity_; }
 
+#if 0 // probably not needed
+      /*******************************************************/
+      // required method to use this as shape function
+      /*******************************************************/
+      template< class Point, class Functor >
+      void evaluateEach ( const Point &x, Functor functor ) const
+      {
+        std::vector<RangeType> values(size());
+        evaluateAll(x,values);
+        for (std::size_t i=0;i<size();++i)
+          functor(i,values[i]);
+      }
+      template< class Point, class Functor >
+      void jacobianEach ( const Point &x, Functor functor ) const
+      {
+        std::vector<JacobianRangeType> values(size());
+        jacobianAll(x,values);
+        for (std::size_t i=0;i<size();++i)
+          functor(i,values[i]);
+      }
+      template< class Point, class Functor >
+      void hessianEach ( const Point &x, Functor functor ) const
+      {
+        DUNE_THROW( NotImplemented, "hessians not implemented for VEMBasisFunctionSet" );
+      }
+      /**********************************************************/
+#endif
+
     private:
       template< class Point >
       DomainType position ( const Point &x ) const

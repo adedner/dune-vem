@@ -12,6 +12,7 @@
 #include <dune/fem/space/common/defaultcommhandler.hh>
 #include <dune/fem/space/common/discretefunctionspace.hh>
 #include <dune/fem/space/common/functionspace.hh>
+#include <dune/fem/space/basisfunctionset/vectorial.hh>
 #include <dune/fem/space/shapefunctionset/orthonormal.hh>
 #include <dune/fem/space/shapefunctionset/proxy.hh>
 #include <dune/fem/space/shapefunctionset/vectorial.hh>
@@ -76,42 +77,17 @@ namespace Dune
       typedef typename GridPartType::template Codim< codimension >::EntityType EntityType;
 
     public:
-#if 0
       typedef Dune::Fem::FunctionSpace<
           typename FunctionSpace::DomainFieldType, typename FunctionSpace::RangeFieldType,
            GridPartType::dimension, 1
         > ScalarShapeFunctionSpaceType;
-
-      struct ScalarShapeFunctionSet
-        : public Dune::Fem::OrthonormalShapeFunctionSet< ScalarShapeFunctionSpaceType >
-      {
-        typedef Dune::Fem::OrthonormalShapeFunctionSet< ScalarShapeFunctionSpaceType >   BaseType;
-
-        static constexpr int numberShapeFunctions =
-              Dune::Fem::OrthonormalShapeFunctions< ScalarShapeFunctionSpaceType::dimDomain >::size(polOrder);
-      public:
-        explicit ScalarShapeFunctionSet ( Dune::GeometryType type )
-          : BaseType( type, polOrder )
-        {
-          assert( size() == BaseType::size() );
-        }
-        explicit ScalarShapeFunctionSet ( Dune::GeometryType type, int p )
-          : BaseType( type, p )
-        {
-          assert( size() == BaseType::size() );
-        }
-
-        // overload size method because it's a static value
-        static constexpr unsigned int size() { return numberShapeFunctions; }
-      };
-      typedef ScalarShapeFunctionSet ScalarShapeFunctionSetType;
-
-      typedef Fem::VectorialShapeFunctionSet< Fem::ShapeFunctionSetProxy< ScalarShapeFunctionSetType >, typename FunctionSpaceType::RangeType > ShapeFunctionSetType;
-#endif
-      typedef typename AgglomerationDGSpaceTraits< FunctionSpace, GridPart, polOrder >::ScalarShapeFunctionSetType ScalarShapeFunctionSetType;
-      typedef typename AgglomerationDGSpaceTraits< FunctionSpace, GridPart, polOrder >::ShapeFunctionSetType ShapeFunctionSetType;
-      typedef typename AgglomerationDGSpaceTraits< FunctionSpace, GridPart, polOrder >::BasisFunctionSetType BBBasisFunctionSetType;
-      typedef VEMBasisFunctionSet< EntityType, BBBasisFunctionSetType > BasisFunctionSetType;
+      typedef AgglomerationDGSpaceTraits< ScalarShapeFunctionSpaceType, GridPart, polOrder > DGTraitsType;
+      typedef typename DGTraitsType::ScalarShapeFunctionSetType ScalarShapeFunctionSetType;
+      typedef typename DGTraitsType::BasisFunctionSetType ScalarBBBasisFunctionSetType;
+      typedef VEMBasisFunctionSet< EntityType, ScalarBBBasisFunctionSetType > ScalarBasisFunctionSetType;
+      // typedef Fem::VectorialShapeFunctionSet< Fem::SmartShapeFunctionSetProxy< ScalarBasisFunctionSetType >, typename FunctionSpaceType::RangeType > ShapeFunctionSetType;
+      // typedef Dune::Fem::SimpleDefaultBasisFunctionSet< EntityType, ShapeFunctionSetType > BasisFunctionSetType;
+      typedef Fem::VectorialBasisFunctionSet< ScalarBasisFunctionSetType, typename FunctionSpaceType::RangeType > BasisFunctionSetType;
 
       typedef Hybrid::IndexRange< int, FunctionSpaceType::dimRange > LocalBlockIndices;
       typedef AgglomerationDofMapper< GridPartType > BlockMapperType;
@@ -164,7 +140,7 @@ namespace Dune
       static const int polynomialOrder = polOrder;
       static const bool conforming = conf;
 
-#if 1 // for interpolation
+      // for interpolation
       struct InterpolationType
       {
         InterpolationType( const AgglomerationIndexSetType &indexSet, const EntityType &element ) noexcept
@@ -175,7 +151,6 @@ namespace Dune
         AgglomerationInterpolationType inter_;
         const EntityType &element_;
       };
-#endif
 
       explicit AgglomerationVEMSpace ( AgglomerationType &agglomeration )
         : BaseType( agglomeration.gridPart() ),
@@ -195,10 +170,18 @@ namespace Dune
         const std::size_t agglomerate = agglomeration().index( entity );
         const auto &valueProjection = valueProjections_[ agglomerate ];
         const auto &jacobianProjection = jacobianProjections_[ agglomerate ];
-        typename Traits::ShapeFunctionSetType shapeFunctionSet( &scalarShapeFunctionSet_ );
         const auto &bbox = blockMapper_.indexSet().boundingBox(agglomerate);
-        typename Traits::BBBasisFunctionSetType bbBasisFunctionSet( entity, bbox, std::move( shapeFunctionSet ) );
-        return BasisFunctionSetType( entity, bbox, valueProjection, jacobianProjection, std::move( bbBasisFunctionSet ) );
+        // scalar ONB Basis proxy
+        typename Traits::DGTraitsType::ShapeFunctionSetType scalarShapeFunctionSet( &scalarShapeFunctionSet_ );
+        // scalar BB Basis
+        typename Traits::ScalarBBBasisFunctionSetType bbScalarBasisFunctionSet( entity, bbox, std::move( scalarShapeFunctionSet ) );
+        // vectorial extended VEM Basis
+        /*
+        typename Traits::ShapeFunctionSetType shapeFunctionSet( entity, bbox, valueProjection, jacobianProjection, std::move( bbScalarBasisFunctionSet ) );
+        return BasisFunctionSetType( entity, std::move( shapeFunctionSet ) );
+        */
+        typename Traits::ScalarBasisFunctionSetType scalarBFS( entity, bbox, valueProjection, jacobianProjection, std::move( bbScalarBasisFunctionSet ) );
+        return BasisFunctionSetType( std::move( scalarBFS ) );
       }
 
       BlockMapperType &blockMapper () const { return blockMapper_; }
@@ -238,8 +221,8 @@ namespace Dune
 
       AgglomerationIndexSetType agIndexSet_;
       mutable BlockMapperType blockMapper_;
-      std::vector< typename BasisFunctionSetType::ValueProjection > valueProjections_;
-      std::vector< typename BasisFunctionSetType::JacobianProjection > jacobianProjections_;
+      std::vector< typename Traits::ScalarBasisFunctionSetType::ValueProjection > valueProjections_;
+      std::vector< typename Traits::ScalarBasisFunctionSetType::JacobianProjection > jacobianProjections_;
       std::vector< Stabilization > stabilizations_;
       ScalarShapeFunctionSetType scalarShapeFunctionSet_;
       EdgeShapeFunctionSetType edgeShapeFunctionSet_;

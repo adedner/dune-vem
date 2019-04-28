@@ -8,13 +8,13 @@ from dune.generator import Constructor, Method
 import dune.common.checkconfiguration as checkconfiguration
 import dune
 
-def bbdgSpace(view, order=1, dimrange=1, field="double", storage="adaptive", **unused):
+def bbdgSpace(view, order=1, dimRange=1, field="double", storage="adaptive"):
     """create a discontinous galerkin space over an agglomerated grid
 
     Args:
         view: the underlying grid view
         order: polynomial order of the finite element functions
-        dimrange: dimension of the range space
+        dimRange: dimension of the range space
         field: field of the range space
         storage: underlying linear algebra backend
 
@@ -23,11 +23,11 @@ def bbdgSpace(view, order=1, dimrange=1, field="double", storage="adaptive", **u
     """
 
     from dune.fem.space import module, addStorage
-    if dimrange < 1:
+    if dimRange < 1:
         raise KeyError(\
             "Parameter error in DiscontinuosGalerkinSpace with "+
-            "dimrange=" + str(dimrange) + ": " +\
-            "dimrange has to be greater or equal to 1")
+            "dimRange=" + str(dimRange) + ": " +\
+            "dimRange has to be greater or equal to 1")
     if order < 0:
         raise KeyError(\
             "Parameter error in DiscontinuousGalerkinSpace with "+
@@ -44,7 +44,7 @@ def bbdgSpace(view, order=1, dimrange=1, field="double", storage="adaptive", **u
 
     gridPartName = "Dune::FemPy::GridPart< " + view._typeName + " >"
     typeName = "Dune::Vem::AgglomerationDGSpace< " +\
-      "Dune::Fem::FunctionSpace< double, " + field + ", " + str(dimw) + ", " + str(dimrange) + " >, " +\
+      "Dune::Fem::FunctionSpace< double, " + field + ", " + str(dimw) + ", " + str(dimRange) + " >, " +\
       gridPartName + ", " + str(order) + " >"
 
     constructor = Constructor(
@@ -74,13 +74,13 @@ def bbdgScheme(model, space, penalty=0, solver=None, parameters={}):
     penaltyClass = "Dune::Vem::BBDGPenalty<"+spaceType+">"
     return dg(model,space,penalty,solver,parameters,penaltyClass)
 
-def vemSpace(view, order=1, dimrange=1, conforming=True, field="double", storage="adaptive", **unused):
+def vemSpace(view, order=1, dimRange=1, conforming=True, field="double", storage="adaptive"):
     """create a virtual element space over an agglomerated grid
 
     Args:
         view: the underlying grid view
         order: polynomial order of the finite element functions
-        dimrange: dimension of the range space
+        dimRrange: dimension of the range space
         field: field of the range space
         storage: underlying linear algebra backend
 
@@ -89,11 +89,11 @@ def vemSpace(view, order=1, dimrange=1, conforming=True, field="double", storage
     """
 
     from dune.fem.space import module, addStorage
-    if dimrange < 1:
+    if dimRange < 1:
         raise KeyError(\
             "Parameter error in DiscontinuosGalerkinSpace with "+
-            "dimrange=" + str(dimrange) + ": " +\
-            "dimrange has to be greater or equal to 1")
+            "dimRange=" + str(dimRange) + ": " +\
+            "dimRange has to be greater or equal to 1")
     if order < 0:
         raise KeyError(\
             "Parameter error in DiscontinuousGalerkinSpace with "+
@@ -111,7 +111,7 @@ def vemSpace(view, order=1, dimrange=1, conforming=True, field="double", storage
     gridPartName = "Dune::FemPy::GridPart< " + view._typeName + " >"
     conforming = "true" if conforming else "false"
     typeName = "Dune::Vem::AgglomerationVEMSpace< " +\
-      "Dune::Fem::FunctionSpace< double, " + field + ", " + str(dimw) + ", " + str(dimrange) + " >, " +\
+      "Dune::Fem::FunctionSpace< double, " + field + ", " + str(dimw) + ", " + str(dimRange) + " >, " +\
       gridPartName + ", " + str(order) + ", " + conforming + " >"
 
     constructor = Constructor(

@@ -155,6 +155,7 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model>
   w.clear();
   // get discrete function space
   const RangeDiscreteFunctionSpaceType &dfSpace = w.space();
+  const int blockSize = dfSpace.localBlockSize; // is equal to 1 for scalar functions
   //
   std::vector<bool> stabilization(dfSpace.agglomeration().size(), false);
   //
@@ -305,9 +306,12 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model>
     if (!stabilization[dfSpace.agglomeration().index(entity)])
     {
       const auto &stabMatrix = dfSpace.stabilization(entity);
+      assert( stabMatrix.cols()*blockSize == uLocal.size() );
+      assert( stabMatrix.rows()*blockSize == wLocal.size() );
       for (std::size_t r = 0; r < stabMatrix.rows(); ++r)
         for (std::size_t c = 0; c < stabMatrix.cols(); ++c)
-          wLocal[r] += VectorOfAveragedDiffusionCoefficients[agglomerate][0]  * stabMatrix[r][c] * uLocal[c];
+          for (std::size_t b = 0; b < blockSize; ++b)
+            wLocal[r*blockSize+b] += VectorOfAveragedDiffusionCoefficients[agglomerate][0]  * stabMatrix[r][c] * uLocal[c*blockSize+b];
       stabilization[dfSpace.agglomeration().index(entity)] = true;
     }
   }
@@ -321,7 +325,6 @@ template<class JacobianOperator, class Model>
 void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
 ::jacobian( const DomainDiscreteFunctionType &u, JacobianOperator &jOp) const
 {
-  std::cout << "starting assembly\n";
   Dune::Timer timer;
   typedef typename JacobianOperator::LocalMatrixType LocalMatrixType;
   typedef typename DomainDiscreteFunctionSpaceType::BasisFunctionSetType DomainBasisFunctionSetType;
@@ -366,8 +369,8 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
   //     rangeSpace.agglomeration());
   const auto &agIndexSet    = rangeSpace.blockMapper().indexSet();
   const auto &agglomeration = rangeSpace.agglomeration();
-  std::cout << "   using new vemelliptic.." << std::endl;
-  std::cout << "   in assembly: start element loop size=" << rangeSpace.gridPart().grid().size(0) << " time=  " << timer.elapsed() << std::endl;;
+  // std::cout << "   using new vemelliptic.." << std::endl;
+  // std::cout << "   in assembly: start element loop size=" << rangeSpace.gridPart().grid().size(0) << " time=  " << timer.elapsed() << std::endl;;
   for (const auto &entity : Dune::elements(
         static_cast<typename GridPartType::GridViewType>(gridPart),
         Dune::Partitions::interiorBorder)) {
@@ -542,19 +545,23 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
     {
       const auto &stabMatrix = rangeSpace.stabilization(entity);
       LocalMatrixType jLocal = jOp.localMatrix(entity, entity);
+      assert( jLocal.rows()    == stabMatrix.rows()*domainBlockSize );
+      assert( jLocal.columns() == stabMatrix.cols()*domainBlockSize );
       for (std::size_t r = 0; r < stabMatrix.rows(); ++r)
         for (std::size_t c = 0; c < stabMatrix.cols(); ++c)
-          jLocal.add(r, c, VectorOfAveragedDiffusionCoefficients[agglomerate][0]  * stabMatrix[r][c]);
+          for (std::size_t b = 0; b < domainBlockSize; ++b)
+            jLocal.add(r*domainBlockSize+b, c*domainBlockSize+b, VectorOfAveragedDiffusionCoefficients[agglomerate][0]  * stabMatrix[r][c]);
       const int nE = agIndexSet.numPolyVertices(entity, GridPartType::dimension);
       const DomainLocalFunctionType uLocal = u.localFunction(entity);
       for (std::size_t c = 0; c < stabMatrix.cols(); ++c)
         for (std::size_t r = 0; r < stabMatrix.rows(); ++r)
           for (std::size_t ccc = 0; ccc < stabMatrix.cols(); ++ccc)
-            jLocal.add(r, c,VectorOfAveragedLinearlisedDiffusionCoefficients [agglomerate][0]  * stabMatrix[r][ccc] * uLocal[ccc] / (nE));
+            for (std::size_t b = 0; b < domainBlockSize; ++b)
+              jLocal.add(r*domainBlockSize+b, c*domainBlockSize+b, VectorOfAveragedLinearlisedDiffusionCoefficients [agglomerate][0]  * stabMatrix[r][ccc] * uLocal[ccc] / (nE));
       stabilization[agglomerate] = true;
     }
   }
   jOp.communicate();
-  std::cout << "   in assembly: final    " << timer.elapsed() << std::endl;;
+  // std::cout << "   in assembly: final    " << timer.elapsed() << std::endl;;
 }
 #endif // #ifndef VEMELLIPTIC_HH

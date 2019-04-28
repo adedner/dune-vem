@@ -9,6 +9,10 @@
 #include <dune/common/dynmatrix.hh>
 #include <dune/geometry/referenceelements.hh>
 
+// #include <dune/fem/space/localfiniteelement/interpolation.hh>
+#include <dune/fem/function/localfunction/converter.hh>
+#include <dune/fem/space/combinedspace/interpolation.hh>
+
 #include <dune/fem/quadrature/elementquadrature.hh>
 #include <dune/fem/space/shapefunctionset/orthonormal.hh>
 #include <dune/vem/agglomeration/basisfunctionset.hh>
@@ -16,6 +20,46 @@
 
 namespace Dune
 {
+  namespace Fem
+  {
+    namespace Impl
+    {
+      template <int dimRange>
+      struct RangeConverter
+      {
+        RangeConverter ( std::size_t range ) : range_( range ) {}
+
+        template< class T >
+        FieldVector< T, 1 > operator() ( const FieldVector< T, dimRange > &in ) const
+        {
+          return in[ range_ ];
+        }
+
+        template< class T, int j >
+        FieldMatrix< T, 1, j > operator() ( const FieldMatrix< T, dimRange, j > &in ) const
+        {
+          return in[ range_ ];
+        }
+
+      protected:
+        std::size_t range_;
+      };
+      template <class DofVector, class DofAlignment>
+      struct SubDofVectorWrapper
+        : public SubDofVector< DofVector, DofAlignment >
+      {
+        typedef SubDofVector< DofVector, DofAlignment > BaseType;
+
+        SubDofVectorWrapper( DofVector& dofs, int coordinate, const DofAlignment &dofAlignment )
+          : BaseType( dofs, coordinate, dofAlignment )
+        {}
+
+        //! do nothing on clear/resize since it's done in apply of this class
+        void clear() {}
+        void resize( const unsigned int) {}
+      };
+    }
+  }
 
   namespace Vem
   {
@@ -101,8 +145,8 @@ namespace Dune
 
       // perform interpolation for a single localized function
       template< class LocalFunction, class LocalDofVector >
-      void operator() ( const ElementType &element, const LocalFunction &localFunction,
-                        LocalDofVector &localDofVector ) const
+      void interpolate_ ( const ElementType &element, const LocalFunction &localFunction,
+                          LocalDofVector &localDofVector ) const
       {
         const int dimension = AgglomerationIndexSet::dimension;
         typename LocalFunction::RangeType value;
@@ -118,7 +162,7 @@ namespace Dune
         {
           const auto &x = refElement.position( i, dimension );
           localFunction.evaluate( x, value );
-          assert( k < localDofVector.size() );
+          //! SubDofWrapper does not have size assert( k < localDofVector.size() );
           localDofVector[ k ] = value[ 0 ];
         };
         auto edge = [&] (int poly,auto intersection,int k,int numDofs)
@@ -136,7 +180,7 @@ namespace Dune
             edgeBFS_.evaluateEach(x,
               [&](std::size_t alpha, typename LocalFunction::RangeType phi ) {
                 int kk = alpha+k;
-                assert( kk < localDofVector.size() );
+                //! SubDofWrapper has no size assert( kk < localDofVector.size() );
                 localDofVector[ kk ] += value[0]*phi[0] * weight;
               }
             );
@@ -145,7 +189,7 @@ namespace Dune
         auto inner = [&] (int poly,int i,int k,int numDofs)
         {
           assert(numDofs == innerShapeFunctionSet.size());
-          assert(k+numDofs == localDofVector.size());
+          //! SubVector has no size: assert(k+numDofs == localDofVector.size());
           InnerQuadratureType innerQuad( element, 2*polOrder );
           for (int qp=0;qp<innerQuad.nop();++qp)
           {
@@ -155,13 +199,48 @@ namespace Dune
             innerShapeFunctionSet.evaluateEach(innerQuad[qp],
               [&](std::size_t alpha, typename LocalFunction::RangeType phi ) {
                 int kk = alpha+k;
-                assert( kk < localDofVector.size() );
+                //! SubVector has no size assert( kk < localDofVector.size() );
                 localDofVector[ kk ] += value[0]*phi[0] * weight;
               }
             );
           }
         };
         (*this)(element,vertex,edge,inner);
+      }
+
+      template< class LocalFunction, class LocalDofVector >
+      void interpolate__( const ElementType &element, const LocalFunction &localFunction,
+                          LocalDofVector &localDofVector, Dune::PriorityTag<2> ) const
+      {
+        typedef Dune::Fem::VerticalDofAlignment<
+               ElementType, typename LocalFunction::RangeType> DofAlignmentType;
+        DofAlignmentType dofAlignment(element);
+        // std::fill(localDofVector.begin(),localDofVector.end(),0);
+        for( std::size_t i = 0; i < LocalFunction::dimRange; ++i )
+        {
+          // std::cout << "interpolation scalar: i=" << i << std::flush;
+          Fem::Impl::SubDofVectorWrapper< LocalDofVector, DofAlignmentType > subLdv( localDofVector, i, dofAlignment );
+          interpolate__(element,
+              Dune::Fem::localFunctionConverter( localFunction, Fem::Impl::RangeConverter<LocalFunction::dimRange>(i) ),
+              subLdv, PriorityTag<1>()
+              );
+          // for (int k=0;k<localDofVector.size();++k)
+          //   std::cout << "  " << localDofVector[k];
+          // std::cout << std::endl;
+        }
+      }
+      template< class LocalFunction, class LocalDofVector >
+      void interpolate__( const ElementType &element, const LocalFunction &localFunction,
+                          LocalDofVector &localDofVector, Dune::PriorityTag<1> ) const
+      {
+        interpolate_(element,localFunction,localDofVector);
+      }
+      template< class LocalFunction, class LocalDofVector >
+      void operator() ( const ElementType &element, const LocalFunction &localFunction,
+                        LocalDofVector &localDofVector ) const
+      {
+        // interpolate_(element,localFunction,localDofVector, Dune::PriorityTag<42>());
+        interpolate__(element,localFunction,localDofVector, Dune::PriorityTag<LocalFunction::RangeType::dimension>() );
       }
 
       // fill a mask vector providing the information which dofs are

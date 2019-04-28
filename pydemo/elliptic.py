@@ -6,32 +6,33 @@ from ufl import *
 import dune.ufl
 
 from dune import create
-from dune.grid import cartesianDomain
+from dune.grid import cartesianDomain, gridFunction
 from dune.fem import parameter
+from dune.fem.operator import linear
 from dune.vem import voronoiCells
 
-dimRange = 1
-start    = 4
+dimRange = 2
+start    = 3
 # polOrder, endEoc = 1,8
-polOrder, endEoc = 2,7
+polOrder, endEoc = 2,8
 # polOrder, endEoc = 3,6
 # polOrder, endEoc = 4,5
 # polOrder, endEoc = 5,4
 # polOrder, endEoc = 6,4 # not working
-methods = [ # "[space,scheme,spaceKwrags]"
+methods = [ ### "[space,scheme,spaceKwrags]"
             ["lagrange","h1",{}],
             ["vem","vem",{"conforming":True}],
             ["vem","vem",{"conforming":False}],
             ["bbdg","bbdg",{}],
-            ["dgonb","dg",{}]
+            ["dgonb","dg",{}], # dg does not converge
    ]
 parameters = {"newton.linear.tolerance": 1e-12,
               "newton.linear.verbose": False,
               "newton.tolerance": 1e-10,
-              "newton.maxiterations": 3, # should finish in 1
+              "newton.maxiterations": 10, # should finish in 1 for linear
               "newton.maxlinesearchiterations":50,
-              "newton.verbose": True,
-              "newton.linear.preconditioning.method": "lu",
+              "newton.verbose": False,
+              "newton.linear.preconditioning.method": "amg-ilu",
               "penalty": 8*polOrder*polOrder
               }
 
@@ -71,14 +72,23 @@ spaceSize = []
 
 def solve(grid,model,exact,space,scheme,spaceKwargs,order):
     print("SOLVING: ",space,scheme,spaceKwargs,flush=True)
-    spc = create.space(space, grid, dimrange=dimRange, order=order, storage="petsc", **spaceKwargs)
+    spc = create.space(space, grid, dimRange=dimRange, order=order,
+            storage="istl", **spaceKwargs)
     name = space + "_".join(['']+[str(v) for v in spaceKwargs.values()])
     interpol = spc.interpolate( exact, "interpol_"+name )
     scheme = create.scheme(scheme, model, spc,
                 solver="cg",
                 parameters=parameters)
-    df = spc.interpolate([0],name=name)
+    df = spc.interpolate([0,]*dimRange,name=name)
+    # info = {"linear_iterations":-1,"iterations":-1}
     info = scheme.solve(target=df)
+
+    # import pickle,sys
+    # linOp = linear(scheme)
+    # scheme.jacobian(df,linOp)
+    # pickle.dump([linOp.as_numpy,df.as_numpy], open( "dump"+str(dimRange), "wb" ) )
+    # sys.exit(0)
+
     errors = error(grid,df,interpol,exact)
     print("Computed",name," size:",spc.size,
           "L^2 (s,i):", [errors[0],errors[1]],
@@ -96,39 +106,44 @@ def compute(grid):
     u = TrialFunction(uflSpace)
     v = TestFunction(uflSpace)
     x = SpatialCoordinate(uflSpace.cell())
-    if False:
+    if True:
         ##### problem 1
         ### trivial Neuman bc
-        factor = 2 # change to 2 for higher order approx
-        exact  = as_vector( [cos(factor*pi*x[0])*cos(factor*pi*x[1])] )
+        exact  = as_vector([
+                  cos(r*pi*x[0])*cos(r*pi*x[1]) for r in range(2,dimRange+2)
+                ])
         #### zero boundary conditions
         exact *= x[0]*x[1]*(2-x[0])*(2-x[1])
         #### non zero and non trivial Neuman boundary conditions
-        exact += as_vector( [sin(factor*x[0]*factor*x[1])] )
+        exact += as_vector([
+                    sin(r*x[0]*r*x[1]) for r in range(1,dimRange+1)
+                 ])
         H = lambda w: grad(grad(w))
-        a = (inner(grad(u), grad(v)) + inner(u,v)) * dx
-        b = ( -(H(exact[0])[0,0]+H(exact[0])[1,1]) + exact[0] ) * v[0] * dx
+        laplace = lambda w: H(w)[0,0] + H(w)[1,1]
+        a = (inner(grad(u),grad(v))) * dx
+        b = sum( [( -laplace(exact[r]) ) * v[r] * dx
+                 for r in range(dimRange)] )
+        # a += inner(u,v) * dx
+        # b += inner(exact,v) * dx
     else:
         ##### problem 2: dummy quasilinear problem:
         exact = as_vector ( [  (x[0] - x[0]*x[0] ) * (x[1] - x[1]*x[1] ) ] )
         Dcoeff = lambda u: 1.0 + u[0]**2
         a = (Dcoeff(u)* inner(grad(u), grad(v)) ) * dx
         b = -div( Dcoeff(u) * grad(exact[0]) ) * v[0] * dx
-    model = create.model("elliptic", grid, a==b
-            , *[dune.ufl.DirichletBC(uflSpace, exact, i+1) for i in range(4)]
-            )
+    dbc = [dune.ufl.DirichletBC(uflSpace, exact, i+1) for i in range(4)]
+    model = create.model("elliptic", grid, a==b, *dbc)
     dfs = []
     for m in methods:
         dfs += solve(grid,model,exact,*m,order=polOrder)
 
+    @gridFunction(grid, name="cells")
+    def polygons(en,x):
+        return grid.hierarchicalGrid.agglomerate(en)
     grid.writeVTK(grid.hierarchicalGrid.agglomerate.suffix,
-        pointdata=dfs,
-        celldata =[ create.function("local",grid,"cells",1,lambda en,x:
-            [grid.hierarchicalGrid.agglomerate(en)]) ])
+        pointdata=dfs, celldata=[polygons] )
     grid.writeVTK("s"+grid.hierarchicalGrid.agglomerate.suffix,subsampling=polOrder-1,
-        pointdata=dfs,
-        celldata =[ create.function("local",grid,"cells",1,lambda en,x:
-            [grid.hierarchicalGrid.agglomerate(en)]) ])
+        pointdata=dfs, celldata=[polygons] )
 
 
 for i in range(endEoc-start):
@@ -145,8 +160,14 @@ for i in range(endEoc-start):
     if i>0:
         l = len(methods)
         for j in range(2*l):
-            l2eoc = math.log( l2errors[2*l*i+j]/l2errors[2*l*(i-1)+j] ) / math.log(0.5)
-            h1eoc = math.log( h1errors[2*l*i+j]/h1errors[2*l*(i-1)+j] ) / math.log(0.5)
+            try:
+                l2eoc = math.log( l2errors[2*l*i+j]/l2errors[2*l*(i-1)+j] ) / math.log(0.5)
+            except ValueError:
+                l2eoc = -1
+            try:
+                h1eoc = math.log( h1errors[2*l*i+j]/h1errors[2*l*(i-1)+j] ) / math.log(0.5)
+            except ValueError:
+                h1eoc = -1
             print("EOC",methods[int(j/2)][0],j,l2eoc,h1eoc)
     with open("errors_p"+str(polOrder)+".dump", 'wb') as f:
         pickle.dump([methods,spaceSize,l2errors,h1errors], f)
