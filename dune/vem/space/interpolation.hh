@@ -216,12 +216,12 @@ namespace Dune
                ElementType, typename LocalFunction::RangeType> DofAlignmentType;
         DofAlignmentType dofAlignment(element);
         // std::fill(localDofVector.begin(),localDofVector.end(),0);
-        for( std::size_t i = 0; i < LocalFunction::dimRange; ++i )
+        for( std::size_t i = 0; i < LocalFunction::RangeType::dimension; ++i )
         {
           // std::cout << "interpolation scalar: i=" << i << std::flush;
           Fem::Impl::SubDofVectorWrapper< LocalDofVector, DofAlignmentType > subLdv( localDofVector, i, dofAlignment );
           interpolate__(element,
-              Dune::Fem::localFunctionConverter( localFunction, Fem::Impl::RangeConverter<LocalFunction::dimRange>(i) ),
+              Dune::Fem::localFunctionConverter( localFunction, Fem::Impl::RangeConverter<LocalFunction::RangeType::dimension>(i) ),
               subLdv, PriorityTag<1>()
               );
           // for (int k=0;k<localDofVector.size();++k)
