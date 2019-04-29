@@ -5,7 +5,6 @@ set(HEADERS
   elliptic.hh
   mass.hh
   vemdirichletconstraints.hh
-  vemdirichletconstraints.old.hh
   vemelliptic.hh
 )
 

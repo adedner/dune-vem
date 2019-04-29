@@ -16,7 +16,6 @@ include(DuneMacros)
 
 # start a dune project with information from dune.module
 dune_project()
-dune_enable_all_packages()
 
 add_subdirectory("src")
 add_subdirectory("dune")
