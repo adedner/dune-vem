@@ -52,7 +52,8 @@ methods = [ ### "[space,scheme,spaceKwrags]"
 parameters = {"newton.linear.tolerance": 1e-12,
               "newton.linear.preconditioning.method": "ilu",
               "penalty": 40,  # for the bbdg scheme
-              "newton.linear.verbose": False,
+              "newton.linear.verbose": True,
+              "newton.verbose": True,
               }
 
 # <markdowncell>
@@ -141,6 +142,8 @@ for m in methods:
     print("Size: ",space.size, "L^2: ", errors[0], "H^1: ", errors[1])
     dfs.plot(gridLines=None)
 
+
+print("END A")
 # <markdowncell>
 # ## Nonlinear elliptic problem
 # We can easily set up a non linear problem
@@ -162,7 +165,7 @@ scheme = create.scheme("vem", [a==b, *dbcs], space, solver="cg", parameters=para
 solution = space.interpolate([0], name="solution")
 info = scheme.solve(target=solution)
 solution.plot(gridLines=None)
-
+print("END B")
 # <markdowncell>
 # ## Linear Elasticity
 # As final example we solve a linear elasticity equation usign a

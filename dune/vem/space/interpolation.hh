@@ -20,47 +20,6 @@
 
 namespace Dune
 {
-  namespace Fem
-  {
-    namespace Impl
-    {
-      template <int dimRange>
-      struct RangeConverter
-      {
-        RangeConverter ( std::size_t range ) : range_( range ) {}
-
-        template< class T >
-        FieldVector< T, 1 > operator() ( const FieldVector< T, dimRange > &in ) const
-        {
-          return in[ range_ ];
-        }
-
-        template< class T, int j >
-        FieldMatrix< T, 1, j > operator() ( const FieldMatrix< T, dimRange, j > &in ) const
-        {
-          return in[ range_ ];
-        }
-
-      protected:
-        std::size_t range_;
-      };
-      template <class DofVector, class DofAlignment>
-      struct SubDofVectorWrapper
-        : public SubDofVector< DofVector, DofAlignment >
-      {
-        typedef SubDofVector< DofVector, DofAlignment > BaseType;
-
-        SubDofVectorWrapper( DofVector& dofs, int coordinate, const DofAlignment &dofAlignment )
-          : BaseType( dofs, coordinate, dofAlignment )
-        {}
-
-        //! do nothing on clear/resize since it's done in apply of this class
-        void clear() {}
-        void resize( const unsigned int) {}
-      };
-    }
-  }
-
   namespace Vem
   {
 

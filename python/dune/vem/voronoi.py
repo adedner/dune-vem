@@ -16,7 +16,7 @@ def in_box(towers, bounding_box):
                           np.logical_and(bounding_box[2] <= towers[:, 1],
                                          towers[:, 1] <= bounding_box[3]))
 
-def voronoiCells(constructor, towers, fileName=None, load=False):
+def voronoiCells(constructor, towers, fileName=None, load=False, show=False):
     lowerleft  = numpy.array(constructor.lower)
     upperright = numpy.array(constructor.upper)
     bounding_box = numpy.array(
@@ -46,7 +46,7 @@ def voronoiCells(constructor, towers, fileName=None, load=False):
     i = in_box(towers, bounding_box)
 
     vor = sp.spatial.Voronoi(towers[i,:],incremental=True)
-    if fileName is not None:
+    if show:
         voronoi_plot_2d(vor,show_points=False,show_vertices=False).\
             savefig(fileName+"inc"+str(len(towers))+".pdf", bbox_inches='tight')
 
