@@ -158,8 +158,9 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model>
   //
   std::vector<bool> stabilization(dfSpace.agglomeration().size(), false);
   //
-
+  std::vector<double> polygonareas(dfSpace.agglomeration().size(), 0.0); // added 3rd June 2019 for source term (GD)
   std::vector<RangeRangeType> VectorOfAveragedDiffusionCoefficients (dfSpace.agglomeration().size(), RangeRangeType(0));
+  std::vector<RangeRangeType> VectorOfAveragedSourceCoefficients (dfSpace.agglomeration().size(), RangeRangeType(0));
   // const Dune::Vem::AgglomerationIndexSet<GridPartType> agIndexSet(
   //     dfSpace.agglomeration());
   const auto &agIndexSet = dfSpace.blockMapper().indexSet();
@@ -217,11 +218,20 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model>
         RangeJacobianRangeType a(0);
         model().diffusiveFlux(GlobalPoint, vu, grad1, a);
         Dcoeff[0] = a[0][0];
-
+        //!!!! 30.05.2019- Ganesh
+        //!!!! We need similar mechanism for source term as well.
+        //!!!! No need to pass entity anymore.
+        //!!!! source(const Entity &entity, const Point &x, const RangeType &value,
+        //!!!!        const JacobianRangeType &gradient, JacobianRangeType &flux ) const
+        RangeRangeType mcoeff(0);
+        model().source(GlobalPoint, vu, grad1, mcoeff );
         double factor = 1. / (2.0 * numVertices);
         VectorOfAveragedDiffusionCoefficients[agglomerate].axpy(factor,Dcoeff);
+        //!!!! define a vector of avg source coeff somewhere..
+        VectorOfAveragedSourceCoefficients[agglomerate].axpy(factor,mcoeff);
       }
     }
+    polygonareas[agglomerate] += geometry.volume();
     // obtain quadrature order
     const int quadOrder = uLocal.order() + wLocal.order();
 
@@ -307,7 +317,7 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model>
       const auto &stabMatrix = dfSpace.stabilization(entity);
       for (std::size_t r = 0; r < stabMatrix.rows(); ++r)
         for (std::size_t c = 0; c < stabMatrix.cols(); ++c)
-          wLocal[r] += VectorOfAveragedDiffusionCoefficients[agglomerate][0]  * stabMatrix[r][c] * uLocal[c];
+          wLocal[r] += ( VectorOfAveragedDiffusionCoefficients[agglomerate][0]  + VectorOfAveragedSourceCoefficients[agglomerate][0] * polygonareas[agglomerate] ) * stabMatrix[r][c] * uLocal[c];
       stabilization[dfSpace.agglomeration().index(entity)] = true;
     }
   }
@@ -355,7 +365,8 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
   std::vector<double> polygonareas(rangeSpace.agglomeration().size(), 0.0);
   std::vector<RangeRangeType> VectorOfAveragedDiffusionCoefficients (rangeSpace.agglomeration().size(), RangeRangeType(0));
   std::vector<RangeRangeType> VectorOfAveragedLinearlisedDiffusionCoefficients (rangeSpace.agglomeration().size(), RangeRangeType(0));
-
+  std::vector<RangeRangeType> VectorOfAveragedmCoefficients(rangeSpace.agglomeration().size(), RangeRangeType(0));
+  std::vector<RangeRangeType> VectorOfAveragedLinearlisedmCoefficients(rangeSpace.agglomeration().size(), RangeRangeType(0));
   RangeRangeType Dcoeff(0);
   RangeRangeType LinDcoeff(0);
   const GridPartType &gridPart = rangeSpace.gridPart();
@@ -411,7 +422,6 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
         RangeJacobianRangeType a(0);
         model().diffusiveFlux(GlobalPoint, vu, grad1, a);
         Dcoeff[0] = a[0][0];
-        //std::cout << "Dcoeff= " << Dcoeff[0] << std::endl;
         //!!! hack for accessing derivative of diffusion coefficient:
         DomainRangeType v(1.);
         DomainJacobianRangeType da(0);
@@ -423,11 +433,22 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
         dval[0][1] = 0;
         model().linDiffusiveFlux(vu, gradbar1, GlobalPoint, v, dval, da);
         LinDcoeff[0] = da[0][0];
-        //std::cout << "LinDcoeff= " << LinDcoeff[0] << std::endl;
+        //!!!! hack for accessing derivative of mass term: Ganesh, 30.05.2019
+        // if mass terms or right hand side is present
+        //model().linSource( u0, jacU0, entity, quadrature[ pt ], phi[ localCol ], dphi[localCol], aphi );
+        RangeRangeType mcoeff(0);
+        model().source(GlobalPoint, vu, grad1, mcoeff );
+        RangeRangeType Linmcoeff(0);
+        model().linSource( vu, gradbar1, GlobalPoint, v, dval, Linmcoeff );
+        std::cout << "mcoeff= " << mcoeff[0] << std::endl;
+        std::cout << "Linmcoeff= " << Linmcoeff[0] << std::endl;
         // Each vertex visited twice in looping around the edges, so we divide by 2
         double factor = 1./(2. * numVertices);
         VectorOfAveragedDiffusionCoefficients[agglomerate].axpy(factor,Dcoeff);
         VectorOfAveragedLinearlisedDiffusionCoefficients[agglomerate].axpy(factor,LinDcoeff);
+        // vectors for the averaged coefficients of mass term
+        VectorOfAveragedmCoefficients[agglomerate].axpy(factor,mcoeff);
+        VectorOfAveragedLinearlisedmCoefficients[agglomerate].axpy(factor,Linmcoeff);
       }
     }
 
@@ -544,13 +565,13 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
       LocalMatrixType jLocal = jOp.localMatrix(entity, entity);
       for (std::size_t r = 0; r < stabMatrix.rows(); ++r)
         for (std::size_t c = 0; c < stabMatrix.cols(); ++c)
-          jLocal.add(r, c, VectorOfAveragedDiffusionCoefficients[agglomerate][0]  * stabMatrix[r][c]);
+          jLocal.add(r, c, ( VectorOfAveragedDiffusionCoefficients[agglomerate][0]  + VectorOfAveragedmCoefficients[agglomerate][0] * polygonareas[agglomerate] ) * stabMatrix[r][c]);
       const int nE = agIndexSet.numPolyVertices(entity, GridPartType::dimension);
       const DomainLocalFunctionType uLocal = u.localFunction(entity);
       for (std::size_t c = 0; c < stabMatrix.cols(); ++c)
         for (std::size_t r = 0; r < stabMatrix.rows(); ++r)
           for (std::size_t ccc = 0; ccc < stabMatrix.cols(); ++ccc)
-            jLocal.add(r, c,VectorOfAveragedLinearlisedDiffusionCoefficients [agglomerate][0]  * stabMatrix[r][ccc] * uLocal[ccc] / (nE));
+            jLocal.add(r, c, ( VectorOfAveragedLinearlisedDiffusionCoefficients [agglomerate][0] + VectorOfAveragedLinearlisedmCoefficients[agglomerate][0] * polygonareas[agglomerate] ) * stabMatrix[r][ccc] * uLocal[ccc] / (nE));
       stabilization[agglomerate] = true;
     }
   }
