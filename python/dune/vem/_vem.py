@@ -110,17 +110,17 @@ def vemSpace(view, order=1, dimRange=1, conforming=True, field="double", storage
     viewType = view._typeName
 
     gridPartName = "Dune::FemPy::GridPart< " + view._typeName + " >"
-    conforming = "true" if conforming else "false"
     typeName = "Dune::Vem::AgglomerationVEMSpace< " +\
       "Dune::Fem::FunctionSpace< double, " + field + ", " + str(dimw) + ", " + str(dimRange) + " >, " +\
-      gridPartName + ", " + str(order) + ", " + conforming + " >"
+      gridPartName + ", " + str(order) + " >"
 
     constructor = Constructor(
                    ['pybind11::object gridView',
-                    'const pybind11::function agglomerate'],
+                    'const pybind11::function agglomerate',
+                    'bool conforming'],
                    ['auto agglo = new Dune::Vem::Agglomeration<' + gridPartName + '>',
                     '         (Dune::FemPy::gridPart<' + viewType + '>(gridView), [agglomerate](const auto& e) { return agglomerate(e).template cast<unsigned int>(); } ); ',
-                    'auto obj = new DuneType( *agglo );',
+                    'auto obj = new DuneType( *agglo, conforming );',
                     'pybind11::cpp_function remove_agglo( [ agglo ] ( pybind11::handle weakref ) {',
                     '  delete agglo;',
                     '  weakref.dec_ref();',
@@ -129,10 +129,10 @@ def vemSpace(view, order=1, dimRange=1, conforming=True, field="double", storage
                     '// assert(nurse);',
                     'pybind11::weakref( agglomerate, remove_agglo ).release();',
                     'return obj;'],
-                   ['"gridView"_a', '"agglomerate"_a',
+                   ['"gridView"_a', '"agglomerate"_a', '"conforming"_a',
                     'pybind11::keep_alive< 1, 2 >()'] )
 
-    spc = module(field, includes, typeName, constructor, storage=storage, ctorArgs=[view, agglomerate])
+    spc = module(field, includes, typeName, constructor, storage=storage, ctorArgs=[view, agglomerate, conforming])
     addStorage(spc, storage)
     return spc.as_ufl()
 

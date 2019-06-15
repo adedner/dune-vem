@@ -26,10 +26,10 @@ namespace Dune
     // AgglomerationVEMInterpolation
     // -----------------------------
 
-    template< class AgglomerationIndexSet, int polOrder, bool conforming >
+    template< class AgglomerationIndexSet >
     class AgglomerationVEMInterpolation
     {
-      typedef AgglomerationVEMInterpolation< AgglomerationIndexSet, polOrder, conforming > ThisType;
+      typedef AgglomerationVEMInterpolation< AgglomerationIndexSet > ThisType;
 
     public:
       typedef typename AgglomerationIndexSet::ElementType ElementType;
@@ -46,10 +46,12 @@ namespace Dune
       typedef Dune::Fem::OrthonormalShapeFunctionSet<InnerFSType> InnerShapeFunctionSetType;
 
     public:
-      explicit AgglomerationVEMInterpolation ( const AgglomerationIndexSet &indexSet ) noexcept
+      explicit AgglomerationVEMInterpolation ( const AgglomerationIndexSet &indexSet, unsigned int polOrder, bool conforming ) noexcept
         : indexSet_( indexSet )
-        , edgeBFS_(  Dune::GeometryType(Dune::GeometryType::cube,GridPartType::dimension-1), std::max(testSpaces()[1],0) )
-        , innerBFS_( Dune::GeometryType(Dune::GeometryType::cube,GridPartType::dimension),   std::max(testSpaces()[2],0) )
+        , edgeBFS_(  Dune::GeometryType(Dune::GeometryType::cube,GridPartType::dimension-1), std::max(testSpaces(polOrder,conforming)[1],0) )
+        , innerBFS_( Dune::GeometryType(Dune::GeometryType::cube,GridPartType::dimension),   std::max(testSpaces(polOrder,conforming)[2],0) )
+        , polOrder_( polOrder )
+        , conforming_( conforming )
       {}
 
       const GridPartType &gridPart() const { return indexSet_.agglomeration().gridPart(); }
@@ -70,7 +72,7 @@ namespace Dune
         getSizesAndOffsets(poly, vertexSize,edgeOffset,edgeSize,innerOffset,innerSize);
 
         // vertex dofs
-        if (testSpaces()[0] >= 0)
+        if (testSpaces(polOrder_,conforming_)[0] >= 0)
         {
           for( int i = 0; i < refElement.size( dimension ); ++i )
           {
@@ -79,7 +81,7 @@ namespace Dune
               vertex(poly,i,k,1);
           }
         }
-        if (testSpaces()[1] >= 0)
+        if (testSpaces(polOrder_,conforming_)[1] >= 0)
         {
           // to avoid any issue with twists we use an intersection iterator
           // here instead of going over the edges
@@ -94,7 +96,7 @@ namespace Dune
               edge(poly,intersection,k,edgeSize);
           }
         }
-        if (testSpaces()[2] >=0)
+        if (testSpaces(polOrder_,conforming_)[2] >=0)
         {
           // inner dofs
           const int k = indexSet_.localIndex( element, 0, 0 )*innerSize + innerOffset;
@@ -129,7 +131,7 @@ namespace Dune
           assert(numDofs == edgeBFS_.size());
           int edgeNumber = intersection.indexInInside();
           EdgeQuadratureType edgeQuad( gridPart(),
-                intersection, 2*polOrder, EdgeQuadratureType::INSIDE );
+                intersection, 2*polOrder_, EdgeQuadratureType::INSIDE );
           for (int qp=0;qp<edgeQuad.nop();++qp)
           {
             auto x = edgeQuad.localPoint(qp);
@@ -149,7 +151,7 @@ namespace Dune
         {
           assert(numDofs == innerShapeFunctionSet.size());
           //! SubVector has no size: assert(k+numDofs == localDofVector.size());
-          InnerQuadratureType innerQuad( element, 2*polOrder );
+          InnerQuadratureType innerQuad( element, 2*polOrder_ );
           for (int qp=0;qp<innerQuad.nop();++qp)
           {
             auto y = innerQuad.point(qp);
@@ -236,7 +238,7 @@ namespace Dune
         {
           assert(numDofs == edgeBFS_.size());
           int edgeNumber = intersection.indexInInside();
-          EdgeQuadratureType edgeQuad( gridPart(), intersection, 2*polOrder, EdgeQuadratureType::INSIDE );
+          EdgeQuadratureType edgeQuad( gridPart(), intersection, 2*polOrder_, EdgeQuadratureType::INSIDE );
           for (int qp=0;qp<edgeQuad.nop();++qp)
           {
             auto x = edgeQuad.localPoint(qp);
@@ -259,7 +261,7 @@ namespace Dune
         auto inner = [&] (int poly,int i,int k,int numDofs)
         {
           assert(numDofs == innerShapeFunctionSet.size());
-          InnerQuadratureType innerQuad( element, 2*polOrder );
+          InnerQuadratureType innerQuad( element, 2*polOrder_ );
           for (int qp=0;qp<innerQuad.nop();++qp)
           {
             auto y = innerQuad.point(qp);
@@ -303,7 +305,7 @@ namespace Dune
         if (k>=0)  // this doesn't make sense - remove?
         {
           std::size_t i = 0;
-          if (testSpaces()[0]>=0)
+          if (testSpaces(polOrder_,conforming_)[0]>=0)
           {
             for( ; i < refElement.size( edgeNumber, dimension-1, dimension ); ++i )
             {
@@ -314,7 +316,7 @@ namespace Dune
               mask.push_back(k);
             }
           }
-          if (testSpaces()[1]>=0)
+          if (testSpaces(polOrder_,conforming_)[1]>=0)
           {
             edge(poly,intersection,i,edgeSize);
             for (int kk=0;kk<edgeSize;++kk)
@@ -353,7 +355,7 @@ namespace Dune
         {
           assert(numDofs == edgeBFS_.size());
           EdgeQuadratureType edgeQuad( gridPart(),
-                intersection, 2*polOrder, EdgeQuadratureType::INSIDE );
+                intersection, 2*polOrder_, EdgeQuadratureType::INSIDE );
           for (int qp=0;qp<edgeQuad.nop();++qp)
           {
             auto x = edgeQuad.localPoint(qp);
@@ -380,7 +382,7 @@ namespace Dune
                   int &innerOffset, int &innerSize) const
       {
         const int dimension = AgglomerationIndexSet::dimension;
-        auto dofs   = dofsPerCodim ();  // assume always three entries in dim order (i.e. 2d)
+        auto dofs   = dofsPerCodim (polOrder_,conforming_);  // assume always three entries in dim order (i.e. 2d)
         vertexSize  = dofs[0].second;
         edgeOffset  = indexSet_.subAgglomerates(poly,dimension)*vertexSize;
         edgeSize    = dofs[1].second;
@@ -388,7 +390,7 @@ namespace Dune
         innerSize   = dofs[2].second;
       }
       // return the order of the spaces to use for the test functions
-      static std::vector< int > testSpaces()
+      static std::vector< int > testSpaces( unsigned int polOrder, bool conforming )
       {
         if (conforming)
           return {  0, polOrder-2, polOrder-2 }; // edge bfs = polOrder   = polOrder-1+2*(0+1)
@@ -396,10 +398,10 @@ namespace Dune
           return { -1, polOrder-1, polOrder-2 }; // edge bfs = polOrder-1 = polOrder-2+2*(-1+1)
       }
       // return the number of dofs per codimension
-      static std::vector< std::pair< int, unsigned int > > dofsPerCodim ()
+      static std::vector< std::pair< int, unsigned int > > dofsPerCodim ( unsigned int polOrder, bool conforming)
       {
         const int dimension = AgglomerationIndexSet::dimension;
-        const auto orders = testSpaces();
+        const auto orders = testSpaces(polOrder,conforming);
         const int vSize = orders[0]>=0? 1:0;
         const int eSize = orders[1]>=0? Dune::Fem::OrthonormalShapeFunctions< GridPartType::dimension-1 >::size( orders[1] ) : 0;
         const int iSize = orders[2]>=0? Dune::Fem::OrthonormalShapeFunctions< GridPartType::dimension >::size( orders[2] ) : 0;
@@ -410,8 +412,10 @@ namespace Dune
 
     private:
       const AgglomerationIndexSet &indexSet_;
-      EdgeShapeFunctionSetType  edgeBFS_;
-      InnerShapeFunctionSetType innerBFS_;
+      const EdgeShapeFunctionSetType  edgeBFS_;
+      const InnerShapeFunctionSetType innerBFS_;
+      const unsigned int polOrder_;
+      const bool conforming_;
     };
 
 
@@ -419,11 +423,11 @@ namespace Dune
     // agglomerationVEMInterpolation
     // -----------------------------
 
-    template< int polOrder, bool conforming, class AgglomerationIndexSet >
-    inline static AgglomerationVEMInterpolation< AgglomerationIndexSet, polOrder, conforming >
-    agglomerationVEMInterpolation ( const AgglomerationIndexSet &indexSet ) noexcept
+    template< class AgglomerationIndexSet >
+    inline static AgglomerationVEMInterpolation< AgglomerationIndexSet >
+    agglomerationVEMInterpolation ( const AgglomerationIndexSet &indexSet, unsigned int polOrder, bool conforming ) noexcept
     {
-      return AgglomerationVEMInterpolation< AgglomerationIndexSet, polOrder, conforming >( indexSet );
+      return AgglomerationVEMInterpolation< AgglomerationIndexSet >( indexSet, polOrder, conforming );
     }
 
   } // namespace Vem
