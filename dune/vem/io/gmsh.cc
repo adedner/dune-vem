@@ -26,11 +26,11 @@ namespace Dune
       struct ElementTypeImpl
         : public ElementType
       {
-        ElementTypeImpl ( std::size_t id, Dune::GeometryType::BasicType basicType, int dim,
+        ElementTypeImpl ( std::size_t id, std::size_t topologyId, int dim,
                           std::initializer_list< std::pair< unsigned int, unsigned int > > subs )
         {
           identifier = id;
-          duneType = GeometryType( basicType, dim );
+          duneType = GeometryType( topologyId, dim );
           numNodes = subs.size();
           subEntity = Std::make_unique< std::pair< unsigned int, unsigned int >[] >( numNodes );
           std::copy( subs.begin(), subs.end(), subEntity.get() );
@@ -46,21 +46,21 @@ namespace Dune
       // Element Types
       // -------------
 
-      static const ElementTypeImpl order1Line( 1, GeometryType::cube, 1, { { 0, 1 }, { 1, 1 } } );
-      static const ElementTypeImpl order1Triangle( 2, GeometryType::simplex, 2, { { 0, 2 }, { 1, 2 }, { 2, 2 } } );
-      static const ElementTypeImpl order1Quadrangle( 3, GeometryType::cube, 2, { { 0, 2 }, { 1, 2 }, { 3, 2 }, { 2, 2 } } );
-      static const ElementTypeImpl order1Tetrahedron( 4, GeometryType::simplex, 3, { { 0, 3 }, { 1, 3 }, { 2, 3 }, { 3, 3 } } );
-      static const ElementTypeImpl order1Hexahedron( 5, GeometryType::cube, 3, { { 0, 3 }, { 1, 3 }, { 3, 3 }, { 2, 3 }, { 4, 3 }, { 5, 3 }, { 7, 3 }, { 6, 3 } } );
-      static const ElementTypeImpl order1Prism( 6, GeometryType::prism, 3, { { 0, 3 }, { 1, 3 }, { 2, 3 }, { 3, 3 }, { 4, 3 }, { 5, 3 } } );
-      static const ElementTypeImpl order1Pyramid( 7, GeometryType::pyramid, 3 , { { 0, 3 }, { 1, 3 }, { 3, 3 }, { 2, 3 }, { 4, 3 } } );
+      static const ElementTypeImpl order1Line( 1, Impl :: CubeTopology < 1 > :: type :: id, 1, { { 0, 1 }, { 1, 1 } } );
+      static const ElementTypeImpl order1Triangle( 2, Impl :: SimplexTopology< 2 > :: type :: id, 2, { { 0, 2 }, { 1, 2 }, { 2, 2 } } );
+      static const ElementTypeImpl order1Quadrangle( 3, Impl :: CubeTopology < 2 > :: type :: id, 2, { { 0, 2 }, { 1, 2 }, { 3, 2 }, { 2, 2 } } );
+      static const ElementTypeImpl order1Tetrahedron( 4, Impl :: SimplexTopology< 3 > :: type :: id, 3, { { 0, 3 }, { 1, 3 }, { 2, 3 }, { 3, 3 } } );
+      static const ElementTypeImpl order1Hexahedron( 5, Impl :: CubeTopology < 3 > :: type :: id, 3, { { 0, 3 }, { 1, 3 }, { 3, 3 }, { 2, 3 }, { 4, 3 }, { 5, 3 }, { 7, 3 }, { 6, 3 } } );
+      static const ElementTypeImpl order1Prism( 6, Impl :: PrismTopology < 3 > :: type :: id, 3, { { 0, 3 }, { 1, 3 }, { 2, 3 }, { 3, 3 }, { 4, 3 }, { 5, 3 } } );
+      static const ElementTypeImpl order1Pyramid( 7, Impl :: PyramidTopology < 3 > :: type :: id, 3 , { { 0, 3 }, { 1, 3 }, { 3, 3 }, { 2, 3 }, { 4, 3 } } );
 
-      static const ElementTypeImpl order2Line( 8, GeometryType::cube, 1, { { 0, 1 }, { 1, 1 }, { 0, 0 } } );
-      static const ElementTypeImpl order2Triangle( 9, GeometryType::simplex, 2, { { 0, 2 }, { 1, 2 }, { 2, 2 }, { 0, 1 }, { 2, 1 }, { 1, 1 } } );
-      static const ElementTypeImpl order2Quadrangle( 10, GeometryType::cube, 2, { { 0, 2 }, { 1, 2 }, { 3, 2 }, { 2, 2 }, { 2, 1 }, { 1, 1 }, { 3, 1 }, { 0, 1 }, { 0, 0 } } );
+      static const ElementTypeImpl order2Line( 8, Impl :: CubeTopology < 1 > :: type :: id, 1, { { 0, 1 }, { 1, 1 }, { 0, 0 } } );
+      static const ElementTypeImpl order2Triangle( 9, Impl :: SimplexTopology< 2 > :: type :: id, 2, { { 0, 2 }, { 1, 2 }, { 2, 2 }, { 0, 1 }, { 2, 1 }, { 1, 1 } } );
+      static const ElementTypeImpl order2Quadrangle( 10, Impl :: CubeTopology < 2 > :: type :: id, 2, { { 0, 2 }, { 1, 2 }, { 3, 2 }, { 2, 2 }, { 2, 1 }, { 1, 1 }, { 3, 1 }, { 0, 1 }, { 0, 0 } } );
 
-      static const ElementTypeImpl point( 15, GeometryType::cube, 0, { { 0, 0 } } );
+      static const ElementTypeImpl point( 15, Impl :: CubeTopology < 0 > :: type :: id, 0, { { 0, 0 } } );
 
-      static const ElementTypeImpl reducedOrder2Quadrangle( 16, GeometryType::cube, 2, { { 0, 2 }, { 1, 2 }, { 3, 2 }, { 2, 2 }, { 2, 1 }, { 1, 1 }, { 3, 1 }, { 0, 1 } } );
+      static const ElementTypeImpl reducedOrder2Quadrangle( 16, Impl :: CubeTopology < 2 > :: type :: id, 2, { { 0, 2 }, { 1, 2 }, { 3, 2 }, { 2, 2 }, { 2, 1 }, { 1, 1 }, { 3, 1 }, { 0, 1 } } );
 
 
 
