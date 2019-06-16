@@ -4,6 +4,7 @@ import sys
 import logging
 logger = logging.getLogger(__name__)
 
+from ufl.equation import Equation
 from dune.generator import Constructor, Method
 import dune.common.checkconfiguration as checkconfiguration
 import dune
@@ -109,17 +110,17 @@ def vemSpace(view, order=1, dimRange=1, conforming=True, field="double", storage
     viewType = view._typeName
 
     gridPartName = "Dune::FemPy::GridPart< " + view._typeName + " >"
-    conforming = "true" if conforming else "false"
     typeName = "Dune::Vem::AgglomerationVEMSpace< " +\
       "Dune::Fem::FunctionSpace< double, " + field + ", " + str(dimw) + ", " + str(dimRange) + " >, " +\
-      gridPartName + ", " + str(order) + ", " + conforming + " >"
+      gridPartName + ", " + str(order) + " >"
 
     constructor = Constructor(
                    ['pybind11::object gridView',
-                    'const pybind11::function agglomerate'],
+                    'const pybind11::function agglomerate',
+                    'bool conforming'],
                    ['auto agglo = new Dune::Vem::Agglomeration<' + gridPartName + '>',
                     '         (Dune::FemPy::gridPart<' + viewType + '>(gridView), [agglomerate](const auto& e) { return agglomerate(e).template cast<unsigned int>(); } ); ',
-                    'auto obj = new DuneType( *agglo );',
+                    'auto obj = new DuneType( *agglo, conforming );',
                     'pybind11::cpp_function remove_agglo( [ agglo ] ( pybind11::handle weakref ) {',
                     '  delete agglo;',
                     '  weakref.dec_ref();',
@@ -128,10 +129,10 @@ def vemSpace(view, order=1, dimRange=1, conforming=True, field="double", storage
                     '// assert(nurse);',
                     'pybind11::weakref( agglomerate, remove_agglo ).release();',
                     'return obj;'],
-                   ['"gridView"_a', '"agglomerate"_a',
+                   ['"gridView"_a', '"agglomerate"_a', '"conforming"_a',
                     'pybind11::keep_alive< 1, 2 >()'] )
 
-    spc = module(field, includes, typeName, constructor, storage=storage, ctorArgs=[view, agglomerate])
+    spc = module(field, includes, typeName, constructor, storage=storage, ctorArgs=[view, agglomerate, conforming])
     addStorage(spc, storage)
     return spc.as_ufl()
 
@@ -153,6 +154,22 @@ def vemScheme(model, space, solver=None, parameters={}):
     # from dune.fem.space import module
     from dune.fem.scheme import module
     from dune.fem.scheme import femschemeModule
+
+    if isinstance(model, (list, tuple)):
+        modelParam = model[1:]
+        model = model[0]
+    if isinstance(model,Equation):
+        if space == None:
+            try:
+                space = model.lhs.arguments()[0].ufl_function_space()
+            except AttributeError:
+                raise ValueError("no space provided and could not deduce from form provided")
+        from dune.fem.model._models import elliptic
+        if modelParam:
+            model = elliptic(space.grid,model,*modelParam)
+        else:
+            model = elliptic(space.grid,model)
+
     # from . import module
     includes = [ "dune/vem/operator/vemelliptic.hh" ]
 

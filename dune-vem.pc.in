@@ -11,5 +11,5 @@ Version: @VERSION@
 Description: dune-vem module
 URL: http://dune-project.org/
 Requires: dune-fem
-Libs: -L${libdir}
+Libs: -L${libdir} -ldunevem
 Cflags: -I${includedir}

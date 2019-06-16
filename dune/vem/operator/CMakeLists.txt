@@ -1,6 +1,11 @@
 add_subdirectory( constraints )
 
-install(
-  FILES mass.hh
-  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/dune/vem/operator
+
+set(HEADERS
+  elliptic.hh
+  mass.hh
+  vemdirichletconstraints.hh
+  vemelliptic.hh
 )
+
+install(FILES ${HEADERS} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/dune/vem/operator)

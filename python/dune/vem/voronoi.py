@@ -16,34 +16,37 @@ def in_box(towers, bounding_box):
                           np.logical_and(bounding_box[2] <= towers[:, 1],
                                          towers[:, 1] <= bounding_box[3]))
 
-def voronoiCells(constructor, towers, fileName=None, load=False):
+def voronoiCells(constructor, towers, fileName=None, load=False, show=False):
     lowerleft  = numpy.array(constructor.lower)
     upperright = numpy.array(constructor.upper)
     bounding_box = numpy.array(
             [lowerleft[0],upperright[0],lowerleft[1],upperright[1]] )
 
     if isinstance(towers,int):
-        fileName = fileName + str(towers) + '.pickle'
-        if not load or not os.path.exists(fileName):
-            print("generating new seeds for voronoi grid")
-            numpy.random.seed(1234)
+        if fileName:
+            fileName = fileName + str(towers) + '.pickle'
+            if not load or not os.path.exists(fileName):
+                print("generating new seeds for voronoi grid")
+                numpy.random.seed(1234)
+                towers = numpy.array(
+                        [ p*(upperright-lowerleft) + lowerleft
+                            for p in numpy.random.rand(towers, 2) ])
+                with open(fileName, 'wb') as f:
+                    pickle.dump(towers, f)
+            else:
+                print("loading seeds for voronoi grid")
+                with open(fileName, 'rb') as f:
+                    towers = pickle.load(f)
+        else:
             towers = numpy.array(
                     [ p*(upperright-lowerleft) + lowerleft
                         for p in numpy.random.rand(towers, 2) ])
-            if fileName is not None:
-                with open(fileName, 'wb') as f:
-                    pickle.dump(towers, f)
-        else:
-            assert fileName is not None
-            print("loading seeds for voronoi grid")
-            with open(fileName, 'rb') as f:
-                towers = pickle.load(f)
 
     # Select towers inside the bounding box
     i = in_box(towers, bounding_box)
 
     vor = sp.spatial.Voronoi(towers[i,:],incremental=True)
-    if fileName is not None:
+    if show:
         voronoi_plot_2d(vor,show_points=False,show_vertices=False).\
             savefig(fileName+"inc"+str(len(towers))+".pdf", bbox_inches='tight')
 

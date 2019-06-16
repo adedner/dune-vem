@@ -1,6 +1,6 @@
 Module: dune-vem
-Version: 2015.10
-Maintainer: nolte@mathematik.uni-freiburg.de
+Version: 2.7
+Maintainer: a.s.dedner@warwick.ac.uk
 Whitespace-Hook: Yes
-Depends: dune-fem dune-alugrid dune-fempy
+Depends: dune-fem dune-alugrid
 Suggests:

@@ -38,7 +38,7 @@ namespace Dune
     // Internal Forward Declarations
     // -----------------------------
 
-    template< class FunctionSpace, class GridPart, int polOrder, bool conforming >
+    template< class FunctionSpace, class GridPart, int polOrder >
     class AgglomerationVEMSpace;
 
 
@@ -51,8 +51,8 @@ namespace Dune
       : std::integral_constant< bool, false >
     {};
 
-    template< class FunctionSpace, class GridPart, int order, bool conforming >
-    struct IsAgglomerationVEMSpace< AgglomerationVEMSpace< FunctionSpace, GridPart, order, conforming > >
+    template< class FunctionSpace, class GridPart, int order >
+    struct IsAgglomerationVEMSpace< AgglomerationVEMSpace< FunctionSpace, GridPart, order > >
       : std::integral_constant< bool, true >
     {};
 
@@ -61,12 +61,12 @@ namespace Dune
     // AgglomerationVEMSpaceTraits
     // ---------------------------
 
-    template< class FunctionSpace, class GridPart, int polOrder, bool conforming >
+    template< class FunctionSpace, class GridPart, int polOrder >
     struct AgglomerationVEMSpaceTraits
     {
-      friend class AgglomerationVEMSpace< FunctionSpace, GridPart, polOrder, conforming >;
+      friend class AgglomerationVEMSpace< FunctionSpace, GridPart, polOrder >;
 
-      typedef AgglomerationVEMSpace< FunctionSpace, GridPart, polOrder, conforming > DiscreteFunctionSpaceType;
+      typedef AgglomerationVEMSpace< FunctionSpace, GridPart, polOrder > DiscreteFunctionSpaceType;
 
       typedef FunctionSpace FunctionSpaceType;
       typedef GridPart GridPartType;
@@ -105,12 +105,12 @@ namespace Dune
     // AgglomerationVEMSpace
     // ---------------------
 
-    template< class FunctionSpace, class GridPart, int polOrder, bool conf >
+    template< class FunctionSpace, class GridPart, int polOrder >
     class AgglomerationVEMSpace
-      : public Fem::DiscreteFunctionSpaceDefault< AgglomerationVEMSpaceTraits< FunctionSpace, GridPart, polOrder, conf > >
+      : public Fem::DiscreteFunctionSpaceDefault< AgglomerationVEMSpaceTraits< FunctionSpace, GridPart, polOrder > >
     {
-      typedef AgglomerationVEMSpace< FunctionSpace, GridPart, polOrder, conf > ThisType;
-      typedef Fem::DiscreteFunctionSpaceDefault< AgglomerationVEMSpaceTraits< FunctionSpace, GridPart, polOrder, conf > > BaseType;
+      typedef AgglomerationVEMSpace< FunctionSpace, GridPart, polOrder > ThisType;
+      typedef Fem::DiscreteFunctionSpaceDefault< AgglomerationVEMSpaceTraits< FunctionSpace, GridPart, polOrder > > BaseType;
 
     public:
       typedef typename BaseType::Traits Traits;
@@ -119,7 +119,7 @@ namespace Dune
       typedef AgglomerationIndexSet< GridPart > AgglomerationIndexSetType;
 
     private:
-      typedef AgglomerationVEMInterpolation< AgglomerationIndexSetType, polOrder, conf > AgglomerationInterpolationType;
+      typedef AgglomerationVEMInterpolation< AgglomerationIndexSetType > AgglomerationInterpolationType;
       typedef typename Traits::ScalarShapeFunctionSetType ScalarShapeFunctionSetType;
 
     public:
@@ -138,7 +138,6 @@ namespace Dune
 
       enum { hasLocalInterpolate = false };
       static const int polynomialOrder = polOrder;
-      static const bool conforming = conf;
 
       // for interpolation
       struct InterpolationType
@@ -152,18 +151,23 @@ namespace Dune
         const EntityType &element_;
       };
 
-      explicit AgglomerationVEMSpace ( AgglomerationType &agglomeration )
+      AgglomerationVEMSpace ( AgglomerationType &agglomeration, bool conforming )
         : BaseType( agglomeration.gridPart() ),
           agIndexSet_( agglomeration ),
-          blockMapper_( agIndexSet_, AgglomerationInterpolationType::dofsPerCodim() ),
+          blockMapper_( agIndexSet_, AgglomerationInterpolationType::dofsPerCodim(polOrder,conforming) ),
           scalarShapeFunctionSet_( Dune::GeometryType( Dune::GeometryType::cube, GridPart::dimension ) ),
           edgeShapeFunctionSet_(   Dune::GeometryType( Dune::GeometryType::cube, GridPart::dimension-1 ),
-              AgglomerationInterpolationType::testSpaces()[1] +       // edge order
-                (AgglomerationInterpolationType::testSpaces()[0]+1)*2 // vertex order * number of vertices on edge
-              )
+              AgglomerationInterpolationType::testSpaces(polOrder,conforming)[1] +       // edge order
+                (AgglomerationInterpolationType::testSpaces(polOrder,conforming)[0]+1)*2 // vertex order * number of vertices on edge
+              ),
+          polOrder_( polOrder ),
+          conforming_( conforming )
       {
         buildProjections();
       }
+
+      const bool conforming() const { return conforming_; }
+      // const unsigned int polynomialOrder() const { return polOrder_; }
 
       const BasisFunctionSetType basisFunctionSet ( const EntityType &entity ) const
       {
@@ -203,7 +207,6 @@ namespace Dune
 
       const Stabilization &stabilization ( const EntityType &entity ) const { return stabilizations_[ agglomeration().index( entity ) ]; }
 
-#if 1 // for interpolation
       //////////////////////////////////////////////////////////
       // Non-interface methods (used in DirichletConstraints) //
       //////////////////////////////////////////////////////////
@@ -215,10 +218,11 @@ namespace Dune
       {
         return InterpolationType( blockMapper().indexSet(), entity );
       }
-#endif
+
     private:
       void buildProjections ();
 
+      // issue with making these const: use of delete default constructor in some python bindings...
       AgglomerationIndexSetType agIndexSet_;
       mutable BlockMapperType blockMapper_;
       std::vector< typename Traits::ScalarBasisFunctionSetType::ValueProjection > valueProjections_;
@@ -226,6 +230,8 @@ namespace Dune
       std::vector< Stabilization > stabilizations_;
       ScalarShapeFunctionSetType scalarShapeFunctionSet_;
       EdgeShapeFunctionSetType edgeShapeFunctionSet_;
+      unsigned int polOrder_;
+      bool conforming_;
     };
 
 
@@ -233,8 +239,8 @@ namespace Dune
     // Implementation of AgglomerationVEMSpace
     // ---------------------------------------
 
-    template< class FunctionSpace, class GridPart, int polOrder, bool conforming >
-    inline void AgglomerationVEMSpace< FunctionSpace, GridPart, polOrder, conforming >::buildProjections ()
+    template< class FunctionSpace, class GridPart, int polOrder >
+    inline void AgglomerationVEMSpace< FunctionSpace, GridPart, polOrder >::buildProjections ()
     {
       typedef typename BasisFunctionSetType::DomainFieldType DomainFieldType;
       typedef typename BasisFunctionSetType::DomainType DomainType;
@@ -262,7 +268,7 @@ namespace Dune
       jacobianProjections_.resize( agglomeration().size() );
       stabilizations_.resize( agglomeration().size() );
 
-      AgglomerationInterpolationType interpolation( blockMapper().indexSet() );
+      AgglomerationInterpolationType interpolation( blockMapper().indexSet(), polOrder, conforming_ );
 
       for( std::size_t agglomerate = 0; agglomerate < agglomeration().size(); ++agglomerate )
       {
@@ -320,7 +326,7 @@ namespace Dune
               continue;
             assert( intersection.conforming() );
             auto normal = intersection.centerUnitOuterNormal();
-            std::vector<int> mask; // contains indices with Phi_mask[i] has support on edge
+            std::vector<int> mask; // contains indices with Phi_mask[i] is attached to edge
             edgePhi.resize(edgeShapeFunctionSet_.size(),edgeShapeFunctionSet_.size(),0);
             interpolation( intersection, edgeShapeFunctionSet_, edgePhi, mask );
             edgePhi.invert();
@@ -522,8 +528,8 @@ namespace Dune
     // ---------------------------------------------------
 
 #if HAVE_DUNE_ISTL
-    template< class Matrix, class FunctionSpace, class GridPart, int polOrder, bool conforming >
-    struct ISTLParallelMatrixAdapter< Matrix, Vem::AgglomerationVEMSpace< FunctionSpace, GridPart, polOrder, conforming > >
+    template< class Matrix, class FunctionSpace, class GridPart, int polOrder >
+    struct ISTLParallelMatrixAdapter< Matrix, Vem::AgglomerationVEMSpace< FunctionSpace, GridPart, polOrder > >
     {
       typedef LagrangeParallelMatrixAdapter< Matrix > Type;
     };
@@ -532,8 +538,8 @@ namespace Dune
 #if 1 // for interpolation
     namespace Capabilities
     {
-      template< class FunctionSpace, class GridPart, int polOrder, bool conforming >
-      struct hasInterpolation< Vem::AgglomerationVEMSpace< FunctionSpace, GridPart, polOrder, conforming > >
+      template< class FunctionSpace, class GridPart, int polOrder >
+      struct hasInterpolation< Vem::AgglomerationVEMSpace< FunctionSpace, GridPart, polOrder > >
       {
         static const bool v = false;
       };

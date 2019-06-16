@@ -24,12 +24,12 @@ polOrder, endEoc = 4,8
 methods = [ # "[space,scheme,spaceKwrags]"
             #["lagrange","h1",{}],
             ["vem","vem",{"conforming":True}],
-            #["vem","vem",{"conforming":False}],
+            ["vem","vem",{"conforming":False}],
             #["bbdg","bbdg",{}],
             #["dgonb","dg",{}]
    ]
 parameters = {"newton.linear.tolerance": 1e-12,
-              "newton.linear.verbose": False,
+              "newton.linear.verbose":True,
               "newton.tolerance": 1e-10,
               "newton.maxiterations": 3, # should finish in 1
               "newton.maxlinesearchiterations":50,
