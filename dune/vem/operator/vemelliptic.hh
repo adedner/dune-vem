@@ -10,6 +10,7 @@
 
 #include <dune/fem/operator/common/differentiableoperator.hh>
 #include <dune/fem/io/parameter.hh>
+#include <dune/fem/schemes/elliptic.hh>
 
 #include <dune/vem/agglomeration/indexset.hh>
 
@@ -51,15 +52,16 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model>
                           ModelType &model,
                           const Dune::Fem::ParameterReader &parameter = Dune::Fem::Parameter::container() )
     : model_( model ),
-      dSpace_(rangeSpace), rSpace_(rangeSpace)
+      dSpace_(rangeSpace), rSpace_(rangeSpace),
+      baseOperator_(rangeSpace,model,parameter)
     {}
     VEMEllipticOperator ( const DomainDiscreteFunctionSpaceType &dSpace,
                           const RangeDiscreteFunctionSpaceType &rSpace,
                           ModelType &model,
                           const Dune::Fem::ParameterReader &parameter = Dune::Fem::Parameter::container() )
     : model_( model ),
-      dSpace_(dSpace), rSpace_(rSpace)
-      // interiorOrder_(-1), surfaceOrder_(-1)
+      dSpace_(dSpace), rSpace_(rSpace),
+      baseOperator_(dSpace,rSpace,model,parameter)
     {}
 
 
@@ -79,6 +81,7 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model>
     ModelType &model_;
     const DomainDiscreteFunctionSpaceType &dSpace_;
     const RangeDiscreteFunctionSpaceType &rSpace_;
+    EllipticOperator<DomainDiscreteFunction,RangeDiscreteFunction,Model> baseOperator_;
 };
 
 // DifferentiableVEMEllipticOperator
@@ -129,12 +132,14 @@ template<class JacobianOperator, class Model>
                      ModelType &model,
                      const Dune::Fem::ParameterReader &parameter = Dune::Fem::Parameter::container() )
     : BaseType( rangeSpace, model )
+    , baseOperator_(rangeSpace,model,parameter)
   {}
   DifferentiableVEMEllipticOperator ( const DomainDiscreteFunctionSpaceType &dSpace,
                                       const RangeDiscreteFunctionSpaceType &rSpace,
                                       ModelType &model,
                                       const Dune::Fem::ParameterReader &parameter = Dune::Fem::Parameter::container() )
   : BaseType( dSpace, rSpace, model, parameter )
+  , baseOperator_(dSpace,rSpace,model,parameter)
   {}
 
   //! method to setup the jacobian of the operator for storage in a matrix
@@ -142,6 +147,7 @@ template<class JacobianOperator, class Model>
       JacobianOperatorType &jOp) const;
 
   using BaseType::model;
+  DifferentiableEllipticOperator<JacobianOperator,Model> baseOperator_;
 };
 
 // Implementation of VEMEllipticOperator
@@ -152,7 +158,8 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model>
   ::operator()(const DomainDiscreteFunctionType &u,
       RangeDiscreteFunctionType &w) const
 {
-  w.clear();
+  baseOperator_(u,w);
+
   // get discrete function space
   const RangeDiscreteFunctionSpaceType &dfSpace = w.space();
   const int blockSize = dfSpace.localBlockSize; // is equal to 1 for scalar functions
@@ -161,8 +168,6 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model>
   //
 
   std::vector<RangeRangeType> VectorOfAveragedDiffusionCoefficients (dfSpace.agglomeration().size(), RangeRangeType(0));
-  // const Dune::Vem::AgglomerationIndexSet<GridPartType> agIndexSet(
-  //     dfSpace.agglomeration());
   const auto &agIndexSet = dfSpace.blockMapper().indexSet();
   // iterate over grid
   const GridPartType &gridPart = w.gridPart();
@@ -223,78 +228,7 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model>
         VectorOfAveragedDiffusionCoefficients[agglomerate].axpy(factor,Dcoeff);
       }
     }
-    // obtain quadrature order
-    const int quadOrder = uLocal.order() + wLocal.order();
-
-    { // element integral
-      QuadratureType quadrature(entity, quadOrder);
-      const size_t numQuadraturePoints = quadrature.nop();
-      for (size_t pt = 0; pt < numQuadraturePoints; ++pt) {
-        //! [Compute local contribution of operator]
-        const typename QuadratureType::CoordinateType &x =
-          quadrature.point(pt);
-        //
-        const double weight = quadrature.weight(pt)
-          * geometry.integrationElement(x);
-
-        DomainRangeType vu;
-        uLocal.evaluate(quadrature[pt], vu);
-        DomainJacobianRangeType du;
-        uLocal.jacobian(quadrature[pt], du);
-
-        // compute mass contribution (studying linear case so linearizing around zero)
-        RangeRangeType avu(0);
-        model().source(quadrature[pt], vu, du, avu);
-        avu *= weight;
-        // add to local functional wLocal.axpy( quadrature[ pt ], avu );
-
-        RangeJacobianRangeType adu(0);
-        // apply diffusive flux
-        model().diffusiveFlux(quadrature[pt], vu, du, adu);
-        adu *= weight;
-        // add to local function
-        wLocal.axpy(quadrature[pt], avu, adu);
-        //! [Compute local contribution of operator]
-      }
-    }
-    if (model().hasNeumanBoundary()) {
-      if (!entity.hasBoundaryIntersections())
-        continue;
-
-      const IntersectionIteratorType iitend = dfSpace.gridPart().iend(
-          entity);
-      for (IntersectionIteratorType iit = dfSpace.gridPart().ibegin(
-            entity); iit != iitend; ++iit) // looping over intersections
-      {
-        const IntersectionType &intersection = *iit;
-        if (!intersection.boundary())
-          continue;
-        Dune::FieldVector<int, RangeRangeType::dimension> components(1);
-        bool hasDirichletComponent = model().isDirichletIntersection(
-            intersection, components);
-        const typename IntersectionType::Geometry &intersectionGeometry =
-          intersection.geometry();
-        FaceQuadratureType quadInside(dfSpace.gridPart(), intersection,
-            quadOrder, FaceQuadratureType::INSIDE);
-        const size_t numQuadraturePoints = quadInside.nop();
-        for (size_t pt = 0; pt < numQuadraturePoints; ++pt) {
-          const typename FaceQuadratureType::LocalCoordinateType &x =
-            quadInside.localPoint(pt);
-          double weight = quadInside.weight(pt)
-            * intersectionGeometry.integrationElement(x);
-          DomainRangeType vu;
-          uLocal.evaluate(quadInside[pt], vu);
-          RangeRangeType alpha(0);
-          model().alpha(quadInside[pt], vu, alpha);
-          alpha *= weight;
-          for (int k = 0; k < RangeRangeType::dimension; ++k)
-            if (hasDirichletComponent && components[k])
-              alpha[k] = 0;
-          wLocal.axpy(quadInside[pt], alpha);
-        }
-      }
-    }
-  } // element loop end
+  }
   // assemble the stablisation matrix
   for (const auto &entity : Dune::elements(
         static_cast<typename GridPartType::GridViewType>(gridPart),
@@ -325,6 +259,8 @@ template<class JacobianOperator, class Model>
 void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
 ::jacobian( const DomainDiscreteFunctionType &u, JacobianOperator &jOp) const
 {
+  baseOperator_.jacobian(u,jOp);
+
   Dune::Timer timer;
   typedef typename JacobianOperator::LocalMatrixType LocalMatrixType;
   typedef typename DomainDiscreteFunctionSpaceType::BasisFunctionSetType DomainBasisFunctionSetType;
@@ -333,27 +269,9 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
   const DomainDiscreteFunctionSpaceType &domainSpace = jOp.domainSpace();
   const RangeDiscreteFunctionSpaceType &rangeSpace = jOp.rangeSpace();
 
-  // std::cout << "   in assembly: matrix stencil    " << timer.elapsed() << std::endl;;
-  Dune::Fem::DiagonalStencil<DomainDiscreteFunctionSpaceType,
-    RangeDiscreteFunctionSpaceType> stencil(domainSpace, rangeSpace);
-  // std::cout << "   in assembly: matrix reserve   " << timer.elapsed() << std::endl;;
-  jOp.reserve(stencil);
-  // std::cout << "   in assembly: matrix clear    " << timer.elapsed() << std::endl;;
-  jOp.clear();
-
   // std::cout << "   in assembly: setting up vectors    " << timer.elapsed() << std::endl;;
   const int domainBlockSize = domainSpace.localBlockSize; // is equal to 1 for scalar functions
   // Note the following is much! too large since it assumes e.g. all vertices in one polygon
-  std::size_t maxSize = domainSpace.blockMapper().maxNumDofs() * domainBlockSize;
-  std::vector<typename DomainLocalFunctionType::RangeType> phi;
-  phi.reserve(maxSize);
-  std::vector<typename DomainLocalFunctionType::JacobianRangeType> dphi;
-  dphi.reserve(maxSize);
-  // const int rangeBlockSize = rangeSpace.localBlockSize; // is equal to 1 for scalar functions
-  // std::vector<typename RangeLocalFunctionType::RangeType> rphi(
-  //     rangeSpace.blockMapper().maxNumDofs() * rangeBlockSize);
-  // std::vector<typename RangeLocalFunctionType::JacobianRangeType> rdphi(
-  //     rangeSpace.blockMapper().maxNumDofs() * rangeBlockSize);
 
   std::vector<double> polygonareas(rangeSpace.agglomeration().size(), 0.0);
   std::vector<RangeRangeType> VectorOfAveragedDiffusionCoefficients (rangeSpace.agglomeration().size(), RangeRangeType(0));
@@ -363,14 +281,11 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
   RangeRangeType LinDcoeff(0);
   const GridPartType &gridPart = rangeSpace.gridPart();
 
-
   // std::cout << "   in assembly: computing index set   " << timer.elapsed() << std::endl;;
-  // const Dune::Vem::AgglomerationIndexSet<GridPartType> agIndexSet(
-  //     rangeSpace.agglomeration());
   const auto &agIndexSet    = rangeSpace.blockMapper().indexSet();
   const auto &agglomeration = rangeSpace.agglomeration();
-  // std::cout << "   using new vemelliptic.." << std::endl;
   // std::cout << "   in assembly: start element loop size=" << rangeSpace.gridPart().grid().size(0) << " time=  " << timer.elapsed() << std::endl;;
+
   for (const auto &entity : Dune::elements(
         static_cast<typename GridPartType::GridViewType>(gridPart),
         Dune::Partitions::interiorBorder)) {
@@ -433,93 +348,7 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
         VectorOfAveragedLinearlisedDiffusionCoefficients[agglomerate].axpy(factor,LinDcoeff);
       }
     }
-
     polygonareas[agglomerate] += geometry.volume();
-    const DomainBasisFunctionSetType &domainBaseSet = jLocal.domainBasisFunctionSet();
-    const RangeBasisFunctionSetType &rangeBaseSet = jLocal.rangeBasisFunctionSet();
-    const unsigned int domainNumBasisFunctions = domainBaseSet.size();
-    phi.resize(domainNumBasisFunctions);
-    dphi.resize(domainNumBasisFunctions);
-
-    QuadratureType quadrature(entity, domainSpace.order() + rangeSpace.order());
-    const std::size_t numQuadraturePoints = quadrature.nop();
-    for (std::size_t pt = 0; pt < numQuadraturePoints; ++pt)
-    {
-      //! [Assembling the local matrix]
-      const typename QuadratureType::CoordinateType &x = quadrature.point(pt);
-      const double weight = quadrature.weight(pt) * geometry.integrationElement(x);
-
-      // evaluate all basis functions at given quadrature point
-      // ... optimize for equal domain and range spaces
-      domainBaseSet.evaluateAll(quadrature[pt], phi);
-      //    rangeBaseSet.evaluateAll(quadrature[pt], rphi);
-
-      // evaluate jacobians of all basis functions at given quadrature point
-      domainBaseSet.jacobianAll(quadrature[pt], dphi);
-      //    rangeBaseSet.jacobianAll(quadrature[pt], rdphi);
-
-      // get value for linearization
-      DomainRangeType u0;
-      DomainJacobianRangeType jacU0;
-      uLocal.evaluate(quadrature[pt], u0);
-      uLocal.jacobian(quadrature[pt], jacU0);
-
-      RangeRangeType aphi(0);
-      RangeJacobianRangeType adphi(0);
-      for (unsigned int localCol = 0; localCol < domainNumBasisFunctions; ++localCol) {
-        // if mass terms or right hand side is present
-        model().linSource(u0, jacU0, quadrature[pt], phi[localCol], dphi[localCol], aphi);
-
-        // if gradient term is present
-        model().linDiffusiveFlux(u0, jacU0, quadrature[pt], phi[localCol], dphi[localCol], adphi);
-
-        // get column object and call axpy method
-        // jLocal.column(localCol).axpy(rphi, rdphi, aphi, adphi, weight);
-        jLocal.column(localCol).axpy(phi, dphi, aphi, adphi, weight);
-      } // basis function loop in stiffness computation
-      //! [Assembling the local matrix]
-    } // stiffness quadrature loop
-
-    if (model().hasNeumanBoundary() && entity.hasBoundaryIntersections())
-    {
-      for (const IntersectionType &intersection : intersections(
-            static_cast<typename GridPartType::GridViewType>(gridPart),
-            entity)) {
-        if (!intersection.boundary())
-          continue;
-
-        Dune::FieldVector<int, RangeRangeType::dimension> components(1);
-        bool hasDirichletComponent = model().isDirichletIntersection(
-            intersection, components);
-
-        const typename IntersectionType::Geometry &intersectionGeometry =
-          intersection.geometry();
-        FaceQuadratureType quadInside(gridPart, intersection,
-            domainSpace.order() + rangeSpace.order(),
-            FaceQuadratureType::INSIDE);
-        const std::size_t numQuadraturePoints = quadInside.nop();
-        for (size_t pt = 0; pt < numQuadraturePoints; ++pt) {
-          const typename FaceQuadratureType::LocalCoordinateType &x =
-            quadInside.localPoint(pt);
-          double weight = quadInside.weight(pt)
-            * intersectionGeometry.integrationElement(x);
-          DomainRangeType u0;
-          uLocal.evaluate(quadInside[pt], u0);
-          domainBaseSet.evaluateAll(quadInside[pt], phi);
-          for (unsigned int localCol = 0;
-              localCol < domainNumBasisFunctions; ++localCol) {
-            RangeRangeType alpha(0);
-            model().linAlpha(u0, quadInside[pt],
-                phi[localCol], alpha);
-            for (int k = 0; k < RangeRangeType::dimension; ++k) {
-              if (hasDirichletComponent && components[k])
-                alpha[k] = 0;
-            }
-            jLocal.column(localCol).axpy(phi, alpha, weight);
-          } // basis function loop
-        } // quadrature loop over edge
-      } // intersection loop
-    } // Neumann boundary loop
   } // element loop end
 
   // the second element loop to add the stabilisation term
