@@ -12,17 +12,18 @@ from dune.vem import voronoiCells
 
 #
 import numpy as np
+from math import log
 
 dimRange = 1
 start    = 4
 # polOrder, endEoc = 1,8
-polOrder, endEoc = 4,8
+polOrder, endEoc = 1,6
 # polOrder, endEoc = 3,6
 # polOrder, endEoc = 4,5
 # polOrder, endEoc = 5,4
 # polOrder, endEoc = 6,4 # not working
 methods = [ # "[space,scheme,spaceKwrags]"
-            #["lagrange","h1",{}],
+            ["lagrange","h1",{}],
             ["vem","vem",{"conforming":True}],
             #["vem","vem",{"conforming":False}],
             #["bbdg","bbdg",{}],
@@ -99,27 +100,27 @@ def compute(grid):
     u = TrialFunction(uflSpace)
     v = TestFunction(uflSpace)
     x = SpatialCoordinate(uflSpace.cell())
-    if False:
-        ##### problem 1
-        ### trivial Neuman bc
-        factor = 2 # change to 2 for higher order approx
-        exact  = as_vector( [cos(factor*pi*x[0])*cos(factor*pi*x[1])] )
-        #### zero boundary conditions
-        exact *= x[0]*x[1]*(2-x[0])*(2-x[1])
-        #### non zero and non trivial Neuman boundary conditions
-        exact += as_vector( [sin(factor*x[0]*factor*x[1])] )
-        H = lambda w: grad(grad(w))
-        a = (inner(grad(u), grad(v)) + inner(u,v)) * dx
-        b = ( -(H(exact[0])[0,0]+H(exact[0])[1,1]) + exact[0] ) * v[0] * dx
-    else:
-        ##### problem 2: dummy quasilinear problem:
-        #exact = as_vector ( [  (x[0] - x[0]*x[0] ) * (x[1] - x[1]*x[1] ) ] )
-        #exact = as_vector ( [ ( sin(3.0*pi*x[0]) * sin(3.0*pi*x[1]) ) ] )
-        exact = as_vector ( [ x[0]**1.6 ] )
-        #Dcoeff = lambda u: 1.0 + ( 1.0 / (1.0 + u[0]**2) )
-        Dcoeff = lambda u: 1.0 + u[0]
-        a = (Dcoeff(u)* inner(grad(u), grad(v)) ) * dx
-        b = -div( Dcoeff(u) * grad(exact[0]) ) * v[0] * dx
+    #if False:
+    ##### problem 1
+    ### trivial Neuman bc
+    factor = 2 # change to 2 for higher order approx
+    exact  = as_vector( [sin(factor*x[0] + 0.5)*cos(x[1] + 0.3) + x[0]*x[1] ]  )
+    #### zero boundary conditions
+    H = lambda w: grad(grad(w))
+    epsilon = 1e-3
+    #a = (epsilon * inner(grad(u), grad(v)) + inner(u,v)) * dx
+    a = (epsilon * inner(grad(u), grad(v))) * dx
+    #b = ( -(H(exact[0])[0,0]+H(exact[0])[1,1]) + exact[0] ) * v[0] * dx
+    b = v[0] * dx
+    #else:
+        ###### problem 2: dummy quasilinear problem:
+        ##exact = as_vector ( [  (x[0] - x[0]*x[0] ) * (x[1] - x[1]*x[1] ) ] )
+        ##exact = as_vector ( [ ( sin(3.0*pi*x[0]) * sin(3.0*pi*x[1]) ) ] )
+        #exact = as_vector ( [ x[0]**1.6 ] )
+        ##Dcoeff = lambda u: 1.0 + ( 1.0 / (1.0 + u[0]**2) )
+        #Dcoeff = lambda u: 1.0 + u[0]
+        #a = (Dcoeff(u)* inner(grad(u), grad(v)) ) * dx
+        #b = -div( Dcoeff(u) * grad(exact[0]) ) * v[0] * dx
     model = create.model("elliptic", grid, a==b
             , *[dune.ufl.DirichletBC(uflSpace, exact, i+1) for i in range(4)]
             )
@@ -135,7 +136,7 @@ def compute(grid):
         pointdata=dfs,
         celldata =[ create.function("local",grid,"cells",1,lambda en,x:
             [grid.hierarchicalGrid.agglomerate(en)]) ])
-
+    #dfs.plot(gridLines=None)
 
 for i in range(endEoc-start):
     print("*******************************************************")
