@@ -5,6 +5,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 from ufl.equation import Equation
+from ufl import Form
 from dune.generator import Constructor, Method
 import dune.common.checkconfiguration as checkconfiguration
 import dune
@@ -136,7 +137,7 @@ def vemSpace(view, order=1, dimRange=1, conforming=True, field="double", storage
     addStorage(spc, storage)
     return spc.as_ufl()
 
-def vemScheme(model, space, solver=None, parameters={}):
+def vemScheme(model, space=None, solver=None, parameters={}):
     """create a scheme for solving second order pdes with the virtual element method
 
     Args:
@@ -188,6 +189,78 @@ def vemScheme(model, space, solver=None, parameters={}):
 
     return femschemeModule(space, model,includes,solver,operator,parameters=parameters)
 
+def vemOperator(model, domainSpace=None, rangeSpace=None):
+    from dune.fem.operator import load
+    if rangeSpace is None:
+        rangeSpace = domainSpace
+
+    modelParam = None
+    if isinstance(model, (list, tuple)):
+        modelParam = model[1:]
+        model = model[0]
+    if isinstance(model,Form):
+        model = model == 0
+    if isinstance(model,Equation):
+        from dune.fem.model._models import elliptic as makeElliptic
+        if rangeSpace == None:
+            try:
+                rangeSpace = model.lhs.arguments()[0].ufl_function_space()
+            except AttributeError:
+                raise ValueError("no range space provided and could not deduce from form provided")
+        if domainSpace == None:
+            try:
+                domainSpace = model.lhs.arguments()[1].ufl_function_space()
+            except AttributeError:
+                raise ValueError("no domain space provided and could not deduce from form provided")
+        if modelParam:
+            model = makeElliptic(domainSpace.grid,model,*modelParam)
+        else:
+            model = makeElliptic(domainSpace.grid,model)
+
+    if not hasattr(rangeSpace,"interpolate"):
+        raise ValueError("wrong range space")
+    if not hasattr(domainSpace,"interpolate"):
+        raise ValueError("wrong domain space")
+
+    domainSpaceType = domainSpace._typeName
+    rangeSpaceType = rangeSpace._typeName
+
+    storage,  domainFunctionIncludes, domainFunctionType, _, _, dbackend = domainSpace.storage
+    rstorage, rangeFunctionIncludes,  rangeFunctionType,  _, _, rbackend = rangeSpace.storage
+    if not rstorage == storage:
+        raise ValueError("storage for both spaces must be identical to construct operator")
+
+    includes = ["dune/vem/operator/elliptic.hh",
+                "dune/fempy/py/grid/gridpart.hh",
+                "dune/fem/schemes/dirichletwrapper.hh",
+                "dune/vem/operator/vemdirichletconstraints.hh"]
+    includes += domainSpace._includes + domainFunctionIncludes
+    includes += rangeSpace._includes + rangeFunctionIncludes
+    includes += ["dune/fem/schemes/diffusionmodel.hh", "dune/fempy/parameter.hh"]
+
+    import dune.create as create
+    linearOperator = create.discretefunction(storage)(domainSpace,rangeSpace)[3]
+
+    modelType = "DiffusionModel< " +\
+          "typename " + domainSpaceType + "::GridPartType, " +\
+          domainSpaceType + "::dimRange, " +\
+          rangeSpaceType + "::dimRange, " +\
+          "typename " + domainSpaceType + "::RangeFieldType >"
+    typeName = "Dune::Vem::DifferentiableEllipticOperator< " + linearOperator + ", " + modelType + ">"
+    if model.hasDirichletBoundary:
+        constraints = "Dune::VemDirichletConstraints< " +\
+                ",".join([modelType,domainSpace._typeName]) + " > "
+        typeName = "DirichletWrapperOperator< " +\
+                ",".join([typeName,constraints(model)]) + " >"
+
+    constructor = Constructor(['const '+domainSpaceType+'& dSpace','const '+rangeSpaceType+' &rSpace', modelType + ' &model'],
+                              ['return new ' + typeName + '( dSpace, rSpace, model );'],
+                              ['pybind11::keep_alive< 1, 2 >()', 'pybind11::keep_alive< 1, 3 >()', 'pybind11::keep_alive< 1, 4 >()'])
+
+    scheme = load(includes, typeName, constructor).Operator(domainSpace,rangeSpace, model)
+    scheme.model = model
+    return scheme
+
 #################################################################
 
 class CartesianAgglomerate:
@@ -208,14 +281,6 @@ class CartesianAgglomerate:
         return index
     def check(self):
         return len(self.ind)==self.N[0]*self.N[1]
-class TrivialAgglomerate:
-    def __init__(self,constructor):
-        self.grid = dune.create.grid("ALUConform", constructor=constructor)
-        self.suffix = "simple"+str(self.grid.size(0))
-    def __call__(self,en):
-        return self.grid.indexSet.index(en)
-    def check(self):
-        return True
 
 #################################################################
 
@@ -250,6 +315,14 @@ def aluSimplexGrid(constructor, dimgrid=None, dimworld=None):
 
 #################################################################
 
+class TrivialAgglomerate:
+    def __init__(self,constructor):
+        self.grid = aluSimplexGrid(constructor)
+        self.suffix = "simple"+str(self.grid.size(0))
+    def __call__(self,en):
+        return self.grid.indexSet.index(en)
+    def check(self):
+        return True
 # http://zderadicka.eu/voronoi-diagrams/
 from dune.vem.voronoi import triangulated_voronoi
 from scipy.spatial import Voronoi, voronoi_plot_2d, cKDTree, Delaunay
