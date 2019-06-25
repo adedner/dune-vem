@@ -48,13 +48,6 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model>
     //
   public:
     //! contructor
-    VEMEllipticOperator ( const RangeDiscreteFunctionSpaceType &rangeSpace,
-                          ModelType &model,
-                          const Dune::Fem::ParameterReader &parameter = Dune::Fem::Parameter::container() )
-    : model_( model ),
-      dSpace_(rangeSpace), rSpace_(rangeSpace),
-      baseOperator_(rangeSpace,model,parameter)
-    {}
     VEMEllipticOperator ( const DomainDiscreteFunctionSpaceType &dSpace,
                           const RangeDiscreteFunctionSpaceType &rSpace,
                           ModelType &model,
@@ -62,6 +55,26 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model>
     : model_( model ),
       dSpace_(dSpace), rSpace_(rSpace),
       baseOperator_(dSpace,rSpace,model,parameter)
+    {
+#if 0
+      std::size_t aSize = rSpace.agglomeration().size();
+      for( std::size_t agglomerate = 0; agglomerate < aSize; ++agglomerate )
+      {
+        const std::size_t dNumDofs = dSpace.blockMapper().numDofs( agglomerate );
+        const std::size_t rNumDofs = rSpace.blockMapper().numDofs( agglomerate );
+        Stabilization &stabilization = stabilizations_[ agglomerate ];
+        stabilization.resize( rNumDofs, dNumDofs, 0 );
+        for( std::size_t i = 0; i < rNumDofs; ++i )
+          for( std::size_t j = 0; j < dNumDofs; ++j )
+            for( std::size_t k = 0; k < numDofs; ++k )
+              stabilization[ i ][ j ] += S[ k ][ i ] * S[ k ][ j ];
+      }
+#endif
+    }
+    VEMEllipticOperator ( const RangeDiscreteFunctionSpaceType &rangeSpace,
+                          ModelType &model,
+                          const Dune::Fem::ParameterReader &parameter = Dune::Fem::Parameter::container() )
+    : VEMEllipticOperator( rangeSpace, rangeSpace, model, parameter )
     {}
 
 
@@ -159,77 +172,79 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model>
       RangeDiscreteFunctionType &w) const
 {
   baseOperator_(u,w);
+  if (! std::is_same<DomainDiscreteFunctionSpaceType,RangeDiscreteFunctionSpaceType>::value)
+    return;
 
   // get discrete function space
   const RangeDiscreteFunctionSpaceType &dfSpace = w.space();
   const int blockSize = dfSpace.localBlockSize; // is equal to 1 for scalar functions
-  //
-  std::vector<bool> stabilization(dfSpace.agglomeration().size(), false);
-  //
 
   std::vector<RangeRangeType> VectorOfAveragedDiffusionCoefficients (dfSpace.agglomeration().size(), RangeRangeType(0));
   const auto &agIndexSet = dfSpace.blockMapper().indexSet();
+
   // iterate over grid
   const GridPartType &gridPart = w.gridPart();
   for (const auto &entity : Dune::elements(
         static_cast<typename GridPartType::GridViewType>(gridPart),
-        Dune::Partitions::interiorBorder)) {
+        Dune::Partitions::interiorBorder))
+  {
     model().init(entity);
     // get elements geometry
     const GeometryType &geometry = entity.geometry();
-    //
-    const int numVertices = agIndexSet.numPolyVertices(entity,
-        GridPartType::dimension);
+
+    const int numVertices = agIndexSet.numPolyVertices(entity, GridPartType::dimension);
 
     // get local representation of the discrete functions
     const DomainLocalFunctionType uLocal = u.localFunction(entity);
     RangeLocalFunctionType wLocal = w.localFunction(entity);
-    //
-    auto& refElement = Dune::ReferenceElements<double, 2>::general(
-        entity.type());
 
-    RangeRangeType Dcoeff(0);
-    const std::size_t agglomerate = dfSpace.agglomeration().index(
-        entity);
+    auto& refElement = Dune::ReferenceElements<double, 2>::general( entity.type());
 
-    // ====
+    const std::size_t agglomerate = dfSpace.agglomeration().index( entity);
+    const auto &bbox = agIndexSet.boundingBox( agglomerate );
+
     for (const auto &intersection : Dune::intersections(
-          static_cast<typename GridPartType::GridViewType>(gridPart), entity))
+         static_cast<typename GridPartType::GridViewType>(gridPart), entity))
     {
       if( !intersection.boundary() && (dfSpace.agglomeration().index( intersection.outside() ) == agglomerate) )
         continue;
-      //
+
       const int faceIndex = intersection.indexInInside();
       const int numEdgeVertices = refElement.size(faceIndex, 1, GridPartType::dimension);
       for (int i = 0; i < numEdgeVertices; ++i)
       {
-        // local vertex number in the triangle/quad, this is not the local vertex number
-        // of the polygon!
+        // local vertex number in the triangle/quad, this is not the local vertex number of the polygon!
         const int j = refElement.subEntity(faceIndex, 1, i, GridPartType::dimension);
         // global coordinate of the vertex
-        DomainType GlobalPoint = geometry.corner(j);
+        DomainType globalPoint = geometry.corner(j);
         // local coordinate of the vertex
-        DomainType LocalPoint = geometry.local(GlobalPoint);
+        DomainType localPoint = geometry.local(globalPoint);
 
         DomainRangeType vu;
         DomainJacobianRangeType dvu;
-        uLocal.evaluate(LocalPoint, vu);
-        uLocal.jacobian(LocalPoint, dvu);
-
-        //!!!! model().diffusionCoefficient( LocalPoint, vu, dvu, Dcoeff);
+        uLocal.evaluate(localPoint, vu);
+        uLocal.jacobian(localPoint, dvu);
+#if 0
         DomainJacobianRangeType grad1;
         grad1[0][0] = 1.;
         grad1[0][1] = 0.;
         RangeJacobianRangeType a(0);
-        model().diffusiveFlux(GlobalPoint, vu, grad1, a);
+        model().diffusiveFlux(localPoint, vu, grad1, a);
+        RangeRangeType Dcoeff;
         Dcoeff[0] = a[0][0];
+#else
+        RangeRangeType Dcoeff = model().gradStabilization(localPoint,vu);
+        Dcoeff.axpy(bbox.volume(), model().massStabilization(localPoint,vu) );
+#endif
 
         double factor = 1. / (2.0 * numVertices);
         VectorOfAveragedDiffusionCoefficients[agglomerate].axpy(factor,Dcoeff);
       }
     }
   }
+
   // assemble the stablisation matrix
+  std::vector<bool> stabilization(dfSpace.agglomeration().size(), false);
   for (const auto &entity : Dune::elements(
         static_cast<typename GridPartType::GridViewType>(gridPart),
         Dune::Partitions::interiorBorder)) {
@@ -245,7 +260,9 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model>
       for (std::size_t r = 0; r < stabMatrix.rows(); ++r)
         for (std::size_t c = 0; c < stabMatrix.cols(); ++c)
           for (std::size_t b = 0; b < blockSize; ++b)
-            wLocal[r*blockSize+b] += VectorOfAveragedDiffusionCoefficients[agglomerate][0]  * stabMatrix[r][c] * uLocal[c*blockSize+b];
+            wLocal[r*blockSize+b] +=
+              VectorOfAveragedDiffusionCoefficients[agglomerate][0]
+                * stabMatrix[r][c] * uLocal[c*blockSize+b];
       stabilization[dfSpace.agglomeration().index(entity)] = true;
     }
   }
@@ -260,6 +277,8 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
 ::jacobian( const DomainDiscreteFunctionType &u, JacobianOperator &jOp) const
 {
   baseOperator_.jacobian(u,jOp);
+  if (! std::is_same<DomainDiscreteFunctionSpaceType,RangeDiscreteFunctionSpaceType>::value)
+    return;
 
   Dune::Timer timer;
   typedef typename JacobianOperator::LocalMatrixType LocalMatrixType;
@@ -273,7 +292,6 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
   const int domainBlockSize = domainSpace.localBlockSize; // is equal to 1 for scalar functions
   // Note the following is much! too large since it assumes e.g. all vertices in one polygon
 
-  std::vector<double> polygonareas(rangeSpace.agglomeration().size(), 0.0);
   std::vector<RangeRangeType> VectorOfAveragedDiffusionCoefficients (rangeSpace.agglomeration().size(), RangeRangeType(0));
   std::vector<RangeRangeType> VectorOfAveragedLinearlisedDiffusionCoefficients (rangeSpace.agglomeration().size(), RangeRangeType(0));
 
@@ -295,6 +313,7 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
     LocalMatrixType jLocal = jOp.localMatrix(entity, entity);
 
     const int agglomerate = agglomeration.index(entity); // the polygon we are integrating
+    const auto &bbox = agIndexSet.boundingBox( agglomerate );
     const int numVertices = agIndexSet.numPolyVertices(entity, GridPartType::dimension);
     // Lines copied from below just before the quadrature loop:
     // For Stabilisation..
@@ -312,57 +331,51 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
       {
         const int j = refElement.subEntity(faceIndex, 1, i, GridPartType::dimension);
         // global coordinate of the vertex
-        DomainType GlobalPoint = geometry.corner(j);
+        DomainType globalPoint = geometry.corner(j);
         // local coordinate of the vertex
-        DomainType LocalPoint = geometry.local(GlobalPoint);
+        DomainType localPoint = geometry.local(globalPoint);
         DomainRangeType vu;
         DomainJacobianRangeType dvu;
-        uLocal.evaluate(LocalPoint, vu);
-        uLocal.jacobian(LocalPoint, dvu);
+        uLocal.evaluate(localPoint, vu);
+        uLocal.jacobian(localPoint, dvu);
 
-        //!!! model().diffusionCoefficient(LocalPoint, vu, dvu, Dcoeff);
-        //!!! model().lindiffusionCoefficient(LocalPoint, vu, dvu, LinDcoeff);
+#if 0
+        //!!! model().diffusionCoefficient(localPoint, vu, dvu, Dcoeff);
+        //!!! model().lindiffusionCoefficient(localPoint, vu, dvu, LinDcoeff);
         //!!! hack for accessing diffusion coefficient:
         DomainJacobianRangeType grad1;
         grad1[0][0] = 1.;
         grad1[0][1] = 0.;
         RangeJacobianRangeType a(0);
-        model().diffusiveFlux(GlobalPoint, vu, grad1, a);
+        model().diffusiveFlux(localPoint, vu, grad1, a);
         Dcoeff[0] = a[0][0];
         //std::cout << "Dcoeff= " << Dcoeff[0] << std::endl;
         //!!! hack for accessing derivative of diffusion coefficient:
         DomainRangeType v(1.);
-        DomainJacobianRangeType da(0);
+        RangeJacobianRangeType da(0);
         DomainJacobianRangeType gradbar1;
         DomainJacobianRangeType dval;
         gradbar1[0][0] = 1.;
         gradbar1[0][1] = 0.;
         dval[0][0] = 0;
         dval[0][1] = 0;
-        model().linDiffusiveFlux(vu, gradbar1, GlobalPoint, v, dval, da);
+        model().linDiffusiveFlux(vu, gradbar1, localPoint, v, dval, da);
         LinDcoeff[0] = da[0][0];
         //std::cout << "LinDcoeff= " << LinDcoeff[0] << std::endl;
         // Each vertex visited twice in looping around the edges, so we divide by 2
+#else
+        RangeRangeType Dcoeff = model().gradStabilization(localPoint,vu);
+        Dcoeff.axpy(bbox.volume(), model().massStabilization(localPoint,vu) );
+        RangeRangeType LinDcoeff = model().linGradStabilization(localPoint,vu);
+        LinDcoeff.axpy(bbox.volume(), model().linMassStabilization(localPoint,vu) );
+#endif
+
         double factor = 1./(2. * numVertices);
         VectorOfAveragedDiffusionCoefficients[agglomerate].axpy(factor,Dcoeff);
         VectorOfAveragedLinearlisedDiffusionCoefficients[agglomerate].axpy(factor,LinDcoeff);
       }
     }
-    polygonareas[agglomerate] += geometry.volume();
   } // element loop end
-
-  // the second element loop to add the stabilisation term
-  // std::cout << "   in assembly: second element loop    " << timer.elapsed() << std::endl;;
-
-  std::vector<double> localmeshsizevec(rangeSpace.agglomeration().size(),0.0);
-  for (int i = 0; i < rangeSpace.agglomeration().size(); ++i) {
-    localmeshsizevec[i] = std::pow(polygonareas[i],
-        1.0 / GridPartType::dimension);
-  }
-  double averagemeshsize = 0.0;
-  for (int i = 0; i < rangeSpace.agglomeration().size(); ++i)
-    averagemeshsize += localmeshsizevec[i]
-      / rangeSpace.agglomeration().size();
 
   std::vector<bool> stabilization(agglomeration.size(), false);
   for (const auto &entity : Dune::elements(
@@ -386,7 +399,7 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
         for (std::size_t r = 0; r < stabMatrix.rows(); ++r)
           for (std::size_t ccc = 0; ccc < stabMatrix.cols(); ++ccc)
             for (std::size_t b = 0; b < domainBlockSize; ++b)
-              jLocal.add(r*domainBlockSize+b, c*domainBlockSize+b, VectorOfAveragedLinearlisedDiffusionCoefficients [agglomerate][0]  * stabMatrix[r][ccc] * uLocal[ccc] / (nE));
+              jLocal.add(r*domainBlockSize+b, c*domainBlockSize+b, VectorOfAveragedLinearlisedDiffusionCoefficients[agglomerate][0]  * stabMatrix[r][ccc] * uLocal[ccc] / (nE));
       stabilization[agglomerate] = true;
     }
   }

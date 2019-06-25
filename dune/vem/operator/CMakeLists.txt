@@ -6,6 +6,7 @@ set(HEADERS
   mass.hh
   vemdirichletconstraints.hh
   vemelliptic.hh
+  diffusionmodel.hh
 )
 
 install(FILES ${HEADERS} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/dune/vem/operator)

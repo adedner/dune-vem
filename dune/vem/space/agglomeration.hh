@@ -486,6 +486,7 @@ namespace Dune
           std::cout << stabScaling[i] << " ";
         std::cout << std::endl;
 #endif
+#if 1
         // stabilization matrix
         Stabilization S( numDofs, numDofs, 0 );
         for( std::size_t i = 0; i < numDofs; ++i )
@@ -501,6 +502,16 @@ namespace Dune
             for( std::size_t k = 0; k < numDofs; ++k )
               stabilization[ i ][ j ] += S[ k ][ i ] * S[ k ][ j ];
               // stabilization[ i ][ j ] += S[ k ][ i ] * std::max(1.,stabScaling[k]) * S[ k ][ j ];
+#else
+        Stabilization &stabilization = stabilizations_[ agglomerate ];
+        stabilization.resize( numDofs, numDofs, 0 );
+        for( std::size_t i = 0; i < numDofs; ++i )
+          stabilization[ i ][ i ] = DomainFieldType( 1 );
+        for( std::size_t i = 0; i < numDofs; ++i )
+          for( std::size_t alpha = 0; alpha < numShapeFunctions; ++alpha )
+            for( std::size_t j = 0; j < numDofs; ++j )
+              stabilization[ i ][ j ] -= D[ i ][ alpha ] * valueProjection[ alpha ][ j ];
+#endif
       }  // loop over agglomerates
     } // build projections
 

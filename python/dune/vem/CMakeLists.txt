@@ -5,4 +5,5 @@ add_python_targets(fem
   min_bounding_rect
   qhull_2d
   bbox
+  patch
 )

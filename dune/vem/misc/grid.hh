@@ -4,6 +4,7 @@ namespace Dune
 {
   namespace Vem
   {
-    using Grid = Dune::ALUGrid< 2, 2, Dune::simplex, Dune::nonconforming >;
+    template <int dg=2, int dw=2>
+    using Grid = Dune::ALUGrid< dg, dw, Dune::simplex, Dune::nonconforming >;
   }
 }

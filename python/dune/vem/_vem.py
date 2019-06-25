@@ -137,7 +137,21 @@ def vemSpace(view, order=1, dimRange=1, conforming=True, field="double", storage
     addStorage(spc, storage)
     return spc.as_ufl()
 
-def vemScheme(model, space=None, solver=None, parameters={}):
+#########################################################
+
+from dune.fem.model import elliptic
+from dune.vem.patch import transform
+
+def vemModel(view, equation, space,
+        gradStabilization=None, massStabilization=None,
+        *args, **kwargs):
+    VM = 'dune/vem/operator/diffusionmodel.hh'
+    return elliptic(view, equation, virtualModel=VM,
+              modelPatch=transform(space,gradStabilization,massStabilization), *args, **kwargs)
+
+
+def vemScheme(model, space=None, solver=None, parameters={},
+              gradStabilization=None, massStabilization=None):
     """create a scheme for solving second order pdes with the virtual element method
 
     Args:
@@ -145,17 +159,11 @@ def vemScheme(model, space=None, solver=None, parameters={}):
     Returns:
         Scheme: the constructed scheme
     """
-    """create a scheme for solving second order pdes with continuous finite element
 
-    Args:
-
-    Returns:
-        Scheme: the constructed scheme
-    """
-    # from dune.fem.space import module
     from dune.fem.scheme import module
     from dune.fem.scheme import femschemeModule
 
+    modelParam = None
     if isinstance(model, (list, tuple)):
         modelParam = model[1:]
         model = model[0]
@@ -165,14 +173,12 @@ def vemScheme(model, space=None, solver=None, parameters={}):
                 space = model.lhs.arguments()[0].ufl_function_space()
             except AttributeError:
                 raise ValueError("no space provided and could not deduce from form provided")
-        from dune.fem.model._models import elliptic
         if modelParam:
-            model = elliptic(space.grid,model,*modelParam)
+            model = vemModel(space.grid,model,space,gradStabilization,massStabilization,*modelParam)
         else:
-            model = elliptic(space.grid,model)
+            model = vemModel(space.grid,model,space,gradStabilization,massStabilization)
 
-    # from . import module
-    includes = [ "dune/vem/operator/vemelliptic.hh" ]
+    includes = [ "dune/vem/operator/vemelliptic.hh", "dune/vem/operator/diffusionmodel.hh" ]
 
     op = lambda linOp,model: "DifferentiableVEMEllipticOperator< " +\
                              ",".join([linOp,model]) + ">"
@@ -187,9 +193,19 @@ def vemScheme(model, space=None, solver=None, parameters={}):
     else:
         operator = op
 
-    return femschemeModule(space, model,includes,solver,operator,parameters=parameters)
+    spaceType = space._typeName
+    modelType = "VEMDiffusionModel< " +\
+          "typename " + spaceType + "::GridPartType, " +\
+          spaceType + "::dimRange, " +\
+          spaceType + "::dimRange, " +\
+          "typename " + spaceType + "::RangeFieldType >"
+
+    return femschemeModule(space,model,includes,solver,operator,
+            parameters=parameters,
+            modelType=modelType)
 
 def vemOperator(model, domainSpace=None, rangeSpace=None):
+    # from dune.fem.model._models import elliptic as makeElliptic
     from dune.fem.operator import load
     if rangeSpace is None:
         rangeSpace = domainSpace
@@ -201,7 +217,6 @@ def vemOperator(model, domainSpace=None, rangeSpace=None):
     if isinstance(model,Form):
         model = model == 0
     if isinstance(model,Equation):
-        from dune.fem.model._models import elliptic as makeElliptic
         if rangeSpace == None:
             try:
                 rangeSpace = model.lhs.arguments()[0].ufl_function_space()
@@ -213,9 +228,9 @@ def vemOperator(model, domainSpace=None, rangeSpace=None):
             except AttributeError:
                 raise ValueError("no domain space provided and could not deduce from form provided")
         if modelParam:
-            model = makeElliptic(domainSpace.grid,model,*modelParam)
+            model = vemModel(domainSpace.grid,model,domainSpace,None,None,*modelParam)
         else:
-            model = makeElliptic(domainSpace.grid,model)
+            model = vemModel(domainSpace.grid,model,domainSpace,None,None)
 
     if not hasattr(rangeSpace,"interpolate"):
         raise ValueError("wrong range space")
@@ -230,23 +245,23 @@ def vemOperator(model, domainSpace=None, rangeSpace=None):
     if not rstorage == storage:
         raise ValueError("storage for both spaces must be identical to construct operator")
 
-    includes = ["dune/vem/operator/elliptic.hh",
+    includes = ["dune/vem/operator/vemelliptic.hh",
                 "dune/fempy/py/grid/gridpart.hh",
                 "dune/fem/schemes/dirichletwrapper.hh",
                 "dune/vem/operator/vemdirichletconstraints.hh"]
     includes += domainSpace._includes + domainFunctionIncludes
     includes += rangeSpace._includes + rangeFunctionIncludes
-    includes += ["dune/fem/schemes/diffusionmodel.hh", "dune/fempy/parameter.hh"]
+    includes += ["dune/vem/operator/diffusionmodel.hh", "dune/fempy/parameter.hh"]
 
     import dune.create as create
     linearOperator = create.discretefunction(storage)(domainSpace,rangeSpace)[3]
 
-    modelType = "DiffusionModel< " +\
+    modelType = "VEMDiffusionModel< " +\
           "typename " + domainSpaceType + "::GridPartType, " +\
           domainSpaceType + "::dimRange, " +\
           rangeSpaceType + "::dimRange, " +\
           "typename " + domainSpaceType + "::RangeFieldType >"
-    typeName = "Dune::Vem::DifferentiableEllipticOperator< " + linearOperator + ", " + modelType + ">"
+    typeName = "DifferentiableVEMEllipticOperator< " + linearOperator + ", " + modelType + ">"
     if model.hasDirichletBoundary:
         constraints = "Dune::VemDirichletConstraints< " +\
                 ",".join([modelType,domainSpace._typeName]) + " > "
@@ -306,18 +321,17 @@ def aluGrid(constructor, dimgrid=None, dimworld=None, elementType=None, **parame
     includes = ["dune/alugrid/grid.hh", "dune/alugrid/dgf.hh"]
     gridModule = module(includes, typeName, dynamicAttr=True)
     return gridModule.LeafGrid(gridModule.reader(constructor))
-def aluSimplexGrid(constructor, dimgrid=None, dimworld=None):
+def aluSimplexGrid(constructor, dimgrid=2, dimworld=2):
     from dune.grid.grid_generator import module, getDimgrid
-    typeName = "Dune::Vem::Grid"
+    typeName = "Dune::Vem::Grid<"+str(dimgrid)+","+str(dimworld)+">"
     includes = ["dune/vem/misc/grid.hh"]
     gridModule = module(includes, typeName, dynamicAttr=True)
     return gridModule.LeafGrid(gridModule.reader(constructor))
 
 #################################################################
-
 class TrivialAgglomerate:
-    def __init__(self,constructor):
-        self.grid = aluSimplexGrid(constructor)
+    def __init__(self,constructor, **kwargs):
+        self.grid = aluSimplexGrid(constructor, **kwargs)
         self.suffix = "simple"+str(self.grid.size(0))
     def __call__(self,en):
         return self.grid.indexSet.index(en)
@@ -395,15 +409,15 @@ class PolyAgglomerate:
                   "simplices": numpy.vstack([ t["triangles"] for t in tr ])}
         return domain, index
 
-def polyGrid(constructor,N=None):
+def polyGrid(constructor,N=None, **kwargs):
     if isinstance(N,int):
         agglomerate = VoronoiAgglomerate(N,constructor)
     elif N is None:
         if isinstance(constructor,dict) and \
-           constructor.get("polygons",None) is not None:
+            constructor.get("polygons",None) is not None:
             agglomerate = PolyAgglomerate(constructor)
         else:
-            agglomerate = TrivialAgglomerate(constructor)
+            agglomerate = TrivialAgglomerate(constructor, **kwargs)
     else:
         agglomerate = CartesianAgglomerate(N,constructor)
     grid = agglomerate.grid
