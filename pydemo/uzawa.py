@@ -1,10 +1,13 @@
 # these two versions should work - but the second doesn't:
+useCartesian = False
 # useVem, useTaylorHood  = False, True    # Fem Taylor-Hood
 useVem, useTaylorHood  = True,  True    # VEM non conforming
-# useVem, useTaylorHood  = True,  False    # VEM non conforming
-uzawaPreconditioner = True  # problem when using this with the non
-                            # conforming space: delta<0 with mu_=0.001,nu_=10.0
+# useVem, useTaylorHood  = True,  False   # VEM non conforming
+uzawaPreconditioner = True   # problem when using this with the non
+                             # conforming space: delta<0 with mu_=0.001,nu_=10.0
 order = 2
+mu_   = 0.001
+nu_   = 10.0
 
 import matplotlib
 matplotlib.rc( 'image', cmap='jet' )
@@ -20,12 +23,15 @@ parameter.append({"fem.verboserank": 0})
 
 # grid construction
 from dune.grid import structuredGrid, cartesianDomain
-if not useVem:
-    from dune.alugrid import aluCubeGrid as leafGridView
+from dune.vem import polyGrid        as leafGridView
+domain = cartesianDomain([0,0],[3,1],[30,10])
+if useCartesian:
+    constructor = domain
 else:
-    from dune.vem import polyGrid        as leafGridView
-grid = leafGridView( cartesianDomain([0,0],[3,1],[30,10]) )
-
+    from dune.vem import voronoiCells
+    constructor = voronoiCells(domain,300,"uzawaseeds",True)
+grid = leafGridView( constructor )
+grid.plot()
 # spaces
 if not useVem:
     from dune.fem.space    import lagrange   as velocitySpace
@@ -61,8 +67,6 @@ velocity = spcU.interpolate([0,]*spcU.dimRange, name="velocity")
 pressure = spcP.interpolate([0], name="pressure")
 
 # setting up the problem
-mu_   = 0.001
-nu_   = 10.0
 cell  = spcU.cell()
 x     = SpatialCoordinate(cell)
 mu    = Constant(mu_,  "mu")
@@ -88,17 +92,24 @@ preconModel = inner(grad(p),grad(q)) * dx
 # operators and schemes
 if not useVem:
     mainOp      = velocityScheme([mainModel==0,DirichletBC(spcU,exact_u,1)])
+    if useTaylorHood:
+        preconOp    = pressureScheme(preconModel==0)
+    else:
+        preconOp    = pressureScheme(preconModel==0, parameters={"penalty":20})
 else:
     mainOp      = velocityScheme([mainModel==0,DirichletBC(spcU,exact_u,1)],
                          gradStabilization=as_vector([2*mu_,2*mu_]),
-                         massStabilization=as_vector([nu_,nu_])
-                  )
+                         massStabilization=as_vector([nu_,nu_]) )
+    if useTaylorHood:
+        preconOp    = pressureScheme(preconModel==0, gradStabilization=1)
+    else:
+        preconOp    = pressureScheme(preconModel==0, parameters={"penalty":20})
 mainOp.model.mu = mu_
 mainOp.model.nu = nu_
+
 gradOp      = galerkinOperator(gradModel)
 divOp       = galerkinOperator(divModel)
 massOp      = pressureScheme(massModel==0)
-preconOp    = pressureScheme(preconModel==0, parameters={"penalty":10})
 
 A = linearOperator(mainOp)
 G = linearOperator(gradOp)
