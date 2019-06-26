@@ -1,6 +1,10 @@
 # these two versions should work - but the second doesn't:
-# useVem, useTaylorHood  = False, True
-useVem, useTaylorHood  = True,  False
+# useVem, useTaylorHood  = False, True    # Fem Taylor-Hood
+useVem, useTaylorHood  = True,  True    # VEM non conforming
+# useVem, useTaylorHood  = True,  False    # VEM non conforming
+uzawaPreconditioner = True  # problem when using this with the non
+                            # conforming space: delta<0 with mu_=0.001,nu_=10.0
+order = 2
 
 import matplotlib
 matplotlib.rc( 'image', cmap='jet' )
@@ -23,27 +27,26 @@ else:
 grid = leafGridView( cartesianDomain([0,0],[3,1],[30,10]) )
 
 # spaces
-order = 2
-
 if not useVem:
-    from dune.fem.space import lagrange     as velocitySpace
+    from dune.fem.space    import lagrange   as velocitySpace
+    from dune.fem.scheme   import galerkin   as velocityScheme
     if useTaylorHood:
-        from dune.fem.space import lagrange as pressureSpace
+        from dune.fem.space  import lagrange as pressureSpace
+        from dune.fem.scheme import galerkin as pressureScheme
     else:
-        from dune.fem.space import dgonb    as pressureSpace
-    from dune.fem.scheme   import galerkin  as velocityScheme
-    from dune.fem.scheme   import dg        as pressureScheme
-    from dune.fem.operator import galerkin  as galerkinOperator
+        from dune.fem.space  import dgonb    as pressureSpace
+        from dune.fem.scheme import dg       as pressureScheme
+    from dune.fem.operator import galerkin   as galerkinOperator
 else:
-    from dune.vem import vemSpace           as velocitySpace
+    from dune.vem import vemSpace            as velocitySpace
+    from dune.vem import vemScheme           as velocityScheme
     if useTaylorHood:
-        from dune.vem import vemSpace       as pressureSpace
+        from dune.vem import vemSpace        as pressureSpace
+        from dune.vem import vemScheme       as pressureScheme
     else:
-        from dune.vem import bbdgSpace      as pressureSpace
-    from dune.vem          import vemScheme as velocityScheme
-    from dune.fem.scheme   import dg        as pressureScheme
-    from dune.fem.operator import galerkin  as galerkinOperator
-
+        from dune.vem import bbdgSpace       as pressureSpace
+        from dune.vem import bbdgScheme      as pressureScheme
+    from dune.fem.operator import galerkin   as galerkinOperator
 if useTaylorHood:
     spcU = velocitySpace(grid, dimRange=grid.dimension, order=order,
               storage="petsc")
@@ -54,9 +57,12 @@ else:
               conforming=False, storage="petsc")
     spcP = pressureSpace(grid, dimRange=1, order=order-1,
               storage="petsc")
+velocity = spcU.interpolate([0,]*spcU.dimRange, name="velocity")
+pressure = spcP.interpolate([0], name="pressure")
 
-mu_   = 0.1
-nu_   = 0.0
+# setting up the problem
+mu_   = 0.001
+nu_   = 10.0
 cell  = spcU.cell()
 x     = SpatialCoordinate(cell)
 mu    = Constant(mu_,  "mu")
@@ -65,16 +71,21 @@ u     = TrialFunction(spcU)
 v     = TestFunction(spcU)
 p     = TrialFunction(spcP)
 q     = TestFunction(spcP)
+
+# exact solution and resulting forcing
 exact_u     = as_vector( [x[1] * (1.-x[1]), 0] )
 exact_p     = as_vector( [ (-2*x[0] + 2)*mu ] )
 f           = as_vector( [0,]*grid.dimension )
 f          += nu*exact_u
+
+# ufl forms
 mainModel   = (nu*dot(u,v) + mu*inner(grad(u)+grad(u).T, grad(v)) - dot(f,v)) * dx
 gradModel   = -inner( p[0]*Identity(grid.dimension), grad(v) ) * dx
 divModel    = -div(u)*q[0] * dx
 massModel   = inner(p,q) * dx
 preconModel = inner(grad(p),grad(q)) * dx
 
+# operators and schemes
 if not useVem:
     mainOp      = velocityScheme([mainModel==0,DirichletBC(spcU,exact_u,1)])
 else:
@@ -82,27 +93,12 @@ else:
                          gradStabilization=as_vector([2*mu_,2*mu_]),
                          massStabilization=as_vector([nu_,nu_])
                   )
+mainOp.model.mu = mu_
+mainOp.model.nu = nu_
 gradOp      = galerkinOperator(gradModel)
 divOp       = galerkinOperator(divModel)
-massOp      = pressureScheme(massModel==0,
-              #       gradStabilization=0,
-              #       massStabilization=1,
-              )
-preconOp    = pressureScheme(preconModel==0,
-              #       gradStabilization=1,
-              #       massStabilization=0,
-                    penalty=1,
-              )
-
-velocity = spcU.interpolate([0,]*spcU.dimRange, name="velocity")
-pressure = spcP.interpolate([0], name="pressure")
-rhsVelo  = velocity.copy()
-rhsPress = pressure.copy()
-
-r      = rhsPress.copy()
-d      = rhsPress.copy()
-precon = rhsPress.copy()
-xi     = rhsVelo.copy()
+massOp      = pressureScheme(massModel==0)
+preconOp    = pressureScheme(preconModel==0, parameters={"penalty":10})
 
 A = linearOperator(mainOp)
 G = linearOperator(gradOp)
@@ -115,6 +111,15 @@ Ainv   = mainOp.inverseLinearOperator(A,parameters=solver)
 Minv   = massOp.inverseLinearOperator(M,parameters=solver)
 Pinv   = preconOp.inverseLinearOperator(P,solver)
 
+# auxiliary variables for uzawa algorithm
+rhsVelo  = velocity.copy()
+rhsPress = pressure.copy()
+r      = rhsPress.copy()
+d      = rhsPress.copy()
+precon = rhsPress.copy()
+xi     = rhsVelo.copy()
+
+# compute initial residual
 mainOp(velocity,rhsVelo)
 rhsVelo *= -1
 G(pressure,xi)
@@ -126,16 +131,19 @@ Ainv(rhsVelo, velocity)
 D(velocity,rhsPress)
 Minv(rhsPress, r)
 
-if mainOp.model.nu > 0:
+if uzawaPreconditioner and mainOp.model.nu > 0:
     precon.clear()
     Pinv(rhsPress, precon)
     r *= mainOp.model.mu
     r.axpy(mainOp.model.nu,precon)
+
 d.assign(r)
 delta = r.scalarProductDofs(rhsPress)
 print("delta:",delta,flush=True)
 assert delta >= 0
-for m in range(1000):
+
+# start iteration
+for m in range(100):
     xi.clear()
     G(d,rhsVelo)
     mainOp.setConstraints(\
@@ -148,7 +156,7 @@ for m in range(1000):
     velocity.axpy(-rho,xi)
     D(velocity, rhsPress)
     Minv(rhsPress,r)
-    if mainOp.model.nu > 0:
+    if uzawaPreconditioner and mainOp.model.nu > 0:
         precon.clear()
         Pinv(rhsPress,precon)
         r *= mainOp.model.mu
@@ -160,5 +168,6 @@ for m in range(1000):
     gamma = delta/oldDelta
     d *= gamma
     d += r
+
 velocity.plot(colorbar="horizontal")
 pressure.plot(colorbar="horizontal")

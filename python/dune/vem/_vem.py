@@ -71,7 +71,12 @@ def bbdgSpace(view, order=1, dimRange=1, field="double", storage="adaptive"):
     return spc.as_ufl()
 
 from dune.fem.scheme import dg
-def bbdgScheme(model, space, penalty=0, solver=None, parameters={}):
+def bbdgScheme(model, space=None, penalty=0, solver=None, parameters={}):
+    if space == None:
+        try:
+            space = model.lhs.arguments()[0].ufl_function_space()
+        except AttributeError:
+            raise ValueError("no space provided and could not deduce from form provided")
     spaceType = space._typeName
     penaltyClass = "Dune::Vem::BBDGPenalty<"+spaceType+">"
     return dg(model,space,penalty,solver,parameters,penaltyClass)
