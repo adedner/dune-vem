@@ -1,5 +1,6 @@
-useVem         = True
-useTaylorHood  = False
+# these two versions should work - but the second doesn't:
+# useVem, useTaylorHood  = False, True
+useVem, useTaylorHood  = True,  False
 
 import matplotlib
 matplotlib.rc( 'image', cmap='jet' )
@@ -22,7 +23,7 @@ else:
 grid = leafGridView( cartesianDomain([0,0],[3,1],[30,10]) )
 
 # spaces
-order = 1
+order = 2
 
 if not useVem:
     from dune.fem.space import lagrange     as velocitySpace
@@ -74,10 +75,13 @@ divModel    = -div(u)*q[0] * dx
 massModel   = inner(p,q) * dx
 preconModel = inner(grad(p),grad(q)) * dx
 
-mainOp      = velocityScheme([mainModel==0,DirichletBC(spcU,exact_u,1)],
-                     gradStabilization=as_vector([mu_,mu_]),
-                     massStabilization=as_vector([nu_,nu_])
-              )
+if not useVem:
+    mainOp      = velocityScheme([mainModel==0,DirichletBC(spcU,exact_u,1)])
+else:
+    mainOp      = velocityScheme([mainModel==0,DirichletBC(spcU,exact_u,1)],
+                         gradStabilization=as_vector([2*mu_,2*mu_]),
+                         massStabilization=as_vector([nu_,nu_])
+                  )
 gradOp      = galerkinOperator(gradModel)
 divOp       = galerkinOperator(divModel)
 massOp      = pressureScheme(massModel==0,
