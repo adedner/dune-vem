@@ -21,7 +21,7 @@ namespace Dune
     // AgglomerationDofMapper
     // ----------------------
 
-    template< class GridPart >
+    template< class GridPart, class IndexSet=AgglomerationIndexSet< GridPart > >
     class AgglomerationDofMapper
     {
       typedef AgglomerationDofMapper< GridPart > This;
@@ -30,7 +30,7 @@ namespace Dune
       typedef std::size_t SizeType;
 
       typedef Agglomeration< GridPart > AgglomerationType;
-      typedef AgglomerationIndexSet< GridPart > IndexSetType;
+      typedef IndexSet IndexSetType;
 
     protected:
       struct SubEntityInfo
@@ -53,7 +53,6 @@ namespace Dune
       AgglomerationDofMapper ( const IndexSetType &indexSet, Iterator begin, Iterator end );
 
       AgglomerationDofMapper ( const IndexSetType &indexSet, const std::vector<std::pair<int,unsigned int>> &dofsPerCodim )
-//          std::initializer_list< std::pair< int, unsigned int > > dofsPerCodim )
         : AgglomerationDofMapper( indexSet, dofsPerCodim.begin(), dofsPerCodim.end() )
       {}
 
@@ -143,13 +142,13 @@ namespace Dune
     // Implementation of AgglomerationDofMapper
     // ----------------------------------------
 
-    template< class GridPart >
-    const int AgglomerationDofMapper< GridPart >::dimension;
+    template< class GridPart, class IndexSet >
+    const int AgglomerationDofMapper< GridPart, IndexSet >::dimension;
 
 
-    template< class GridPart >
+    template< class GridPart, class IndexSet >
     template< class Iterator >
-    inline AgglomerationDofMapper< GridPart >::AgglomerationDofMapper ( const IndexSetType &indexSet, Iterator begin, Iterator end )
+    inline AgglomerationDofMapper< GridPart, IndexSet >::AgglomerationDofMapper ( const IndexSetType &indexSet, Iterator begin, Iterator end )
       : indexSet_( indexSet ), subEntityInfo_( std::distance( begin, end ) )
     {
       std::transform( begin, end, subEntityInfo_.begin(), [] ( std::pair< int, unsigned int > codimDofs ) {
@@ -173,8 +172,8 @@ namespace Dune
     }
 
 
-    template< class GridPart >
-    inline unsigned int AgglomerationDofMapper< GridPart >::numDofs ( std::size_t agglomerate ) const
+    template< class GridPart, class IndexSet >
+    inline unsigned int AgglomerationDofMapper< GridPart, IndexSet >::numDofs ( std::size_t agglomerate ) const
     {
       unsigned int numDofs = 0;
       for( const SubEntityInfo &info : subEntityInfo_ )
@@ -183,8 +182,8 @@ namespace Dune
     }
 
 
-    template< class GridPart >
-    inline unsigned int AgglomerationDofMapper< GridPart >::numDofs ( const ElementType &element ) const
+    template< class GridPart, class IndexSet >
+    inline unsigned int AgglomerationDofMapper< GridPart, IndexSet >::numDofs ( const ElementType &element ) const
     {
       unsigned int numDofs = 0;
       for( const SubEntityInfo &info : subEntityInfo_ )
@@ -193,8 +192,8 @@ namespace Dune
     }
 
 
-    template< class GridPart >
-    inline void AgglomerationDofMapper< GridPart >::onSubEntity ( const ElementType &element, int i, int c, std::vector< bool > &filter ) const
+    template< class GridPart, class IndexSet >
+    inline void AgglomerationDofMapper< GridPart, IndexSet >::onSubEntity ( const ElementType &element, int i, int c, std::vector< bool > &filter ) const
     {
       filter.resize( numDofs( element ) );
       std::fill( filter.begin(), filter.end(), false );
@@ -215,9 +214,9 @@ namespace Dune
     }
 
 
-    template< class GridPart >
+    template< class GridPart, class IndexSet >
     template< class Functor >
-    inline void AgglomerationDofMapper< GridPart >::mapEach ( const ElementType &element, Functor f ) const
+    inline void AgglomerationDofMapper< GridPart, IndexSet >::mapEach ( const ElementType &element, Functor f ) const
     {
       unsigned int local = 0;
       for( const SubEntityInfo &info : subEntityInfo_ )
@@ -245,9 +244,9 @@ namespace Dune
     }
 
 
-    template< class GridPart >
+    template< class GridPart, class IndexSet >
     template< class Entity, class Functor >
-    inline void AgglomerationDofMapper< GridPart >::mapEachEntityDof ( const Entity &entity, Functor f ) const
+    inline void AgglomerationDofMapper< GridPart, IndexSet >::mapEachEntityDof ( const Entity &entity, Functor f ) const
     {
       const SubEntityInfo &info = subEntityInfo_[ codimIndex_[ Entity::codimension ] ];
       if( info.numDofs == 0u )
@@ -271,8 +270,8 @@ namespace Dune
     }
 
 
-    template< class GridPart >
-    inline void AgglomerationDofMapper< GridPart >::update ()
+    template< class GridPart, class IndexSet >
+    inline void AgglomerationDofMapper< GridPart, IndexSet >::update ()
     {
       size_ = 0;
       maxNumDofs_ = 0;

@@ -33,6 +33,7 @@ from dune.vem import voronoiCells
 from ufl import *
 import dune.ufl
 
+order = 1
 
 dune.fem.parameter.append({"fem.verboserank": 0})
 
@@ -43,12 +44,13 @@ dune.fem.parameter.append({"fem.verboserank": 0})
 # <codecell>
 methods = [ ### "[space,scheme,spaceKwrags]"
             ["lagrange","h1",{}],
+            ["vem","vem",{"testSpaces":[0,order-2,order-1]}],  # bubble
             ["vem","vem",{"conforming":True}],
             ["vem","vem",{"conforming":False}],
             ["bbdg","bbdg",{}],
    ]
 parameters = {"newton.linear.tolerance": 1e-12,
-              "newton.linear.preconditioning.method": "ilu",
+              "newton.linear.preconditioning.method": "jacobi",
               "penalty": 40,  # for the bbdg scheme
               "newton.linear.verbose": False,
               "newton.verbose": False
@@ -65,10 +67,12 @@ exact = as_vector( [x[0]*x[1] * cos(pi*x[0]*x[1])] )
 # next the bilinear form
 u = TrialFunction(uflSpace)
 v = TestFunction(uflSpace)
-a = (inner(grad(u),grad(v))) * dx + (1+sin(dot(x,x)))*dot(u,v) * dx
+massCoeff = 1+sin(dot(x,x))
+diffCoeff = 1-0.9*cos(dot(x,x))
+a = (diffCoeff*inner(grad(u),grad(v)) + massCoeff*dot(u,v) ) * dx
 
 # finally the right hand side and the boundary conditions
-b = -div(grad(exact[0])) * v[0] * dx
+b = (-diffCoeff*div(grad(exact[0])) + massCoeff*exact[0] ) * v[0] * dx
 dbc = [dune.ufl.DirichletBC(uflSpace, exact, i+1) for i in range(4)]
 
 
@@ -77,7 +81,7 @@ dbc = [dune.ufl.DirichletBC(uflSpace, exact, i+1) for i in range(4)]
 
 # <codecell>
 constructor = cartesianDomain([-0.5,-0.5],[1,1],[1,1])
-polyGrid = create.grid("polygrid", voronoiCells(constructor,50,"voronoiseeds",True) )
+polyGrid = create.grid("polygrid", voronoiCells(constructor,800,"voronoiseeds",True) )
 
 # <markdowncell>
 # In general we can construct a `polygrid` by providing a dictionary with
@@ -108,7 +112,7 @@ polyGrid = create.grid("polygrid", voronoiCells(constructor,50,"voronoiseeds",Tr
 @gridFunction(polyGrid, name="cells")
 def polygons(en,x):
     return polyGrid.hierarchicalGrid.agglomerate(en)
-polygons.plot(colorbar="horizontal")
+# polygons.plot(colorbar="horizontal")
 
 
 
@@ -121,32 +125,35 @@ def compute(grid, space, schemeName):
     # solve the pde
     if schemeName == "vem":
         scheme = create.scheme(schemeName, [a==b, *dbc], space, solver="cg",
-                     gradStabilization=1,
-                     massStabilization=1+sin(dot(x,x)),
+                       gradStabilization=diffCoeff,
+                       massStabilization=massCoeff,
                      parameters=parameters)
     else:
         scheme = create.scheme(schemeName, [a==b, *dbc], space, solver="cg", parameters=parameters)
     df = space.interpolate([0],name="solution")
     info = scheme.solve(target=df)
+    # df.interpolate(exact)
 
     # compute the error
     edf = exact-df
     errors = [ math.sqrt(e) for e in
-               integrate(grid, [inner(edf,edf),inner(grad(edf),grad(edf))], order=5) ]
+               integrate(grid, [inner(edf,edf),inner(grad(edf),grad(edf))], order=8) ]
 
-    return df, errors
+    return df, errors, info
 
 # <markdowncell>
 # Finally we iterate over the requested methods and solve the problems
 
 # <codecell>
-fig = pyplot.figure(figsize=(40,10))
+fig = pyplot.figure(figsize=(10*len(methods),10))
+figPos = 100+10*len(methods)+1
 for i,m in enumerate(methods):
-    space = create.space(m[0], polyGrid, order=3, dimRange=1, storage="istl", **m[2])
-    dfs,errors = compute(polyGrid, space, m[1])
+    space = create.space(m[0], polyGrid, order=order, dimRange=1, storage="istl", **m[2])
+    dfs,errors,info = compute(polyGrid, space, m[1])
     print("method:(",m[0],m[2],")",
-          "Size: ",space.size, "L^2: ", errors[0], "H^1: ", errors[1], flush=True)
-    dfs.plot(figure=(fig,141+i),gridLines=None, colorbar="horizontal")
+          "Size: ",space.size, "L^2: ", errors[0], "H^1: ", errors[1],
+          info["linear_iterations"], flush=True)
+    dfs.plot(figure=(fig,figPos+i),gridLines=None, colorbar="horizontal")
 pyplot.show()
 
 # <markdowncell>

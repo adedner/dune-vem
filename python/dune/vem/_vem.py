@@ -81,7 +81,8 @@ def bbdgScheme(model, space=None, penalty=0, solver=None, parameters={}):
     penaltyClass = "Dune::Vem::BBDGPenalty<"+spaceType+">"
     return dg(model,space,penalty,solver,parameters,penaltyClass)
 
-def vemSpace(view, order=1, dimRange=1, conforming=True, field="double", storage="adaptive"):
+def vemSpace(view, order=1, testSpaces=None,
+             dimRange=1, conforming=True, field="double", storage="adaptive"):
     """create a virtual element space over an agglomerated grid
 
     Args:
@@ -109,6 +110,12 @@ def vemSpace(view, order=1, dimRange=1, conforming=True, field="double", storage
     if field == "complex":
         field = "std::complex<double>"
 
+    if testSpaces is None:
+        if conforming:
+          testSpaces = [  0, order-2, order-2 ]
+        else:
+          testSpaces = [ -1, order-1, order-2 ]
+
     agglomerate = view.hierarchicalGrid.agglomerate
 
     includes = [ "dune/vem/space/agglomeration.hh" ] + view._includes
@@ -123,10 +130,10 @@ def vemSpace(view, order=1, dimRange=1, conforming=True, field="double", storage
     constructor = Constructor(
                    ['pybind11::object gridView',
                     'const pybind11::function agglomerate',
-                    'bool conforming'],
+                    'std::vector<int> testSpaces'],
                    ['auto agglo = new Dune::Vem::Agglomeration<' + gridPartName + '>',
                     '         (Dune::FemPy::gridPart<' + viewType + '>(gridView), [agglomerate](const auto& e) { return agglomerate(e).template cast<unsigned int>(); } ); ',
-                    'auto obj = new DuneType( *agglo, conforming );',
+                    'auto obj = new DuneType( *agglo, testSpaces );',
                     'pybind11::cpp_function remove_agglo( [ agglo ] ( pybind11::handle weakref ) {',
                     '  delete agglo;',
                     '  weakref.dec_ref();',
@@ -135,13 +142,43 @@ def vemSpace(view, order=1, dimRange=1, conforming=True, field="double", storage
                     '// assert(nurse);',
                     'pybind11::weakref( agglomerate, remove_agglo ).release();',
                     'return obj;'],
-                   ['"gridView"_a', '"agglomerate"_a', '"conforming"_a',
+                   ['"gridView"_a', '"agglomerate"_a', '"testSpaces"_a',
                     'pybind11::keep_alive< 1, 2 >()'] )
 
-    spc = module(field, includes, typeName, constructor, storage=storage, ctorArgs=[view, agglomerate, conforming])
+    spc = module(field, includes, typeName, constructor, storage=storage, ctorArgs=[view, agglomerate, testSpaces])
     addStorage(spc, storage)
     return spc.as_ufl()
 
+def space(view, order=1, dimRange=1,
+          testSpaces=None,
+          conforming=True,
+          version=None,
+          field="double", storage="adaptive"):
+    '''
+        version is tuple,list
+        version == "dg"
+        version == "dgSimplex"
+        version == "continuous"
+        version == "continuousSimplex"
+        version == "non-conforming"
+    '''
+    if isinstance(version,tuple) or isinstance(version,list):
+        return vemSpace(view,order=order,dimRange=dimRange,field=field,storage=storage,
+                        testSpaces=version)
+    elif version == "dg":
+        return bbdgSpace(view,order=order,dimRange=dimRange,field=field,storage=storage)
+    elif version == "dgSimplex":
+        from dune.fem.space import onb
+        return onb(view,order=order,dimRange=dimRange,field=field,storage=storage)
+    elif version == "continuous":
+        return vemSpace(view,order=order,dimRange=dimRange,field=field,storage=storage,
+                        conforming=True)
+    elif version == "continuousSimplex":
+        from dune.fem.space import lagrange
+        return lagrange(view,order=order,dimRange=dimRange,field=field,storage=storage)
+    elif version == "non-conforming":
+        return vemSpace(view,order=order,dimRange=dimRange,field=field,storage=storage,
+                        conforming=False)
 #########################################################
 
 from dune.fem.model import elliptic
