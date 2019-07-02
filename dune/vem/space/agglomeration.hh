@@ -166,7 +166,7 @@ namespace Dune
               ),
           polOrder_( polOrder )
       {
-#if 1
+#if 0
         const int innerTestSpace = testSpaces[2];
         assert(innerTestSpace>=-1);
         const std::size_t numShapeFunctions = scalarShapeFunctionSet_.size(); // uses polOrder
