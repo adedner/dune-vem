@@ -117,12 +117,18 @@ namespace Dune
       BoundingBoxBasisFunctionSet ( const EntityType &entity, const BoundingBoxType &bbox,
                                     ShapeFunctionSet shapeFunctionSet = ShapeFunctionSet() )
         : entity_( &entity ), shapeFunctionSet_( std::move( shapeFunctionSet ) ), bbox_( std::move( bbox ) ),
-          transformation_(bbox_)
-      {}
+          transformation_(bbox_),
+          vals_(shapeFunctionSet_.size()),
+          jacs_(shapeFunctionSet_.size()),
+          hess_(shapeFunctionSet_.size())
+      {
+      }
 
       int order () const { return shapeFunctionSet_.order(); }
 
       std::size_t size () const { return shapeFunctionSet_.size(); }
+
+      const EntityType &entity () const { assert( entity_ ); return *entity_; }
 
       const ReferenceElementType &referenceElement () const
       {
@@ -151,16 +157,22 @@ namespace Dune
       template< class Point, class DofVector >
       void axpy ( const Point &x, const RangeType &valueFactor, DofVector &dofs ) const
       {
+        // onb
+        sfEvaluateAll(x,vals_);
         Fem::FunctionalAxpyFunctor< RangeType, DofVector > f( valueFactor, dofs );
-        shapeFunctionSet_.evaluateEach( position( x ), f );
+        for (std::size_t beta=0;beta<size();++beta)
+          f(beta,vals_[beta]);
       }
 
       template< class Point, class DofVector >
       void axpy ( const Point &x, const JacobianRangeType &jacobianFactor, DofVector &dofs ) const
       {
+        // onb
+        sfEvaluateAll(x,jacs_);
         const JacobianRangeType transformedFactor = transformation_( jacobianFactor,true );
         Fem::FunctionalAxpyFunctor< JacobianRangeType, DofVector > f( transformedFactor, dofs );
-        shapeFunctionSet_.jacobianEach( position( x ), f );
+        for (std::size_t beta=0;beta<size();++beta)
+          f(beta,jacs_[beta]);
       }
 
       template< class Point, class DofVector >
@@ -181,17 +193,23 @@ namespace Dune
       template< class Point, class DofVector >
       void evaluateAll ( const Point &x, const DofVector &dofs, RangeType &value ) const
       {
+        // onb
+        sfEvaluateAll(x,vals_);
         value = RangeType( 0 );
         Fem::AxpyFunctor< DofVector, RangeType > f( dofs, value );
-        shapeFunctionSet_.evaluateEach( position( x ), f );
+        for (std::size_t beta=0;beta<size();++beta)
+          f(beta,vals_[beta]);
       }
 
       template< class Point, class Values > const
       void evaluateAll ( const Point &x, Values &values ) const
       {
+        // onb
+        sfEvaluateAll(x,vals_);
         assert( values.size() >= size() );
         Fem::AssignFunctor< Values > f( values );
-        shapeFunctionSet_.evaluateEach( position( x ), f );
+        for (std::size_t beta=0;beta<size();++beta)
+          f(beta,vals_[beta]);
       }
 
       template< class Quadrature, class DofVector, class Jacobians >
@@ -205,18 +223,24 @@ namespace Dune
       template< class Point, class DofVector >
       void jacobianAll ( const Point &x, const DofVector &dofs, JacobianRangeType &jacobian ) const
       {
+        // onb
+        sfEvaluateAll(x,jacs_);
         jacobian = JacobianRangeType( 0 );
         Fem::AxpyFunctor< DofVector, JacobianRangeType > f( dofs, jacobian );
-        shapeFunctionSet_.jacobianEach( position( x ), f );
+        for (std::size_t beta=0;beta<size();++beta)
+          f(beta,jacs_[beta]);
         jacobian = transformation_( jacobian );
       }
 
       template< class Point, class Jacobians > const
       void jacobianAll ( const Point &x, Jacobians &jacobians ) const
       {
+        // onb
+        sfEvaluateAll(x,jacs_);
         assert( jacobians.size() >= size() );
         Fem::AssignFunctor< Jacobians, TransformedAssign< Transformation > > f( jacobians, transformation_ );
-        shapeFunctionSet_.jacobianEach( position( x ), f );
+        for (std::size_t beta=0;beta<size();++beta)
+          f(beta,jacs_[beta]);
       }
 
       template< class Quadrature, class DofVector, class Hessians >
@@ -230,35 +254,45 @@ namespace Dune
       template< class Point, class DofVector >
       void hessianAll ( const Point &x, const DofVector &dofs, HessianRangeType &hessian ) const
       {
+        // onb
+        sfEvaluateAll(x,hess_);
         hessian = HessianRangeType( RangeFieldType( 0 ) );
         Fem::AxpyFunctor< DofVector, HessianRangeType > f( dofs, hessian );
-        shapeFunctionSet_.hessianEach( position( x ), f );
+        for (std::size_t beta=0;beta<size();++beta)
+          f(beta,hess_[beta]);
         hessian = transformation_( hessian );
       }
 
       template< class Point, class Hessians > const
       void hessianAll ( const Point &x, Hessians &hessians ) const
       {
+        // onb
+        sfEvaluateAll(x,hess_);
         assert( hessians.size() >= size() );
         Fem::AssignFunctor< Hessians, TransformedAssign< Transformation > > f( hessians, transformation_ );
-        shapeFunctionSet_.hessianEach( position( x ), f );
+        for (std::size_t beta=0;beta<size();++beta)
+          f(beta,hess_[beta]);
       }
 
       template< class Point, class Functor >
       void evaluateEach ( const Point &x, Functor functor ) const
       {
-        shapeFunctionSet_.evaluateEach( position( x ), functor );
+        //! onb
+        sfEvaluateAll(x,vals_);
+        for (std::size_t beta=0;beta<size();++beta)
+          functor(beta,vals_[beta]);
       }
 
       template< class Point, class Functor >
       void jacobianEach ( const Point &x, Functor functor ) const
       {
-        shapeFunctionSet_.jacobianEach( position( x ),
-            [ & ] ( std::size_t beta, JacobianRangeType psi )
-            { functor(beta, transformation_(psi)); } );
+        //! onb
+        sfEvaluateAll(x,jacs_);
+        for (std::size_t beta=0;beta<size();++beta)
+          functor(beta,transformation_( jacs_[beta] ));
       }
 
-#if 0
+#if 0 // TODO: needs correct 'transformation'
       template< class Point, class Functor >
       void hessianEach ( const Point &x, Functor functor ) const
       {
@@ -266,27 +300,180 @@ namespace Dune
       }
 #endif
 
-      const EntityType &entity () const { assert( entity_ ); return *entity_; }
-
     private:
       template< class Point >
       DomainType position ( const Point &x ) const
       {
-#if 0
-        DomainType y = entity().geometry().global( Fem::coordinate( x ) ) - bbox_.first;
-        for( int k = 0; k < dimDomain; ++k )
-          y[ k ] /= (bbox_.second[ k ] - bbox_.first[ k ]);
-        return y;
-#else
         return bbox_.transform( entity().geometry().global( Fem::coordinate( x ) ) );
-#endif
+      }
+      // make basis orthogonal
+      // k = 0
+      // for i < N
+      //   for j < i; ++k
+      //     b_i -= r_k b_j {Remove the projection of b_i onto b_j
+      //   b_i /= r_k
+      template <class Vector>
+      void onb(Vector &values) const
+      {
+        std::size_t k = 0;
+        for (std::size_t i=0;i<values.size();++i,++k)
+        {
+          for (std::size_t j=0;j<i;++j,++k)
+            values[i].axpy(-bbox_.r(k), values[j]);
+          values[i] /= bbox_.r(k);
+        }
+      }
+      template< class Point>
+      void sfEvaluateAll(const Point &x, std::vector<RangeType> &values) const
+      {
+        Fem::AssignFunctor< decltype(values) > f( values );
+        auto y = position(x);
+        for (std::size_t beta=0;beta<size();++beta)
+          shapeFunctionSet_.evaluateEach( y, f);
+        onb( values );
+      }
+      template< class Point>
+      void sfEvaluateAll(const Point &x, std::vector<JacobianRangeType> &values) const
+      {
+        Fem::AssignFunctor< decltype(values) > f( values );
+        auto y = position(x);
+        for (std::size_t beta=0;beta<size();++beta)
+          shapeFunctionSet_.jacobianEach( y, f);
+        onb( values );
+      }
+      template< class Point>
+      void sfEvaluateAll(const Point &x, std::vector<HessianRangeType> &values) const
+      {
+        Fem::AssignFunctor< decltype(values) > f( values );
+        auto y = position(x);
+        for (std::size_t beta=0;beta<size();++beta)
+          shapeFunctionSet_.hessianEach( y, f);
+        // onb( values ); // Note: failing axpy on FV<FM> due to missing // double*FM
+        std::size_t k = 0;
+        for (std::size_t i=0;i<values.size();++i,++k)
+        {
+          for (std::size_t j=0;j<i;++j,++k)
+            for (std::size_t r=0;r<values[i].size();++r)
+              values[i][r].axpy(-bbox_.r(k), values[j][r]);
+          values[i] /= bbox_.r(k);
+        }
       }
 
       const EntityType *entity_ = nullptr;
       ShapeFunctionSet shapeFunctionSet_;
       BoundingBoxType bbox_;
       Transformation transformation_;
+      mutable std::vector< RangeType > vals_;
+      mutable std::vector< JacobianRangeType > jacs_;
+      mutable std::vector< HessianRangeType > hess_;
     };
+
+    template< class GridPart, class ShapeFunctionSet >
+    inline static void onbBasis( const Agglomeration< GridPart > &agglomeration,
+        const ShapeFunctionSet &shapeFunctionSet,
+        std::vector< BoundingBox< GridPart > > &boundingBoxes )
+    {
+      typedef typename GridPart::template Codim< 0 >::EntityType ElementType;
+      typedef typename GridPart::template Codim< 0 >::EntitySeedType ElementSeedType;
+      typedef BoundingBoxBasisFunctionSet< GridPart, ShapeFunctionSet > BBBasisFunctionSetType;
+      typedef typename BBBasisFunctionSetType::RangeType RangeType;
+      typedef typename BBBasisFunctionSetType::DomainFieldType DomainFieldType;
+
+      const int polOrder = shapeFunctionSet.order();
+      const auto &gridPart = agglomeration.gridPart();
+
+      // start off with R=I
+      for (std::size_t b=0;b<boundingBoxes.size();++b)
+      {
+        auto &bbox = boundingBoxes[b];
+        bbox.resizeR( shapeFunctionSet.size() );
+        std::size_t k = 0;
+        for (std::size_t i=0;i<shapeFunctionSet.size();++i,++k)
+        {
+          for (std::size_t j=0;j<i;++j,++k)
+            bbox.r(k) = 0;
+          bbox.r(k) = 1;
+        }
+      }
+
+      // return; // no ONB
+
+      std::vector<RangeType> val;
+      std::vector< std::vector<RangeType> > values;
+      std::vector<DomainFieldType> weights;
+      values.resize( shapeFunctionSet.size() );
+      val.resize( shapeFunctionSet.size() );
+
+      // compute onb factors
+      // want to iterate over each polygon separately - so collect all
+      // triangles from a given polygon
+      std::vector< std::vector< ElementSeedType > > entitySeeds( agglomeration.size() );
+      for( const ElementType &element : elements( static_cast< typename GridPart::GridViewType >( gridPart ), Partitions::interiorBorder ) )
+        entitySeeds[ agglomeration.index( element ) ].push_back( element.seed() );
+
+      // start iteration over all polygons
+      for( std::size_t agglomerate = 0; agglomerate < agglomeration.size(); ++agglomerate )
+      {
+        auto &bbox = boundingBoxes[agglomerate];
+        const ElementType &element = gridPart.entity( entitySeeds[agglomerate][0] );
+
+        // first collect all weights and basis function evaluation needed
+        // to compute mass matrix over this polygon
+        Fem::ElementQuadrature< GridPart, 0 > quadrature( element , 2*polOrder );
+        const std::size_t nop = quadrature.nop();
+        for (std::size_t i=0;i<values.size(); ++i)
+          values[i].resize( nop * entitySeeds[agglomerate].size() );
+        weights.resize( nop * entitySeeds[agglomerate].size() );
+        std::size_t e = 0;
+        for( const ElementSeedType &entitySeed : entitySeeds[ agglomerate ] )
+        {
+          const ElementType &element = gridPart.entity( entitySeed );
+          const auto geometry = element.geometry();
+          BBBasisFunctionSetType basisFunctionSet( element, bbox, shapeFunctionSet );
+          Fem::ElementQuadrature< GridPart, 0 > quadrature( element, 2*polOrder );
+          for( std::size_t qp = 0; qp < nop; ++qp, ++e )
+          {
+            weights[e] = geometry.integrationElement( quadrature.point( qp ) ) * quadrature.weight( qp );
+            basisFunctionSet.evaluateAll(quadrature[qp], val);
+            for (int i=0;i<val.size();++i)
+              values[i][e] = val[i];
+          }
+        }
+
+        // now compute ONB coefficients
+        // k = 0
+        // for i < N
+        //   for j < i; ++k
+        //     r_k = ( b_i, b_j )
+        //     b_i -= r_k b_j {Remove the projection of b_i onto b_j
+        //   r_k = ( b_i, b_i )
+        //   b_i /= r_k
+        auto l2Integral = [&](std::size_t i, std::size_t j) -> double {
+          double ret = 0;
+          for (std::size_t l = 0; l<weights.size(); ++l)
+            ret += values[i][l]*values[j][l]*weights[l];
+          return ret;
+        };
+        std::size_t k = 0;
+        for (std::size_t i=0;i<values.size();++i,++k)
+        {
+          auto &bi = values[i];
+          for (std::size_t j=0;j<i;++j,++k)
+          {
+            bbox.r(k) = l2Integral(i,j);
+            assert( bbox.r(k) == bbox.r(k) );
+            for (std::size_t l = 0; l<values[i].size(); ++l)
+              bi[l].axpy(-bbox.r(k), values[j][l]);
+            // std::cout << i << " " << j << " = " << bbox.r(k) << "   ";
+          }
+          bbox.r(k) = std::sqrt( l2Integral(i,i) );
+          assert( bbox.r(k) == bbox.r(k) );
+          // std::cout << i << " " << i << " = " << bbox.r(k) << std::endl;
+          for (std::size_t l = 0; l<values[i].size(); ++l)
+            bi[l] /= bbox.r(k);
+        }
+      }
+    }
 
   } // namespace Vem
 

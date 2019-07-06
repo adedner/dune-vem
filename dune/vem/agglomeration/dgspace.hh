@@ -154,7 +154,9 @@ namespace Dune
           // scalarShapeFunctionSet_( polOrder )
           scalarShapeFunctionSet_(
               Dune::GeometryType(Dune::GeometryType::cube,GridPart::dimension), polOrder )
-      {}
+      {
+        onbBasis( agglomeration, scalarShapeFunctionSet_, boundingBoxes_ );
+      }
 
       const BoundingBox< GridPart >& boundingBox( const EntityType &entity ) const
       {

@@ -152,6 +152,14 @@ namespace Dune
       {
         return boundingBox( index( element ) );
       }
+      const std::vector< BoundingBox< GridPart > >& boundingBox() const
+      {
+        return boundingBoxes_;
+      }
+      std::vector< BoundingBox< GridPart > >& boundingBox()
+      {
+        return boundingBoxes_;
+      }
 
     private:
       const Agglomerate &agglomerate ( std::size_t agglomerateIndex ) const { return agglomerates_[ agglomerateIndex ]; }

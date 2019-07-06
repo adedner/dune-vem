@@ -264,11 +264,12 @@ template<class JacobianOperator, class Model>
 void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
 ::jacobian( const DomainDiscreteFunctionType &u, JacobianOperator &jOp) const
 {
+  Dune::Timer timer;
   baseOperator_.jacobian(u,jOp);
   if (! std::is_same<DomainDiscreteFunctionSpaceType,RangeDiscreteFunctionSpaceType>::value)
     return;
+  // std::cout << "   in assembly: base operator    " << timer.elapsed() << std::endl;
 
-  Dune::Timer timer;
   typedef typename JacobianOperator::LocalMatrixType LocalMatrixType;
   typedef typename DomainDiscreteFunctionSpaceType::BasisFunctionSetType DomainBasisFunctionSetType;
   typedef typename RangeDiscreteFunctionSpaceType::BasisFunctionSetType RangeBasisFunctionSetType;
@@ -276,7 +277,6 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
   const DomainDiscreteFunctionSpaceType &domainSpace = jOp.domainSpace();
   const RangeDiscreteFunctionSpaceType &rangeSpace = jOp.rangeSpace();
 
-  // std::cout << "   in assembly: setting up vectors    " << timer.elapsed() << std::endl;;
   const int domainBlockSize = domainSpace.localBlockSize; // is equal to 1 for scalar functions
   // Note the following is much! too large since it assumes e.g. all vertices in one polygon
 
@@ -287,10 +287,13 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
   RangeRangeType LinDcoeff(0);
   const GridPartType &gridPart = rangeSpace.gridPart();
 
-  // std::cout << "   in assembly: computing index set   " << timer.elapsed() << std::endl;;
   const auto &agIndexSet    = rangeSpace.blockMapper().indexSet();
   const auto &agglomeration = rangeSpace.agglomeration();
-  // std::cout << "   in assembly: start element loop size=" << rangeSpace.gridPart().grid().size(0) << " time=  " << timer.elapsed() << std::endl;;
+
+  typedef typename GridPartType::template Codim< 0 >::EntitySeedType ElementSeedType;
+  std::vector< ElementSeedType > stabilization( agglomeration.size() );
+
+  // std::cout << "   in assembly: start element loop time=  " << timer.elapsed() << std::endl;
 
   for (const auto &entity : Dune::elements(
         static_cast<typename GridPartType::GridViewType>(gridPart),
@@ -302,6 +305,8 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
     const int agglomerate = agglomeration.index(entity); // the polygon we are integrating
     const auto &bbox = agIndexSet.boundingBox( agglomerate );
     const int numVertices = agIndexSet.numPolyVertices(entity, GridPartType::dimension);
+    stabilization[ agglomerate ] = entity.seed();
+
     // Lines copied from below just before the quadrature loop:
     // For Stabilisation..
     auto& refElement = Dune::ReferenceElements<double, 2>::general( entity.type());
@@ -336,33 +341,41 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
     }
   } // element loop end
 
-  std::vector<bool> stabilization(agglomeration.size(), false);
-  for (const auto &entity : Dune::elements(
-        static_cast<typename GridPartType::GridViewType>(gridPart),
-        Dune::Partitions::interiorBorder))
+  // std::cout << "   in assembly: finished element loop time=  " << timer.elapsed() << std::endl;
+
+  for (const auto &seed : stabilization)
   {
+    const auto entity = gridPart.entity( seed );
     const std::size_t agglomerate = agglomeration.index( entity );
-    if (!stabilization[agglomerate])
-    {
-      const auto &stabMatrix = rangeSpace.stabilization(entity);
-      LocalMatrixType jLocal = jOp.localMatrix(entity, entity);
-      assert( jLocal.rows()    == stabMatrix.rows()*domainBlockSize );
-      assert( jLocal.columns() == stabMatrix.cols()*domainBlockSize );
-      for (std::size_t r = 0; r < stabMatrix.rows(); ++r)
-        for (std::size_t c = 0; c < stabMatrix.cols(); ++c)
-          for (std::size_t b = 0; b < domainBlockSize; ++b)
-            jLocal.add(r*domainBlockSize+b, c*domainBlockSize+b, VectorOfAveragedDiffusionCoefficients[agglomerate][0]  * stabMatrix[r][c]);
-      //??? const int nE = agIndexSet.numPolyVertices(entity, GridPartType::dimension);
-      const DomainLocalFunctionType uLocal = u.localFunction(entity);
+
+    const auto &stabMatrix = rangeSpace.stabilization(entity);
+    LocalMatrixType jLocal = jOp.localMatrix(entity, entity);
+    assert( jLocal.rows()    == stabMatrix.rows()*domainBlockSize );
+    assert( jLocal.columns() == stabMatrix.cols()*domainBlockSize );
+    //??? const int nE = agIndexSet.numPolyVertices(entity, GridPartType::dimension);
+    const DomainLocalFunctionType uLocal = u.localFunction(entity);
+
+    for (std::size_t r = 0; r < stabMatrix.rows(); ++r)
       for (std::size_t c = 0; c < stabMatrix.cols(); ++c)
-        for (std::size_t r = 0; r < stabMatrix.rows(); ++r)
+        for (std::size_t b = 0; b < domainBlockSize; ++b)
+        {
+          jLocal.add(r*domainBlockSize+b, c*domainBlockSize+b, VectorOfAveragedDiffusionCoefficients[agglomerate][0]  * stabMatrix[r][c]);
           for (std::size_t ccc = 0; ccc < stabMatrix.cols(); ++ccc)
-            for (std::size_t b = 0; b < domainBlockSize; ++b)
-              jLocal.add(r*domainBlockSize+b, c*domainBlockSize+b, VectorOfAveragedLinearlisedDiffusionCoefficients[agglomerate][0]  * stabMatrix[r][ccc] * uLocal[ccc]); //???  / (nE));
-      stabilization[agglomerate] = true;
+            jLocal.add(r*domainBlockSize+b, c*domainBlockSize+b, VectorOfAveragedLinearlisedDiffusionCoefficients[agglomerate][0]  * stabMatrix[r][ccc] * uLocal[ccc]); //???  / (nE));
+        }
+#if 0
+    for (std::size_t r = 0; r < stabMatrix.rows(); ++r)
+    {
+      for (std::size_t c = 0; c < stabMatrix.cols(); ++c)
+        for (std::size_t b = 0; b < domainBlockSize; ++b)
+          std::cout << r << " " << c << " : "
+            << jLocal.get(r*domainBlockSize+b,c*domainBlockSize+b) << "    ";
+      std::cout << std::endl;
     }
+#endif
   }
+  // std::cout << "   in assembly: end stabilization    " << timer.elapsed() << std::endl;
   jOp.communicate();
-  // std::cout << "   in assembly: final    " << timer.elapsed() << std::endl;;
+  // std::cout << "   in assembly: final    " << timer.elapsed() << std::endl;
 }
 #endif // #ifndef VEMELLIPTIC_HH

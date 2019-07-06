@@ -68,10 +68,25 @@ namespace Dune
         transform_.invert();
       }
       void set(pybind11::object obj) { set( obj.cast<ReturnType>() ); }
+      const double r(int k) const
+      {
+        assert(k < r_.size() );
+        return r_[k];
+      }
+      double& r(int k)
+      {
+        assert(k < r_.size() );
+        return r_[k];
+      }
+      void resizeR(int N)
+      {
+        r_.resize(N*(N+1)/2);
+      }
       private:
       ReturnType rotation_;
       double volume_ = 0;
       Dune::FieldMatrix< typename GridPart::ctype, GridPart::dimensionworld, GridPart::dimensionworld > transform_;
+      std::vector<double> r_;
     };
 
     // agglomerateBoundingBoxes
@@ -83,6 +98,7 @@ namespace Dune
       typedef typename GridPart::template Codim< 0 >::GeometryType GeometryType;
 
       BoundingBox< GridPart > emptyBox;
+      emptyBox.resizeR(0);
       for( int k = 0; k < GridPart::dimensionworld; ++k )
       {
         emptyBox.first[ k ] = std::numeric_limits< typename GridPart::ctype >::max();

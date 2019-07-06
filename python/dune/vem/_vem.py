@@ -324,7 +324,7 @@ class CartesianAgglomerate:
     def __init__(self,N,constructor):
         self.N = N
         self.suffix = "cartesian"+str(N)
-        self.grid = dune.create.grid("yasp", constructor=constructor)
+        self.grid = yaspGrid(constructor=constructor)
         self.division = constructor.division
         self.ind = set()
     def __call__(self,en):
@@ -370,10 +370,54 @@ def aluSimplexGrid(constructor, dimgrid=2, dimworld=2):
     gridModule = module(includes, typeName, dynamicAttr=True)
     return gridModule.LeafGrid(gridModule.reader(constructor))
 
+def yaspGrid(constructor, dimgrid=None, coordinates="equidistant", ctype="double"):
+    from dune.generator import Constructor
+    from dune.grid.grid_generator import module, getDimgrid
+    from dune.typeregistry import generateTypeName
+
+    if not dimgrid:
+        dimgrid = getDimgrid(constructor)
+    if coordinates == "equidistant":
+        coordinates = "Dune::EquidistantOffsetCoordinates"
+    elif coordinates == "tensorproduct":
+        coordinates = "Dune::TensorProductCoordinates"
+
+    if not dimgrid:
+        dimgrid = getDimgrid(constructor)
+    coordinates, _ = generateTypeName(coordinates, ctype, dimgrid)
+    typeName, includes = generateTypeName("Dune::Vem::YGrid", dimgrid, coordinates)
+    includes += ["dune/vem/misc/grid.hh", "dune/grid/io/file/dgfparser/dgfyasp.hh"]
+
+    ctor = Constructor([
+              'Dune::FieldVector<'+ctype+', '+str(dimgrid)+'> lowerleft',
+              'Dune::FieldVector<'+ctype+', '+str(dimgrid)+'> upperright',
+              'std::array<int, '+str(dimgrid)+'> elements',
+              'std::array<bool, '+str(dimgrid)+'> periodic',
+              'int overlap'],
+              ['std::bitset<'+str(dimgrid)+'> periodic_;',
+               'for (int i=0;i<'+str(dimgrid)+';++i) periodic_.set(i,periodic[i]);',
+               'return new DuneType(lowerleft,upperright,elements,periodic_,overlap);'],
+              ['"lowerleft"_a', '"upperright"_a', '"elements"_a', '"periodic"_a', '"overlap"_a'])
+
+    gridModule = module(includes, typeName, ctor, dynamicAttr=True)
+
+    try:
+        lowerleft  = constructor.lower
+        upperright = constructor.upper
+        elements   = constructor.division
+        periodic   = constructor.param.get("periodic", [False,]*dimgrid)
+        overlap    = constructor.param.get("overlap", 0)
+        return gridModule.HierarchicalGrid(lowerleft,upperright,elements,periodic,overlap).leafView
+    except AttributeError:
+        return gridModule.reader(constructor).leafView
+
 #################################################################
 class TrivialAgglomerate:
-    def __init__(self,constructor, **kwargs):
-        self.grid = aluSimplexGrid(constructor, **kwargs)
+    def __init__(self,constructor, cubes=False, **kwargs):
+        if cubes:
+            self.grid = yaspGrid(constructor, **kwargs)
+        else:
+            self.grid = aluSimplexGrid(constructor, **kwargs)
         self.suffix = "simple"+str(self.grid.size(0))
     def __call__(self,en):
         return self.grid.indexSet.index(en)
@@ -451,7 +495,7 @@ class PolyAgglomerate:
                   "simplices": numpy.vstack([ t["triangles"] for t in tr ])}
         return domain, index
 
-def polyGrid(constructor,N=None, **kwargs):
+def polyGrid(constructor,N=None, cubes=False, **kwargs):
     if isinstance(N,int):
         agglomerate = VoronoiAgglomerate(N,constructor)
     elif N is None:
@@ -459,7 +503,7 @@ def polyGrid(constructor,N=None, **kwargs):
             constructor.get("polygons",None) is not None:
             agglomerate = PolyAgglomerate(constructor)
         else:
-            agglomerate = TrivialAgglomerate(constructor, **kwargs)
+            agglomerate = TrivialAgglomerate(constructor, cubes, **kwargs)
     else:
         agglomerate = CartesianAgglomerate(N,constructor)
     grid = agglomerate.grid

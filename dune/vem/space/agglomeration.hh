@@ -184,6 +184,7 @@ namespace Dune
           << std::endl;
         std::cout << "******************************************\n";
 #endif
+        onbBasis( agglomeration, scalarShapeFunctionSet_, agIndexSet_.boundingBox() );
         buildProjections();
       }
 
@@ -249,7 +250,6 @@ namespace Dune
     };
 
 
-
     // Implementation of AgglomerationVEMSpace
     // ---------------------------------------
 
@@ -277,7 +277,7 @@ namespace Dune
 
       // set up matrices used for constructing gradient, value, and edge projections
       // Note: the code is set up with the assumption that the dofs suffice to compute the edge projection
-      DynamicMatrix< DomainFieldType > D, C, Hp, HpGrad;
+      DynamicMatrix< DomainFieldType > D, C, Hp, HpGrad, HpInv, HpGradInv;
       DynamicMatrix< DomainType > G, R;
       DynamicMatrix< DomainFieldType > edgePhi;
 
@@ -416,8 +416,10 @@ namespace Dune
               for (std::size_t beta=0; beta<numShapeFunctions; ++beta)
                 C[alpha][i] += Hp[alpha][beta]*valueProjection[beta][i];
 
-          Hp.invert();
-          HpGrad.invert();
+          HpInv = Hp;
+          HpInv.invert();
+          HpGradInv = HpGrad;
+          HpGradInv.invert();
 
           auto Gtmp = G;
           for (std::size_t alpha=0; alpha<numGradShapeFunctions; ++alpha)
@@ -426,7 +428,7 @@ namespace Dune
             {
               G[alpha][beta] = DomainType(0);
               for (std::size_t gamma=0; gamma<numGradShapeFunctions; ++gamma)
-                G[alpha][beta].axpy(HpGrad[alpha][gamma],Gtmp[gamma][beta]);
+                G[alpha][beta].axpy(HpGradInv[alpha][gamma],Gtmp[gamma][beta]);
             }
           }
 
@@ -446,7 +448,7 @@ namespace Dune
                         derivative(gridPart(),G,shapeFunctionSet,alpha); // used G matrix to compute gradients of monomials
                     derivative.evaluate(quad[qp],d);
                     d -= phi[0];
-                    assert(d.two_norm() < 1e-10);
+                    assert(d.two_norm() < 1e-8);
                   }
                 });
               }
@@ -465,10 +467,10 @@ namespace Dune
             {
               valueProjection[alpha][i] = 0;
               for (std::size_t beta=0; beta<numShapeFunctions; ++beta)
-                valueProjection[alpha][i] += Hp[alpha][beta]*C[beta][i];
+                valueProjection[alpha][i] += HpInv[alpha][beta]*C[beta][i];
               if (alpha<numGradShapeFunctions)
                 for (std::size_t beta=0; beta<numGradShapeFunctions; ++beta)
-                  jacobianProjection[alpha][i].axpy(HpGrad[alpha][beta],R[beta][i]);
+                  jacobianProjection[alpha][i].axpy(HpGradInv[alpha][beta],R[beta][i]);
             }
           }
         } // have some inner moments
@@ -529,6 +531,8 @@ namespace Dune
             for( std::size_t j = 0; j < numDofs; ++j )
               stabilization[ i ][ j ] -= D[ i ][ alpha ] * valueProjection[ alpha ][ j ];
 #endif
+
+
       }  // loop over agglomerates
     } // build projections
 
@@ -563,7 +567,6 @@ namespace Dune
     };
 #endif // #if HAVE_DUNE_ISTL
 
-#if 1 // for interpolation
     namespace Capabilities
     {
       template< class FunctionSpace, class GridPart, int polOrder >
@@ -572,7 +575,7 @@ namespace Dune
         static const bool v = false;
       };
     }
-#endif
+
   } // namespace Fem
 
 } // namespace Dune
