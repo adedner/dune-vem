@@ -154,17 +154,23 @@ namespace Dune
         const EntityType &element_;
       };
 
-      AgglomerationVEMSpace ( AgglomerationType &agglomeration, std::vector<int> testSpaces )
+      // basisChoice:
+      // 1: use onb for inner moments but not for computing projections
+      // 2: use onb for both the inner moments and computation of projection
+      // 3: don't use onb at all
+      AgglomerationVEMSpace ( AgglomerationType &agglomeration, std::vector<int> testSpaces,
+          int basisChoice)
         : BaseType( agglomeration.gridPart() ),
           agIndexSet_( agglomeration, testSpaces ),
           blockMapper_( agIndexSet_, agIndexSet_.dofsPerCodim() ),
-          interpolation_(blockMapper().indexSet(), polOrder ),
+          interpolation_(blockMapper().indexSet(), polOrder, basisChoice!=3 ),
           scalarShapeFunctionSet_( Dune::GeometryType( Dune::GeometryType::cube, GridPart::dimension ) ),
           edgeShapeFunctionSet_(   Dune::GeometryType( Dune::GeometryType::cube, GridPart::dimension-1 ),
               testSpaces[1] +       // edge order
                 (testSpaces[0]+1)*2 // vertex order * number of vertices on edge
               ),
-          polOrder_( polOrder )
+          polOrder_( polOrder ),
+          useOnb_(basisChoice==2)
       {
 #if 0
         const int innerTestSpace = testSpaces[2];
@@ -197,7 +203,8 @@ namespace Dune
         // scalar ONB Basis proxy
         typename Traits::DGTraitsType::ShapeFunctionSetType scalarShapeFunctionSet( &scalarShapeFunctionSet_ );
         // scalar BB Basis
-        typename Traits::ScalarBBBasisFunctionSetType bbScalarBasisFunctionSet( entity, bbox, std::move( scalarShapeFunctionSet ) );
+        typename Traits::ScalarBBBasisFunctionSetType bbScalarBasisFunctionSet( entity, bbox,
+            useOnb_, std::move( scalarShapeFunctionSet ) );
         // vectorial extended VEM Basis
         typename Traits::ScalarBasisFunctionSetType scalarBFS( entity, bbox, valueProjection, jacobianProjection, std::move( bbScalarBasisFunctionSet ) );
         return BasisFunctionSetType( std::move( scalarBFS ) );
@@ -234,6 +241,11 @@ namespace Dune
         return InterpolationType( blockMapper().indexSet(), entity );
       }
 
+      AgglomerationInterpolationType interpolation() const
+      {
+        return interpolation_;
+      }
+
     private:
       void buildProjections ();
 
@@ -247,6 +259,7 @@ namespace Dune
       ScalarShapeFunctionSetType scalarShapeFunctionSet_;
       EdgeShapeFunctionSetType edgeShapeFunctionSet_;
       unsigned int polOrder_;
+      const bool useOnb_;
     };
 
 
@@ -309,7 +322,8 @@ namespace Dune
           const auto &refElement = ReferenceElements< typename GridPart::ctype, GridPart::dimension >::general( element.type() );
 
           // get the bounding box monomials and apply all dofs to them
-          BoundingBoxBasisFunctionSet< GridPart, ScalarShapeFunctionSetType > shapeFunctionSet( element, bbox, scalarShapeFunctionSet_ );
+          BoundingBoxBasisFunctionSet< GridPart, ScalarShapeFunctionSetType > shapeFunctionSet( element, bbox,
+              useOnb_, scalarShapeFunctionSet_ );
           interpolation_( shapeFunctionSet, D );
 
           // compute mass matrices Hp, HpGrad, and the gradient matrices G^l
@@ -436,7 +450,8 @@ namespace Dune
             for( const ElementSeedType &entitySeed : entitySeeds[ agglomerate ] )
             {
               const ElementType &element = gridPart().entity( entitySeed );
-              BoundingBoxBasisFunctionSet< GridPart, ScalarShapeFunctionSetType > shapeFunctionSet( element, bbox, scalarShapeFunctionSet_ );
+              BoundingBoxBasisFunctionSet< GridPart, ScalarShapeFunctionSetType > shapeFunctionSet( element, bbox,
+                  useOnb_, scalarShapeFunctionSet_ );
               Fem::ElementQuadrature< GridPart, 0 > quad( element, 2*polOrder );
               for( std::size_t qp = 0; qp < quad.nop(); ++qp )
               {

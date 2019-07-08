@@ -46,11 +46,12 @@ namespace Dune
       typedef Dune::Fem::OrthonormalShapeFunctionSet<InnerFSType> InnerShapeFunctionSetType;
 
     public:
-      explicit AgglomerationVEMInterpolation ( const AgglomerationIndexSet &indexSet, unsigned int polOrder ) noexcept
+      explicit AgglomerationVEMInterpolation ( const AgglomerationIndexSet &indexSet, unsigned int polOrder, bool useOnb ) noexcept
         : indexSet_( indexSet )
         , edgeBFS_(  Dune::GeometryType(Dune::GeometryType::cube,GridPartType::dimension-1), std::max(indexSet_.testSpaces()[1],0) )
         , innerBFS_( Dune::GeometryType(Dune::GeometryType::cube,GridPartType::dimension),   std::max(indexSet_.testSpaces()[2],0) )
         , polOrder_( polOrder )
+        , useOnb_(useOnb)
       {}
 
       const GridPartType &gridPart() const { return indexSet_.agglomeration().gridPart(); }
@@ -87,7 +88,7 @@ namespace Dune
 
         // use the bb set for this polygon for the inner testing space
         const auto &bbox = indexSet_.boundingBox(element);
-        BoundingBoxBasisFunctionSet< GridPartType, InnerShapeFunctionSetType > innerShapeFunctionSet( element, bbox, innerBFS_ );
+        BoundingBoxBasisFunctionSet< GridPartType, InnerShapeFunctionSetType > innerShapeFunctionSet( element, bbox, useOnb_, innerBFS_ );
 
         // define the corresponding vertex,edge, and inner parts of the interpolation
         auto vertex = [&] (int poly,int i,int k,int numDofs)
@@ -273,7 +274,7 @@ namespace Dune
 
         // use the bb set for this polygon for the inner testing space
         const auto &bbox = indexSet_.boundingBox(element);
-        BoundingBoxBasisFunctionSet< GridPartType, InnerShapeFunctionSetType > innerShapeFunctionSet( element, bbox, innerBFS_ );
+        BoundingBoxBasisFunctionSet< GridPartType, InnerShapeFunctionSetType > innerShapeFunctionSet( element, bbox, useOnb_, innerBFS_ );
 
         // define the vertex,edge, and inner parts of the interpolation
         auto vertex = [&] (int poly,auto i,int k,int numDofs)
@@ -397,20 +398,21 @@ namespace Dune
       const EdgeShapeFunctionSetType  edgeBFS_;
       const InnerShapeFunctionSetType innerBFS_;
       const unsigned int polOrder_;
+      const bool useOnb_;
     };
 
 
-
+#if 0
     // agglomerationVEMInterpolation
     // -----------------------------
 
     template< class AgglomerationIndexSet >
     inline AgglomerationVEMInterpolation< AgglomerationIndexSet >
-    agglomerationVEMInterpolation ( const AgglomerationIndexSet &indexSet, unsigned int polOrder ) noexcept
+    agglomerationVEMInterpolation ( const AgglomerationIndexSet &indexSet, unsigned int polOrder, bool useOnb ) noexcept
     {
-      return AgglomerationVEMInterpolation< AgglomerationIndexSet >( indexSet, polOrder );
+      return AgglomerationVEMInterpolation< AgglomerationIndexSet >( indexSet, polOrder, useOnb );
     }
-
+#endif
   } // namespace Vem
 
 } // namespace Dune

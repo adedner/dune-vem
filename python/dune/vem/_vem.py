@@ -82,7 +82,8 @@ def bbdgScheme(model, space=None, penalty=0, solver=None, parameters={}):
     return dg(model,space,penalty,solver,parameters,penaltyClass)
 
 def vemSpace(view, order=1, testSpaces=None,
-             dimRange=1, conforming=True, field="double", storage="adaptive"):
+             dimRange=1, conforming=True, field="double",
+             storage="adaptive", basisChoice=2):
     """create a virtual element space over an agglomerated grid
 
     Args:
@@ -130,10 +131,11 @@ def vemSpace(view, order=1, testSpaces=None,
     constructor = Constructor(
                    ['pybind11::object gridView',
                     'const pybind11::function agglomerate',
-                    'std::vector<int> testSpaces'],
+                    'std::vector<int> testSpaces',
+                    'int basisChoice'],
                    ['auto agglo = new Dune::Vem::Agglomeration<' + gridPartName + '>',
                     '         (Dune::FemPy::gridPart<' + viewType + '>(gridView), [agglomerate](const auto& e) { return agglomerate(e).template cast<unsigned int>(); } ); ',
-                    'auto obj = new DuneType( *agglo, testSpaces );',
+                    'auto obj = new DuneType( *agglo, testSpaces, basisChoice );',
                     'pybind11::cpp_function remove_agglo( [ agglo ] ( pybind11::handle weakref ) {',
                     '  delete agglo;',
                     '  weakref.dec_ref();',
@@ -142,10 +144,10 @@ def vemSpace(view, order=1, testSpaces=None,
                     '// assert(nurse);',
                     'pybind11::weakref( agglomerate, remove_agglo ).release();',
                     'return obj;'],
-                   ['"gridView"_a', '"agglomerate"_a', '"testSpaces"_a',
+                   ['"gridView"_a', '"agglomerate"_a', '"testSpaces"_a', '"basisChoice"_a',
                     'pybind11::keep_alive< 1, 2 >()'] )
 
-    spc = module(field, includes, typeName, constructor, storage=storage, ctorArgs=[view, agglomerate, testSpaces])
+    spc = module(field, includes, typeName, constructor, storage=storage, ctorArgs=[view, agglomerate, testSpaces, basisChoice])
     addStorage(spc, storage)
     return spc.as_ufl()
 
@@ -153,6 +155,7 @@ def space(view, order=1, dimRange=1,
           testSpaces=None,
           conforming=True,
           version=None,
+          basisChoice=2,
           field="double", storage="adaptive"):
     '''
         version is tuple,list
@@ -164,7 +167,7 @@ def space(view, order=1, dimRange=1,
     '''
     if isinstance(version,tuple) or isinstance(version,list):
         return vemSpace(view,order=order,dimRange=dimRange,field=field,storage=storage,
-                        testSpaces=version)
+                        testSpaces=version, basisChoice=basisChoice)
     elif version == "dg":
         return bbdgSpace(view,order=order,dimRange=dimRange,field=field,storage=storage)
     elif version == "dgSimplex":
@@ -172,13 +175,13 @@ def space(view, order=1, dimRange=1,
         return onb(view,order=order,dimRange=dimRange,field=field,storage=storage)
     elif version == "continuous":
         return vemSpace(view,order=order,dimRange=dimRange,field=field,storage=storage,
-                        conforming=True)
+                        conforming=True, basisChoice=basisChoice)
     elif version == "continuousSimplex":
         from dune.fem.space import lagrange
         return lagrange(view,order=order,dimRange=dimRange,field=field,storage=storage)
     elif version == "non-conforming":
         return vemSpace(view,order=order,dimRange=dimRange,field=field,storage=storage,
-                        conforming=False)
+                        conforming=False, basisChoice=basisChoice)
 #########################################################
 
 from dune.fem.model import elliptic

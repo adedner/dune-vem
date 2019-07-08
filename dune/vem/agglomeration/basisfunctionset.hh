@@ -111,16 +111,18 @@ namespace Dune
 
     public:
       BoundingBoxBasisFunctionSet ()
-      : entity_(nullptr)
+      : entity_(nullptr) , useOnb_(false)
       { }
 
       BoundingBoxBasisFunctionSet ( const EntityType &entity, const BoundingBoxType &bbox,
+                                    bool useOnb,
                                     ShapeFunctionSet shapeFunctionSet = ShapeFunctionSet() )
         : entity_( &entity ), shapeFunctionSet_( std::move( shapeFunctionSet ) ), bbox_( std::move( bbox ) ),
           transformation_(bbox_),
           vals_(shapeFunctionSet_.size()),
           jacs_(shapeFunctionSet_.size()),
-          hess_(shapeFunctionSet_.size())
+          hess_(shapeFunctionSet_.size()),
+          useOnb_(useOnb)
       {
       }
 
@@ -315,6 +317,8 @@ namespace Dune
       template <class Vector>
       void onb(Vector &values) const
       {
+        if (!useOnb_)
+          return;
         std::size_t k = 0;
         for (std::size_t i=0;i<values.size();++i,++k)
         {
@@ -366,6 +370,7 @@ namespace Dune
       mutable std::vector< RangeType > vals_;
       mutable std::vector< JacobianRangeType > jacs_;
       mutable std::vector< HessianRangeType > hess_;
+      bool useOnb_ = false;
     };
 
     template< class GridPart, class ShapeFunctionSet >
@@ -429,7 +434,7 @@ namespace Dune
         {
           const ElementType &element = gridPart.entity( entitySeed );
           const auto geometry = element.geometry();
-          BBBasisFunctionSetType basisFunctionSet( element, bbox, shapeFunctionSet );
+          BBBasisFunctionSetType basisFunctionSet( element, bbox, false, shapeFunctionSet );
           Fem::ElementQuadrature< GridPart, 0 > quadrature( element, 2*polOrder );
           for( std::size_t qp = 0; qp < nop; ++qp, ++e )
           {
@@ -452,7 +457,7 @@ namespace Dune
           double ret = 0;
           for (std::size_t l = 0; l<weights.size(); ++l)
             ret += values[i][l]*values[j][l]*weights[l];
-          return ret;
+          return ret / bbox.volume();
         };
         std::size_t k = 0;
         for (std::size_t i=0;i<values.size();++i,++k)

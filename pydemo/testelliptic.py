@@ -41,16 +41,19 @@ dune.fem.parameter.append({"fem.verboserank": 0})
 # a bounding box dg space and a conforming/non conforming VEM space
 
 # <codecell>
-orders = [5] # range(1,6)
-resolutions = [2*2**n for n in range(8)]
+massCoeff = 0   # 1+sin(dot(x,x))
+diffCoeff = 1   # -0.9*cos(dot(x,x))
+basisChoice=1
+orders = range(1,7)
+resolutions = [4,8,16,32] # [2*2**n for n in range(6)]
 methods = lambda order:\
           [ ### "[spaceVersion,scheme]"
-            # ["continuousSimplex","h1"],
-            ["continuous","vem"],
-            # ["non-conforming","vem"],
+            # [{"version":"continuousSimplex"},"h1"],
+            [ {"version":"continuous", "basisChoice":basisChoice},"vem"],
+            # [ {"version":"non-conforming", "basisChoice":basisChoice},"vem"],
             # ["dg","bbdg"],
-            # [[0,order-2,order-3],"vem"],
-            # [[0,order-2,order-1],"vem"],  # bubble fails with N=160, order=5
+            # [ {"version":[0,order-2,order-3], "basisChoice":basisChoice},"vem"],
+            # [ {"version":[0,order-2,order-1], "basisChoice":basisChoice},"vem"],
    ]
 # <markdowncell>
 # Now we define the model starting with the exact solution:
@@ -64,8 +67,6 @@ exact = exact*10*((x[0]-1)*(x[0]+0.)*(x[1]-1)*(x[1]+0.))
 # next the bilinear form
 u = TrialFunction(uflSpace)
 v = TestFunction(uflSpace)
-massCoeff = 0   # 1+sin(dot(x,x))
-diffCoeff = 1   # -0.9*cos(dot(x,x))
 a   = (diffCoeff*inner(grad(u),grad(v)) + massCoeff*dot(u,v) ) * dx
 b   = (-diffCoeff*div(grad(exact[0])) + massCoeff*exact[0] ) * v[0] * dx
 dbc = [dune.ufl.DirichletBC(uflSpace, exact, i+1) for i in range(4)]
@@ -79,14 +80,15 @@ dbc = [dune.ufl.DirichletBC(uflSpace, exact, i+1) for i in range(4)]
 def compute(grid, order, spaceArgs, schemeName):
     print("setting up space...",flush=True)
     space = generalSpace(polyGrid, order=order,
-                         version=spaceArgs, dimRange=1, storage="istl")
+                         **spaceArgs,
+                         dimRange=1, storage="fem")
     print("...done",flush=True)
     # solve the pde
     parameters = {"newton.linear.tolerance": 1e-12,
-                  "newton.linear.preconditioning.method": "ilu",
-                  "penalty": 8*space.order**2,  # for the bbdg scheme
-                  "newton.linear.maxiterations": 20000,
-                  "newton.linear.verbose": True,
+                  "newton.linear.preconditioning.method": "jacobi",
+                  "penalty": diffCoeff*8*space.order**2,  # for the bbdg scheme
+                  "newton.linear.maxiterations": 10000,
+                  "newton.linear.verbose": False,
                   "newton.verbose": False
                   }
     if schemeName == "vem":
@@ -101,23 +103,40 @@ def compute(grid, order, spaceArgs, schemeName):
                        parameters=parameters)
     df = space.interpolate([0],name="solution")
 
-    if False:
+    if True:
         from dune.fem.operator import linear as linearOperator
-        A = linearOperator(scheme).as_numpy.todense()
-        import numpy as np
-        print( "symmetry:", np.allclose(A, A.T, rtol=1e-7, atol=1e-9),flush=True )
-        l = np.linalg.eigvals(A)
-        l.sort()
-        print( "eigenvalues:", l,flush=True )
+        A = linearOperator(scheme).as_numpy.tocsc()
+        # import numpy as np
+        # Ad = A.todense()
+        # print( "symmetry:", np.allclose(Ad, Ad.T, rtol=1e-7, atol=1e-9),flush=True )
+        # l = np.linalg.eigvals(Ad).real
+        # l.sort()
+        # conditioning_dense = l[-1]/l[0]
+        # print("conditioning dense", conditioning_dense)
+        from scipy.sparse.linalg import eigs
+        ll = eigs(A, k=1, which='LR', return_eigenvectors=False).real
+        ll.sort()
+        ls = eigs(A, k=1, which='LR', sigma=0,
+                return_eigenvectors=False,maxiter=20000,tol=1e-8).real
+        ls.sort()
+        conditioning = ll[-1]/ls[0]
+        print( "eigenvalues:", ls,ll,
+               "conditioning:", conditioning,
+               # "cond_dense:", conditioning_dense,
+               flush=True )
+    else:
+        conditioning = -1
 
-    # info = {"linear_iterations":0}
-    # df.interpolate(exact)
-    info = scheme.solve(target=df)
+    info = {"linear_iterations":-1}
+    df.interpolate(exact)
+    # info = scheme.solve(target=df)
 
     # compute the error
     edf = exact-df
     errors = [ math.sqrt(e) for e in
                integrate(grid, [inner(edf,edf),inner(grad(edf),grad(edf))], order=8) ]
+
+    info["conditioning"] = conditioning
 
     return df, errors, info
 
@@ -128,7 +147,7 @@ def compute(grid, order, spaceArgs, schemeName):
 results = []
 for N in resolutions:
     constructor = cartesianDomain([0,0],[1,1],[N,N])
-    constructor = voronoiCells(constructor,N*N,"voronoiseeds",True)
+    # constructor = voronoiCells(constructor,N*N,"voronoiseeds",True)
     polyGrid = create.grid("polygrid", constructor, cubes=False )
     for order in orders:
         # fig = pyplot.figure(figsize=(10*len(methods(order)),10))
@@ -138,11 +157,13 @@ for N in resolutions:
             dfs,errors,info = compute(polyGrid, order,m[0],m[1])
             print("method:",m[0]," order: ",order," cells: ",N*N," simplex: ", polyGrid.size(0),
                   "size: ",dfs.size, "L^2: ", errors[0], "H^1: ", errors[1],
-                  info["linear_iterations"], flush=True)
-            print("Done")
-            results += [N,order,m,polyGrid.size(0),dfs.size,errors,info]
+                  info["linear_iterations"],
+                  info["conditioning"],
+                  flush=True)
+            print("Done",flush=True)
+            results += [ [N,order,m,polyGrid.size(0),dfs.size,errors,info] ]
             # dfs.plot(figure=(fig,figPos+i),gridLines="black", colorbar="horizontal")
             del dfs
-            print("collected: ",gc.collect())
+            print("collected: ",gc.collect(),flush=True)
         # pyplot.show()
         pickle.dump(results,open('testelliptic.dump','wb'))

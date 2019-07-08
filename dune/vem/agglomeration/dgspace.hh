@@ -166,7 +166,8 @@ namespace Dune
       const BasisFunctionSetType basisFunctionSet ( const EntityType &entity ) const
       {
         typename Traits::ShapeFunctionSetType shapeFunctionSet( &scalarShapeFunctionSet_ );
-        return BasisFunctionSetType( entity, boundingBoxes_[ agglomeration().index( entity ) ], std::move( shapeFunctionSet ) );
+        return BasisFunctionSetType( entity, boundingBoxes_[ agglomeration().index( entity ) ],
+                                     true, std::move( shapeFunctionSet ) );
       }
 
       BlockMapperType &blockMapper () const { return blockMapper_; }
