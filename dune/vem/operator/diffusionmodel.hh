@@ -7,6 +7,7 @@
 #include <dune/fem/solver/timeprovider.hh>
 #include <dune/fem/io/parameter.hh>
 #include <dune/fem/space/common/functionspace.hh>
+#include <dune/fem/schemes/integrands.hh>
 #include <dune/fem/function/common/gridfunctionadapter.hh>
 #include <dune/fem/quadrature/cachingquadrature.hh>
 #include <dune/fempy/quadrature/fempyquadratures.hh>
@@ -277,6 +278,306 @@ struct DiffusionModelWrapper : public VEMDiffusionModel<typename ModelImpl::Grid
   private:
   ModelImpl impl_;
 };
+
+
+namespace Dune
+{
+
+  namespace Fem
+  {
+
+    template< class Integrands >
+    struct FullVemIntegrands : public FullIntegrands<Integrands>
+    {
+      typedef FullIntegrands<Integrands> Base;
+      template< class... Args >
+      explicit FullVemIntegrands ( Args &&... args )
+        : Base( std::forward< Args >( args )... )
+      {}
+      using Base::integrands;
+      template <class Point, class DRangeType>
+      auto gradStabilization ( const Point &x, const DRangeType &u ) const
+      {
+        return integrands().gradStabilization(x,u);
+      }
+      template <class Point, class DRangeType>
+      auto linGradStabilization ( const Point &x, const DRangeType &u ) const
+      {
+        return integrands().linGradStabilization(x,u);
+      }
+      template <class Point, class DRangeType>
+      auto massStabilization ( const Point &x, const DRangeType &u ) const
+      {
+        return integrands().massStabilization(x,u);
+      }
+      template <class Point, class DRangeType>
+      auto linMassStabilization ( const Point &x, const DRangeType &u ) const
+      {
+        return integrands().linMassStabilization(x,u);
+      }
+    };
+
+    template< class GridPart, class DomainValue, class RangeValue = DomainValue >
+    class VirtualizedVemIntegrands
+    {
+      typedef VirtualizedVemIntegrands< GridPart, DomainValue, RangeValue > This;
+
+    public:
+      typedef GridPart GridPartType;
+      typedef DomainValue DomainValueType;
+      typedef RangeValue RangeValueType;
+
+      typedef typename GridPartType::template Codim< 0 >::EntityType EntityType;
+      typedef typename GridPartType::IntersectionType IntersectionType;
+
+      using RRangeType = typename detail::GetDimRange<std::tuple_element_t<0,RangeValueType>>::type;
+      using DRangeType = typename detail::GetDimRange<std::tuple_element_t<0,DomainValueType>>::type;
+      typedef Dune::FieldVector<int,RRangeType::dimension> DirichletComponentType;
+      typedef typename EntityType::Geometry::LocalCoordinate DomainType;
+
+    private:
+      typedef typename EntityType::Geometry::LocalCoordinate LocalCoordinateType;
+
+      typedef FemPy::CachingPoint< LocalCoordinateType, 0 > InteriorCachingPointType;
+      typedef FemPy::ElementPoint< LocalCoordinateType, 0 > InteriorElementPointType;
+      typedef FemPy::CachingPoint< LocalCoordinateType, 1 > SurfaceCachingPointType;
+      typedef FemPy::ElementPoint< LocalCoordinateType, 1 > SurfaceElementPointType;
+
+      template< class QP >
+      static Fem::QuadraturePointWrapper< QP > asQP ( const QP &qp )
+      {
+        return static_cast< Fem::QuadraturePointWrapper< QP > >( qp );
+      }
+
+      template< class R >
+      using Linearization = std::function< R( const DomainValueType & ) >;
+
+      template< class R >
+      using LinearizationPair = std::pair< Linearization< std::pair< R, R > >, Linearization< std::pair< R, R > > >;
+
+      struct Interface
+      {
+        virtual ~Interface ()  {}
+        virtual Interface *clone () const = 0;
+
+        virtual bool init ( const EntityType &entity ) = 0;
+        virtual bool init ( const IntersectionType &intersection ) = 0;
+
+        virtual bool hasInterior () const = 0;
+        virtual RangeValueType interior ( const InteriorCachingPointType &x, const DomainValueType &u ) const = 0;
+        virtual RangeValueType interior ( const InteriorElementPointType &x, const DomainValueType &u ) const = 0;
+        virtual Linearization< RangeValueType > linearizedInterior ( const InteriorCachingPointType &x, const DomainValueType &u ) const = 0;
+        virtual Linearization< RangeValueType > linearizedInterior ( const InteriorElementPointType &x, const DomainValueType &u ) const = 0;
+
+        virtual bool hasBoundary () const = 0;
+        virtual RangeValueType boundary ( const SurfaceCachingPointType &x, const DomainValueType &u ) const = 0;
+        virtual RangeValueType boundary ( const SurfaceElementPointType &x, const DomainValueType &u ) const = 0;
+        virtual Linearization< RangeValueType > linearizedBoundary ( const SurfaceCachingPointType &x, const DomainValueType &u ) const = 0;
+        virtual Linearization< RangeValueType > linearizedBoundary ( const SurfaceElementPointType &x, const DomainValueType &u ) const = 0;
+
+        virtual bool hasSkeleton () const = 0;
+        virtual std::pair< RangeValueType, RangeValueType > skeleton ( const SurfaceCachingPointType &xIn, const DomainValueType &uIn, const SurfaceCachingPointType &xOut, const DomainValueType &uOut ) const = 0;
+        virtual std::pair< RangeValueType, RangeValueType > skeleton ( const SurfaceElementPointType &xIn, const DomainValueType &uIn, const SurfaceElementPointType &xOut, const DomainValueType &uOut ) const = 0;
+        virtual LinearizationPair< RangeValueType > linearizedSkeleton ( const SurfaceCachingPointType &xIn, const DomainValueType &uIn, const SurfaceCachingPointType &xOut, const DomainValueType &uOut ) const = 0;
+        virtual LinearizationPair< RangeValueType > linearizedSkeleton ( const SurfaceElementPointType &xIn, const DomainValueType &uIn, const SurfaceElementPointType &xOut, const DomainValueType &uOut ) const = 0;
+
+        virtual bool hasDirichletBoundary () const = 0;
+        virtual bool isDirichletIntersection( const IntersectionType& inter, DirichletComponentType &dirichletComponent ) = 0;
+        virtual void dirichlet( int bndId, const DomainType &x,RRangeType &value) const = 0;
+
+        virtual RRangeType gradStabilization ( const DomainType &x, const DRangeType &u ) const = 0;
+        virtual RRangeType linGradStabilization ( const DomainType &x, const DRangeType &u ) const = 0;
+        virtual RRangeType massStabilization ( const DomainType &x, const DRangeType &u ) const = 0;
+        virtual RRangeType linMassStabilization ( const DomainType &x, const DRangeType &u ) const = 0;
+      };
+
+      template< class Impl >
+      struct Implementation final
+        : public Interface
+      {
+        Implementation ( Impl impl ) : impl_( std::move( impl ) ) {}
+        virtual Interface *clone () const override { return new Implementation( *this ); }
+
+        virtual bool init ( const EntityType &entity ) override { return impl().init( entity ); }
+        virtual bool init ( const IntersectionType &intersection ) override { return impl().init( intersection ); }
+
+        virtual bool hasInterior () const override { return impl().hasInterior(); }
+        virtual RangeValueType interior ( const InteriorCachingPointType &x, const DomainValueType &u ) const override { return impl().interior( asQP( x ), u ); }
+        virtual RangeValueType interior ( const InteriorElementPointType &x, const DomainValueType &u ) const override { return impl().interior( asQP( x ), u ); }
+        virtual Linearization< RangeValueType > linearizedInterior ( const InteriorCachingPointType &x, const DomainValueType &u ) const override { return impl().linearizedInterior( asQP( x ), u ); }
+        virtual Linearization< RangeValueType > linearizedInterior ( const InteriorElementPointType &x, const DomainValueType &u ) const override { return impl().linearizedInterior( asQP( x ), u ); }
+
+        virtual bool hasBoundary () const override { return impl().hasBoundary(); }
+        virtual RangeValueType boundary ( const SurfaceCachingPointType &x, const DomainValueType &u ) const override { return impl().boundary( asQP( x ), u ); }
+        virtual RangeValueType boundary ( const SurfaceElementPointType &x, const DomainValueType &u ) const override { return impl().boundary( asQP( x ), u ); }
+        virtual Linearization< RangeValueType > linearizedBoundary ( const SurfaceCachingPointType &x, const DomainValueType &u ) const override { return impl().linearizedBoundary( asQP( x ), u ); }
+        virtual Linearization< RangeValueType > linearizedBoundary ( const SurfaceElementPointType &x, const DomainValueType &u ) const override { return impl().linearizedBoundary( asQP( x ), u ); }
+
+        virtual bool hasSkeleton () const override { return impl().hasSkeleton(); }
+        virtual std::pair< RangeValueType, RangeValueType > skeleton ( const SurfaceCachingPointType &xIn, const DomainValueType &uIn, const SurfaceCachingPointType &xOut, const DomainValueType &uOut ) const override { return impl().skeleton( asQP( xIn ), uIn, asQP( xOut ), uOut ); }
+        virtual std::pair< RangeValueType, RangeValueType > skeleton ( const SurfaceElementPointType &xIn, const DomainValueType &uIn, const SurfaceElementPointType &xOut, const DomainValueType &uOut ) const override { return impl().skeleton( asQP( xIn ), uIn, asQP( xOut ), uOut ); }
+        virtual LinearizationPair< RangeValueType > linearizedSkeleton ( const SurfaceCachingPointType &xIn, const DomainValueType &uIn, const SurfaceCachingPointType &xOut, const DomainValueType &uOut ) const override { return impl().linearizedSkeleton( asQP( xIn ), uIn, asQP( xOut ), uOut ); }
+        virtual LinearizationPair< RangeValueType > linearizedSkeleton ( const SurfaceElementPointType &xIn, const DomainValueType &uIn, const SurfaceElementPointType &xOut, const DomainValueType &uOut ) const override { return impl().linearizedSkeleton( asQP( xIn ), uIn, asQP( xOut ), uOut ); }
+
+        virtual bool hasDirichletBoundary () const override { return impl().hasDirichletBoundary(); }
+        virtual bool isDirichletIntersection( const IntersectionType& inter, DirichletComponentType &dirichletComponent ) override { return impl().isDirichletIntersection(inter,dirichletComponent); }
+        virtual void dirichlet( int bndId, const DomainType &x,RRangeType &value) const override { impl().dirichlet(bndId,x,value); }
+
+        virtual RRangeType gradStabilization ( const DomainType &x, const DRangeType &u ) const { return impl().gradStabilization(x,u); }
+        virtual RRangeType linGradStabilization ( const DomainType &x, const DRangeType &u ) const { return impl().linGradStabilization(x,u); }
+        virtual RRangeType massStabilization ( const DomainType &x, const DRangeType &u ) const { return impl().massStabilization(x,u); }
+        virtual RRangeType linMassStabilization ( const DomainType &x, const DRangeType &u ) const { return impl().linMassStabilization(x,u); }
+
+      private:
+        const auto &impl () const { return std::cref( impl_ ).get(); }
+        auto &impl () { return std::ref( impl_ ).get(); }
+
+        Impl impl_;
+      };
+
+      template< class Integrands >
+      using isVirtualized = std::is_same< std::decay_t< decltype( std::ref( std::declval< Integrands & >() ).get() ) >, This >;
+
+    public:
+      template< class Integrands, std::enable_if_t< IntegrandsTraits< std::decay_t< Integrands > >::isFull && !isVirtualized< Integrands >::value, int > = 0 >
+      explicit VirtualizedVemIntegrands ( Integrands integrands )
+        : impl_( new Implementation< Integrands >( std::move( integrands ) ) )
+      {}
+
+      template< class Integrands, std::enable_if_t< !IntegrandsTraits< Integrands >::isFull && !isVirtualized< Integrands >::value, int > = 0 >
+      explicit VirtualizedVemIntegrands ( Integrands integrands )
+        : VirtualizedVemIntegrands( FullVemIntegrands< std::decay_t< Integrands > >( std::move( integrands ) ) )
+      {}
+
+      VirtualizedVemIntegrands ( const This &other ) : impl_( other ? other.impl().clone() : nullptr ) {}
+      VirtualizedVemIntegrands ( This && ) = default;
+
+      VirtualizedVemIntegrands &operator= ( const This &other ) { impl_.reset( other ? other.impl().clone() : nullptr ); }
+      VirtualizedVemIntegrands &operator= ( This && ) = default;
+
+      explicit operator bool () const { return static_cast< bool >( impl_ ); }
+
+      bool init ( const EntityType &entity ) { return impl().init( entity ); }
+      bool init ( const IntersectionType &intersection ) { return impl().init( intersection ); }
+
+      bool hasInterior () const { return impl().hasInterior(); }
+
+      template< class Quadrature, std::enable_if_t< std::is_convertible< Quadrature, Fem::CachingInterface >::value, int > = 0 >
+      RangeValueType interior ( const Fem::QuadraturePointWrapper< Quadrature > &x, const DomainValueType &u ) const
+      {
+        return impl().interior( InteriorCachingPointType( x ), u );
+      }
+
+      template< class Quadrature, std::enable_if_t< !std::is_convertible< Quadrature, Fem::CachingInterface >::value, int > = 0 >
+      RangeValueType interior ( const Fem::QuadraturePointWrapper< Quadrature > &x, const DomainValueType &u ) const
+      {
+        return impl().interior( InteriorElementPointType( x ), u );
+      }
+
+      template< class Quadrature, std::enable_if_t< std::is_convertible< Quadrature, Fem::CachingInterface >::value, int > = 0 >
+      auto linearizedInterior ( const Fem::QuadraturePointWrapper< Quadrature > &x, const DomainValueType &u ) const
+      {
+        return impl().linearizedInterior( InteriorCachingPointType( x ), u );
+      }
+
+      template< class Quadrature, std::enable_if_t< !std::is_convertible< Quadrature, Fem::CachingInterface >::value, int > = 0 >
+      auto linearizedInterior ( const Fem::QuadraturePointWrapper< Quadrature > &x, const DomainValueType &u ) const
+      {
+        return impl().linearizedInterior( InteriorElementPointType( x ), u );
+      }
+
+      bool hasBoundary () const { return impl().hasBoundary(); }
+
+      template< class Quadrature, std::enable_if_t< std::is_convertible< Quadrature, Fem::CachingInterface >::value, int > = 0 >
+      RangeValueType boundary ( const Fem::QuadraturePointWrapper< Quadrature > &x, const DomainValueType &u ) const
+      {
+        return impl().boundary( SurfaceCachingPointType( x ), u );
+      }
+
+      template< class Quadrature, std::enable_if_t< !std::is_convertible< Quadrature, Fem::CachingInterface >::value, int > = 0 >
+      RangeValueType boundary ( const Fem::QuadraturePointWrapper< Quadrature > &x, const DomainValueType &u ) const
+      {
+        return impl().boundary( SurfaceElementPointType( x ), u );
+      }
+
+      template< class Quadrature, std::enable_if_t< std::is_convertible< Quadrature, Fem::CachingInterface >::value, int > = 0 >
+      auto linearizedBoundary ( const Fem::QuadraturePointWrapper< Quadrature > &x, const DomainValueType &u ) const
+      {
+        return impl().linearizedBoundary( SurfaceCachingPointType( x ), u );
+      }
+
+      template< class Quadrature, std::enable_if_t< !std::is_convertible< Quadrature, Fem::CachingInterface >::value, int > = 0 >
+      auto linearizedBoundary ( const Fem::QuadraturePointWrapper< Quadrature > &x, const DomainValueType &u ) const
+      {
+        return impl().linearizedBoundary( SurfaceElementPointType( x ), u );
+      }
+
+      bool hasSkeleton () const { return impl().hasSkeleton(); }
+
+      template< class Quadrature, std::enable_if_t< std::is_convertible< Quadrature, Fem::CachingInterface >::value, int > = 0 >
+      std::pair< RangeValueType, RangeValueType > skeleton ( const Fem::QuadraturePointWrapper< Quadrature > &xIn, const DomainValueType &uIn, const Fem::QuadraturePointWrapper< Quadrature > &xOut, const DomainValueType &uOut ) const
+      {
+        return impl().skeleton( SurfaceCachingPointType( xIn ), uIn, SurfaceCachingPointType( xOut ), uOut );
+      }
+
+      template< class Quadrature, std::enable_if_t< !std::is_convertible< Quadrature, Fem::CachingInterface >::value, int > = 0 >
+      std::pair< RangeValueType, RangeValueType > skeleton ( const Fem::QuadraturePointWrapper< Quadrature > &xIn, const DomainValueType &uIn, const Fem::QuadraturePointWrapper< Quadrature > &xOut, const DomainValueType &uOut ) const
+      {
+        return impl().skeleton( SurfaceElementPointType( xIn ), uIn, SurfaceElementPointType( xOut ), uOut );
+      }
+
+      template< class Quadrature, std::enable_if_t< std::is_convertible< Quadrature, Fem::CachingInterface >::value, int > = 0 >
+      auto linearizedSkeleton ( const Fem::QuadraturePointWrapper< Quadrature > &xIn, const DomainValueType &uIn, const Fem::QuadraturePointWrapper< Quadrature > &xOut, const DomainValueType &uOut ) const
+      {
+        return impl().linearizedSkeleton( SurfaceCachingPointType( xIn ), uIn, SurfaceCachingPointType( xOut ), uOut );
+      }
+
+      template< class Quadrature, std::enable_if_t< !std::is_convertible< Quadrature, Fem::CachingInterface >::value, int > = 0 >
+      auto linearizedSkeleton ( const Fem::QuadraturePointWrapper< Quadrature > &xIn, const DomainValueType &uIn, const Fem::QuadraturePointWrapper< Quadrature > &xOut, const DomainValueType &uOut ) const
+      {
+        return impl().linearizedSkeleton( SurfaceElementPointType( xIn ), uIn, SurfaceElementPointType( xOut ), uOut );
+      }
+
+      bool hasDirichletBoundary () const
+      {
+        return impl().hasDirichletBoundary();
+      }
+      bool isDirichletIntersection( const IntersectionType& inter, DirichletComponentType &dirichletComponent )
+      {
+        return impl().isDirichletIntersection(inter,dirichletComponent);
+      }
+      void dirichlet( int bndId, const DomainType &x,RRangeType &value) const
+      {
+        return impl().dirichlet(bndId,x,value);
+      }
+
+      RRangeType gradStabilization ( const DomainType &x, const DRangeType &u ) const
+      {
+        return impl().gradStabilization(x,u);
+      }
+      RRangeType linGradStabilization ( const DomainType &x, const DRangeType &u ) const
+      {
+        return impl().linGradStabilization(x,u);
+      }
+      RRangeType massStabilization ( const DomainType &x, const DRangeType &u ) const
+      {
+        return impl().massStabilization(x,u);
+      }
+      RRangeType linMassStabilization ( const DomainType &x, const DRangeType &u ) const
+      {
+        return impl().linMassStabilization(x,u);
+      }
+
+      auto get() const { return impl_.get(); }
+    private:
+      const Interface &impl () const { assert( impl_ ); return *impl_; }
+      Interface &impl () { assert( impl_ ); return *impl_; }
+
+      std::unique_ptr< Interface > impl_;
+    };
+
+  }
+}
 
 
 #endif // #ifndef ELLIPTC_MODEL_HH

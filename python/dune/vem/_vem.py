@@ -184,16 +184,20 @@ def space(view, order=1, dimRange=1,
                         conforming=False, basisChoice=basisChoice)
 #########################################################
 
-from dune.fem.model import elliptic
+# from dune.fem.model import elliptic
+from dune.fem.model import integrands
 from dune.vem.patch import transform
 
 def vemModel(view, equation, space,
         gradStabilization=None, massStabilization=None,
         *args, **kwargs):
-    VM = 'dune/vem/operator/diffusionmodel.hh'
-    return elliptic(view, equation, virtualModel=VM,
-              modelPatch=transform(space,gradStabilization,massStabilization), *args, **kwargs)
-
+    # VM = 'dune/vem/operator/diffusionmodel.hh'
+    # return elliptic(view, equation, virtualModel=VM,
+    #                 modelPatch=transform(space,gradStabilization,massStabilization), *args, **kwargs)
+    return integrands(view, equation,
+                      modelPatch=transform(space,gradStabilization,massStabilization),
+                      includes=["dune/vem/py/integrands.hh"],
+                      *args, **kwargs)
 
 def vemScheme(model, space=None, solver=None, parameters={},
               gradStabilization=None, massStabilization=None):
@@ -239,15 +243,21 @@ def vemScheme(model, space=None, solver=None, parameters={},
         operator = op
 
     spaceType = space._typeName
-    modelType = "VEMDiffusionModel< " +\
-          "typename " + spaceType + "::GridPartType, " +\
-          spaceType + "::dimRange, " +\
-          spaceType + "::dimRange, " +\
-          "typename " + spaceType + "::RangeFieldType >"
+    # modelType = "VEMDiffusionModel< " +\
+    #       "typename " + spaceType + "::GridPartType, " +\
+    #       spaceType + "::dimRange, " +\
+    #       spaceType + "::dimRange, " +\
+    #       "typename " + spaceType + "::RangeFieldType >"
+
+    includes += ["dune/vem/operator/diffusionmodel.hh"]
+    valueType = 'std::tuple< typename ' + spaceType + '::RangeType, typename ' + spaceType + '::JacobianRangeType >'
+    modelType = 'Dune::Fem::VirtualizedVemIntegrands< typename ' + spaceType + '::GridPartType, ' + model._domainValueType + ", " + model._rangeValueType+ ' >'
 
     return femschemeModule(space,model,includes,solver,operator,
             parameters=parameters,
-            modelType=modelType)
+            modelType=modelType
+            )
+
 
 def vemOperator(model, domainSpace=None, rangeSpace=None):
     # from dune.fem.model._models import elliptic as makeElliptic

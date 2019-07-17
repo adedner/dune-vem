@@ -27,7 +27,6 @@ namespace Dune
     // -------------------
 
     // TODO: add template arguments for ValueProjection and JacobianProjection
-
     template< class Entity, class ShapeFunctionSet >
     class VEMBasisFunctionSet
     {
@@ -157,7 +156,6 @@ namespace Dune
       }
 
       // TODO: use lower order shape function set for Jacobian
-
       template< class Quadrature, class DofVector, class Jacobians >
       void jacobianAll ( const Quadrature &quadrature, const DofVector &dofs, Jacobians &jacobians ) const
       {
@@ -222,45 +220,11 @@ namespace Dune
 
       const EntityType &entity () const { assert( entity_ ); return *entity_; }
 
-#if 0 // probably not needed
-      /*******************************************************/
-      // required method to use this as shape function
-      /*******************************************************/
-      template< class Point, class Functor >
-      void evaluateEach ( const Point &x, Functor functor ) const
-      {
-        std::vector<RangeType> values(size());
-        evaluateAll(x,values);
-        for (std::size_t i=0;i<size();++i)
-          functor(i,values[i]);
-      }
-      template< class Point, class Functor >
-      void jacobianEach ( const Point &x, Functor functor ) const
-      {
-        std::vector<JacobianRangeType> values(size());
-        jacobianAll(x,values);
-        for (std::size_t i=0;i<size();++i)
-          functor(i,values[i]);
-      }
-      template< class Point, class Functor >
-      void hessianEach ( const Point &x, Functor functor ) const
-      {
-        DUNE_THROW( NotImplemented, "hessians not implemented for VEMBasisFunctionSet" );
-      }
-      /**********************************************************/
-#endif
-
     private:
       template< class Point >
       DomainType position ( const Point &x ) const
       {
         return Fem::coordinate(x);
-#if 0
-        DomainType y = entity().geometry().global( Fem::coordinate( x ) ) - bbox_.first;
-        for( int k = 0; k < dimDomain; ++k )
-          y[ k ] /= (bbox_.second[ k ] - bbox_.first[ k ]);
-        return y;
-#endif
       }
 
       const EntityType *entity_ = nullptr;

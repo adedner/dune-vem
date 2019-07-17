@@ -33,7 +33,7 @@ from dune.vem import voronoiCells
 from ufl import *
 import dune.ufl
 
-order = 1
+order = 3
 
 dune.fem.parameter.append({"fem.verboserank": 0})
 
@@ -43,7 +43,7 @@ dune.fem.parameter.append({"fem.verboserank": 0})
 
 # <codecell>
 methods = [ ### "[space,scheme,spaceKwrags]"
-            ["lagrange","h1",{}],
+            ["lagrange","galerkin",{}],
             ["vem","vem",{"testSpaces":[0,order-2,order-1]}],  # bubble
             ["vem","vem",{"conforming":True}],
             ["vem","vem",{"conforming":False}],
@@ -70,6 +70,8 @@ v = TestFunction(uflSpace)
 massCoeff = 1+sin(dot(x,x))
 diffCoeff = 1-0.9*cos(dot(x,x))
 a = (diffCoeff*inner(grad(u),grad(v)) + massCoeff*dot(u,v) ) * dx
+laplace = lambda w: div(grad(w[0]))
+# a += laplace(u)*laplace(v) * dx
 
 # finally the right hand side and the boundary conditions
 b = (-diffCoeff*div(grad(exact[0])) + massCoeff*exact[0] ) * v[0] * dx
@@ -81,7 +83,7 @@ dbc = [dune.ufl.DirichletBC(uflSpace, exact, i+1) for i in range(4)]
 
 # <codecell>
 constructor = cartesianDomain([-0.5,-0.5],[1,1],[1,1])
-polyGrid = create.grid("polygrid", voronoiCells(constructor,800,"voronoiseeds",True) )
+polyGrid = create.grid("polygrid", voronoiCells(constructor,50,"voronoiseeds",True) )
 
 # <markdowncell>
 # In general we can construct a `polygrid` by providing a dictionary with
@@ -123,21 +125,22 @@ def polygons(en,x):
 # <codecell>
 def compute(grid, space, schemeName):
     # solve the pde
+    df = space.interpolate([0],name="solution")
     if schemeName == "vem":
         scheme = create.scheme(schemeName, [a==b, *dbc], space, solver="cg",
                        gradStabilization=diffCoeff,
                        massStabilization=massCoeff,
                      parameters=parameters)
     else:
-        scheme = create.scheme(schemeName, [a==b, *dbc], space, solver="cg", parameters=parameters)
-    df = space.interpolate([0],name="solution")
+        scheme = create.scheme(schemeName, [a==b, *dbc], space,
+                solver="cg", parameters=parameters)
     info = scheme.solve(target=df)
-    # df.interpolate(exact)
+    # df.interpolate(exact); info = {"linear_iterations":-1}
 
     # compute the error
     edf = exact-df
-    errors = [ math.sqrt(e) for e in
-               integrate(grid, [inner(edf,edf),inner(grad(edf),grad(edf))], order=8) ]
+    err = [inner(edf,edf),inner(grad(edf),grad(edf))] # ,laplace(edf)**2]
+    errors = [ math.sqrt(e) for e in integrate(grid, err, order=8) ]
 
     return df, errors, info
 
@@ -152,6 +155,7 @@ for i,m in enumerate(methods):
     dfs,errors,info = compute(polyGrid, space, m[1])
     print("method:(",m[0],m[2],")",
           "Size: ",space.size, "L^2: ", errors[0], "H^1: ", errors[1],
+          # "laplace: ", errors[2],
           info["linear_iterations"], flush=True)
     dfs.plot(figure=(fig,figPos+i),gridLines=None, colorbar="horizontal")
 pyplot.show()

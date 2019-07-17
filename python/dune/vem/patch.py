@@ -6,7 +6,7 @@ from ufl.core.expr import Expr
 from dune.source.cplusplus import Variable, UnformattedExpression, AccessModifier
 from ufl.algorithms import expand_compounds, expand_derivatives, expand_indices, expand_derivatives
 
-def codeVEM(self, name='Model', targs=[]):
+def codeVEM(self, name, targs):
     code = self._code(name,targs)
 
     u = self.trialFunction
@@ -61,36 +61,38 @@ def codeVEM(self, name='Model', targs=[]):
             'RRangeType', 'gradStabilization',
             args=['const Point &x',
                   'const DRangeType &u'],
-            targs=['class Point'], static=False, const=True,
+            targs=['class Point','class DRangeType'], static=False, const=True,
             predefined=predefined)
     generateMethod(code, dgStab,
             'RRangeType', 'linGradStabilization',
             args=['const Point &x',
                   'const DRangeType &u'],
-            targs=['class Point'], static=False, const=True,
+            targs=['class Point','class DRangeType'], static=False, const=True,
             predefined=predefined)
     generateMethod(code, mStab,
             'RRangeType', 'massStabilization',
             args=['const Point &x',
                   'const DRangeType &u'],
-            targs=['class Point'], static=False, const=True,
+            targs=['class Point','class DRangeType'], static=False, const=True,
             predefined=predefined)
     generateMethod(code, dmStab,
             'RRangeType', 'linMassStabilization',
             args=['const Point &x',
                   'const DRangeType &u'],
-            targs=['class Point'], static=False, const=True,
+            targs=['class Point','class DRangeType'], static=False, const=True,
             predefined=predefined)
 
 
     return code
 
 def transform(space,gStab,mStab):
-    def transform_(Class):
-        Class._code = Class.code
-        Class.code = codeVEM
-        Class.space = space
-        Class.gStab = gStab
-        Class.mStab = mStab
-        Class.signature += 'vem'
+    def transform_(model):
+        if model.baseName == "vemintegrands":
+            return
+        model._code = model.code
+        model.code  = lambda *args,**kwargs: codeVEM(model,*args,**kwargs)
+        model.space = space
+        model.gStab = gStab
+        model.mStab = mStab
+        model.baseName = "vemintegrands"
     return transform_

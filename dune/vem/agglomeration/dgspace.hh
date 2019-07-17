@@ -84,8 +84,10 @@ namespace Dune
 
       struct ScalarShapeFunctionSet
         : public Dune::Fem::OrthonormalShapeFunctionSet< ScalarShapeFunctionSpaceType >
+        // : public Dune::Fem::LegendreShapeFunctionSet< ScalarShapeFunctionSpaceType,true >
       {
         typedef Dune::Fem::OrthonormalShapeFunctionSet< ScalarShapeFunctionSpaceType >   BaseType;
+        // typedef Dune::Fem::LegendreShapeFunctionSet< ScalarShapeFunctionSpaceType,true >   BaseType;
 
         static constexpr int numberShapeFunctions =
               Dune::Fem::OrthonormalShapeFunctions< ScalarShapeFunctionSpaceType::dimDomain >::size(polOrder);

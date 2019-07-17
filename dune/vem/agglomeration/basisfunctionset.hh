@@ -15,6 +15,7 @@
 
 #include <dune/vem/agglomeration/boundingbox.hh>
 #include <dune/vem/agglomeration/functor.hh>
+// #include <dune/vem/misc/highorderquadratures.hh>
 
 namespace Dune
 {
@@ -53,12 +54,8 @@ namespace Dune
       {
         Transformation() {}
         explicit Transformation ( const BoundingBoxType &bbox )
-        : extentInv_( bbox.second - bbox.first )
-        , bbox_(bbox)
-        {
-          std::transform(extentInv_.begin(),extentInv_.end(),extentInv_.begin(),
-              [](const double &x){return 1./x;});
-        }
+        : bbox_(bbox)
+        {}
 
         JacobianRangeType operator() ( JacobianRangeType jacobian, bool transpose=false ) const
         {
@@ -74,38 +71,29 @@ namespace Dune
           return jacobian;
         }
 
-        HessianRangeType operator() ( HessianRangeType hessian ) const
+        HessianRangeType operator() ( HessianRangeType hessian, bool transpose=false ) const
         {
           for( int i = 0; i < RangeType::dimension; ++i )
-            applyScalar( hessian[ i ] );
+            applyScalar( hessian[ i ], transpose );
           return hessian;
         }
 
         template< class ScalarHessian >
-        Fem::MakeVectorialExpression< ScalarHessian, HessianRangeType > operator() ( Fem::MakeVectorialExpression< ScalarHessian, HessianRangeType > hessian ) const
+        Fem::MakeVectorialExpression< ScalarHessian, HessianRangeType > operator() ( Fem::MakeVectorialExpression< ScalarHessian, HessianRangeType > hessian, bool transpose ) const
         {
-          applyScalar( hessian.scalar()[ 0 ] );
+          applyScalar( hessian.scalar()[ 0 ], transpose );
           return hessian;
         }
 
         void applyScalar ( FieldVector< RangeFieldType, dimDomain > &jacobian, bool transpose=false ) const
         {
-#if 0
-          for( int j = 0; j < dimDomain; ++j )
-            jacobian[ j ] *= extentInv_[ j ];
-#else
           bbox_.gradientTransform(jacobian,transpose);
-#endif
         }
 
-        void applyScalar ( FieldMatrix< RangeFieldType, dimDomain, dimDomain > &hessian ) const
+        void applyScalar ( FieldMatrix< RangeFieldType, dimDomain, dimDomain > &hessian, bool transpose=false ) const
         {
-          for( int j = 0; j < dimDomain; ++j )
-            for( int k = 0; k < dimDomain; ++k )
-              hessian[ j ][ k ] *= (extentInv_[ j ] * extentInv_[ k ]);
+          bbox_.hessianTransform(hessian,transpose);
         }
-
-        DomainType extentInv_;
         BoundingBoxType bbox_;
       };
 
@@ -294,13 +282,13 @@ namespace Dune
           functor(beta,transformation_( jacs_[beta] ));
       }
 
-#if 0 // TODO: needs correct 'transformation'
       template< class Point, class Functor >
       void hessianEach ( const Point &x, Functor functor ) const
       {
-        shapeFunctionSet_.hessianEach( position( x ), functor );
+        sfEvaluateAll(x,hess_);
+        for (std::size_t beta=0;beta<size();++beta)
+          functor(beta,transformation_( hess_[beta] ));
       }
-#endif
 
     private:
       template< class Point >
@@ -384,6 +372,14 @@ namespace Dune
       typedef typename BBBasisFunctionSetType::RangeType RangeType;
       typedef typename BBBasisFunctionSetType::DomainFieldType DomainFieldType;
 
+#if 1 // FemQuads
+      typedef Dune::Fem::ElementQuadrature<GridPart,0> Quadrature0Type;
+      typedef Dune::Fem::ElementQuadrature<GridPart,1> Quadrature1Type;
+#else
+      typedef Dune::Fem::ElementQuadrature<GridPart,0,Dune::Fem::HighOrderQuadratureTraits> Quadrature0Type;
+      typedef Dune::Fem::ElementQuadrature<GridPart,1,Dune::Fem::HighOrderQuadratureTraits> Quadrature1Type;
+#endif
+
       const int polOrder = shapeFunctionSet.order();
       const auto &gridPart = agglomeration.gridPart();
 
@@ -424,7 +420,7 @@ namespace Dune
 
         // first collect all weights and basis function evaluation needed
         // to compute mass matrix over this polygon
-        Fem::ElementQuadrature< GridPart, 0 > quadrature( element , 2*polOrder );
+        Quadrature0Type quadrature( element , 2*polOrder );
         const std::size_t nop = quadrature.nop();
         for (std::size_t i=0;i<values.size(); ++i)
           values[i].resize( nop * entitySeeds[agglomerate].size() );
@@ -435,7 +431,7 @@ namespace Dune
           const ElementType &element = gridPart.entity( entitySeed );
           const auto geometry = element.geometry();
           BBBasisFunctionSetType basisFunctionSet( element, bbox, false, shapeFunctionSet );
-          Fem::ElementQuadrature< GridPart, 0 > quadrature( element, 2*polOrder );
+          Quadrature0Type quadrature( element, 2*polOrder );
           for( std::size_t qp = 0; qp < nop; ++qp, ++e )
           {
             weights[e] = geometry.integrationElement( quadrature.point( qp ) ) * quadrature.weight( qp );

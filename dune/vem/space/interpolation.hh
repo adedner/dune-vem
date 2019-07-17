@@ -15,8 +15,10 @@
 
 #include <dune/fem/quadrature/elementquadrature.hh>
 #include <dune/fem/space/shapefunctionset/orthonormal.hh>
+// #include <dune/fem/space/shapefunctionset/legendre.hh>
 #include <dune/vem/agglomeration/basisfunctionset.hh>
 // #include <dune/vem/agglomeration/shapefunctionset.hh>
+// #include <dune/vem/misc/highorderquadratures.hh>
 
 namespace Dune
 {
@@ -37,13 +39,20 @@ namespace Dune
       typedef typename GridPartType::IntersectionType IntersectionType;
 
     private:
+#if 1 // FemQuads
       typedef Dune::Fem::ElementQuadrature<GridPartType,0> InnerQuadratureType;
       typedef Dune::Fem::ElementQuadrature<GridPartType,1> EdgeQuadratureType;
+#else
+      typedef Dune::Fem::ElementQuadrature<GridPartType,0,Dune::Fem::HighOrderQuadratureTraits> InnerQuadratureType;
+      typedef Dune::Fem::ElementQuadrature<GridPartType,1,Dune::Fem::HighOrderQuadratureTraits> EdgeQuadratureType;
+#endif
       typedef typename ElementType::Geometry::ctype ctype;
       typedef Dune::Fem::FunctionSpace<double,double,GridPartType::dimensionworld-1,1> EdgeFSType;
       typedef Dune::Fem::OrthonormalShapeFunctionSet<EdgeFSType> EdgeShapeFunctionSetType;
+      // typedef Dune::Fem::LegendreShapeFunctionSet<EdgeFSType,true> EdgeShapeFunctionSetType;
       typedef Dune::Fem::FunctionSpace<double,double,GridPartType::dimensionworld,1> InnerFSType;
       typedef Dune::Fem::OrthonormalShapeFunctionSet<InnerFSType> InnerShapeFunctionSetType;
+      // typedef Dune::Fem::LegendreShapeFunctionSet<InnerFSType,true> InnerShapeFunctionSetType;
 
     public:
       explicit AgglomerationVEMInterpolation ( const AgglomerationIndexSet &indexSet, unsigned int polOrder, bool useOnb ) noexcept

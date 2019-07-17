@@ -28,6 +28,7 @@
 #include <dune/vem/space/interpolate.hh>
 
 #include <dune/vem/space/test.hh>
+// #include <dune/vem/misc/highorderquadratures.hh>
 
 namespace Dune
 {
@@ -129,10 +130,19 @@ namespace Dune
       typedef typename BaseType::GridPartType GridPartType;
       typedef Dune::Fem::FunctionSpace<double,double,GridPartType::dimensionworld-1,1> EdgeFSType;
       typedef Dune::Fem::OrthonormalShapeFunctionSet<EdgeFSType> EdgeShapeFunctionSetType;
+      // typedef Dune::Fem::LegendreShapeFunctionSet<EdgeFSType,true> EdgeShapeFunctionSetType;
       typedef typename BasisFunctionSetType::DomainFieldType DomainFieldType;
       typedef typename BasisFunctionSetType::DomainType DomainType;
       typedef typename GridPart::template Codim< 0 >::EntityType ElementType;
       typedef typename GridPart::template Codim< 0 >::EntitySeedType ElementSeedType;
+
+#if 1 // FemQuads
+      typedef Dune::Fem::ElementQuadrature<GridPartType,0> Quadrature0Type;
+      typedef Dune::Fem::ElementQuadrature<GridPartType,1> Quadrature1Type;
+#else
+      typedef Dune::Fem::ElementQuadrature<GridPartType,0,Dune::Fem::HighOrderQuadratureTraits> Quadrature0Type;
+      typedef Dune::Fem::ElementQuadrature<GridPartType,1,Dune::Fem::HighOrderQuadratureTraits> Quadrature1Type;
+#endif
 
 
       typedef DynamicMatrix< typename BasisFunctionSetType::DomainFieldType > Stabilization;
@@ -327,7 +337,7 @@ namespace Dune
           interpolation_( shapeFunctionSet, D );
 
           // compute mass matrices Hp, HpGrad, and the gradient matrices G^l
-          Fem::ElementQuadrature< GridPart, 0 > quadrature( element, 2*polOrder );
+          Quadrature0Type quadrature( element, 2*polOrder );
           for( std::size_t qp = 0; qp < quadrature.nop(); ++qp )
           {
             const DomainFieldType weight = geometry.integrationElement( quadrature.point( qp ) ) * quadrature.weight( qp );
@@ -387,8 +397,7 @@ namespace Dune
             } // testing
 
             // now compute int_e Phi_mask[i] m_alpha
-            typedef Fem::ElementQuadrature< GridPart, 1 > EdgeQuadratureType;
-            EdgeQuadratureType quadrature( gridPart(), intersection, 2*polOrder, EdgeQuadratureType::INSIDE );
+            Quadrature1Type quadrature( gridPart(), intersection, 2*polOrder, Quadrature1Type::INSIDE );
             for( std::size_t qp = 0; qp < quadrature.nop(); ++qp )
             {
               auto x = quadrature.localPoint(qp);
@@ -452,7 +461,7 @@ namespace Dune
               const ElementType &element = gridPart().entity( entitySeed );
               BoundingBoxBasisFunctionSet< GridPart, ScalarShapeFunctionSetType > shapeFunctionSet( element, bbox,
                   useOnb_, scalarShapeFunctionSet_ );
-              Fem::ElementQuadrature< GridPart, 0 > quad( element, 2*polOrder );
+              Quadrature0Type quad( element, 2*polOrder );
               for( std::size_t qp = 0; qp < quad.nop(); ++qp )
               {
                 shapeFunctionSet.jacobianEach( quad[qp], [ & ] ( std::size_t alpha, FieldMatrix< DomainFieldType, 1,2 > phi ) {
