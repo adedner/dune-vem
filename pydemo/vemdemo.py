@@ -46,8 +46,8 @@ methods = [ ### "[space,scheme,spaceKwrags]"
             ["lagrange","galerkin",{}],
             # ["vem","vem",{"testSpaces":[0,order-2,order-1]}],  # bubble
             # ["vem","vem",{"conforming":True}],
-            # ["vem","vem",{"conforming":False}],
-            ["bbdg","bbdg",{}],
+            ["vem","vem",{"conforming":False}],
+            # ["bbdg","bbdg",{}],
    ]
 parameters = {"newton.linear.tolerance": 1e-12,
               "newton.linear.preconditioning.method": "jacobi",
@@ -70,7 +70,7 @@ v = TestFunction(uflSpace)
 massCoeff = 1+sin(dot(x,x))
 diffCoeff = 1-0.9*cos(dot(x,x))
 a = (diffCoeff*inner(grad(u),grad(v)) + massCoeff*dot(u,v) ) * dx
-laplace = lambda w: div(grad(w[0]))
+laplace = lambda w: w[0] # div(grad(w[0]))
 # a += laplace(u)*laplace(v) * dx
 
 # finally the right hand side and the boundary conditions
@@ -159,6 +159,10 @@ for i,m in enumerate(methods):
           info["linear_iterations"], flush=True)
     dfs.plot(figure=(fig,figPos+i),gridLines=None, colorbar="horizontal")
 pyplot.show()
+
+# get me out of here\
+import os
+os._exit(0)
 
 # <markdowncell>
 # # Nonlinear elliptic problem
