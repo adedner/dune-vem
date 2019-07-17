@@ -44,9 +44,9 @@ dune.fem.parameter.append({"fem.verboserank": 0})
 # <codecell>
 methods = [ ### "[space,scheme,spaceKwrags]"
             ["lagrange","galerkin",{}],
-            ["vem","vem",{"testSpaces":[0,order-2,order-1]}],  # bubble
-            ["vem","vem",{"conforming":True}],
-            ["vem","vem",{"conforming":False}],
+            # ["vem","vem",{"testSpaces":[0,order-2,order-1]}],  # bubble
+            # ["vem","vem",{"conforming":True}],
+            # ["vem","vem",{"conforming":False}],
             ["bbdg","bbdg",{}],
    ]
 parameters = {"newton.linear.tolerance": 1e-12,
@@ -126,20 +126,20 @@ def polygons(en,x):
 def compute(grid, space, schemeName):
     # solve the pde
     df = space.interpolate([0],name="solution")
-    if schemeName == "vem":
-        scheme = create.scheme(schemeName, [a==b, *dbc], space, solver="cg",
-                       gradStabilization=diffCoeff,
-                       massStabilization=massCoeff,
-                     parameters=parameters)
-    else:
-        scheme = create.scheme(schemeName, [a==b, *dbc], space,
-                solver="cg", parameters=parameters)
-    info = scheme.solve(target=df)
-    # df.interpolate(exact); info = {"linear_iterations":-1}
+    # if schemeName == "vem":
+    #     scheme = create.scheme(schemeName, [a==b, *dbc], space, solver="cg",
+    #                    gradStabilization=diffCoeff,
+    #                    massStabilization=massCoeff,
+    #                  parameters=parameters)
+    # else:
+    #     scheme = create.scheme(schemeName, [a==b, *dbc], space,
+    #             solver="cg", parameters=parameters)
+    # info = scheme.solve(target=df)
+    df.interpolate(exact); info = {"linear_iterations":-1}
 
     # compute the error
     edf = exact-df
-    err = [inner(edf,edf),inner(grad(edf),grad(edf))] # ,laplace(edf)**2]
+    err = [inner(edf,edf),inner(grad(edf),grad(edf)),laplace(edf)**2]
     errors = [ math.sqrt(e) for e in integrate(grid, err, order=8) ]
 
     return df, errors, info
@@ -155,7 +155,7 @@ for i,m in enumerate(methods):
     dfs,errors,info = compute(polyGrid, space, m[1])
     print("method:(",m[0],m[2],")",
           "Size: ",space.size, "L^2: ", errors[0], "H^1: ", errors[1],
-          # "laplace: ", errors[2],
+          "laplace: ", errors[2],
           info["linear_iterations"], flush=True)
     dfs.plot(figure=(fig,figPos+i),gridLines=None, colorbar="horizontal")
 pyplot.show()
