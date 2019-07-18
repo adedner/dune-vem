@@ -173,14 +173,20 @@ namespace Dune
       {
         jacobian = JacobianRangeType( 0 );
         shapeFunctionSet_.evaluateEach( position( x ), [ this, &dofs, &jacobian ] ( std::size_t alpha, RangeType phi_alpha ) {
+            const auto &jacobianProjectionAlpha = jacobianProjection_[alpha];
             for( std::size_t j = 0; j < size(); ++j )
             {
+              jacobian[0].axpy( dofs[j]*phi_alpha[0], jacobianProjectionAlpha[j]);
+#if 0
+              const auto &jacobianProjectionAlphaJ = jacobianProjectionAlpha[j];
               for( int k = 0; k < dimDomain; ++k )
               {
-                double v = jacobianProjection_[ alpha ][ j ][ k ];
-                FieldMatrixColumn< JacobianRangeType > jacobian_k( jacobian, k );
-                jacobian_k.axpy( jacobianProjection_[ alpha ][ j ][ k ]*dofs[ j ], phi_alpha );
+                // double v = jacobianProjection_[ alpha ][ j ][ k ];
+                // FieldMatrixColumn< JacobianRangeType > jacobian_k( jacobian, k );
+                // jacobian_k.axpy( jacobianProjection_[ alpha ][ j ][ k ]*dofs[ j ], phi_alpha );
+                jacobian[0][k] += jacobianProjectionAlphaJ[ k ]*dofs[ j ]*phi_alpha[0];
               }
+#endif
             }
           } );
       }
@@ -193,15 +199,7 @@ namespace Dune
         shapeFunctionSet_.evaluateEach( position(x), [ this, &jacobians ] ( std::size_t alpha, RangeType phi_alpha ) {
             const auto &jacobianProjectionAlpha = jacobianProjection_[alpha];
             for( std::size_t j = 0; j < size(); ++j )
-            {
-              const auto &jacobianProjectionAlphaJ = jacobianProjectionAlpha[j];
-              for( int k = 0; k < dimDomain; ++k )
-              {
-                  jacobians[j][k][l] += jacobianProjectionAlphaJ[k]*phi_alpha[0];
-//                 FieldMatrixColumn< JacobianRangeType > jacobian_jk( jacobians[ j ], k );
-//                 jacobian_jk.axpy( jacobianProjectionAlphaJ[ k ], phi_alpha );
-              }
-            }
+              jacobians[j][0].axpy( phi_alpha[0], jacobianProjectionAlpha[j]);
         } );
       }
 
@@ -227,7 +225,7 @@ namespace Dune
       {
         const std::size_t nop = quadrature.nop();
         for(std::size_t qp = 0; qp <nop; ++qp )
-            hessianAll( quadrature[ qp ], dofs, hessians[ qp ] );
+          hessianAll( quadrature[ qp ], dofs, hessians[ qp ] );
       }
 
       template< class Point, class DofVector >
