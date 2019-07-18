@@ -31,7 +31,7 @@ namespace Dune
       typedef VemAgglomerationIndexSet< GridPart, Allocator > ThisType;
       typedef AgglomerationIndexSet< GridPart, Allocator > BaseType;
 
-      std::vector< std::vector <<int>> testSpaces_;
+      std::vector <int> testSpaces_;
     public:
       typedef GridPart GridPartType;
 

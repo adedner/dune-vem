@@ -175,19 +175,7 @@ namespace Dune
         shapeFunctionSet_.evaluateEach( position( x ), [ this, &dofs, &jacobian ] ( std::size_t alpha, RangeType phi_alpha ) {
             const auto &jacobianProjectionAlpha = jacobianProjection_[alpha];
             for( std::size_t j = 0; j < size(); ++j )
-            {
               jacobian[0].axpy( dofs[j]*phi_alpha[0], jacobianProjectionAlpha[j]);
-#if 0
-              const auto &jacobianProjectionAlphaJ = jacobianProjectionAlpha[j];
-              for( int k = 0; k < dimDomain; ++k )
-              {
-                // double v = jacobianProjection_[ alpha ][ j ][ k ];
-                // FieldMatrixColumn< JacobianRangeType > jacobian_k( jacobian, k );
-                // jacobian_k.axpy( jacobianProjection_[ alpha ][ j ][ k ]*dofs[ j ], phi_alpha );
-                jacobian[0][k] += jacobianProjectionAlphaJ[ k ]*dofs[ j ]*phi_alpha[0];
-              }
-#endif
-            }
           } );
       }
 
@@ -203,23 +191,6 @@ namespace Dune
         } );
       }
 
-//     template< class Point, class DofVector >
-//       void jacobianAll ( const Point &x, const DofVector &dofs, JacobianRangeType &jacobian ) const
-//       {
-//         jacobian = JacobianRangeType( 0 );
-//         shapeFunctionSet_.evaluateEach( position( x ), [ this, &dofs, &jacobian ] ( std::size_t alpha, RangeType phi_alpha ) {
-//             for( std::size_t j = 0; j < size(); ++j )
-//             {
-//               for( int k = 0; k < dimDomain; ++k )
-//               {
-//                 double v = jacobianProjection_[ alpha ][ j ][ k ];
-//                 FieldMatrixColumn< JacobianRangeType > jacobian_k( jacobian, k );
-//                 jacobian_k.axpy( jacobianProjection_[ alpha ][ j ][ k ]*dofs[ j ], phi_alpha );
-//               }
-//             }
-//           } );
-//       }
-
       template< class Quadrature, class DofVector, class Hessians >
       void hessianAll ( const Quadrature &quadrature, const DofVector &dofs, Hessians &hessians ) const
       {
@@ -233,19 +204,10 @@ namespace Dune
       {
         hessian = HessianRangeType( 0 );
         shapeFunctionSet_.evaluateEach( position(x), [this, &dofs, &hessian ] ( std::size_t alpha, RangeType phi_alpha ) {
-        for( std::size_t j=0; j< size(); ++j )
-        {
-            for( int k =0; k < dimDomain; ++k )
-            {
-                for (int l =0; l < dimDomain; ++l)
-                {
-                    double v = hessianProjection_[ alpha ][ j ][ k ][ l ];
-                    FieldMatrixColumn< HessianRangeType > hessian_l(hessian, l);
-                    hessian_l.axpy( hessianProjection_[alpha ][ j ][ k ][ l ]*dofs[ l ], phi_alpha);
-                }
-            }
-        }
-        }
+            const auto &hessianProjectionAlpha = hessianProjection_[alpha];
+            for( std::size_t j = 0; j < size(); ++j )
+              hessian[0].axpy( dofs[j]*phi_alpha[0], hessianProjectionAlpha[j]);
+        } );
       }
 
       template< class Point, class Hessians > const
@@ -255,24 +217,21 @@ namespace Dune
         std::fill( hessians.begin(), hessians.end(), HessianRangeType( 0 ) );
         shapeFunctionSet_.evaluateEach( position(x), [ this, &hessians ] ( std::size_t alpha, RangeType phi_alpha ) {
             const auto &hessianProjectionAlpha = hessianProjection_[alpha];
-            //gives a vector of vector of hessian matrices
             for( std::size_t j = 0; j < size(); ++j )
-            {
-              const auto &hessianProjectionAlphaJ = hessianProjectionAlpha[j];
-              //selects the j-th vector of the outer vector
-              for( int k = 0; k < dimDomain; ++k )
-              {
-                  for( int l = 0; l < dimDomain; ++l)
-                  {
-                     //selects the k,l entry of the first matrix (since not dealng with vector field)
-                    hessians[j][0][k][l] += hessianProjectionAlphaJ[k][l]*phi_alpha[0];
-                  }
-                }
-            }
+              hessians[j][0].axpy( phi_alpha[0], hessianProjectionAlpha[j]);
         } );
       }
 
       const EntityType &entity () const { assert( entity_ ); return *entity_; }
+
+      template< class Point, class Factor >
+      void axpy ( const Point &x, const Factor &factor, DynamicVector<DomainType> &dofs ) const
+      {
+        shapeFunctionSet_.evaluateEach( position( x ), [ this, &factor, &dofs ] ( std::size_t alpha, RangeType phi_alpha ) {
+            for( std::size_t j = 0; j < size(); ++j )
+              dofs[ j ].axpy( phi_alpha[0]*valueProjection_[ alpha ][ j ], factor );
+          } );
+      }
 
     private:
       template< class Point >

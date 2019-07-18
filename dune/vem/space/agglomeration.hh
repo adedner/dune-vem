@@ -220,6 +220,21 @@ namespace Dune
         typename Traits::ScalarBasisFunctionSetType scalarBFS( entity, bbox, valueProjection, jacobianProjection, hessianProjection, std::move( bbScalarBasisFunctionSet ) );
         return BasisFunctionSetType( std::move( scalarBFS ) );
       }
+      const typename Traits::ScalarBasisFunctionSetType scalarBasisFunctionSet ( const EntityType &entity ) const
+      {
+        const std::size_t agglomerate = agglomeration().index( entity );
+        const auto &valueProjection = valueProjections_[ agglomerate ];
+        const auto &jacobianProjection = jacobianProjections_[ agglomerate ];
+        const auto &hessianProjection = hessianProjections_[ agglomerate ];
+        const auto &bbox = blockMapper_.indexSet().boundingBox(agglomerate);
+        // scalar ONB Basis proxy
+        typename Traits::DGTraitsType::ShapeFunctionSetType scalarShapeFunctionSet( &scalarShapeFunctionSet_ );
+        // scalar BB Basis
+        typename Traits::ScalarBBBasisFunctionSetType bbScalarBasisFunctionSet( entity, bbox,
+            useOnb_, std::move( scalarShapeFunctionSet ) );
+        // vectorial extended VEM Basis
+        return typename Traits::ScalarBasisFunctionSetType( entity, bbox, valueProjection, jacobianProjection, hessianProjection, std::move( bbScalarBasisFunctionSet ) );
+      }
 
       BlockMapperType &blockMapper () const { return blockMapper_; }
 
@@ -303,7 +318,7 @@ namespace Dune
       // set up matrices used for constructing gradient, value, and edge projections
       // Note: the code is set up with the assumption that the dofs suffice to compute the edge projection
       DynamicMatrix< DomainFieldType > D, C, Hp, HpGrad, HpInv, HpGradInv;
-      DynamicMatrix< DomainType > G, R;
+      DynamicMatrix< DomainType > R; // ,G //!!!
       DynamicMatrix< DomainFieldType > edgePhi;
 
       LeftPseudoInverse< DomainFieldType > pseudoInverse( numShapeFunctions );
@@ -311,7 +326,7 @@ namespace Dune
       // these are the matrices we need to compute
       valueProjections_.resize( agglomeration().size() );
       jacobianProjections_.resize( agglomeration().size() );
-      hessianProjections_.resize( aggloremation().size() );
+      hessianProjections_.resize( agglomeration().size() );
       stabilizations_.resize( agglomeration().size() );
 
       // start iteration over all polygons
@@ -324,7 +339,7 @@ namespace Dune
         C.resize( numShapeFunctions, numDofs, 0 );
         Hp.resize( numShapeFunctions, numShapeFunctions, 0 );
         HpGrad.resize( numGradShapeFunctions, numGradShapeFunctions, 0 );
-        G.resize( numGradShapeFunctions, numGradShapeFunctions, DomainType(0) );
+        //!!! G.resize( numGradShapeFunctions, numGradShapeFunctions, DomainType(0) );
         R.resize( numGradShapeFunctions, numDofs, DomainType(0) );
 
         // iterate over the triangles of this polygon
@@ -351,70 +366,15 @@ namespace Dune
                         beta<numGradShapeFunctions) // basis set is hierarchic so we can compute HpGrad using the order p shapeFunctionSet
                       HpGrad[alpha][beta] += phi[0]*psi[0]*weight;
                   } );
+#if 0 // !!!!
                 if (alpha<numGradShapeFunctions)
                   shapeFunctionSet.jacobianEach( quadrature[ qp ], [ & ] ( std::size_t beta, typename ScalarShapeFunctionSetType::JacobianRangeType psi ) {
                       if (beta<numGradShapeFunctions)
                         G[alpha][beta].axpy(phi[0]*weight, psi[0]);
                     } );
+#endif
               } );
           } // quadrature loop
-
-          // compute the boundary terms for the gradient projection
-          for( const auto &intersection : intersections( static_cast< typename GridPart::GridViewType >( gridPart() ), element ) )
-          {
-            // ignore edges inside the given polygon
-            if( !intersection.boundary() && (agglomeration().index( intersection.outside() ) == agglomerate) )
-              continue;
-            assert( intersection.conforming() );
-            auto normal = intersection.centerUnitOuterNormal();
-            std::vector<int> mask; // contains indices with Phi_mask[i] is attached to given edge
-            edgePhi.resize(edgeShapeFunctionSet_.size(),edgeShapeFunctionSet_.size(),0);
-            interpolation_( intersection, edgeShapeFunctionSet_, edgePhi, mask );
-            edgePhi.invert();
-
-            { // test edgePhi
-              assert( mask.size() == edgeShapeFunctionSet_.size() );
-              std::vector<double> lambda(numDofs);
-#if 1 // terrible hack!
-              bool succ = true;
-              for (int i=0;i<mask.size();++i)
-              {
-                std::fill(lambda.begin(),lambda.end(),0);
-                PhiEdge<GridPartType, Dune::DynamicMatrix<double>,EdgeShapeFunctionSetType>
-                  phiEdge(gridPart(),intersection,edgePhi,edgeShapeFunctionSet_,i); // behaves like Phi_mask[i] restricted to edge
-                interpolation_(element,phiEdge,lambda);
-                for (int k=0;k<numDofs;++k) // lambda should be 1 for k=mask[i] otherwise 0
-                  succ &= ( mask[i]==k? std::abs(lambda[k]-1)<1e-10: std::abs(lambda[k])<1e-10 );
-              }
-              if (!succ) std::swap(mask[0],mask[1]);
-#endif
-              for (int i=0;i<mask.size();++i)
-              {
-                std::fill(lambda.begin(),lambda.end(),0);
-                PhiEdge<GridPartType, Dune::DynamicMatrix<double>,EdgeShapeFunctionSetType>
-                  phiEdge(gridPart(),intersection,edgePhi,edgeShapeFunctionSet_,i); // behaves like Phi_mask[i] restricted to edge
-                interpolation_(element,phiEdge,lambda);
-                for (int k=0;k<numDofs;++k) // lambda should be 1 for k=mask[i] otherwise 0
-                  assert( mask[i]==k? std::abs(lambda[k]-1)<1e-10: std::abs(lambda[k])<1e-10 );
-              }
-            } // testing
-
-            // now compute int_e Phi_mask[i] m_alpha
-            Quadrature1Type quadrature( gridPart(), intersection, 2*polOrder, Quadrature1Type::INSIDE );
-            for( std::size_t qp = 0; qp < quadrature.nop(); ++qp )
-            {
-              auto x = quadrature.localPoint(qp);
-              auto y = intersection.geometryInInside().global(x);
-              const DomainFieldType weight = intersection.geometry().integrationElement( x ) * quadrature.weight( qp );
-              shapeFunctionSet.evaluateEach( y, [ & ] ( std::size_t alpha, FieldVector< DomainFieldType, 1 > phi ) {
-                 if (alpha<numGradShapeFunctions)
-                    edgeShapeFunctionSet_.evaluateEach( x, [ & ] ( std::size_t beta, FieldVector< DomainFieldType, 1 > psi ) {
-                        for (int s=0;s<mask.size();++s) // note that edgePhi is the transposed of the basis transform matrix
-                          R[alpha][mask[s]].axpy( edgePhi[beta][s]*psi[0]*phi[0]*weight, normal);
-                    } );
-              } );
-            } // quadrature loop
-          } // loop over intersections
         } // loop over triangles in agglomerate
 
         // finished agglomerating all auxiliary matrices
@@ -430,7 +390,7 @@ namespace Dune
         hessianProjection.resize( numShapeFunctions );
         for( std::size_t alpha = 0; alpha < numShapeFunctions; ++alpha ){
           jacobianProjection[ alpha ].resize( numDofs, DomainType( 0 ) );
-          hessianProjection[ alpha ].resize( numDofs, )
+          hessianProjection[ alpha ].resize( numDofs, 0 ); // typename hessianProjection[alpha]::value_type( 0 ) );
         }
         //type def for standard vector (to pick up re size for Hessian projection)
         // need to resize Hessian projection
@@ -453,6 +413,7 @@ namespace Dune
           HpGradInv = HpGrad;
           HpGradInv.invert();
 
+#if 0 //!!!
           auto Gtmp = G;
           for (std::size_t alpha=0; alpha<numGradShapeFunctions; ++alpha)
           {
@@ -487,6 +448,7 @@ namespace Dune
               }
             }
           } // test G matrix
+#endif
 
           // need to compute value projection first
            // now compute projection by multiplying with inverse mass matrix
@@ -497,6 +459,7 @@ namespace Dune
               valueProjection[alpha][i] = 0;
               for (std::size_t beta=0; beta<numShapeFunctions; ++beta)
                 valueProjection[alpha][i] += HpInv[alpha][beta]*C[beta][i];
+              //!!!
               // if (alpha<numGradShapeFunctions)
                 // for (std::size_t beta=0; beta<numGradShapeFunctions; ++beta)
                   // jacobianProjection[alpha][i].axpy(HpGradInv[alpha][beta],R[beta][i]);
@@ -517,85 +480,17 @@ namespace Dune
               valueProjection[alpha][i] = 0;
               for (std::size_t beta=0; beta<numShapeFunctions; ++beta)
                 valueProjection[alpha][i] += HpInv[alpha][beta]*C[beta][i];
+              //!!!!
               // if (alpha<numGradShapeFunctions)
                 // for (std::size_t beta=0; beta<numGradShapeFunctions; ++beta)
                   // jacobianProjection[alpha][i].axpy(HpGradInv[alpha][beta],R[beta][i]);
             }
           }
         } // have some inner moments
-        else
-        { // with no inner moments we didn't need to compute the inverse of the mass matrix H_{p-1} -
-          // it's simply 1/H0 so we implement this case separately
-          for (std::size_t i=0; i<numDofs; ++i)
-            jacobianProjection[0][i].axpy(1./H0, R[0][i]);
-        }
 
-#if 0
-        // compute energy norm stability scalling
-        std::vector<double> stabScaling(numDofs, 0);
-        std::vector<typename BasisFunctionSetType::JacobianRangeType> dphi(numDofs);
-        for( const ElementSeedType &entitySeed : entitySeeds[ agglomerate ] )
-        {
-          const ElementType &element = gridPart().entity( entitySeed );
-          const auto geometry = element.geometry();
-          const BasisFunctionSetType vemBaseSet = basisFunctionSet ( element );
-          Fem::ElementQuadrature< GridPart, 0 > quadrature( element, 2*polOrder );
-          for( std::size_t qp = 0; qp < quadrature.nop(); ++qp )
-          {
-            vemBaseSet.jacobianAll(quadrature[qp], dphi);
-            const auto &x = quadrature.point(qp);
-            const double weight = quadrature.weight(qp) * geometry.integrationElement(x);
-            for (int i=0;i<numDofs;++i)
-              stabScaling[i] += weight*(dphi[i][0]*dphi[i][0]);
-          }
-        }
-        std::cout << "stabscaling= " << std::flush;
-        for( std::size_t i = 0; i < numDofs; ++i )
-          std::cout << stabScaling[i] << " ";
-        std::cout << std::endl;
-#endif
-#if 1
-        // stabilization matrix
-        Stabilization S( numDofs, numDofs, 0 );
-        for( std::size_t i = 0; i < numDofs; ++i )
-          S[ i ][ i ] = DomainFieldType( 1 );
-        for( std::size_t i = 0; i < numDofs; ++i )
-          for( std::size_t alpha = 0; alpha < numShapeFunctions; ++alpha )
-            for( std::size_t j = 0; j < numDofs; ++j )
-              S[ i ][ j ] -= D[ i ][ alpha ] * valueProjection[ alpha ][ j ];
-        Stabilization &stabilization = stabilizations_[ agglomerate ];
-        stabilization.resize( numDofs, numDofs, 0 );
-        for( std::size_t i = 0; i < numDofs; ++i )
-          for( std::size_t j = 0; j < numDofs; ++j )
-            for( std::size_t k = 0; k < numDofs; ++k )
-              stabilization[ i ][ j ] += S[ k ][ i ] * S[ k ][ j ];
-              // stabilization[ i ][ j ] += S[ k ][ i ] * std::max(1.,stabScaling[k]) * S[ k ][ j ];
-#else
-        Stabilization &stabilization = stabilizations_[ agglomerate ];
-        stabilization.resize( numDofs, numDofs, 0 );
-        for( std::size_t i = 0; i < numDofs; ++i )
-          stabilization[ i ][ i ] = DomainFieldType( 1 );
-        for( std::size_t i = 0; i < numDofs; ++i )
-          for( std::size_t alpha = 0; alpha < numShapeFunctions; ++alpha )
-            for( std::size_t j = 0; j < numDofs; ++j )
-              stabilization[ i ][ j ] -= D[ i ][ alpha ] * valueProjection[ alpha ][ j ];
-#endif
-
-
-      }  // loop over agglomerates
-
-    //iterate over triangles again
-        for( std::size_t agglomerate = 0; agglomerate < agglomeration().size(); ++agglomerate )
-      {
-        const auto &bbox = blockMapper_.indexSet().boundingBox(agglomerate);
-        const std::size_t numDofs = blockMapper().numDofs( agglomerate );
-
-        D.resize( numDofs, numShapeFunctions, 0 );
-        C.resize( numShapeFunctions, numDofs, 0 );
-        Hp.resize( numShapeFunctions, numShapeFunctions, 0 );
-        HpGrad.resize( numGradShapeFunctions, numGradShapeFunctions, 0 );
-        G.resize( numGradShapeFunctions, numGradShapeFunctions, DomainType(0) );
-        R.resize( numGradShapeFunctions, numDofs, DomainType(0) );
+        //////////////////////////////////////////////////////////////////////////
+        //////////////////////////////////////////////////////////////////////////
+        //////////////////////////////////////////////////////////////////////////
 
         // iterate over the triangles of this polygon
         for( const ElementSeedType &entitySeed : entitySeeds[ agglomerate ] )
@@ -607,27 +502,6 @@ namespace Dune
           // get the bounding box monomials and apply all dofs to them
           BoundingBoxBasisFunctionSet< GridPart, ScalarShapeFunctionSetType > shapeFunctionSet( element, bbox,
               useOnb_, scalarShapeFunctionSet_ );
-          interpolation_( shapeFunctionSet, D );
-
-          // compute mass matrices Hp, HpGrad, and the gradient matrices G^l
-          Quadrature0Type quadrature( element, 2*polOrder );
-          for( std::size_t qp = 0; qp < quadrature.nop(); ++qp )
-          {
-            const DomainFieldType weight = geometry.integrationElement( quadrature.point( qp ) ) * quadrature.weight( qp );
-            shapeFunctionSet.evaluateEach( quadrature[ qp ], [ & ] ( std::size_t alpha, FieldVector< DomainFieldType, 1 > phi ) {
-                shapeFunctionSet.evaluateEach( quadrature[ qp ], [ & ] ( std::size_t beta, FieldVector< DomainFieldType, 1 > psi ) {
-                    Hp[alpha][beta] += phi[0]*psi[0]*weight;
-                    if (alpha<numGradShapeFunctions &&
-                        beta<numGradShapeFunctions) // basis set is hierarchic so we can compute HpGrad using the order p shapeFunctionSet
-                      HpGrad[alpha][beta] += phi[0]*psi[0]*weight;
-                  } );
-                if (alpha<numGradShapeFunctions)
-                  shapeFunctionSet.jacobianEach( quadrature[ qp ], [ & ] ( std::size_t beta, typename ScalarShapeFunctionSetType::JacobianRangeType psi ) {
-                      if (beta<numGradShapeFunctions)
-                        G[alpha][beta].axpy(phi[0]*weight, psi[0]);
-                    } );
-              } );
-          } // quadrature loop
 
           // compute the boundary terms for the gradient projection
           for( const auto &intersection : intersections( static_cast< typename GridPart::GridViewType >( gridPart() ), element ) )
@@ -685,108 +559,39 @@ namespace Dune
               } );
             } // quadrature loop
           } // loop over intersections
+
+          auto vemBasisFunction = scalarBasisFunctionSet(element);
+          Quadrature0Type quadrature( element, 2*polOrder );
+          for( std::size_t qp = 0; qp < quadrature.nop(); ++qp )
+          {
+            const DomainFieldType weight = geometry.integrationElement( quadrature.point( qp ) ) * quadrature.weight( qp );
+            shapeFunctionSet.jacobianEach( quadrature[ qp ], [ & ] ( std::size_t alpha, typename ScalarShapeFunctionSetType::JacobianRangeType gradPhi ) {
+              // R[alpha][j]  -=  Pi phi_j  grad(m_alpha) * weight
+              if (alpha<numGradShapeFunctions)
+              {
+                gradPhi *= -weight;
+                vemBasisFunction.axpy( quadrature[ qp ], gradPhi[0], R[alpha] );
+              }
+            } );
+
+          } // quadrature loop
+
         } // loop over triangles in agglomerate
 
         // finished agglomerating all auxiliary matrices
         // now compute projection matrices and stabilization for the given polygon
 
-        // volume of polygon
-        DomainFieldType H0 = blockMapper_.indexSet().volume(agglomerate);
-
-        auto &valueProjection    = valueProjections_[ agglomerate ];
-        auto &jacobianProjection = jacobianProjections_[ agglomerate ];
-        auto &hessianProjection = hessianProjections_[ agglomerate ];
-        jacobianProjection.resize( numShapeFunctions );
-        hessianProjection.resize( numShapeFunctions );
-        for( std::size_t alpha = 0; alpha < numShapeFunctions; ++alpha ){
-          jacobianProjection[ alpha ].resize( numDofs, DomainType( 0 ) );
-          hessianProjection[ alpha ].resize( numDofs, )
-        }
-        //type def for standard vector (to pick up re size for Hessian projection)
+        // type def for standard vector (to pick up re size for Hessian projection)
         // need to resize Hessian projection
-
-        pseudoInverse( D, valueProjection );
 
         if (numInnerShapeFunctions > 0)
         {
-          // modify C for inner dofs
-          std::size_t alpha=0;
-          for (; alpha<numInnerShapeFunctions; ++alpha)
-            C[alpha][alpha+numDofs-numInnerShapeFunctions] = H0;
-          for (; alpha<numShapeFunctions; ++alpha)
-            for (std::size_t i=0; i<numDofs; ++i)
-              for (std::size_t beta=0; beta<numShapeFunctions; ++beta)
-                C[alpha][i] += Hp[alpha][beta]*valueProjection[beta][i];
-
-          HpInv = Hp;
-          HpInv.invert();
-          HpGradInv = HpGrad;
-          HpGradInv.invert();
-
-          auto Gtmp = G;
-          for (std::size_t alpha=0; alpha<numGradShapeFunctions; ++alpha)
-          {
-            for (std::size_t beta=0; beta<numGradShapeFunctions; ++beta)
-            {
-              G[alpha][beta] = DomainType(0);
-              for (std::size_t gamma=0; gamma<numGradShapeFunctions; ++gamma)
-                G[alpha][beta].axpy(HpGradInv[alpha][gamma],Gtmp[gamma][beta]);
-            }
-          }
-
-          { // test G matrix
-            for( const ElementSeedType &entitySeed : entitySeeds[ agglomerate ] )
-            {
-              const ElementType &element = gridPart().entity( entitySeed );
-              BoundingBoxBasisFunctionSet< GridPart, ScalarShapeFunctionSetType > shapeFunctionSet( element, bbox,
-                  useOnb_, scalarShapeFunctionSet_ );
-              Quadrature0Type quad( element, 2*polOrder );
-              for( std::size_t qp = 0; qp < quad.nop(); ++qp )
-              {
-                shapeFunctionSet.jacobianEach( quad[qp], [ & ] ( std::size_t alpha, FieldMatrix< DomainFieldType, 1,2 > phi ) {
-                  if (alpha<numGradShapeFunctions)
-                  {
-                    Dune::FieldVector<double,2> d;
-                    Derivative<GridPartType, Dune::DynamicMatrix<DomainType>,decltype(shapeFunctionSet)>
-                        derivative(gridPart(),G,shapeFunctionSet,alpha); // used G matrix to compute gradients of monomials
-                    derivative.evaluate(quad[qp],d);
-                    d -= phi[0];
-                    assert(d.two_norm() < 1e-8);
-                  }
-                });
-              }
-            }
-          } // test G matrix
-
           // need to compute value projection first
            // now compute projection by multiplying with inverse mass matrix
           for (std::size_t alpha=0; alpha<numShapeFunctions; ++alpha)
           {
             for (std::size_t i=0; i<numDofs; ++i)
             {
-              valueProjection[alpha][i] = 0;
-              for (std::size_t beta=0; beta<numShapeFunctions; ++beta)
-                valueProjection[alpha][i] += HpInv[alpha][beta]*C[beta][i];
-              // if (alpha<numGradShapeFunctions)
-                // for (std::size_t beta=0; beta<numGradShapeFunctions; ++beta)
-                  // jacobianProjection[alpha][i].axpy(HpGradInv[alpha][beta],R[beta][i]);
-            }
-          }
-
-
-          // add interior integrals for gradient projection
-          for (std::size_t alpha=0; alpha<numGradShapeFunctions; ++alpha)
-            for (std::size_t beta=0; beta<numInnerShapeFunctions; ++beta)
-              R[alpha][beta+numDofs-numInnerShapeFunctions].axpy(-H0, G[beta][alpha]);
-
-          // now compute projection by multiplying with inverse mass matrix
-          for (std::size_t alpha=0; alpha<numShapeFunctions; ++alpha)
-          {
-            for (std::size_t i=0; i<numDofs; ++i)
-            {
-              valueProjection[alpha][i] = 0;
-              for (std::size_t beta=0; beta<numShapeFunctions; ++beta)
-                valueProjection[alpha][i] += HpInv[alpha][beta]*C[beta][i];
               if (alpha<numGradShapeFunctions)
                 for (std::size_t beta=0; beta<numGradShapeFunctions; ++beta)
                   jacobianProjection[alpha][i].axpy(HpGradInv[alpha][beta],R[beta][i]);
@@ -800,6 +605,9 @@ namespace Dune
             jacobianProjection[0][i].axpy(1./H0, R[0][i]);
         }
 
+        /////////////////////////////////////////////////////////////////////
+        /////////////////////////////////////////////////////////////////////
+        /////////////////////////////////////////////////////////////////////
 #if 0
         // compute energy norm stability scalling
         std::vector<double> stabScaling(numDofs, 0);
@@ -856,33 +664,13 @@ namespace Dune
       //how to call evaluate all
 
 
-      Quadrature0Type quadrature( element, 2*polOrder );
-          for( std::size_t qp = 0; qp < quadrature.nop(); ++qp )
-          {
-            const DomainFieldType weight = geometry.integrationElement( quadrature.point( qp ) ) * quadrature.weight( qp );
-            for {
-              //for loop for R
-            }
-
-            void evaluateAll();
-
-            for (std::size_t alpha=0; alpha<numGradShapeFunctions; ++alpha)
-            for (std::size_t beta=0; beta<numInnerShapeFunctions; ++beta)
-              R[alpha][beta+numDofs-numInnerShapeFunctions] += weight*G[beta][alpha]*v;
-
-          } // quadrature loop
-
-        // need to add edge contributions as well
-
-
-      }
-
       // Need to implement hessian projections
       // Need
       // quad rule for inner and edges
       // jacobianall
       // (only one IBP)
 
+      } // iterate over polygons
 
     } // build projections
 
