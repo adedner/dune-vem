@@ -52,16 +52,20 @@ namespace Dune
 
       typedef std::vector< std::vector< DomainFieldType > > ValueProjection;
       typedef std::vector< std::vector< DomainType > > JacobianProjection;
+      typedef std::vector< std::vector< FieldMatrix < DomainFieldType, dimDomain, dimDomain > > > HessianProjection;
+
 
       VEMBasisFunctionSet () = default;
 
       VEMBasisFunctionSet ( const EntityType &entity, std::pair< DomainType, DomainType > bbox,
                             ValueProjection valueProjection, JacobianProjection jacobianProjection,
+                            HessianProjection hessianProjection,
                             ShapeFunctionSet shapeFunctionSet = ShapeFunctionSet() )
-        : entity_( &entity ),
+        : entity_( &entity ), //polygon
           shapeFunctionSet_( std::move( shapeFunctionSet ) ),
           valueProjection_( std::move( valueProjection ) ),
           jacobianProjection_( std::move( jacobianProjection ) ),
+          hessianProjection_( std::move( hessianProjection ) ),
           bbox_( std::move( bbox ) ),
           size_( valueProjection_[0].size() * dimRange)
       {}
@@ -193,29 +197,81 @@ namespace Dune
               const auto &jacobianProjectionAlphaJ = jacobianProjectionAlpha[j];
               for( int k = 0; k < dimDomain; ++k )
               {
-                FieldMatrixColumn< JacobianRangeType > jacobian_jk( jacobians[ j ], k );
-                jacobian_jk.axpy( jacobianProjectionAlphaJ[ k ], phi_alpha );
+                  jacobians[j][k][l] += jacobianProjectionAlphaJ[k]*phi_alpha[0];
+//                 FieldMatrixColumn< JacobianRangeType > jacobian_jk( jacobians[ j ], k );
+//                 jacobian_jk.axpy( jacobianProjectionAlphaJ[ k ], phi_alpha );
               }
             }
         } );
       }
 
+//     template< class Point, class DofVector >
+//       void jacobianAll ( const Point &x, const DofVector &dofs, JacobianRangeType &jacobian ) const
+//       {
+//         jacobian = JacobianRangeType( 0 );
+//         shapeFunctionSet_.evaluateEach( position( x ), [ this, &dofs, &jacobian ] ( std::size_t alpha, RangeType phi_alpha ) {
+//             for( std::size_t j = 0; j < size(); ++j )
+//             {
+//               for( int k = 0; k < dimDomain; ++k )
+//               {
+//                 double v = jacobianProjection_[ alpha ][ j ][ k ];
+//                 FieldMatrixColumn< JacobianRangeType > jacobian_k( jacobian, k );
+//                 jacobian_k.axpy( jacobianProjection_[ alpha ][ j ][ k ]*dofs[ j ], phi_alpha );
+//               }
+//             }
+//           } );
+//       }
+
       template< class Quadrature, class DofVector, class Hessians >
       void hessianAll ( const Quadrature &quadrature, const DofVector &dofs, Hessians &hessians ) const
       {
-        DUNE_THROW( NotImplemented, "hessians not implemented for VEMBasisFunctionSet" );
+        const std::size_t nop = quadrature.nop();
+        for(std::size_t qp = 0; qp <nop; ++qp )
+            hessianAll( quadrature[ qp ], dofs, hessians[ qp ] );
       }
 
       template< class Point, class DofVector >
       void hessianAll ( const Point &x, const DofVector &dofs, HessianRangeType &hessian ) const
       {
-        DUNE_THROW( NotImplemented, "hessians not implemented for VEMBasisFunctionSet" );
+        hessian = HessianRangeType( 0 );
+        shapeFunctionSet_.evaluateEach( position(x), [this, &dofs, &hessian ] ( std::size_t alpha, RangeType phi_alpha ) {
+        for( std::size_t j=0; j< size(); ++j )
+        {
+            for( int k =0; k < dimDomain; ++k )
+            {
+                for (int l =0; l < dimDomain; ++l)
+                {
+                    double v = hessianProjection_[ alpha ][ j ][ k ][ l ];
+                    FieldMatrixColumn< HessianRangeType > hessian_l(hessian, l);
+                    hessian_l.axpy( hessianProjection_[alpha ][ j ][ k ][ l ]*dofs[ l ], phi_alpha);
+                }
+            }
+        }
+        }
       }
 
       template< class Point, class Hessians > const
       void hessianAll ( const Point &x, Hessians &hessians ) const
       {
-        DUNE_THROW( NotImplemented, "hessians not implemented for VEMBasisFunctionSet" );
+        assert( hessians.size() >= size() );
+        std::fill( hessians.begin(), hessians.end(), HessianRangeType( 0 ) );
+        shapeFunctionSet_.evaluateEach( position(x), [ this, &hessians ] ( std::size_t alpha, RangeType phi_alpha ) {
+            const auto &hessianProjectionAlpha = hessianProjection_[alpha];
+            //gives a vector of vector of hessian matrices
+            for( std::size_t j = 0; j < size(); ++j )
+            {
+              const auto &hessianProjectionAlphaJ = hessianProjectionAlpha[j];
+              //selects the j-th vector of the outer vector
+              for( int k = 0; k < dimDomain; ++k )
+              {
+                  for( int l = 0; l < dimDomain; ++l)
+                  {
+                     //selects the k,l entry of the first matrix (since not dealng with vector field)
+                    hessians[j][0][k][l] += hessianProjectionAlphaJ[k][l]*phi_alpha[0];
+                  }
+                }
+            }
+        } );
       }
 
       const EntityType &entity () const { assert( entity_ ); return *entity_; }
@@ -231,6 +287,7 @@ namespace Dune
       ShapeFunctionSet shapeFunctionSet_;
       ValueProjection valueProjection_;
       JacobianProjection jacobianProjection_;
+      HessianProjection hessianProjection_;
       std::pair< DomainType, DomainType > bbox_;
       size_t size_;
     };

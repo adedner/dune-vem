@@ -257,7 +257,7 @@ namespace Dune
           {
             const auto& intersection = *it;
             const int i = intersection.indexInInside();
-            const int k = indexSet_.localIndex( element, i, dimension-1 )*edgeSize + edgeOffset;
+            const int k = indexSet_.localIndex( element, i, dimension-1 )*edgeSize + edgeOffset; //
             if ( k>=edgeOffset ) // 'real' edge of polygon
               edge(poly,intersection,k,edgeSize);
           }
