@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <fstream>
 #include <initializer_list>
+#include <memory>
 #include <sstream>
 
 #include <dune/common/exceptions.hh>
@@ -32,7 +33,7 @@ namespace Dune
           identifier = id;
           duneType = GeometryType( topologyId, dim );
           numNodes = subs.size();
-          subEntity = Std::make_unique< std::pair< unsigned int, unsigned int >[] >( numNodes );
+          subEntity = std::make_unique< std::pair< unsigned int, unsigned int >[] >( numNodes );
           std::copy( subs.begin(), subs.end(), subEntity.get() );
         }
 
@@ -174,11 +175,11 @@ namespace Dune
 
           if( elements[ i ].numTags > 4096 )
             DUNE_THROW( IOError, "Too many element tags encountered in 'Elements' section" );
-          elements[ i ].tags = Std::make_unique< int[] >( elements[ i ].numTags );
+          elements[ i ].tags = std::make_unique< int[] >( elements[ i ].numTags );
           for( std::size_t j = 0; j < elements[ i ].numTags; ++j )
             input >> elements[ i ].tags[ j ];
 
-          elements[ i ].nodes = Std::make_unique< std::size_t[] >( elements[ i ].type->numNodes );
+          elements[ i ].nodes = std::make_unique< std::size_t[] >( elements[ i ].type->numNodes );
           for( std::size_t j = 0; j < elements[ i ].type->numNodes; ++j )
             input >> elements[ i ].nodes[ j ];
 
