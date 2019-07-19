@@ -60,7 +60,7 @@ namespace Dune
       {
         DuneEntity ( std::size_t id, GeometryType type )
           : id_( id ), type_( type ),
-            vertices_( Std::make_unique< std::size_t[] >( size() ) )
+            vertices_( std::make_unique< std::size_t[] >( size() ) )
         {}
 
         std::size_t id () const { return id_; }
