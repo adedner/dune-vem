@@ -50,9 +50,11 @@ namespace Dune
 
       typedef ReferenceElement< typename DomainType::field_type, dimDomain > ReferenceElementType;
 
+      typedef FieldMatrix < DomainFieldType, dimDomain, dimDomain > HessianMatrixType;
+
       typedef std::vector< std::vector< DomainFieldType > > ValueProjection;
       typedef std::vector< std::vector< DomainType > > JacobianProjection;
-      typedef std::vector< std::vector< FieldMatrix < DomainFieldType, dimDomain, dimDomain > > > HessianProjection;
+      typedef std::vector< std::vector< HessianMatrixType > > HessianProjection;
 
 
       VEMBasisFunctionSet () = default;
@@ -230,6 +232,18 @@ namespace Dune
         shapeFunctionSet_.evaluateEach( position( x ), [ this, &factor, &dofs ] ( std::size_t alpha, RangeType phi_alpha ) {
             for( std::size_t j = 0; j < size(); ++j )
               dofs[ j ].axpy( phi_alpha[0]*valueProjection_[ alpha ][ j ], factor );
+          } );
+      }
+      template< class Point, class Factor >
+      void axpy ( const Point &x, const Factor &factor, DynamicVector<HessianMatrixType> &dofs ) const
+      {
+        shapeFunctionSet_.evaluateEach( position( x ), [ this, &factor, &dofs ] ( std::size_t alpha, RangeType phi_alpha ) {
+            for( std::size_t j = 0; j < size(); ++j )
+              for ( std::size_t l = 0; l < dimDomain; ++l )
+                for ( std::size_t k = 0; k < dimDomain; ++k )
+                  dofs[ j ][l][k] += phi_alpha[0] *
+                      0.5*( jacobianProjection_[ alpha ][ j ][ k ]*factor[l] +
+                            jacobianProjection_[ alpha ][ j ][ l ]*factor[k] );
           } );
       }
 
