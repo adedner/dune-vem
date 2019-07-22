@@ -246,6 +246,22 @@ namespace Dune
                             jacobianProjection_[ alpha ][ j ][ l ]*factor[k] );
           } );
       }
+      template< class Point, class Factor >
+      void axpy ( const Point &x, const DomainType &normal, const Factor &factor, DynamicVector<HessianMatrixType> &dofs ) const
+      {
+        shapeFunctionSet_.evaluateEach( position( x ), [ this, &factor, &dofs, &normal ] ( std::size_t alpha, RangeType phi_alpha ) {
+            for( std::size_t j = 0; j < size(); ++j )
+            {
+              DomainFieldType Gn = 0;
+              for ( std::size_t n = 0; n < dimDomain; ++n )
+                Gn += phi_alpha[0] * jacobianProjection_[ alpha ][ j ][ n ]*normal[n];
+              for ( std::size_t l = 0; l < dimDomain; ++l )
+                for ( std::size_t k = 0; k < dimDomain; ++k )
+                    dofs[ j ][l][k] += Gn * 0.5*(normal[k]*factor[l] + normal[l]*factor[k] );
+            }
+          } );
+      }
+
 
     private:
       template< class Point >

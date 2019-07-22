@@ -310,6 +310,8 @@ namespace Dune
       assert(innerTestSpace>=-1);
       const std::size_t numShapeFunctions = scalarShapeFunctionSet_.size(); // uses polOrder
       // const std::size_t  //! this casuses a weird internal compiler error...
+      int numHessShapeFunctions =
+              Dune::Fem::OrthonormalShapeFunctions< DomainType::dimension >::size(innerTestSpace+2);
       int numGradShapeFunctions =
               Dune::Fem::OrthonormalShapeFunctions< DomainType::dimension >::size(innerTestSpace+1);
       const std::size_t numInnerShapeFunctions = innerTestSpace<0?0:
@@ -317,13 +319,14 @@ namespace Dune
 
       // set up matrices used for constructing gradient, value, and edge projections
       // Note: the code is set up with the assumption that the dofs suffice to compute the edge projection
-      DynamicMatrix< DomainFieldType > D, C, Hp, HpGrad, HpInv, HpGradInv;
+      DynamicMatrix< DomainFieldType > D, C, Hp, HpGrad, HpHess, HpInv, HpGradInv, HpHessInv;
       DynamicMatrix< DomainType > R; // ,G //!!!
       DynamicMatrix< DomainFieldType > edgePhi;
+      DynamicMatrix< typename Traits::ScalarBasisFunctionSetType::HessianMatrixType > P;
 
       LeftPseudoInverse< DomainFieldType > pseudoInverse( numShapeFunctions );
 
-      // these are the matrices we need to compute
+      // these are the matrices we need to comput              e
       valueProjections_.resize( agglomeration().size() );
       jacobianProjections_.resize( agglomeration().size() );
       hessianProjections_.resize( agglomeration().size() );
@@ -339,8 +342,10 @@ namespace Dune
         C.resize( numShapeFunctions, numDofs, 0 );
         Hp.resize( numShapeFunctions, numShapeFunctions, 0 );
         HpGrad.resize( numGradShapeFunctions, numGradShapeFunctions, 0 );
+        HpHess.resize( numHessShapeFunctions, numHessShapeFunctions, 0);
         //!!! G.resize( numGradShapeFunctions, numGradShapeFunctions, DomainType(0) );
         R.resize( numGradShapeFunctions, numDofs, DomainType(0) );
+        P.resize( numHessShapeFunctions, numDofs, 0);
 
         // iterate over the triangles of this polygon
         for( const ElementSeedType &entitySeed : entitySeeds[ agglomerate ] )
@@ -365,6 +370,8 @@ namespace Dune
                     if (alpha<numGradShapeFunctions &&
                         beta<numGradShapeFunctions) // basis set is hierarchic so we can compute HpGrad using the order p shapeFunctionSet
                       HpGrad[alpha][beta] += phi[0]*psi[0]*weight;
+                    if (alpha<numHessShapeFunctions && beta <numHessShapeFunctions)
+                      HpHess[alpha][beta] += phi[0]*psi[0]*weight;
                   } );
 #if 0 // !!!!
                 if (alpha<numGradShapeFunctions)
@@ -412,6 +419,8 @@ namespace Dune
           HpInv.invert();
           HpGradInv = HpGrad;
           HpGradInv.invert();
+          HpHessInv = HpHess;
+          HpHessInv.invert();
 
 #if 0 //!!!
           auto Gtmp = G;
@@ -489,7 +498,7 @@ namespace Dune
         } // have some inner moments
 
         //////////////////////////////////////////////////////////////////////////
-        //////////////////////////////////////////////////////////////////////////
+        /// GradientProjecjtion //////////////////////////////////////////////////
         //////////////////////////////////////////////////////////////////////////
 
         // iterate over the triangles of this polygon
@@ -552,13 +561,28 @@ namespace Dune
               const DomainFieldType weight = intersection.geometry().integrationElement( x ) * quadrature.weight( qp );
               shapeFunctionSet.evaluateEach( y, [ & ] ( std::size_t alpha, FieldVector< DomainFieldType, 1 > phi ) {
                  if (alpha<numGradShapeFunctions)
+                    //jacobian eachhere for edge shape fns
                     edgeShapeFunctionSet_.evaluateEach( x, [ & ] ( std::size_t beta, FieldVector< DomainFieldType, 1 > psi ) {
                         for (int s=0;s<mask.size();++s) // note that edgePhi is the transposed of the basis transform matrix
                           R[alpha][mask[s]].axpy( edgePhi[beta][s]*psi[0]*phi[0]*weight, normal);
                     } );
+                 if (alpha<numHessShapeFunctions)
+                    //jacobian eachhere for edge shape fns
+                    edgeShapeFunctionSet_.jacobianEach( x, [ & ] ( std::size_t beta, FieldMatrix< DomainFieldType, 1,1 > dpsi ) {
+                        typename Traits::ScalarBasisFunctionSetType::HessianMatrixType factor;
+                        DomainType tau = intersection.geometry().corner(1);
+                        tau -= intersection.geometry().corner(0);    // use jacobianInverseTranspose?
+                        tau /= tau.two_norm();
+                        for (std::size_t i=0;i<factor.rows;++i)
+                          for (std::size_t j=0;j<factor.cols;++j)
+                            factor[i][j] = 0.5*(normal[i]*tau[j] + normal[j]*tau[i]);
+                        for (int s=0;s<mask.size();++s) // note that edgePhi is the transposed of the basis transform matrix
+                          P[alpha][mask[s]].axpy( edgePhi[beta][s]*dpsi[0][0]*phi[0]*weight, factor);
+                    } );
               } );
             } // quadrature loop
           } // loop over intersections
+
 
           auto vemBasisFunction = scalarBasisFunctionSet(element);
           Quadrature0Type quadrature( element, 2*polOrder );
@@ -577,12 +601,6 @@ namespace Dune
           } // quadrature loop
 
         } // loop over triangles in agglomerate
-
-        // finished agglomerating all auxiliary matrices
-        // now compute projection matrices and stabilization for the given polygon
-
-        // type def for standard vector (to pick up re size for Hessian projection)
-        // need to resize Hessian projection
 
         if (numInnerShapeFunctions > 0)
         {
@@ -603,6 +621,82 @@ namespace Dune
           // it's simply 1/H0 so we implement this case separately
           for (std::size_t i=0; i<numDofs; ++i)
             jacobianProjection[0][i].axpy(1./H0, R[0][i]);
+        }
+
+        /////////////////////////////////////////////////////////////////////
+        // HessianProjection ////////////////////////////////////////////////
+        /////////////////////////////////////////////////////////////////////
+
+        // iterate over the triangles of this polygon (for Hessian projection)
+        for( const ElementSeedType &entitySeed : entitySeeds[ agglomerate ] )
+        {
+          const ElementType &element = gridPart().entity( entitySeed );
+          const auto geometry = element.geometry();
+          const auto &refElement = ReferenceElements< typename GridPart::ctype, GridPart::dimension >::general( element.type() );
+
+          // get the bounding box monomials and apply all dofs to them
+          BoundingBoxBasisFunctionSet< GridPart, ScalarShapeFunctionSetType > shapeFunctionSet( element, bbox,
+              useOnb_, scalarShapeFunctionSet_ );
+          auto vemBasisFunction = scalarBasisFunctionSet(element);
+
+          // compute the boundary terms for the gradient projection
+          for( const auto &intersection : intersections( static_cast< typename GridPart::GridViewType >( gridPart() ), element ) )
+          {
+            // ignore edges inside the given polygon
+            if( !intersection.boundary() && (agglomeration().index( intersection.outside() ) == agglomerate) )
+              continue;
+            assert( intersection.conforming() );
+            auto normal = intersection.centerUnitOuterNormal();
+
+            // change to compute boundary term in Hessian Projection
+            // now compute int_e Phi_mask[i] m_alpha
+            Quadrature1Type quadrature( gridPart(), intersection, 2*polOrder, Quadrature1Type::INSIDE );
+            for( std::size_t qp = 0; qp < quadrature.nop(); ++qp )
+            {
+              auto x = quadrature.localPoint(qp);
+              auto y = intersection.geometryInInside().global(x);
+              const DomainFieldType weight = intersection.geometry().integrationElement( x ) * quadrature.weight( qp );
+              shapeFunctionSet.evaluateEach( y, [ & ] ( std::size_t alpha, FieldVector< DomainFieldType, 1 > phi ) {
+                 if (alpha<numHessShapeFunctions)
+                 {
+                   DomainType factor = normal;
+                   factor *= weight * phi[0];
+                   vemBasisFunction.axpy( y, normal, factor, P[alpha] );
+                   // vemBasisFunction.axpy( y, factor, P[alpha] );
+                 }
+              } );
+            } // quadrature loop
+          } // loop over intersections
+
+
+          Quadrature0Type quadrature( element, 2*polOrder );
+          for( std::size_t qp = 0; qp < quadrature.nop(); ++qp )
+          {
+            const DomainFieldType weight = geometry.integrationElement( quadrature.point( qp ) ) * quadrature.weight( qp );
+            shapeFunctionSet.jacobianEach( quadrature[ qp ], [ & ] ( std::size_t alpha, typename ScalarShapeFunctionSetType::JacobianRangeType gradPhi ) {
+              // P[alpha][j] -= pi grad phi_j grad(m_alpha) * weight
+              if (alpha<numHessShapeFunctions)
+              {
+                // P[alpha] vector of hessians i.e. use axpy with type DynamicVector <HessianMatrixType>
+                gradPhi *= -weight;
+                vemBasisFunction.axpy( quadrature[ qp ], gradPhi[0], P[alpha] );
+              }
+            } );
+
+          } // quadrature loop
+
+        } // loop over triangles in agglomerate
+
+        // need to compute value projection first
+        // now compute projection by multiplying with inverse mass matrix
+        for (std::size_t alpha=0; alpha<numShapeFunctions; ++alpha)
+        {
+          for (std::size_t i=0; i<numDofs; ++i)
+          {
+            if (alpha<numHessShapeFunctions)
+              for (std::size_t beta=0; beta<numGradShapeFunctions; ++beta)
+                hessianProjection[alpha][i].axpy(HpHessInv[alpha][beta],P[beta][i]);
+          }
         }
 
         /////////////////////////////////////////////////////////////////////
