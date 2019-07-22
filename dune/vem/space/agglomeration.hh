@@ -169,7 +169,8 @@ namespace Dune
       // 2: use onb for both the inner moments and computation of projection
       // 3: don't use onb at all
       //!TS: change to vector of vectors
-      AgglomerationVEMSpace ( AgglomerationType &agglomeration, std::vector<int> testSpaces,
+      AgglomerationVEMSpace ( AgglomerationType &agglomeration,
+          const typename AgglomerationIndexSetType::TestSpacesType &testSpaces,
           int basisChoice)
         : BaseType( agglomeration.gridPart() ),
           agIndexSet_( agglomeration, testSpaces ),

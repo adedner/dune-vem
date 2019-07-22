@@ -113,9 +113,9 @@ def vemSpace(view, order=1, testSpaces=None,
 
     if testSpaces is None:
         if conforming:
-          testSpaces = [  0, order-2, order-2 ]
+          testSpaces = [  [0], [order-2], [order-2] ]
         else:
-          testSpaces = [ -1, order-1, order-2 ]
+          testSpaces = [ [-1], [order-1], [order-2] ]
 
     agglomerate = view.hierarchicalGrid.agglomerate
 
@@ -131,7 +131,7 @@ def vemSpace(view, order=1, testSpaces=None,
     constructor = Constructor(
                    ['pybind11::object gridView',
                     'const pybind11::function agglomerate',
-                    'std::vector<int> testSpaces',
+                    'const std::array<std::vector<int>,'+str(view.dimension+1)+'> &testSpaces',
                     'int basisChoice'],
                    ['auto agglo = new Dune::Vem::Agglomeration<' + gridPartName + '>',
                     '         (Dune::FemPy::gridPart<' + viewType + '>(gridView), [agglomerate](const auto& e) { return agglomerate(e).template cast<unsigned int>(); } ); ',

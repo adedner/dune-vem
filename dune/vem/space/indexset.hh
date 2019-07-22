@@ -31,9 +31,9 @@ namespace Dune
       typedef VemAgglomerationIndexSet< GridPart, Allocator > ThisType;
       typedef AgglomerationIndexSet< GridPart, Allocator > BaseType;
 
-      // !TS
-      std::vector <int> testSpaces_;
     public:
+      // !TS
+      typedef std::array<std::vector<int>,BaseType::dimension+1> TestSpacesType;
       typedef GridPart GridPartType;
 
       typedef typename BaseType::AgglomerationType AgglomerationType;
@@ -41,7 +41,7 @@ namespace Dune
 
       // !TS assume vector of vectors
       explicit VemAgglomerationIndexSet ( const AgglomerationType &agglomeration,
-          std::vector<int> testSpaces,
+          const TestSpacesType &testSpaces,
           AllocatorType allocator = AllocatorType() )
       : BaseType( agglomeration, allocator )
       , testSpaces_( testSpaces )
@@ -60,20 +60,27 @@ namespace Dune
       std::vector< std::pair< int, unsigned int > > dofsPerCodim () const
       {
         const int dimension = BaseType::dimension;
-        const int vSize = testSpaces_[0]>=0? 1:0;
-        const int eSize = testSpaces_[1]>=0? Dune::Fem::OrthonormalShapeFunctions< GridPartType::dimension-1 >::size( testSpaces_[1] ) : 0;
-        const int iSize = testSpaces_[2]>=0? Dune::Fem::OrthonormalShapeFunctions< GridPartType::dimension >::size( testSpaces_[2] ) : 0;
+        const int vSize = sumTestSpaces(0)>=0? 1:0;
+        const int eSize = sumTestSpaces(1)>=0? Dune::Fem::OrthonormalShapeFunctions< GridPartType::dimension-1 >::size( testSpaces_[1][0] ) : 0;
+        const int iSize = sumTestSpaces(2)>=0? Dune::Fem::OrthonormalShapeFunctions< GridPartType::dimension >::size( testSpaces_[2][0] ) : 0;
         return { std::make_pair( dimension,   vSize ),
                  std::make_pair( dimension-1, eSize ),
                  std::make_pair( dimension-2, iSize ) };
       }
 
       // !TS
-      const std::vector<int> &testSpaces() const
+      const std::vector<int> testSpaces() const
       {
-        return testSpaces_;
+        return {testSpaces_[0][0],testSpaces_[1][0],testSpaces_[2][0]};
       }
 
+    private:
+      int sumTestSpaces(unsigned int codim) const
+      {
+        return std::accumulate(testSpaces_[codim].begin(),testSpaces_[codim].end(),0);
+      }
+      // !TS
+      const TestSpacesType testSpaces_;
     };
 
 

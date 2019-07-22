@@ -45,6 +45,7 @@ dune.fem.parameter.append({"fem.verboserank": 0})
 methods = [ ### "[space,scheme,spaceKwrags]"
             ["lagrange","galerkin",{}],
             # ["vem","vem",{"testSpaces":[0,order-2,order-1]}],  # bubble
+            ["vem","vem",{"testSpaces":[[-1,-1],[order-1,order-3],[order-2,-1]]}], # C^1 non conforming
             ["vem","vem",{"conforming":True}],
             ["vem","vem",{"conforming":False}],
             # ["bbdg","bbdg",{}],
@@ -70,7 +71,7 @@ v = TestFunction(uflSpace)
 massCoeff = 1+sin(dot(x,x))
 diffCoeff = 1-0.9*cos(dot(x,x))
 a = (diffCoeff*inner(grad(u),grad(v)) + massCoeff*dot(u,v) ) * dx
-laplace = lambda w: w[0] # div(grad(w[0]))
+laplace = lambda w: div(grad(w[0]))
 # a += laplace(u)*laplace(v) * dx
 
 # finally the right hand side and the boundary conditions
