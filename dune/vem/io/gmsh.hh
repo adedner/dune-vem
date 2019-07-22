@@ -10,7 +10,6 @@
 
 #include <dune/common/iteratorrange.hh>
 #include <dune/common/fvector.hh>
-#include <dune/common/std/memory.hh>
 #include <dune/common/version.hh>
 
 #include <dune/geometry/type.hh>
