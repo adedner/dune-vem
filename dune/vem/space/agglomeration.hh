@@ -168,6 +168,7 @@ namespace Dune
       // 1: use onb for inner moments but not for computing projections
       // 2: use onb for both the inner moments and computation of projection
       // 3: don't use onb at all
+      //!TS: change to vector of vectors
       AgglomerationVEMSpace ( AgglomerationType &agglomeration, std::vector<int> testSpaces,
           int basisChoice)
         : BaseType( agglomeration.gridPart() ),
@@ -176,8 +177,8 @@ namespace Dune
           interpolation_(blockMapper().indexSet(), polOrder, basisChoice!=3 ),
           scalarShapeFunctionSet_( Dune::GeometryType( Dune::GeometryType::cube, GridPart::dimension ) ),
           edgeShapeFunctionSet_(   Dune::GeometryType( Dune::GeometryType::cube, GridPart::dimension-1 ),
-              testSpaces[1] +       // edge order
-                (testSpaces[0]+1)*2 // vertex order * number of vertices on edge
+              agIndexSet_.testSpaces()[1] +       // edge order  //!TS needs changing - add method to indexSet?
+                (agIndexSet_.testSpaces()[0]+1)*2 // vertex order * number of vertices on edge
               ),
           polOrder_( polOrder ),
           useOnb_(basisChoice==2)
@@ -306,6 +307,9 @@ namespace Dune
       // - size of space for value projection
       // - size of space for gradient projection
       // - size of space for inner moments
+      //!TS add method to indexSet that returns correct orders as required, i.e.,
+      //!TS   std::vector<int> orders = agIndexSet_.orders();
+      //!TS Where orders.size() is always 2, i.e., for evaluate, jacobian, hessian
       const int innerTestSpace = agIndexSet_.testSpaces()[2];
       assert(innerTestSpace>=-1);
       const std::size_t numShapeFunctions = scalarShapeFunctionSet_.size(); // uses polOrder

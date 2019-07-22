@@ -31,6 +31,7 @@ namespace Dune
       typedef VemAgglomerationIndexSet< GridPart, Allocator > ThisType;
       typedef AgglomerationIndexSet< GridPart, Allocator > BaseType;
 
+      // !TS
       std::vector <int> testSpaces_;
     public:
       typedef GridPart GridPartType;
@@ -38,6 +39,7 @@ namespace Dune
       typedef typename BaseType::AgglomerationType AgglomerationType;
       typedef typename BaseType::AllocatorType AllocatorType;
 
+      // !TS assume vector of vectors
       explicit VemAgglomerationIndexSet ( const AgglomerationType &agglomeration,
           std::vector<int> testSpaces,
           AllocatorType allocator = AllocatorType() )
@@ -54,6 +56,7 @@ namespace Dune
       }
 
       // return the number of dofs per codimension
+      // !TS change to take into account vector of vector storage
       std::vector< std::pair< int, unsigned int > > dofsPerCodim () const
       {
         const int dimension = BaseType::dimension;
@@ -65,6 +68,7 @@ namespace Dune
                  std::make_pair( dimension-2, iSize ) };
       }
 
+      // !TS
       const std::vector<int> &testSpaces() const
       {
         return testSpaces_;
