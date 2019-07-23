@@ -311,16 +311,17 @@ namespace Dune
       //!TS add method to indexSet that returns correct orders as required, i.e.,
       //!TS   std::vector<int> orders = agIndexSet_.orders();
       //!TS Where orders.size() is always 2, i.e., for evaluate, jacobian, hessian
+      std::vector<int> orders = agIndexSet_.orders();
       const int innerTestSpace = agIndexSet_.testSpaces()[2];
       assert(innerTestSpace>=-1);
       const std::size_t numShapeFunctions = scalarShapeFunctionSet_.size(); // uses polOrder
       // const std::size_t  //! this casuses a weird internal compiler error...
       int numHessShapeFunctions =
-              Dune::Fem::OrthonormalShapeFunctions< DomainType::dimension >::size(innerTestSpace+2);
+              Dune::Fem::OrthonormalShapeFunctions< DomainType::dimension >::size(orders[2]);
       int numGradShapeFunctions =
-              Dune::Fem::OrthonormalShapeFunctions< DomainType::dimension >::size(innerTestSpace+1);
+              Dune::Fem::OrthonormalShapeFunctions< DomainType::dimension >::size(orders[1]);
       const std::size_t numInnerShapeFunctions = innerTestSpace<0?0:
-              Dune::Fem::OrthonormalShapeFunctions< DomainType::dimension >::size(innerTestSpace);
+              Dune::Fem::OrthonormalShapeFunctions< DomainType::dimension >::size(orders[0]);
 
       // set up matrices used for constructing gradient, value, and edge projections
       // Note: the code is set up with the assumption that the dofs suffice to compute the edge projection

@@ -73,6 +73,14 @@ namespace Dune
       {
         return {testSpaces_[0][0],testSpaces_[1][0],testSpaces_[2][0]};
       }
+      std::vector<int> orders()
+      {
+          std::vector<int> ret(3,0);
+          ret[0] += testSpaces_[2][0];
+          ret[1] += testSpaces_[2][0] + 1;
+          ret[2] += testSpaces_[2][0] + 2;
+          return ret;
+    }
 
     private:
       int sumTestSpaces(unsigned int codim) const
