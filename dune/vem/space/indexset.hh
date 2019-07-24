@@ -80,7 +80,31 @@ namespace Dune
           ret[1] += testSpaces_[2][0] + 1;
           ret[2] += testSpaces_[2][0] + 2;
           return ret;
-    }
+      }
+
+      std::vector<int> maxDegreePerCodim()
+        {
+          std::vector<int> ret(3,0);
+            for ( int k = 0; k < ret.size(); k++){
+              ret[k] += *std::max_element( testSpaces_[k].begin(), testSpaces_[k].end() );
+            }
+           return ret;
+      }
+
+      std::vector<int> vertexOrders()
+      {
+          return testSpaces_[0];
+      }
+
+      std::vector<int> edgeOrders()
+      {
+          return testSpaces_[1];
+      }
+
+      std::vector<int> innerOrders()
+      {
+          return testSpaces_[2];
+      }
 
     private:
       int sumTestSpaces(unsigned int codim) const

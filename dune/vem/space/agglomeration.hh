@@ -178,8 +178,10 @@ namespace Dune
           interpolation_(blockMapper().indexSet(), polOrder, basisChoice!=3 ),
           scalarShapeFunctionSet_( Dune::GeometryType( Dune::GeometryType::cube, GridPart::dimension ) ),
           edgeShapeFunctionSet_(   Dune::GeometryType( Dune::GeometryType::cube, GridPart::dimension-1 ),
-              agIndexSet_.testSpaces()[1] +       // edge order  //!TS needs changing - add method to indexSet?
-                (agIndexSet_.testSpaces()[0]+1)*2 // vertex order * number of vertices on edge
+              agIndexSet_.maxDegreePerCodim()[1] +
+//               agIndexSet_.edgeOrders[1] +
+              // edge order  //!TS needs changing - add method to indexSet?
+                (agIndexSet_.vertexOrders[0]+1)*2 // vertex order * number of vertices on edge
               ),
           polOrder_( polOrder ),
           useOnb_(basisChoice==2)
@@ -312,15 +314,16 @@ namespace Dune
       //!TS   std::vector<int> orders = agIndexSet_.orders();
       //!TS Where orders.size() is always 2, i.e., for evaluate, jacobian, hessian
       std::vector<int> orders = agIndexSet_.orders();
-      const int innerTestSpace = agIndexSet_.testSpaces()[2];
-      assert(innerTestSpace>=-1);
+//       const int innerTestSpace = agIndexSet_.testSpaces()[2];
+//       assert(innerTestSpace>=-1);
+//       innerTestSpace now orders[0]
       const std::size_t numShapeFunctions = scalarShapeFunctionSet_.size(); // uses polOrder
       // const std::size_t  //! this casuses a weird internal compiler error...
       int numHessShapeFunctions =
               Dune::Fem::OrthonormalShapeFunctions< DomainType::dimension >::size(orders[2]);
       int numGradShapeFunctions =
               Dune::Fem::OrthonormalShapeFunctions< DomainType::dimension >::size(orders[1]);
-      const std::size_t numInnerShapeFunctions = innerTestSpace<0?0:
+      const std::size_t numInnerShapeFunctions = orders[0]<0?0:
               Dune::Fem::OrthonormalShapeFunctions< DomainType::dimension >::size(orders[0]);
 
       // set up matrices used for constructing gradient, value, and edge projections
@@ -527,7 +530,10 @@ namespace Dune
             assert( intersection.conforming() );
             auto normal = intersection.centerUnitOuterNormal();
             std::vector<int> mask; // contains indices with Phi_mask[i] is attached to given edge
-            edgePhi.resize(edgeShapeFunctionSet_.size(),edgeShapeFunctionSet_.size(),0);
+            int edgePhiSize; // size of edgePhi for edge dofs (not including normal moments)
+            edgePhiSize = agIndexSet_.edgeOrders()[0] + (agIndexSet_.vertexOrders[0]+1)*2;
+            edgePhi.resize(edgePhiSize, edgePhiSize,0);
+//             edgePhi.resize(edgeShapeFunctionSet_.size(),edgeShapeFunctionSet_.size(),0);
             interpolation_( intersection, edgeShapeFunctionSet_, edgePhi, mask );
             edgePhi.invert();
 
