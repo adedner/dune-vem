@@ -84,9 +84,9 @@ namespace Dune
 
       std::vector<int> maxDegreePerCodim()
         {
-          std::vector<int> ret(3,0);
+          std::vector<int> ret(3);
             for ( int k = 0; k < ret.size(); k++){
-              ret[k] += *std::max_element( testSpaces_[k].begin(), testSpaces_[k].end() );
+              ret[k] = *std::max_element( testSpaces_[k].begin(), testSpaces_[k].end() );
             }
            return ret;
       }

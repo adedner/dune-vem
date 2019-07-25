@@ -42,10 +42,12 @@ dune.fem.parameter.append({"fem.verboserank": 0})
 # a bounding box dg space and a conforming/non conforming VEM space
 
 # <codecell>
+# Note: suboptimal laplace error for bubble (space is reduced to polorder=3 but could be 4 = ts+2
 methods = [ ### "[space,scheme,spaceKwrags]"
             ["lagrange","galerkin",{}],
-            # ["vem","vem",{"testSpaces":[0,order-2,order-1]}],  # bubble
-            ["vem","vem",{"testSpaces":[[-1,-1],[order-1,order-3],[order-2,-1]]}], # C^1 non conforming
+            ["vem","vem",{"testSpaces":[ [0],  [order-2], [order-1] ] }],  # bubble
+            ["vem","vem",{"testSpaces":[ [0],  [order-2], [order-3] ] }],  # serendipity
+            ["vem","vem",{"testSpaces":[ [-1], [order-1], [order-3] ] }],  # nc-serendipity
             ["vem","vem",{"conforming":True}],
             ["vem","vem",{"conforming":False}],
             # ["bbdg","bbdg",{}],
@@ -83,8 +85,10 @@ dbc = [dune.ufl.DirichletBC(uflSpace, exact, i+1) for i in range(4)]
 # Now we define a grid build up of voronoi cells around $50$ random points
 
 # <codecell>
-constructor = cartesianDomain([-0.5,-0.5],[1,1],[1,1])
-polyGrid = create.grid("polygrid", voronoiCells(constructor,50,"voronoiseeds",True) )
+constructor = cartesianDomain([-0.5,-0.5],[1,1],[10,10])
+# polyGrid = create.grid("polygrid", voronoiCells(constructor,50,"voronoiseeds",True) )
+polyGrid = create.grid("polygrid", constructor, cubes=False )
+# polyGrid = create.grid("polygrid", constructor, cubes=True )
 
 # <markdowncell>
 # In general we can construct a `polygrid` by providing a dictionary with
@@ -115,7 +119,7 @@ polyGrid = create.grid("polygrid", voronoiCells(constructor,50,"voronoiseeds",Tr
 @gridFunction(polyGrid, name="cells")
 def polygons(en,x):
     return polyGrid.hierarchicalGrid.agglomerate(en)
-# polygons.plot(colorbar="horizontal")
+polygons.plot(colorbar="horizontal")
 
 
 
@@ -140,7 +144,9 @@ def compute(grid, space, schemeName):
 
     # compute the error
     edf = exact-df
-    err = [inner(edf,edf),inner(grad(edf),grad(edf)),laplace(edf)**2]
+    err = [inner(edf,edf),
+           inner(grad(edf),grad(edf)),
+           inner(div(grad(edf)),div(grad(edf)))]
     errors = [ math.sqrt(e) for e in integrate(grid, err, order=8) ]
 
     return df, errors, info
