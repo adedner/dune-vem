@@ -59,11 +59,13 @@ namespace Dune
         : indexSet_( indexSet )
         //!TS use method on indexSet - do we need extra edgeBFS_ space for
         //!TS normal derivative or can we use same space with largest required order
-        , edgeBFS_(  Dune::GeometryType(Dune::GeometryType::cube,GridPartType::dimension-1), std::max(indexSet_.testSpaces()[1],0) )
-        , innerBFS_( Dune::GeometryType(Dune::GeometryType::cube,GridPartType::dimension),   std::max(indexSet_.testSpaces()[2],0) )
+        , edgeBFS_(  Dune::GeometryType(Dune::GeometryType::cube,GridPartType::dimension-1), std::max(indexSet_.maxDegreePerCodim[1],0) )
+        , innerBFS_( Dune::GeometryType(Dune::GeometryType::cube,GridPartType::dimension),   std::max(indexSet_.maxDegreePerCodim[2],0) )
         , polOrder_( polOrder )
         , useOnb_(useOnb)
       {}
+//edgeBFS_(  Dune::GeometryType(Dune::GeometryType::cube,GridPartType::dimension-1), std::max(indexSet_.testSpaces()[1],0) )
+//, innerBFS_( Dune::GeometryType(Dune::GeometryType::cube,GridPartType::dimension),   std::max(indexSet_.testSpaces()[2],0) )
 
       const GridPartType &gridPart() const { return indexSet_.agglomeration().gridPart(); }
 
@@ -176,6 +178,8 @@ namespace Dune
         const auto &refElement = ReferenceElements< ctype, dimension >::general( element.type() );
         int edgeNumber = intersection.indexInInside();
         const auto &edgeGeo = refElement.template geometry<1>(edgeNumber);
+        std::vector< DynamicMatrix<double> > localDofMatrix_Normal; //vector of matrices for the normal deriv matrix
+        const auto normal = intersection.centreUnitOuterNormal();
 
         // define the three relevant part of the interpolation, i.e.,
         // vertices,edges - no inner needed since only doing interpolation
@@ -188,6 +192,11 @@ namespace Dune
               assert( k < localDofMatrix.size() );
               localDofMatrix[ k ][ alpha ] = phi[ 0 ];
             } );
+//            shapeFunctionSet.jacobianEach( x, [ &localDofMatrix, k ] ( std::size_t alpha, typename ShapeFunctionSet::RangeType phi ) {
+//               assert( phi.dimension == 1 );
+//               assert( k < localDofMatrix.size() );
+//               localDofMatrix[ k ][ alpha ] = phi[ 0 ];
+//             } );
         };
         auto edge = [&] (int poly,auto intersection,int k,int numDofs)
         { //!TS add normal derivatives
@@ -203,9 +212,28 @@ namespace Dune
                 edgeBFS_.evaluateEach( xx,
                   [&](std::size_t alpha, typename EdgeFSType::RangeType phi ) {
                     //!TS add alpha<...
-                    int kk = alpha+k;
-                    assert( kk < localDofMatrix.size() );
-                    localDofMatrix[ kk ][ beta ] += value[0]*phi[0] * weight;
+                    if (alpha < localDofMatrix.size())
+                    {
+                      int kk = alpha+k;
+                      assert( kk < localDofMatrix.size() );
+                      localDofMatrix[ kk ][ beta ] += value[0]*phi[0] * weight;
+                    }
+                  }
+                );
+              }
+            );
+            shapeFunctionSet.evaluateEach( x, [ & ] ( std::size_t beta, typename ShapeFunctionSet::RangeType value ) {
+                edgeBFS_.jacobianEach( xx,
+                  [&](std::size_t alpha, typename EdgeFSType::JacobianRangeType dphi ) {
+//                       for ( std::size_t n=0; n < dimDomain; n++)
+//                         for ( std::size_t l=0; l<dimDomain; l++ )
+//                           for ( std::size_t k=0; k<dimDomain; k++ )
+//                             localDofMatrix_Normal[l][k] += weight*value[0]*dphi[alpha][k]*normal[l]*weight;
+                      int kk = alpha +k;
+                      for (std::size_t n = 0; n < ShapeFunctionSet::FunctionSpaceType::DomainType::dimension; n++)
+                      {
+                        localDofMatrix_Normal[ kk ][ beta ] += value[0] * dphi[0][n] * normal[n] * weight;
+                      }
                   }
                 );
               }
@@ -246,7 +274,7 @@ namespace Dune
 
         // vertex dofs
         //!TS needs changing
-        if (indexSet_.testSpaces()[0] >= 0)
+        if (indexSet_.vertexOrders()[0] >= 0)
         {
           for( int i = 0; i < refElement.size( dimension ); ++i )
           {
@@ -256,7 +284,7 @@ namespace Dune
           }
         }
         //!TS needs changing
-        if (indexSet_.testSpaces()[1] >= 0)
+        if (indexSet_.edgeOrders()[0] >= 0)
         {
           // to avoid any issue with twists we use an intersection iterator
           // here instead of going over the edges
@@ -272,7 +300,7 @@ namespace Dune
           }
         }
         //! needs changing
-        if (indexSet_.testSpaces()[2] >=0)
+        if (indexSet_.innerOrders()[0] >=0)
         {
           // inner dofs
           const int k = indexSet_.localIndex( element, 0, 0 )*innerSize + innerOffset;
@@ -394,7 +422,7 @@ namespace Dune
         if (k>=0)  // this doesn't make sense - remove?
         {
           std::size_t i = 0;
-          if (indexSet_.testSpaces()[0]>=0) //!TS
+          if (indexSet_.vertexOrders()[0]>=0) //!TS
           {
             for( ; i < refElement.size( edgeNumber, dimension-1, dimension ); ++i )
             {
@@ -405,7 +433,7 @@ namespace Dune
               mask.push_back(k);
             }
           }
-          if (indexSet_.testSpaces()[1]>=0) //!TS
+          if (indexSet_.edgeOrders()[0]>=0) //!TS
           {
             edge(poly,intersection,i,edgeSize);
             for (int kk=0;kk<edgeSize;++kk)
