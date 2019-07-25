@@ -318,13 +318,17 @@ namespace Dune
 //       assert(innerTestSpace>=-1);
 //       innerTestSpace now orders[0]
       const std::size_t numShapeFunctions = scalarShapeFunctionSet_.size(); // uses polOrder
-      // const std::size_t  //! this casuses a weird internal compiler error...
-      int numHessShapeFunctions =
-              Dune::Fem::OrthonormalShapeFunctions< DomainType::dimension >::size(orders[2]);
-      int numGradShapeFunctions =
-              Dune::Fem::OrthonormalShapeFunctions< DomainType::dimension >::size(orders[1]);
+      int numHessShapeFunctions = std::min( numShapeFunctions,
+            Dune::Fem::OrthonormalShapeFunctions< DomainType::dimension >::
+              size( std::max(orders[2],polOrder-2) )
+          );
+      int numGradShapeFunctions = std::min( numShapeFunctions,
+             Dune::Fem::OrthonormalShapeFunctions< DomainType::dimension >::
+               size( std::max(orders[1],polOrder-1) )
+          );
       const std::size_t numInnerShapeFunctions = orders[0]<0?0:
-              Dune::Fem::OrthonormalShapeFunctions< DomainType::dimension >::size(orders[0]);
+              Dune::Fem::OrthonormalShapeFunctions< DomainType::dimension >::
+                size(orders[0]);
 
       // set up matrices used for constructing gradient, value, and edge projections
       // Note: the code is set up with the assumption that the dofs suffice to compute the edge projection
@@ -530,6 +534,7 @@ namespace Dune
             assert( intersection.conforming() );
             auto normal = intersection.centerUnitOuterNormal();
             std::vector<int> mask; // contains indices with Phi_mask[i] is attached to given edge
+            // size of edgePhi for edge dofs (not including normal moments)
             int edgePhiSize = Dune::Fem::OrthonormalShapeFunctions< DomainType::dimension-1 >::
                    size( agIndexSet_.edgeOrders()[0] + (agIndexSet_.vertexOrders()[0]+1)*2 );
 //            int edgePhiSize; // size of edgePhi for edge dofs (not including normal moments)

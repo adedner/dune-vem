@@ -382,7 +382,12 @@ def aluSimplexGrid(constructor, dimgrid=2, dimworld=2):
     includes = ["dune/vem/misc/grid.hh"]
     gridModule = module(includes, typeName, dynamicAttr=True)
     return gridModule.LeafGrid(gridModule.reader(constructor))
-
+def aluCubeGrid(constructor, dimgrid=2, dimworld=2):
+    from dune.grid.grid_generator import module, getDimgrid
+    typeName = "Dune::Vem::CubeGrid<"+str(dimgrid)+","+str(dimworld)+">"
+    includes = ["dune/vem/misc/grid.hh"]
+    gridModule = module(includes, typeName, dynamicAttr=True)
+    return gridModule.LeafGrid(gridModule.reader(constructor))
 def yaspGrid(constructor, dimgrid=None, coordinates="equidistant", ctype="double"):
     from dune.generator import Constructor
     from dune.grid.grid_generator import module, getDimgrid
@@ -428,7 +433,7 @@ def yaspGrid(constructor, dimgrid=None, coordinates="equidistant", ctype="double
 class TrivialAgglomerate:
     def __init__(self,constructor, cubes=False, **kwargs):
         if cubes:
-            self.grid = yaspGrid(constructor, **kwargs)
+            self.grid = aluCubeGrid(constructor, **kwargs)
         else:
             self.grid = aluSimplexGrid(constructor, **kwargs)
         self.suffix = "simple"+str(self.grid.size(0))
