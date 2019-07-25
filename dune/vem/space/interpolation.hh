@@ -59,8 +59,8 @@ namespace Dune
         : indexSet_( indexSet )
         //!TS use method on indexSet - do we need extra edgeBFS_ space for
         //!TS normal derivative or can we use same space with largest required order
-        , edgeBFS_(  Dune::GeometryType(Dune::GeometryType::cube,GridPartType::dimension-1), std::max(indexSet_.maxDegreePerCodim[1],0) )
-        , innerBFS_( Dune::GeometryType(Dune::GeometryType::cube,GridPartType::dimension),   std::max(indexSet_.maxDegreePerCodim[2],0) )
+        , edgeBFS_(  Dune::GeometryType(Dune::GeometryType::cube,GridPartType::dimension-1), std::max(indexSet_.maxDegreePerCodim()[1],0) )
+        , innerBFS_( Dune::GeometryType(Dune::GeometryType::cube,GridPartType::dimension),   std::max(indexSet_.maxDegreePerCodim()[2],0) )
         , polOrder_( polOrder )
         , useOnb_(useOnb)
       {}
@@ -128,9 +128,22 @@ namespace Dune
                 edgeBFS_.evaluateEach( x,
                   [&](std::size_t alpha, typename EdgeFSType::RangeType phi ) {
                     //!TS add 'if alpha<...' so that larger edgeBFS is possible
-                    int kk = alpha+k;
-                    assert(kk<localDofMatrix.size());
-                    localDofMatrix[ kk ][ beta ] += value[0]*phi[0] * weight;
+                    if ( alpha < localDofMatrix.size() )
+                    {
+                      int kk = alpha+k;
+                      assert(kk<localDofMatrix.size());
+                      localDofMatrix[ kk ][ beta ] += value[0]*phi[0] * weight;
+                    }
+                  }
+                );
+              }
+            );
+            shapeFunctionSet.evaluateEach( y, [ & ] ( std::size_t beta, typename ShapeFunctionSet::RangeType value ) {
+                edgeBFS_.jacobianEach( x,
+                  [&](std::size_t alpha, typename EdgeFSType::JacobianRangeType dphi ) {
+                      auto dphi_n = dphi[0] * normal;
+//                       localDofVector_Matrix[1][ entryNormal ][ beta ] += value[0] * dphi_n * weight;
+//                       ++entryNormal;
                   }
                 );
               }
@@ -169,7 +182,7 @@ namespace Dune
       //!TS ii) add an int normDerivOrder parameter and fill the matrix only for that order?
       template< class ShapeFunctionSet >
       void operator() (const IntersectionType &intersection,
-                       const ShapeFunctionSet &shapeFunctionSet, Dune::DynamicMatrix<double> &localDofMatrix,
+                       const ShapeFunctionSet &shapeFunctionSet, std::vector < Dune::DynamicMatrix<double> > &localDofVector_Matrix,
                        std::vector<int> &mask) const
       {
         const int dimension = AgglomerationIndexSet::dimension;
@@ -178,19 +191,20 @@ namespace Dune
         const auto &refElement = ReferenceElements< ctype, dimension >::general( element.type() );
         int edgeNumber = intersection.indexInInside();
         const auto &edgeGeo = refElement.template geometry<1>(edgeNumber);
-        std::vector< DynamicMatrix<double> > localDofMatrix_Normal; //vector of matrices for the normal deriv matrix
+//         std::vector< DynamicMatrix<double> > localDofMatrix_Normal; //vector of matrices for the normal deriv matrix
         const auto normal = intersection.centreUnitOuterNormal();
-
+        std::size_t entry=0, entryNormal=0;
         // define the three relevant part of the interpolation, i.e.,
         // vertices,edges - no inner needed since only doing interpolation
-        // on intersection
+        // on intersectionn
         auto vertex = [&] (int poly,int i,int k,int numDofs)
         { //!TS add derivatives at vertex (probably only normal component - is the mask then correct?)
           const auto &x = edgeGeo.local( refElement.position( i, dimension ) );
-          shapeFunctionSet.evaluateEach( x, [ &localDofMatrix, k ] ( std::size_t alpha, typename ShapeFunctionSet::RangeType phi ) {
+          shapeFunctionSet.evaluateEach( x, [ &localDofVector_Matrix, k, &entry ] ( std::size_t alpha, typename ShapeFunctionSet::RangeType phi ) {
               assert( phi.dimension == 1 );
-              assert( k < localDofMatrix.size() );
-              localDofMatrix[ k ][ alpha ] = phi[ 0 ];
+              assert( entry < localDofVector_Matrix[0].size() );
+              localDofVector_Matrix[0][ entry ][ alpha ] = phi[ 0 ];
+              ++entry;
             } );
 //            shapeFunctionSet.jacobianEach( x, [ &localDofMatrix, k ] ( std::size_t alpha, typename ShapeFunctionSet::RangeType phi ) {
 //               assert( phi.dimension == 1 );
@@ -212,28 +226,25 @@ namespace Dune
                 edgeBFS_.evaluateEach( xx,
                   [&](std::size_t alpha, typename EdgeFSType::RangeType phi ) {
                     //!TS add alpha<...
-                    if (alpha < localDofMatrix.size())
+                    if (alpha < localDofVector_Matrix[0].size())
                     {
-                      int kk = alpha+k;
-                      assert( kk < localDofMatrix.size() );
-                      localDofMatrix[ kk ][ beta ] += value[0]*phi[0] * weight;
+                      assert( entry < localDofVector_Matrix[0].size() );
+                      localDofVector_Matrix[0][ entry ][ beta ] += value[0]*phi[0] * weight;
+                      ++entry;
                     }
                   }
                 );
               }
             );
             shapeFunctionSet.evaluateEach( x, [ & ] ( std::size_t beta, typename ShapeFunctionSet::RangeType value ) {
-                edgeBFS_.jacobianEach( xx,
+                edgeBFS_.jacobianEach( x,
                   [&](std::size_t alpha, typename EdgeFSType::JacobianRangeType dphi ) {
-//                       for ( std::size_t n=0; n < dimDomain; n++)
-//                         for ( std::size_t l=0; l<dimDomain; l++ )
-//                           for ( std::size_t k=0; k<dimDomain; k++ )
-//                             localDofMatrix_Normal[l][k] += weight*value[0]*dphi[alpha][k]*normal[l]*weight;
-                      int kk = alpha +k;
-                      for (std::size_t n = 0; n < ShapeFunctionSet::FunctionSpaceType::DomainType::dimension; n++)
-                      {
-                        localDofMatrix_Normal[ kk ][ beta ] += value[0] * dphi[0][n] * normal[n] * weight;
-                      }
+                     if (alpha < localDofVector_Matrix[1].size() )
+                     {
+                      auto dphi_n = dphi[0] * normal;
+                      localDofVector_Matrix[1][ entryNormal ][ beta ] += value[0] * dphi_n * weight;
+                      ++entryNormal;
+                     }
                   }
                 );
               }
@@ -335,6 +346,7 @@ namespace Dune
         { //!TS edge derivatives
           assert(numDofs == edgeBFS_.size());
           int edgeNumber = intersection.indexInInside();
+          const auto normal = intersection.centreUnitOuterNormal();
           EdgeQuadratureType edgeQuad( gridPart(),
                 intersection, 2*polOrder_, EdgeQuadratureType::INSIDE );
           for (int qp=0;qp<edgeQuad.nop();++qp)
@@ -349,6 +361,13 @@ namespace Dune
                 int kk = alpha+k;
                 //! SubDofWrapper has no size assert( kk < localDofVector.size() );
                 localDofVector[ kk ] += value[0]*phi[0] * weight;
+              }
+            );
+            edgeBFS_.jacobianEach( x,
+              [&](std::size_t alpha, typename LocalFunction::JacobianRangeType dphi ) {
+                 int kk = k + alpha;
+                 auto dphi_n = dphi[0] * normal;
+                 localDofVector[ kk ] += value[0] * dphi_n * weight;
               }
             );
           }

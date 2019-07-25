@@ -59,8 +59,9 @@ namespace Dune
       // !TS change to take into account vector of vector storage
       std::vector< std::pair< int, unsigned int > > dofsPerCodim () const
       {
+          //issue with entries being -1 here?
         const int dimension = BaseType::dimension;
-        const int vSize = sumTestSpaces(0)>=0? 1:0;
+        const int vSize = 2*sumTestSpaces(0)>=0? 1:0;
         const int eSize = sumTestSpaces(1)>=0? Dune::Fem::OrthonormalShapeFunctions< GridPartType::dimension-1 >::size( testSpaces_[1][0] ) : 0;
         const int iSize = sumTestSpaces(2)>=0? Dune::Fem::OrthonormalShapeFunctions< GridPartType::dimension >::size( testSpaces_[2][0] ) : 0;
         return { std::make_pair( dimension,   vSize ),
@@ -82,7 +83,7 @@ namespace Dune
           return ret;
       }
 
-      std::vector<int> maxDegreePerCodim()
+      const std::vector<int> maxDegreePerCodim() const
         {
           std::vector<int> ret(3,0);
             for ( int k = 0; k < ret.size(); k++){

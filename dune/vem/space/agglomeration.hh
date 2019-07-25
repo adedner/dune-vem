@@ -181,7 +181,7 @@ namespace Dune
               agIndexSet_.maxDegreePerCodim()[1] +
 //               agIndexSet_.edgeOrders[1] +
               // edge order  //!TS needs changing - add method to indexSet?
-                (agIndexSet_.vertexOrders[0]+1)*2 // vertex order * number of vertices on edge
+                (agIndexSet_.vertexOrders()[0]+1)*2 // vertex order * number of vertices on edge
               ),
           polOrder_( polOrder ),
           useOnb_(basisChoice==2)
@@ -531,7 +531,8 @@ namespace Dune
             auto normal = intersection.centerUnitOuterNormal();
             std::vector<int> mask; // contains indices with Phi_mask[i] is attached to given edge
             int edgePhiSize; // size of edgePhi for edge dofs (not including normal moments)
-            edgePhiSize = agIndexSet_.edgeOrders()[0] + (agIndexSet_.vertexOrders[0]+1)*2;
+            // needs to be size not order
+            edgePhiSize = agIndexSet_.edgeOrders()[0] + (agIndexSet_.vertexOrders()[0]+1)*2;
             edgePhi.resize(edgePhiSize, edgePhiSize,0);
 //             edgePhi.resize(edgeShapeFunctionSet_.size(),edgeShapeFunctionSet_.size(),0);
             interpolation_( intersection, edgeShapeFunctionSet_, edgePhi, mask );
