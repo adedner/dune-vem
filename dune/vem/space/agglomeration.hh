@@ -330,7 +330,7 @@ namespace Dune
       // Note: the code is set up with the assumption that the dofs suffice to compute the edge projection
       DynamicMatrix< DomainFieldType > D, C, Hp, HpGrad, HpHess, HpInv, HpGradInv, HpHessInv;
       DynamicMatrix< DomainType > R; // ,G //!!!
-      DynamicMatrix< DomainFieldType > edgePhi;
+      DynamicMatrix< DomainFieldType > edgePhi, edgeNormalPhi;
       DynamicMatrix< typename Traits::ScalarBasisFunctionSetType::HessianMatrixType > P;
 
       LeftPseudoInverse< DomainFieldType > pseudoInverse( numShapeFunctions );
@@ -516,7 +516,7 @@ namespace Dune
           const ElementType &element = gridPart().entity( entitySeed );
           const auto geometry = element.geometry();
           const auto &refElement = ReferenceElements< typename GridPart::ctype, GridPart::dimension >::general( element.type() );
-
+          std::vector< Dune::DynamicMatrix < double > > edgePhiVector;
           // get the bounding box monomials and apply all dofs to them
           BoundingBoxBasisFunctionSet< GridPart, ScalarShapeFunctionSetType > shapeFunctionSet( element, bbox,
               useOnb_, scalarShapeFunctionSet_ );
@@ -530,14 +530,21 @@ namespace Dune
             assert( intersection.conforming() );
             auto normal = intersection.centerUnitOuterNormal();
             std::vector<int> mask; // contains indices with Phi_mask[i] is attached to given edge
-            int edgePhiSize; // size of edgePhi for edge dofs (not including normal moments)
+            int edgePhiSize = Dune::Fem::OrthonormalShapeFunctions< DomainType::dimension-1 >::
+                   size( agIndexSet_.edgeOrders()[0] + (agIndexSet_.vertexOrders()[0]+1)*2 );
+//            int edgePhiSize; // size of edgePhi for edge dofs (not including normal moments)
             // needs to be size not order
-            edgePhiSize = agIndexSet_.edgeOrders()[0] + (agIndexSet_.vertexOrders()[0]+1)*2;
+//            edgePhiSize = agIndexSet_.edgeOrders()[0] + (agIndexSet_.vertexOrders()[0]+1)*2;
             edgePhi.resize(edgePhiSize, edgePhiSize,0);
 //             edgePhi.resize(edgeShapeFunctionSet_.size(),edgeShapeFunctionSet_.size(),0);
-            interpolation_( intersection, edgeShapeFunctionSet_, edgePhi, mask );
+            int edgeNormalPhiSize = Dune::Fem::OrthonormalShapeFunctions< DomainType::dimension-1 >::
+                   size( agIndexSet_.edgeOrders()[1] + (agIndexSet_.vertexOrders()[0]+1)*2 );
+            edgeNormalPhi.resize(edgeNormalPhiSize, edgeNormalPhiSize, 0);
+            edgePhiVector.push_back(edgePhi);
+            edgePhiVector.push_back(edgeNormalPhi);
+            interpolation_( intersection, edgeShapeFunctionSet_, edgePhiVector, mask );
             edgePhi.invert();
-
+            edgeNormalPhi.invert();
             { // test edgePhi
               assert( mask.size() == edgeShapeFunctionSet_.size() );
               std::vector<double> lambda(numDofs);

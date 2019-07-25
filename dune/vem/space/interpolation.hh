@@ -98,6 +98,7 @@ namespace Dune
         const int dimension = AgglomerationIndexSet::dimension;
         const ElementType &element = shapeFunctionSet.entity();
         const auto &refElement = ReferenceElements< ctype, dimension >::general( element.type() );
+//         const auto normal = intersection.centreUnitOuterNormal();
 
         // use the bb set for this polygon for the inner testing space
         const auto &bbox = indexSet_.boundingBox(element);
@@ -116,6 +117,7 @@ namespace Dune
         { //!TS add nomral derivatives
           assert(numDofs == edgeBFS_.size());
           int edgeNumber = intersection.indexInInside();
+//           const auto normal = intersection.centreUnitOuterNormal();
           EdgeQuadratureType edgeQuad( gridPart(), intersection, 2*polOrder_, EdgeQuadratureType::INSIDE );
           for (int qp=0;qp<edgeQuad.nop();++qp)
           {
@@ -138,16 +140,16 @@ namespace Dune
                 );
               }
             );
-            shapeFunctionSet.evaluateEach( y, [ & ] ( std::size_t beta, typename ShapeFunctionSet::RangeType value ) {
-                edgeBFS_.jacobianEach( x,
-                  [&](std::size_t alpha, typename EdgeFSType::JacobianRangeType dphi ) {
-                      auto dphi_n = dphi[0] * normal;
+//             shapeFunctionSet.evaluateEach( y, [ & ] ( std::size_t beta, typename ShapeFunctionSet::RangeType value ) {
+//                 edgeBFS_.jacobianEach( x,
+//                   [&](std::size_t alpha, typename EdgeFSType::JacobianRangeType dphi ) {
+//                       auto dphi_n = dphi[0] * normal;
 //                       localDofVector_Matrix[1][ entryNormal ][ beta ] += value[0] * dphi_n * weight;
 //                       ++entryNormal;
-                  }
-                );
-              }
-            );
+//                   }
+//                 );
+//               }
+//             );
           }
         };
         auto inner = [&] (int poly,int i,int k,int numDofs)
@@ -192,7 +194,7 @@ namespace Dune
         int edgeNumber = intersection.indexInInside();
         const auto &edgeGeo = refElement.template geometry<1>(edgeNumber);
 //         std::vector< DynamicMatrix<double> > localDofMatrix_Normal; //vector of matrices for the normal deriv matrix
-        const auto normal = intersection.centreUnitOuterNormal();
+        const auto normal = intersection.centerUnitOuterNormal();
         std::size_t entry=0, entryNormal=0;
         // define the three relevant part of the interpolation, i.e.,
         // vertices,edges - no inner needed since only doing interpolation
@@ -346,7 +348,7 @@ namespace Dune
         { //!TS edge derivatives
           assert(numDofs == edgeBFS_.size());
           int edgeNumber = intersection.indexInInside();
-          const auto normal = intersection.centreUnitOuterNormal();
+          const auto normal = intersection.centerUnitOuterNormal();
           EdgeQuadratureType edgeQuad( gridPart(),
                 intersection, 2*polOrder_, EdgeQuadratureType::INSIDE );
           for (int qp=0;qp<edgeQuad.nop();++qp)

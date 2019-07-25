@@ -92,17 +92,17 @@ namespace Dune
            return ret;
       }
 
-      std::vector<int> vertexOrders()
+      const std::vector<int> vertexOrders() const
       {
           return testSpaces_[0];
       }
 
-      std::vector<int> edgeOrders()
+      const std::vector<int> edgeOrders() const
       {
           return testSpaces_[1];
       }
 
-      std::vector<int> innerOrders()
+      const std::vector<int> innerOrders() const
       {
           return testSpaces_[2];
       }
