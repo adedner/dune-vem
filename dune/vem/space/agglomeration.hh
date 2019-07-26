@@ -533,8 +533,10 @@ namespace Dune
             edgePhiVector[0].resize(agIndexSet_.edgeSize(0), agIndexSet_.edgeSize(0), 0);
             edgePhiVector[1].resize(agIndexSet_.edgeSize(1), agIndexSet_.edgeSize(1), 0);
             interpolation_( intersection, edgeShapeFunctionSet_, edgePhiVector, mask );
-            edgePhiVector[0].invert();
-            edgePhiVector[1].invert();
+            if (edgePhiVector[0].size()>0)
+              edgePhiVector[0].invert();
+            if (edgePhiVector[1].size()>0)
+              edgePhiVector[1].invert();
 
             // now compute int_e Phi_mask[i] m_alpha
             Quadrature1Type quadrature( gridPart(), intersection, 2*polOrder, Quadrature1Type::INSIDE );
@@ -564,6 +566,7 @@ namespace Dune
                         for (int s=0;s<mask[0].size();++s) // note that edgePhi is the transposed of the basis transform matrix
                           P[alpha][mask[0][s]].axpy( edgePhiVector[0][beta][s]*dpsi[0][0]*phi[0]*weight, factor);
                     } );
+                    assert( agIndexSet_.edgeSize(1) == 0);
                     if ( agIndexSet_.edgeSize(1) > 0)
                     {
                       for (std::size_t i=0;i<factor.rows;++i)
@@ -660,7 +663,6 @@ namespace Dune
                      DomainType factor = normal;
                      factor *= weight * phi[0];
                      vemBasisFunction.axpy( y, normal, factor, P[alpha] );
-                     // vemBasisFunction.axpy( y, factor, P[alpha] );
                    }
                 } );
               } // quadrature loop

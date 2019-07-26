@@ -46,11 +46,13 @@ namespace Dune
       : BaseType( agglomeration, allocator )
       , testSpaces_( testSpaces )
       {
+#if 0
         std::cout << "####################\n";
         std::cout << testSpaces_[0][0] << " " << dofsPerCodim()[0].second << std::endl;
         std::cout << testSpaces_[1][0] << " " << dofsPerCodim()[1].second << std::endl;
         std::cout << testSpaces_[2][0] << " " << dofsPerCodim()[2].second << std::endl;
         std::cout << "####################\n";
+#endif
       }
 
       // return the number of dofs per codimension
@@ -98,18 +100,20 @@ namespace Dune
       std::vector<int> edgeDegrees() const
       {
         assert( testSpaces_[0].size()<2 );
-        std::vector<int> degrees(2,0);
+        std::vector<int> degrees(2, -1);
         for (std::size_t i=0;i<testSpaces_[0].size();++i)
-          degrees[i] += 2*(testSpaces_[0][i]+1);
+          if (i<testSpaces_[0].size())
+            degrees[i] += 2*(testSpaces_[0][i]+1);
         for (std::size_t i=0;i<testSpaces_[1].size();++i)
-          degrees[i] += std::max(-1,testSpaces_[1][i]);
+          if (i<testSpaces_[1].size())
+            degrees[i] += std::max(0,testSpaces_[1][i]+1);
         return degrees;
       }
       int edgeSize(int deriv) const
       {
         auto degrees = edgeDegrees();
-        return Dune::Fem::OrthonormalShapeFunctions<1>::
-              size( degrees[deriv] );
+        return degrees[deriv] < 0 ? 0 :
+              Dune::Fem::OrthonormalShapeFunctions<1>::size( degrees[deriv] );
       }
       int maxEdgeDegree() const
       {
