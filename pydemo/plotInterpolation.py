@@ -46,7 +46,7 @@ for e, errName in enumerate(errorNames):
     pyplot.tick_params(axis='both', which='minor', labelsize=32)
     pyplot.xlabel('number of dofs',fontsize=20)
     pyplot.legend(loc="lower left")
-    pyplot.savefig('interpolationErrorL2.eps')
+    pyplot.savefig('interpolationError'+errName'.eps')
     pyplot.show()
 
     pyplot.figure()
@@ -58,5 +58,5 @@ for e, errName in enumerate(errorNames):
     pyplot.tick_params(axis='both', which='minor', labelsize=32)
     pyplot.xlabel('number of dofs',fontsize=20)
     pyplot.legend(loc="lower left")
-    pyplot.savefig('interpolationErrorL2.eps')
+    pyplot.savefig('interpolationEoc'+errName'.eps')
     pyplot.show()

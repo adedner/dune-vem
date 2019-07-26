@@ -12,23 +12,25 @@ from dune.vem import voronoiCells
 
 from ufl import *
 import dune.ufl
+dune.fem.parameter.append({"fem.verboserank": 0})
 
-order = 3
+# use some run time parameters here to enable batch processesing
+# the dump file should include the parameter values and the plot script
+# should also use the parameters to determin input and output file names
+order = 1
 gridTypes = ["triangles","cartesian","quadrilaterals","voronoi"]
-useGrid = 3 # 0..3
+useGrid = 0 # 0..3
 # note that the hessian of the reference element based basis
 # function is not implemented for the 'quadrilaterals' grid
-
-dune.fem.parameter.append({"fem.verboserank": 0})
 
 # Note: suboptimal laplace error for bubble (space is reduced to polorder=3 but could be 4 = ts+2
 methods = [ ### "[space,scheme,spaceKwrags]"
             ["lagrange","galerkin",{}, "Lagrange"],
-            ["vem","vem",{"testSpaces":[ [0],  [order-2], [order-1] ] }, "Bubble"],
-            ["vem","vem",{"testSpaces":[ [0],  [order-2], [order-3] ] }, "Serendipity"],
-            ["vem","vem",{"testSpaces":[ [-1], [order-1], [order-3] ] }, "Nc-Serendipity"],
+            # ["vem","vem",{"testSpaces":[ [0],  [order-2], [order-1] ] }, "Bubble"],
+            # ["vem","vem",{"testSpaces":[ [0],  [order-2], [order-3] ] }, "Serendipity"],
+            # ["vem","vem",{"testSpaces":[ [-1], [order-1], [order-3] ] }, "Nc-Serendipity"],
             ["vem","vem",{"conforming":True}, "conforming"],
-            ["vem","vem",{"conforming":False}, "non-conforming"],
+            # ["vem","vem",{"conforming":False}, "non-conforming"],
             # ["bbdg","bbdg",{}],
    ]
 
@@ -38,8 +40,8 @@ exact = as_vector( [x[0]*x[1] * cos(pi*x[0]*x[1])] )
 
 def compute(grid, space, schemeName):
     # do the interpolation
-    df = space.interpolate([0],name="solution")
-    df.interpolate(exact); info = {"linear_iterations":-1}
+    df = space.interpolate(exact,name="solution")
+    info = {"linear_iterations":-1}
     # compute the error
     edf = exact-df
     err = [inner(edf,edf),
@@ -93,7 +95,7 @@ for level in range(2,6):
         dfs.plot(figure=(fig,figPos+i),gridLines=None, colorbar="horizontal")
         res += [ [m, gridVidth, space.size, errors] ]
 
-    # pyplot.show()
+    pyplot.show()
     results += [res]
     pickle.dump(results,open('interpolation.dump','wb'))
 print(results)

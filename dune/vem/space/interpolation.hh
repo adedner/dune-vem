@@ -98,7 +98,6 @@ namespace Dune
         const int dimension = AgglomerationIndexSet::dimension;
         const ElementType &element = shapeFunctionSet.entity();
         const auto &refElement = ReferenceElements< ctype, dimension >::general( element.type() );
-//         const auto normal = intersection.centreUnitOuterNormal();
 
         // use the bb set for this polygon for the inner testing space
         const auto &bbox = indexSet_.boundingBox(element);
@@ -115,41 +114,43 @@ namespace Dune
         };
         auto edge = [&] (int poly,auto intersection,int k,int numDofs)
         { //!TS add nomral derivatives
+          int kStart = k;
           assert(numDofs == edgeBFS_.size());
           int edgeNumber = intersection.indexInInside();
-//           const auto normal = intersection.centreUnitOuterNormal();
           EdgeQuadratureType edgeQuad( gridPart(), intersection, 2*polOrder_, EdgeQuadratureType::INSIDE );
+          const auto normal = intersection.centerUnitOuterNormal();
           for (int qp=0;qp<edgeQuad.nop();++qp)
           {
+            k = kStart;
             auto x = edgeQuad.localPoint(qp);
             auto y = intersection.geometryInInside().global(x);
             double weight = edgeQuad.weight(qp) * intersection.geometry().integrationElement(x) / intersection.geometry().volume();
-            shapeFunctionSet.evaluateEach( y,
-              [ & ] ( std::size_t beta, typename ShapeFunctionSet::RangeType value )
-              {
-                edgeBFS_.evaluateEach( x,
-                  [&](std::size_t alpha, typename EdgeFSType::RangeType phi ) {
-                    //!TS add 'if alpha<...' so that larger edgeBFS is possible
-                    if ( alpha < localDofMatrix.size() )
+            edgeBFS_.evaluateEach( x,
+                [&](std::size_t alpha, typename EdgeFSType::RangeType phi ) {
+                if (alpha < indexSet_.template order2size<1>(0))
+                {
+                  shapeFunctionSet.evaluateEach( y,
+                    [ & ] ( std::size_t beta, typename ShapeFunctionSet::RangeType value )
                     {
-                      int kk = alpha+k;
-                      assert(kk<localDofMatrix.size());
-                      localDofMatrix[ kk ][ beta ] += value[0]*phi[0] * weight;
+                      assert(k<localDofMatrix.size());
+                      localDofMatrix[ k ][ beta ] += value[0]*phi[0] * weight;
                     }
-                  }
-                );
+                  );
+                  ++k;
+                }
+                if (alpha < indexSet_.template order2size<1>(1))
+                {
+                  shapeFunctionSet.jacobianEach( y,
+                    [ & ] ( std::size_t beta, typename ShapeFunctionSet::JacobianRangeType dvalue )
+                    {
+                      assert(k<localDofMatrix.size());
+                      localDofMatrix[ k ][ beta ] += (dvalue[0]*normal)*phi[0] * weight;
+                    }
+                  );
+                  ++k;
+                }
               }
             );
-//             shapeFunctionSet.evaluateEach( y, [ & ] ( std::size_t beta, typename ShapeFunctionSet::RangeType value ) {
-//                 edgeBFS_.jacobianEach( x,
-//                   [&](std::size_t alpha, typename EdgeFSType::JacobianRangeType dphi ) {
-//                       auto dphi_n = dphi[0] * normal;
-//                       localDofVector_Matrix[1][ entryNormal ][ beta ] += value[0] * dphi_n * weight;
-//                       ++entryNormal;
-//                   }
-//                 );
-//               }
-//             );
           }
         };
         auto inner = [&] (int poly,int i,int k,int numDofs)
@@ -184,8 +185,8 @@ namespace Dune
       //!TS ii) add an int normDerivOrder parameter and fill the matrix only for that order?
       template< class ShapeFunctionSet >
       void operator() (const IntersectionType &intersection,
-                       const ShapeFunctionSet &shapeFunctionSet, std::vector < Dune::DynamicMatrix<double> > &localDofVector_Matrix,
-                       std::vector<int> &mask) const
+                       const ShapeFunctionSet &shapeFunctionSet, std::vector < Dune::DynamicMatrix<double> > &localDofVectorMatrix,
+                       std::vector<std::vector<int>> &mask) const
       {
         const int dimension = AgglomerationIndexSet::dimension;
         mask.clear();
@@ -193,26 +194,21 @@ namespace Dune
         const auto &refElement = ReferenceElements< ctype, dimension >::general( element.type() );
         int edgeNumber = intersection.indexInInside();
         const auto &edgeGeo = refElement.template geometry<1>(edgeNumber);
-//         std::vector< DynamicMatrix<double> > localDofMatrix_Normal; //vector of matrices for the normal deriv matrix
         const auto normal = intersection.centerUnitOuterNormal();
-        std::size_t entry=0, entryNormal=0;
+        std::vector<std::size_t> entry(localDofVectorMatrix.size(), 0);
+
         // define the three relevant part of the interpolation, i.e.,
         // vertices,edges - no inner needed since only doing interpolation
         // on intersectionn
         auto vertex = [&] (int poly,int i,int k,int numDofs)
         { //!TS add derivatives at vertex (probably only normal component - is the mask then correct?)
           const auto &x = edgeGeo.local( refElement.position( i, dimension ) );
-          shapeFunctionSet.evaluateEach( x, [ &localDofVector_Matrix, k, &entry ] ( std::size_t alpha, typename ShapeFunctionSet::RangeType phi ) {
+          shapeFunctionSet.evaluateEach( x, [ &localDofVectorMatrix, k, &entry ] ( std::size_t alpha, typename ShapeFunctionSet::RangeType phi ) {
               assert( phi.dimension == 1 );
-              assert( entry < localDofVector_Matrix[0].size() );
-              localDofVector_Matrix[0][ entry ][ alpha ] = phi[ 0 ];
-              ++entry;
+              assert( entry[0] < localDofVectorMatrix[0].size() );
+              localDofVectorMatrix[0][ entry[0] ][ alpha ] = phi[ 0 ];
             } );
-//            shapeFunctionSet.jacobianEach( x, [ &localDofMatrix, k ] ( std::size_t alpha, typename ShapeFunctionSet::RangeType phi ) {
-//               assert( phi.dimension == 1 );
-//               assert( k < localDofMatrix.size() );
-//               localDofMatrix[ k ][ alpha ] = phi[ 0 ];
-//             } );
+            ++entry[0];
         };
         auto edge = [&] (int poly,auto intersection,int k,int numDofs)
         { //!TS add normal derivatives
@@ -228,30 +224,25 @@ namespace Dune
                 edgeBFS_.evaluateEach( xx,
                   [&](std::size_t alpha, typename EdgeFSType::RangeType phi ) {
                     //!TS add alpha<...
-                    if (alpha < localDofVector_Matrix[0].size())
+                    if (alpha < indexSet_.template order2size<1>(0) &&
+                        beta < indexSet_.template order2size<1>(0) )
                     {
-                      assert( entry < localDofVector_Matrix[0].size() );
-                      localDofVector_Matrix[0][ entry ][ beta ] += value[0]*phi[0] * weight;
-                      ++entry;
+                      assert( entry[0]+alpha < localDofVectorMatrix[0].size() );
+                      localDofVectorMatrix[0][ entry[0]+alpha ][ beta ] += value[0]*phi[0] * weight;
+                    }
+                    if (alpha < indexSet_.template order2size<1>(1) &&
+                        beta < indexSet_.template order2size<1>(1) )
+                    {
+                      assert( entry[1]+alpha < localDofVectorMatrix[1].size() );
+                      localDofVectorMatrix[1][ entry[1]+alpha ][ beta ] += value[0]*phi[0] * weight;
                     }
                   }
                 );
               }
             );
-            shapeFunctionSet.evaluateEach( x, [ & ] ( std::size_t beta, typename ShapeFunctionSet::RangeType value ) {
-                edgeBFS_.jacobianEach( x,
-                  [&](std::size_t alpha, typename EdgeFSType::JacobianRangeType dphi ) {
-                     if (alpha < localDofVector_Matrix[1].size() )
-                     {
-                      auto dphi_n = dphi[0] * normal;
-                      localDofVector_Matrix[1][ entryNormal ][ beta ] += value[0] * dphi_n * weight;
-                      ++entryNormal;
-                     }
-                  }
-                );
-              }
-            );
           }
+          entry[0] += indexSet_.template order2size<1>(0);
+          entry[1] += indexSet_.template order2size<1>(1);
         };
         applyOnIntersection(intersection,vertex,edge,mask);
       }
@@ -329,6 +320,7 @@ namespace Dune
       {
         const int dimension = AgglomerationIndexSet::dimension;
         typename LocalFunction::RangeType value;
+        typename LocalFunction::JacobianRangeType dvalue;
         assert( value.dimension == 1 );
         const auto &refElement = ReferenceElements< ctype, dimension >::general( element.type() );
 
@@ -357,19 +349,22 @@ namespace Dune
             auto y = intersection.geometryInInside().global(x);
             localFunction.evaluate( y, value );
             double weight = edgeQuad.weight(qp) * intersection.geometry().integrationElement(x) / intersection.geometry().volume();
+            if (indexSet_.template order2size<1>(1)>0)
+              localFunction.jacobian( y, dvalue);
+            double dnvalue = dvalue[0]*normal;
             edgeBFS_.evaluateEach(x,
               [&](std::size_t alpha, typename LocalFunction::RangeType phi ) {
-                //!TS if alpha<...
-                int kk = alpha+k;
                 //! SubDofWrapper has no size assert( kk < localDofVector.size() );
-                localDofVector[ kk ] += value[0]*phi[0] * weight;
-              }
-            );
-            edgeBFS_.jacobianEach( x,
-              [&](std::size_t alpha, typename LocalFunction::JacobianRangeType dphi ) {
-                 int kk = k + alpha;
-                 auto dphi_n = dphi[0] * normal;
-                 localDofVector[ kk ] += value[0] * dphi_n * weight;
+                if (alpha < indexSet_.template order2size<1>(0))
+                {
+                  localDofVector[ k ] += value[0]*phi[0] * weight;
+                  ++k;
+                }
+                if (alpha < indexSet_.template order2size<1>(1))
+                {
+                  localDofVector[ k ] += dnvalue * phi[0] * weight;
+                  ++k;
+                }
               }
             );
           }
@@ -427,7 +422,7 @@ namespace Dune
       template< class Vertex, class Edge>
       void applyOnIntersection( const IntersectionType &intersection,
                                 const Vertex &vertex, const Edge &edge,
-                                std::vector<int> &mask) const
+                                std::vector<std::vector<int>> &mask) const
       {
         const int dimension = AgglomerationIndexSet::dimension;
         const ElementType &element = intersection.inside();
@@ -448,17 +443,23 @@ namespace Dune
             for( ; i < refElement.size( edgeNumber, dimension-1, dimension ); ++i )
             {
               int vertexNumber = refElement.subEntity( edgeNumber, dimension-1, i, dimension);
-              const int k = indexSet_.localIndex( element, vertexNumber, dimension );
-              assert(k>=0); // intersection is 'outside' so vertices should be as well
+              const int vtxk = indexSet_.localIndex( element, vertexNumber, dimension );
+              assert(vtxk>=0); // intersection is 'outside' so vertices should be as well
               vertex(poly,vertexNumber,i,1);
-              mask.push_back(k);
+              mask[0].push_back(vtxk);
             }
           }
           if (indexSet_.edgeOrders()[0]>=0) //!TS
           {
             edge(poly,intersection,i,edgeSize);
-            for (int kk=0;kk<edgeSize;++kk)
-              mask.push_back(k*edgeSize+edgeOffset+kk);
+            int count = 0;
+            for (std::size_t alpha=0;alpha<edgeBFS_.size();++alpha)
+              for (int deriv=0;deriv<2;++deriv)
+                if (alpha < indexSet_.template order2size<1>(deriv))
+                {
+                  mask[deriv].push_back(k*edgeSize+edgeOffset+count);
+                  ++count;
+                }
           }
         }
       }

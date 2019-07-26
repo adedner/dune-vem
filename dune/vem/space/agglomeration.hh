@@ -178,11 +178,7 @@ namespace Dune
           interpolation_(blockMapper().indexSet(), polOrder, basisChoice!=3 ),
           scalarShapeFunctionSet_( Dune::GeometryType( Dune::GeometryType::cube, GridPart::dimension ) ),
           edgeShapeFunctionSet_(   Dune::GeometryType( Dune::GeometryType::cube, GridPart::dimension-1 ),
-              agIndexSet_.maxDegreePerCodim()[1] +
-//               agIndexSet_.edgeOrders[1] +
-              // edge order  //!TS needs changing - add method to indexSet?
-                (agIndexSet_.vertexOrders()[0]+1)*2 // vertex order * number of vertices on edge
-              ),
+              agIndexSet_.maxEdgeDegree() ),
           polOrder_( polOrder ),
           useOnb_(basisChoice==2)
       {
@@ -520,7 +516,7 @@ namespace Dune
           const ElementType &element = gridPart().entity( entitySeed );
           const auto geometry = element.geometry();
           const auto &refElement = ReferenceElements< typename GridPart::ctype, GridPart::dimension >::general( element.type() );
-          std::vector< Dune::DynamicMatrix < double > > edgePhiVector;
+          std::vector< Dune::DynamicMatrix < double > > edgePhiVector(2);
           // get the bounding box monomials and apply all dofs to them
           BoundingBoxBasisFunctionSet< GridPart, ScalarShapeFunctionSetType > shapeFunctionSet( element, bbox,
               useOnb_, scalarShapeFunctionSet_ );
@@ -533,49 +529,12 @@ namespace Dune
               continue;
             assert( intersection.conforming() );
             auto normal = intersection.centerUnitOuterNormal();
-            std::vector<int> mask; // contains indices with Phi_mask[i] is attached to given edge
-            // size of edgePhi for edge dofs (not including normal moments)
-            int edgePhiSize = Dune::Fem::OrthonormalShapeFunctions< DomainType::dimension-1 >::
-                   size( agIndexSet_.edgeOrders()[0] + (agIndexSet_.vertexOrders()[0]+1)*2 );
-//            int edgePhiSize; // size of edgePhi for edge dofs (not including normal moments)
-            // needs to be size not order
-//            edgePhiSize = agIndexSet_.edgeOrders()[0] + (agIndexSet_.vertexOrders()[0]+1)*2;
-            edgePhi.resize(edgePhiSize, edgePhiSize,0);
-//             edgePhi.resize(edgeShapeFunctionSet_.size(),edgeShapeFunctionSet_.size(),0);
-            int edgeNormalPhiSize = Dune::Fem::OrthonormalShapeFunctions< DomainType::dimension-1 >::
-                   size( agIndexSet_.edgeOrders()[1] + (agIndexSet_.vertexOrders()[0]+1)*2 );
-            edgeNormalPhi.resize(edgeNormalPhiSize, edgeNormalPhiSize, 0);
-            edgePhiVector.push_back(edgePhi);
-            edgePhiVector.push_back(edgeNormalPhi);
+            std::vector<std::vector<int>> mask(2); // contains indices with Phi_mask[i] is attached to given edge
+            edgePhiVector[0].resize(agIndexSet_.edgeSize(0), agIndexSet_.edgeSize(0), 0);
+            edgePhiVector[1].resize(agIndexSet_.edgeSize(1), agIndexSet_.edgeSize(1), 0);
             interpolation_( intersection, edgeShapeFunctionSet_, edgePhiVector, mask );
-            edgePhi.invert();
-            edgeNormalPhi.invert();
-            { // test edgePhi
-              assert( mask.size() == edgeShapeFunctionSet_.size() );
-              std::vector<double> lambda(numDofs);
-#if 1 // terrible hack!
-              bool succ = true;
-              for (int i=0;i<mask.size();++i)
-              {
-                std::fill(lambda.begin(),lambda.end(),0);
-                PhiEdge<GridPartType, Dune::DynamicMatrix<double>,EdgeShapeFunctionSetType>
-                  phiEdge(gridPart(),intersection,edgePhi,edgeShapeFunctionSet_,i); // behaves like Phi_mask[i] restricted to edge
-                interpolation_(element,phiEdge,lambda);
-                for (int k=0;k<numDofs;++k) // lambda should be 1 for k=mask[i] otherwise 0
-                  succ &= ( mask[i]==k? std::abs(lambda[k]-1)<1e-10: std::abs(lambda[k])<1e-10 );
-              }
-              if (!succ) std::swap(mask[0],mask[1]);
-#endif
-              for (int i=0;i<mask.size();++i)
-              {
-                std::fill(lambda.begin(),lambda.end(),0);
-                PhiEdge<GridPartType, Dune::DynamicMatrix<double>,EdgeShapeFunctionSetType>
-                  phiEdge(gridPart(),intersection,edgePhi,edgeShapeFunctionSet_,i); // behaves like Phi_mask[i] restricted to edge
-                interpolation_(element,phiEdge,lambda);
-                for (int k=0;k<numDofs;++k) // lambda should be 1 for k=mask[i] otherwise 0
-                  assert( mask[i]==k? std::abs(lambda[k]-1)<1e-10: std::abs(lambda[k])<1e-10 );
-              }
-            } // testing
+            edgePhiVector[0].invert();
+            edgePhiVector[1].invert();
 
             // now compute int_e Phi_mask[i] m_alpha
             Quadrature1Type quadrature( gridPart(), intersection, 2*polOrder, Quadrature1Type::INSIDE );
@@ -588,22 +547,34 @@ namespace Dune
                  if (alpha<numGradShapeFunctions)
                     //jacobian eachhere for edge shape fns
                     edgeShapeFunctionSet_.evaluateEach( x, [ & ] ( std::size_t beta, FieldVector< DomainFieldType, 1 > psi ) {
-                        for (int s=0;s<mask.size();++s) // note that edgePhi is the transposed of the basis transform matrix
-                          R[alpha][mask[s]].axpy( edgePhi[beta][s]*psi[0]*phi[0]*weight, normal);
+                        for (int s=0;s<mask[0].size();++s) // note that edgePhi is the transposed of the basis transform matrix
+                          R[alpha][mask[0][s]].axpy( edgePhiVector[0][beta][s]*psi[0]*phi[0]*weight, normal);
                     } );
                  if (alpha<numHessShapeFunctions)
+                 {
+                    typename Traits::ScalarBasisFunctionSetType::HessianMatrixType factor;
+                    DomainType tau = intersection.geometry().corner(1);
+                    tau -= intersection.geometry().corner(0);    // use jacobianInverseTranspose?
+                    tau /= tau.two_norm();
+                    for (std::size_t i=0;i<factor.rows;++i)
+                      for (std::size_t j=0;j<factor.cols;++j)
+                        factor[i][j] = 0.5*(normal[i]*tau[j] + normal[j]*tau[i]);
                     //jacobian eachhere for edge shape fns
                     edgeShapeFunctionSet_.jacobianEach( x, [ & ] ( std::size_t beta, FieldMatrix< DomainFieldType, 1,1 > dpsi ) {
-                        typename Traits::ScalarBasisFunctionSetType::HessianMatrixType factor;
-                        DomainType tau = intersection.geometry().corner(1);
-                        tau -= intersection.geometry().corner(0);    // use jacobianInverseTranspose?
-                        tau /= tau.two_norm();
-                        for (std::size_t i=0;i<factor.rows;++i)
-                          for (std::size_t j=0;j<factor.cols;++j)
-                            factor[i][j] = 0.5*(normal[i]*tau[j] + normal[j]*tau[i]);
-                        for (int s=0;s<mask.size();++s) // note that edgePhi is the transposed of the basis transform matrix
-                          P[alpha][mask[s]].axpy( edgePhi[beta][s]*dpsi[0][0]*phi[0]*weight, factor);
+                        for (int s=0;s<mask[0].size();++s) // note that edgePhi is the transposed of the basis transform matrix
+                          P[alpha][mask[0][s]].axpy( edgePhiVector[0][beta][s]*dpsi[0][0]*phi[0]*weight, factor);
                     } );
+                    if ( agIndexSet_.edgeSize(1) > 0)
+                    {
+                      for (std::size_t i=0;i<factor.rows;++i)
+                        for (std::size_t j=0;j<factor.cols;++j)
+                          factor[i][j] = 0.5*(normal[i]*normal[j] + normal[j]*normal[i]);
+                      edgeShapeFunctionSet_.evaluateEach( x, [ & ] ( std::size_t beta, FieldVector< DomainFieldType, 1 > psi ) {
+                          for (int s=0;s<mask[1].size();++s) // note that edgePhi is the transposed of the basis transform matrix
+                            P[alpha][mask[1][s]].axpy( edgePhiVector[1][beta][s]*psi[0]*phi[0]*weight, factor);
+                      } );
+                    }
+                  }
               } );
             } // quadrature loop
           } // loop over intersections
@@ -665,34 +636,36 @@ namespace Dune
           auto vemBasisFunction = scalarBasisFunctionSet(element);
 
           // compute the boundary terms for the gradient projection
-          for( const auto &intersection : intersections( static_cast< typename GridPart::GridViewType >( gridPart() ), element ) )
+          if ( agIndexSet_.edgeSize(1) == 0)
           {
-            // ignore edges inside the given polygon
-            if( !intersection.boundary() && (agglomeration().index( intersection.outside() ) == agglomerate) )
-              continue;
-            assert( intersection.conforming() );
-            auto normal = intersection.centerUnitOuterNormal();
-
-            // change to compute boundary term in Hessian Projection
-            // now compute int_e Phi_mask[i] m_alpha
-            Quadrature1Type quadrature( gridPart(), intersection, 2*polOrder, Quadrature1Type::INSIDE );
-            for( std::size_t qp = 0; qp < quadrature.nop(); ++qp )
+            for( const auto &intersection : intersections( static_cast< typename GridPart::GridViewType >( gridPart() ), element ) )
             {
-              auto x = quadrature.localPoint(qp);
-              auto y = intersection.geometryInInside().global(x);
-              const DomainFieldType weight = intersection.geometry().integrationElement( x ) * quadrature.weight( qp );
-              shapeFunctionSet.evaluateEach( y, [ & ] ( std::size_t alpha, FieldVector< DomainFieldType, 1 > phi ) {
-                 if (alpha<numHessShapeFunctions)
-                 {
-                   DomainType factor = normal;
-                   factor *= weight * phi[0];
-                   vemBasisFunction.axpy( y, normal, factor, P[alpha] );
-                   // vemBasisFunction.axpy( y, factor, P[alpha] );
-                 }
-              } );
-            } // quadrature loop
-          } // loop over intersections
+              // ignore edges inside the given polygon
+              if( !intersection.boundary() && (agglomeration().index( intersection.outside() ) == agglomerate) )
+                continue;
+              assert( intersection.conforming() );
+              auto normal = intersection.centerUnitOuterNormal();
 
+              // change to compute boundary term in Hessian Projection
+              // now compute int_e Phi_mask[i] m_alpha
+              Quadrature1Type quadrature( gridPart(), intersection, 2*polOrder, Quadrature1Type::INSIDE );
+              for( std::size_t qp = 0; qp < quadrature.nop(); ++qp )
+              {
+                auto x = quadrature.localPoint(qp);
+                auto y = intersection.geometryInInside().global(x);
+                const DomainFieldType weight = intersection.geometry().integrationElement( x ) * quadrature.weight( qp );
+                shapeFunctionSet.evaluateEach( y, [ & ] ( std::size_t alpha, FieldVector< DomainFieldType, 1 > phi ) {
+                   if (alpha<numHessShapeFunctions)
+                   {
+                     DomainType factor = normal;
+                     factor *= weight * phi[0];
+                     vemBasisFunction.axpy( y, normal, factor, P[alpha] );
+                     // vemBasisFunction.axpy( y, factor, P[alpha] );
+                   }
+                } );
+              } // quadrature loop
+            } // loop over intersections
+          }
 
           Quadrature0Type quadrature( element, 2*polOrder );
           for( std::size_t qp = 0; qp < quadrature.nop(); ++qp )

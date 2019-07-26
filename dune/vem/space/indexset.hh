@@ -46,24 +46,27 @@ namespace Dune
       : BaseType( agglomeration, allocator )
       , testSpaces_( testSpaces )
       {
-        /*
         std::cout << "####################\n";
-        std::cout << testSpaces_[0] << " " << dofsPerCodim()[0].second << std::endl;
-        std::cout << testSpaces_[1] << " " << dofsPerCodim()[1].second << std::endl;
-        std::cout << testSpaces_[2] << " " << dofsPerCodim()[2].second << std::endl;
+        std::cout << testSpaces_[0][0] << " " << dofsPerCodim()[0].second << std::endl;
+        std::cout << testSpaces_[1][0] << " " << dofsPerCodim()[1].second << std::endl;
+        std::cout << testSpaces_[2][0] << " " << dofsPerCodim()[2].second << std::endl;
         std::cout << "####################\n";
-        */
       }
 
       // return the number of dofs per codimension
       // !TS change to take into account vector of vector storage
       std::vector< std::pair< int, unsigned int > > dofsPerCodim () const
       {
-          //issue with entries being -1 here?
         const int dimension = BaseType::dimension;
-        const int vSize = 2*sumTestSpaces(0)>=0? 1:0;
-        const int eSize = sumTestSpaces(1)>=0? Dune::Fem::OrthonormalShapeFunctions< GridPartType::dimension-1 >::size( testSpaces_[1][0] ) : 0;
-        const int iSize = sumTestSpaces(2)>=0? Dune::Fem::OrthonormalShapeFunctions< GridPartType::dimension >::size( testSpaces_[2][0] ) : 0;
+        int vSize = 0;
+        int eSize = 0;
+        int iSize = 0;
+        for (size_t i=0;i<testSpaces_[0].size();++i) // order2size fails for dim=dimension
+          vSize += (testSpaces_[0][i]>=0) ? pow(BaseType::dimension,i):0;
+        for (size_t i=0;i<testSpaces_[1].size();++i)
+          eSize += order2size<1>(i);
+        for (size_t i=0;i<testSpaces_[2].size();++i)
+          iSize += order2size<2>(i);
         return { std::make_pair( dimension,   vSize ),
                  std::make_pair( dimension-1, eSize ),
                  std::make_pair( dimension-2, iSize ) };
@@ -92,6 +95,28 @@ namespace Dune
            return ret;
       }
 
+      std::vector<int> edgeDegrees() const
+      {
+        assert( testSpaces_[0].size()<2 );
+        std::vector<int> degrees(2,0);
+        for (std::size_t i=0;i<testSpaces_[0].size();++i)
+          degrees[i] += 2*(testSpaces_[0][i]+1);
+        for (std::size_t i=0;i<testSpaces_[1].size();++i)
+          degrees[i] += std::max(-1,testSpaces_[1][i]);
+        return degrees;
+      }
+      int edgeSize(int deriv) const
+      {
+        auto degrees = edgeDegrees();
+        return Dune::Fem::OrthonormalShapeFunctions<1>::
+              size( degrees[deriv] );
+      }
+      int maxEdgeDegree() const
+      {
+        auto degrees = edgeDegrees();
+        return *std::max_element(degrees.begin(),degrees.end());
+      }
+
       const std::vector<int> vertexOrders() const
       {
           return testSpaces_[0];
@@ -106,6 +131,22 @@ namespace Dune
       {
           return testSpaces_[2];
       }
+
+      template <int dim>
+      std::size_t order2size(int deriv) const
+      {
+        if (testSpaces_[dim].size()<=deriv || testSpaces_[dim][deriv]<0)
+          return 0;
+        else
+        {
+          if (dim>0)
+            return Dune::Fem::OrthonormalShapeFunctions<dim>::
+              size(testSpaces_[dim][deriv]);
+          else
+            return pow(BaseType::dimension,deriv);
+        }
+      }
+
 
     private:
       int sumTestSpaces(unsigned int codim) const
