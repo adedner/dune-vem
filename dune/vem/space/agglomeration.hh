@@ -571,7 +571,6 @@ namespace Dune
                           // P[alpha][mask[0][s]].axpy( edgePhiVector[0][beta][s]*dpsi[0][0]*phi[0]*weight, factor);
                           P[alpha][mask[0][s]].axpy( edgePhiVector[0][beta][s]*gradPsiDotn*phi[0]*weight, factor);
                     } );
-                    assert( agIndexSet_.edgeSize(1) == 0);
                     if ( agIndexSet_.edgeSize(1) > 0)
                     {
                       for (std::size_t i=0;i<factor.rows;++i)
