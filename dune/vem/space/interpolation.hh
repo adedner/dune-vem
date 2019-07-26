@@ -339,12 +339,14 @@ namespace Dune
         auto edge = [&] (int poly,auto intersection,int k,int numDofs)
         { //!TS edge derivatives
           assert(numDofs == edgeBFS_.size());
+          int kStart = k;
           int edgeNumber = intersection.indexInInside();
           const auto normal = intersection.centerUnitOuterNormal();
           EdgeQuadratureType edgeQuad( gridPart(),
                 intersection, 2*polOrder_, EdgeQuadratureType::INSIDE );
           for (int qp=0;qp<edgeQuad.nop();++qp)
           {
+            k = kStart;
             auto x = edgeQuad.localPoint(qp);
             auto y = intersection.geometryInInside().global(x);
             localFunction.evaluate( y, value );
@@ -357,11 +359,13 @@ namespace Dune
                 //! SubDofWrapper has no size assert( kk < localDofVector.size() );
                 if (alpha < indexSet_.template order2size<1>(0))
                 {
+                  assert(k < localDofVector.size() );
                   localDofVector[ k ] += value[0]*phi[0] * weight;
                   ++k;
                 }
                 if (alpha < indexSet_.template order2size<1>(1))
                 {
+                  assert(k < localDofVector.size() );
                   localDofVector[ k ] += dnvalue * phi[0] * weight;
                   ++k;
                 }

@@ -29,8 +29,9 @@ methods = [ ### "[space,scheme,spaceKwrags]"
             # ["vem","vem",{"testSpaces":[ [0],  [order-2], [order-1] ] }, "Bubble"],
             # ["vem","vem",{"testSpaces":[ [0],  [order-2], [order-3] ] }, "Serendipity"],
             # ["vem","vem",{"testSpaces":[ [-1], [order-1], [order-3] ] }, "Nc-Serendipity"],
-            ["vem","vem",{"conforming":True}, "conforming"],
+            # ["vem","vem",{"conforming":True}, "conforming"],
             # ["vem","vem",{"conforming":False}, "non-conforming"],
+            ["vem","vem",{"testSpaces":[ [0],  [order-3,order-2], [order-4] ] }, "Serendipity"],
             # ["bbdg","bbdg",{}],
    ]
 
