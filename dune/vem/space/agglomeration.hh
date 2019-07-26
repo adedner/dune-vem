@@ -558,13 +558,18 @@ namespace Dune
                     DomainType tau = intersection.geometry().corner(1);
                     tau -= intersection.geometry().corner(0);    // use jacobianInverseTranspose?
                     tau /= tau.two_norm();
+                    auto jit = intersection.geometry().jacobianInverseTransposed(x);
                     for (std::size_t i=0;i<factor.rows;++i)
                       for (std::size_t j=0;j<factor.cols;++j)
-                        factor[i][j] = 0.5*(normal[i]*tau[j] + normal[j]*tau[i]);
+                        factor[i][j] = 0.5 * (normal[i]*tau[j] + normal[j]*tau[i]);
                     //jacobian eachhere for edge shape fns
                     edgeShapeFunctionSet_.jacobianEach( x, [ & ] ( std::size_t beta, FieldMatrix< DomainFieldType, 1,1 > dpsi ) {
+                        Dune::FieldVector<double,2> gradPsi;
+                        jit.mv(dpsi[0], gradPsi);
+                        double gradPsiDotn = gradPsi*tau;
                         for (int s=0;s<mask[0].size();++s) // note that edgePhi is the transposed of the basis transform matrix
-                          P[alpha][mask[0][s]].axpy( edgePhiVector[0][beta][s]*dpsi[0][0]*phi[0]*weight, factor);
+                          // P[alpha][mask[0][s]].axpy( edgePhiVector[0][beta][s]*dpsi[0][0]*phi[0]*weight, factor);
+                          P[alpha][mask[0][s]].axpy( edgePhiVector[0][beta][s]*gradPsiDotn*phi[0]*weight, factor);
                     } );
                     assert( agIndexSet_.edgeSize(1) == 0);
                     if ( agIndexSet_.edgeSize(1) > 0)
