@@ -26,18 +26,19 @@ useGrid = 0 # 0..3
 # Note: suboptimal laplace error for bubble (space is reduced to polorder=3 but could be 4 = ts+2
 methods = [ ### "[space,scheme,spaceKwrags]"
             ["lagrange","galerkin",{}, "Lagrange"],
-            # ["vem","vem",{"testSpaces":[ [0],  [order-2], [order-1] ] }, "Bubble"],
-            # ["vem","vem",{"testSpaces":[ [0],  [order-2], [order-3] ] }, "Serendipity"],
+            ["vem","vem",{"testSpaces":[ [0],  [order-2], [order-1] ] }, "Bubble"],
+            ["vem","vem",{"testSpaces":[ [0],  [order-2], [order-3] ] }, "Serendipity"],
             # ["vem","vem",{"testSpaces":[ [-1], [order-1], [order-3] ] }, "Nc-Serendipity"],
-            # ["vem","vem",{"conforming":True}, "conforming"],
+            ["vem","vem",{"conforming":True}, "conforming"],
             # ["vem","vem",{"conforming":False}, "non-conforming"],
-            ["vem","vem",{"testSpaces":[ [0],  [order-3,order-2], [order-4] ] }, "Serendipity"],
+            # ["vem","vem",{"testSpaces":[ [0],  [order-3,order-2], [order-4] ] }, "C1-non-conforming"],
+            # ["vem","vem",{"testSpaces":[ [0],  [order-2,order-2], [order-2] ] }, "C1C0-conforming"],
             # ["bbdg","bbdg",{}],
    ]
 
 uflSpace = dune.ufl.Space(2, dimRange=1)
 x = SpatialCoordinate(uflSpace)
-exact = as_vector( [x[0]*x[1] * cos(pi*x[0]*x[1])] )
+exact = as_vector( [10*(x[0]*x[1])**3 * cos(pi*x[0]*x[1])] )
 
 def compute(grid, space, schemeName):
     # do the interpolation
@@ -58,7 +59,7 @@ def compute(grid, space, schemeName):
            ], info
 
 results = []
-for level in range(2,6):
+for level in range(3,6):
     N = 2**level
     constructor = cartesianDomain([-0.5,-0.5],[1,1],[N,N])
     if useGrid == 0:
@@ -83,8 +84,10 @@ for level in range(2,6):
         return polyGrid.hierarchicalGrid.agglomerate(en)
     # polygons.plot(colorbar="horizontal")
 
-    fig = pyplot.figure(figsize=(10*len(methods),10))
-    figPos = 100+10*len(methods)+1
+    figCols = 4
+    figRows = len(methods)//figCols
+    fig = pyplot.figure(figsize=(10*figCols,10*figRows))
+    figPos = 100*figRows+10*figCols+1
     res = []
     for i,m in enumerate(methods):
         space = create.space(m[0], polyGrid, order=order, dimRange=1, storage="istl", **m[2])
@@ -93,10 +96,14 @@ for level in range(2,6):
               "Size: ",space.size,
               *[e for e in errors],
               flush=True)
-        dfs.plot(figure=(fig,figPos+i),gridLines=None, colorbar="horizontal")
+        # dfs.plot(figure=(fig,figPos+i),gridLines=None, colorbar="horizontal",level=3)
+        # plot(grad(dfs)[0,0],grid=polyGrid,level=3,
+        #      figure=(fig,figPos+i),gridLines=None, colorbar="horizontal")
+        plot(grad(grad(dfs))[0,0,0],grid=polyGrid,level=3,
+             figure=(fig,figPos+i),gridLines=None, colorbar="horizontal")
         res += [ [m, gridVidth, space.size, errors] ]
 
-    pyplot.show()
     results += [res]
     pickle.dump(results,open('interpolation.dump','wb'))
 print(results)
+pyplot.show()

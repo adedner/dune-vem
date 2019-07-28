@@ -115,16 +115,18 @@ namespace Dune
         auto edge = [&] (int poly,auto intersection,int k,int numDofs)
         { //!TS add nomral derivatives
           int kStart = k;
-          assert(numDofs == edgeBFS_.size());
           int edgeNumber = intersection.indexInInside();
           EdgeQuadratureType edgeQuad( gridPart(), intersection, 2*polOrder_, EdgeQuadratureType::INSIDE );
-          const auto normal = intersection.centerUnitOuterNormal();
+          auto normal = intersection.centerUnitOuterNormal();
+          if (intersection.neighbor()) // we need to check the orientation of the normal
+            if (indexSet_.index(intersection.inside()) > indexSet_.index(intersection.outside()))
+              normal *= -1;
           for (int qp=0;qp<edgeQuad.nop();++qp)
           {
             k = kStart;
             auto x = edgeQuad.localPoint(qp);
             auto y = intersection.geometryInInside().global(x);
-            double weight = edgeQuad.weight(qp) * intersection.geometry().integrationElement(x) / intersection.geometry().volume();
+            double weight = edgeQuad.weight(qp) * intersection.geometry().integrationElement(x);
             edgeBFS_.evaluateEach( x,
                 [&](std::size_t alpha, typename EdgeFSType::RangeType phi ) {
                 if (alpha < indexSet_.template order2size<1>(0))
@@ -133,7 +135,8 @@ namespace Dune
                     [ & ] ( std::size_t beta, typename ShapeFunctionSet::RangeType value )
                     {
                       assert(k<localDofMatrix.size());
-                      localDofMatrix[ k ][ beta ] += value[0]*phi[0] * weight;
+                      localDofMatrix[ k ][ beta ] += value[0]*phi[0] * weight
+                                                     / intersection.geometry().volume();
                     }
                   );
                   ++k;
@@ -143,6 +146,8 @@ namespace Dune
                   shapeFunctionSet.jacobianEach( y,
                     [ & ] ( std::size_t beta, typename ShapeFunctionSet::JacobianRangeType dvalue )
                     {
+                      // we assume here that jacobianEach is in global
+                      // space so the jit is not applied
                       assert(k<localDofMatrix.size());
                       localDofMatrix[ k ][ beta ] += (dvalue[0]*normal)*phi[0] * weight;
                     }
@@ -194,7 +199,16 @@ namespace Dune
         const auto &refElement = ReferenceElements< ctype, dimension >::general( element.type() );
         int edgeNumber = intersection.indexInInside();
         const auto &edgeGeo = refElement.template geometry<1>(edgeNumber);
-        const auto normal = intersection.centerUnitOuterNormal();
+        /**/ // Question: is it correct that the nomral and derivatives are not needed here
+        auto normal = intersection.centerUnitOuterNormal();
+        double flipNormal = 1.;
+        if (intersection.neighbor()) // we need to check the orientation of the normal
+          if (indexSet_.index(intersection.inside()) > indexSet_.index(intersection.outside()))
+          {
+            normal *= -1;
+            flipNormal = -1;
+          }
+        /**/
         std::vector<std::size_t> entry(localDofVectorMatrix.size(), 0);
 
         // define the three relevant part of the interpolation, i.e.,
@@ -212,29 +226,29 @@ namespace Dune
         };
         auto edge = [&] (int poly,auto intersection,int k,int numDofs)
         { //!TS add normal derivatives
-          assert(numDofs == edgeBFS_.size());
           EdgeQuadratureType edgeQuad( gridPart(),
                 intersection, 2*polOrder_, EdgeQuadratureType::INSIDE );
           for (int qp=0;qp<edgeQuad.nop();++qp)
           {
             auto x = edgeQuad.localPoint(qp);
             auto xx = x;
-            double weight = edgeQuad.weight(qp) * intersection.geometry().integrationElement(x) / intersection.geometry().volume();
+            double weight = edgeQuad.weight(qp) * intersection.geometry().integrationElement(x);
             shapeFunctionSet.evaluateEach( x, [ & ] ( std::size_t beta, typename ShapeFunctionSet::RangeType value ) {
                 edgeBFS_.evaluateEach( xx,
                   [&](std::size_t alpha, typename EdgeFSType::RangeType phi ) {
                     //!TS add alpha<...
                     if (alpha < indexSet_.template order2size<1>(0) &&
-                        beta < indexSet_.template order2size<1>(0) )
+                        beta < indexSet_.edgeSize(0))
                     {
                       assert( entry[0]+alpha < localDofVectorMatrix[0].size() );
-                      localDofVectorMatrix[0][ entry[0]+alpha ][ beta ] += value[0]*phi[0] * weight;
+                      localDofVectorMatrix[0][ entry[0]+alpha ][ beta ] += value[0]*phi[0] * weight
+                                                                           / intersection.geometry().volume();
                     }
                     if (alpha < indexSet_.template order2size<1>(1) &&
-                        beta < indexSet_.template order2size<1>(1) )
+                        beta < indexSet_.edgeSize(1))
                     {
                       assert( entry[1]+alpha < localDofVectorMatrix[1].size() );
-                      localDofVectorMatrix[1][ entry[1]+alpha ][ beta ] += value[0]*phi[0] * weight;
+                      localDofVectorMatrix[1][ entry[1]+alpha ][ beta ] += value[0]*phi[0] * weight * flipNormal;
                     }
                   }
                 );
@@ -338,10 +352,12 @@ namespace Dune
         };
         auto edge = [&] (int poly,auto intersection,int k,int numDofs)
         { //!TS edge derivatives
-          assert(numDofs == edgeBFS_.size());
           int kStart = k;
           int edgeNumber = intersection.indexInInside();
-          const auto normal = intersection.centerUnitOuterNormal();
+          auto normal = intersection.centerUnitOuterNormal();
+          if (intersection.neighbor()) // we need to check the orientation of the normal
+            if (indexSet_.index(intersection.inside()) > indexSet_.index(intersection.outside()))
+              normal *= -1;
           EdgeQuadratureType edgeQuad( gridPart(),
                 intersection, 2*polOrder_, EdgeQuadratureType::INSIDE );
           for (int qp=0;qp<edgeQuad.nop();++qp)
@@ -350,7 +366,7 @@ namespace Dune
             auto x = edgeQuad.localPoint(qp);
             auto y = intersection.geometryInInside().global(x);
             localFunction.evaluate( y, value );
-            double weight = edgeQuad.weight(qp) * intersection.geometry().integrationElement(x) / intersection.geometry().volume();
+            double weight = edgeQuad.weight(qp) * intersection.geometry().integrationElement(x);
             if (indexSet_.template order2size<1>(1)>0)
               localFunction.jacobian( y, dvalue);
             double dnvalue = dvalue[0]*normal;
@@ -360,7 +376,8 @@ namespace Dune
                 if (alpha < indexSet_.template order2size<1>(0))
                 {
                   assert(k < localDofVector.size() );
-                  localDofVector[ k ] += value[0]*phi[0] * weight;
+                  localDofVector[ k ] += value[0]*phi[0] * weight
+                                         / intersection.geometry().volume();
                   ++k;
                 }
                 if (alpha < indexSet_.template order2size<1>(1))

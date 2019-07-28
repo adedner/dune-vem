@@ -46,13 +46,15 @@ namespace Dune
       : BaseType( agglomeration, allocator )
       , testSpaces_( testSpaces )
       {
-#if 0
-        std::cout << "####################\n";
+        std::cout << "######## dofs per codim ############\n";
         std::cout << testSpaces_[0][0] << " " << dofsPerCodim()[0].second << std::endl;
         std::cout << testSpaces_[1][0] << " " << dofsPerCodim()[1].second << std::endl;
         std::cout << testSpaces_[2][0] << " " << dofsPerCodim()[2].second << std::endl;
+        std::cout << "--------- orders for derivatives ---\n";
+        std::cout << orders()[0] << " " << orders()[1] << " " << orders()[2] << std::endl;
+        std::cout << "----------edge orders --------------\n";
+        std::cout << edgeDegrees()[0] << " " << edgeDegrees()[1] << std::endl;
         std::cout << "####################\n";
-#endif
       }
 
       // return the number of dofs per codimension
@@ -74,11 +76,13 @@ namespace Dune
                  std::make_pair( dimension-2, iSize ) };
       }
 
+#if 0
       // !TS
       const std::vector<int> testSpaces() const
       {
         return {testSpaces_[0][0],testSpaces_[1][0],testSpaces_[2][0]};
       }
+#endif
       std::vector<int> orders()
       {
           std::vector<int> ret(3,0);
