@@ -28,17 +28,17 @@ methods = [ ### "[space,scheme,spaceKwrags]"
             ["lagrange","galerkin",{}, "Lagrange"],
             ["vem","vem",{"testSpaces":[ [0],  [order-2], [order-1] ] }, "Bubble"],
             ["vem","vem",{"testSpaces":[ [0],  [order-2], [order-3] ] }, "Serendipity"],
-            ["vem","vem",{"testSpaces":[ [-1], [order-1], [order-3] ] }, "Nc-Serendipity"],
+            # ["vem","vem",{"testSpaces":[ [-1], [order-1], [order-3] ] }, "Nc-Serendipity"],
             ["vem","vem",{"conforming":True}, "conforming"],
             ["vem","vem",{"conforming":False}, "non-conforming"],
             ["vem","vem",{"testSpaces":[ [0],  [order-3,order-2], [order-4] ] }, "C1-non-conforming"],
             ["vem","vem",{"testSpaces":[ [0],  [order-2,order-2], [order-2] ] }, "C1C0-conforming"],
-            ["bbdg","bbdg",{}],
+            ["bbdg","bbdg",{},"bbdg"],
    ]
 
 uflSpace = dune.ufl.Space(2, dimRange=1)
 x = SpatialCoordinate(uflSpace)
-exact = as_vector( [10*(x[0]*x[1])**3 * cos(pi*x[0]*x[1])] )
+exact = as_vector( [x[0]*x[1] * cos(pi*x[0]*x[1])] )
 
 def compute(grid, space, schemeName):
     # do the interpolation
@@ -59,7 +59,7 @@ def compute(grid, space, schemeName):
            ], info
 
 results = []
-for level in range(2,4):
+for level in range(2,5):
     N = 2**level
     constructor = cartesianDomain([-0.5,-0.5],[1,1],[N,N])
     if useGrid == 0:
@@ -82,7 +82,7 @@ for level in range(2,4):
     @gridFunction(polyGrid, name="cells")
     def polygons(en,x):
         return polyGrid.hierarchicalGrid.agglomerate(en)
-    polygons.plot(colorbar="horizontal")
+    # polygons.plot(colorbar="horizontal")
 
     figCols = 4
     figRows = len(methods)//figCols+1
