@@ -315,24 +315,17 @@ namespace Dune
 //       innerTestSpace now orders[0]
 //    // Question: how to choose the Grad/Hess spaces? Check Bubble and C1C0 space
       const std::size_t numShapeFunctions = scalarShapeFunctionSet_.size(); // uses polOrder
-      int numHessShapeFunctions =
-        Dune::Fem::OrthonormalShapeFunctions< DomainType::dimension >::size(polOrder-2);
-      //  std::min( numShapeFunctions,
-      //      Dune::Fem::OrthonormalShapeFunctions< DomainType::dimension >::
-      //        size( std::max(orders[2],polOrder-2) )
-      //    );
-      int numGradShapeFunctions =
-        Dune::Fem::OrthonormalShapeFunctions< DomainType::dimension >::size(polOrder-1);
-      //  std::min( numShapeFunctions,
-      //       Dune::Fem::OrthonormalShapeFunctions< DomainType::dimension >::
-      //         size( std::max(orders[1],polOrder-1) )
-      //    );
+      int numHessShapeFunctions = std::min( numShapeFunctions,
+            Dune::Fem::OrthonormalShapeFunctions< DomainType::dimension >::
+              size( std::max(orders[2],polOrder-2) )
+          );
+      int numGradShapeFunctions = std::min( numShapeFunctions,
+             Dune::Fem::OrthonormalShapeFunctions< DomainType::dimension >::
+               size( std::max(orders[1],polOrder-1) )
+          );
       const std::size_t numInnerShapeFunctions = orders[0]<0?0:
               Dune::Fem::OrthonormalShapeFunctions< DomainType::dimension >::
                 size(orders[0]);
-      std::cout << "####### number of SF per derivative ######" << std::endl;
-      std::cout << numShapeFunctions << " " << numGradShapeFunctions << " " << numHessShapeFunctions << std::endl;
-      std::cout << "##########################################" << std::endl;
 
       // set up matrices used for constructing gradient, value, and edge projections
       // Note: the code is set up with the assumption that the dofs suffice to compute the edge projection
@@ -705,15 +698,10 @@ namespace Dune
         {
           // need to compute value projection first
            // now compute projection by multiplying with inverse mass matrix
-          for (std::size_t alpha=0; alpha<numShapeFunctions; ++alpha)
-          {
+          for (std::size_t alpha=0; alpha<numGradShapeFunctions; ++alpha)
             for (std::size_t i=0; i<numDofs; ++i)
-            {
-              if (alpha<numGradShapeFunctions)
-                for (std::size_t beta=0; beta<numGradShapeFunctions; ++beta)
-                  jacobianProjection[alpha][i].axpy(HpGradInv[alpha][beta],R[beta][i]);
-            }
-          }
+              for (std::size_t beta=0; beta<numGradShapeFunctions; ++beta)
+                jacobianProjection[alpha][i].axpy(HpGradInv[alpha][beta],R[beta][i]);
         } // have some inner moments
         else
         { // with no inner moments we didn't need to compute the inverse of the mass matrix H_{p-1} -
@@ -791,27 +779,13 @@ namespace Dune
 
           } // quadrature loop
         } // loop over triangles in agglomerate
-#if 0 // debug output of P
-        for (std::size_t i=0; i<numDofs; ++i)
-        {
-          for (std::size_t alpha=0; alpha<numShapeFunctions; ++alpha)
-            std::cout << P[alpha][i][0][0] << "," << P[alpha][i][0][1] << "    ";
-          std::cout << std::endl;
-        }
-        std::cout << std::endl;
-#endif
 
         // need to compute value projection first
         // now compute projection by multiplying with inverse mass matrix
-        for (std::size_t alpha=0; alpha<numShapeFunctions; ++alpha)
-        {
+        for (std::size_t alpha=0; alpha<numHessShapeFunctions; ++alpha)
           for (std::size_t i=0; i<numDofs; ++i)
-          {
-            if (alpha<numHessShapeFunctions)
-              for (std::size_t beta=0; beta<numHessShapeFunctions; ++beta)
-                hessianProjection[alpha][i].axpy(HpHessInv[alpha][beta],P[beta][i]);
-          }
-        }
+            for (std::size_t beta=0; beta<numHessShapeFunctions; ++beta)
+              hessianProjection[alpha][i].axpy(HpHessInv[alpha][beta],P[beta][i]);
 
         /////////////////////////////////////////////////////////////////////
         /////////////////////////////////////////////////////////////////////

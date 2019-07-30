@@ -46,6 +46,7 @@ namespace Dune
       : BaseType( agglomeration, allocator )
       , testSpaces_( testSpaces )
       {
+#if 0
         std::cout << "######## dofs per codim ############\n";
         std::cout << testSpaces_[0][0] << " " << dofsPerCodim()[0].second << std::endl;
         std::cout << testSpaces_[1][0] << " " << dofsPerCodim()[1].second << std::endl;
@@ -55,6 +56,7 @@ namespace Dune
         std::cout << "----------edge orders --------------\n";
         std::cout << edgeDegrees()[0] << " " << edgeDegrees()[1] << std::endl;
         std::cout << "####################\n";
+#endif
       }
 
       // return the number of dofs per codimension
