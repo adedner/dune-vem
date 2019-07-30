@@ -59,7 +59,7 @@ def compute(grid, space, schemeName):
            ], info
 
 results = []
-for level in range(3,4):
+for level in range(2,4):
     N = 2**level
     constructor = cartesianDomain([-0.5,-0.5],[1,1],[N,N])
     if useGrid == 0:
@@ -85,7 +85,7 @@ for level in range(3,4):
     polygons.plot(colorbar="horizontal")
 
     figCols = 4
-    figRows = len(methods)//figCols
+    figRows = len(methods)//figCols+1
     fig = pyplot.figure(figsize=(10*figCols,10*figRows))
     figPos = 100*figRows+10*figCols+1
     res = []
