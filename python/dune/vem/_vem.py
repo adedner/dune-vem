@@ -189,18 +189,15 @@ from dune.fem.model import integrands
 from dune.vem.patch import transform
 
 def vemModel(view, equation, space,
-        gradStabilization=None, massStabilization=None,
+        hessStabilization=None,gradStabilization=None, massStabilization=None,
         *args, **kwargs):
-    # VM = 'dune/vem/operator/diffusionmodel.hh'
-    # return elliptic(view, equation, virtualModel=VM,
-    #                 modelPatch=transform(space,gradStabilization,massStabilization), *args, **kwargs)
     return integrands(view, equation,
-                      modelPatch=transform(space,gradStabilization,massStabilization),
+                      modelPatch=transform(space,hessStabilization,gradStabilization,massStabilization),
                       includes=["dune/vem/py/integrands.hh"],
                       *args, **kwargs)
 
 def vemScheme(model, space=None, solver=None, parameters={},
-              gradStabilization=None, massStabilization=None):
+              hessStabilization=None, gradStabilization=None, massStabilization=None):
     """create a scheme for solving second order pdes with the virtual element method
 
     Args:
@@ -223,9 +220,9 @@ def vemScheme(model, space=None, solver=None, parameters={},
             except AttributeError:
                 raise ValueError("no space provided and could not deduce from form provided")
         if modelParam:
-            model = vemModel(space.grid,model,space,gradStabilization,massStabilization,*modelParam)
+            model = vemModel(space.grid,model,space,hessStabilization,gradStabilization,massStabilization,*modelParam)
         else:
-            model = vemModel(space.grid,model,space,gradStabilization,massStabilization)
+            model = vemModel(space.grid,model,space,hessStabilization,gradStabilization,massStabilization)
 
     includes = [ "dune/vem/operator/vemelliptic.hh", "dune/vem/operator/diffusionmodel.hh" ]
 

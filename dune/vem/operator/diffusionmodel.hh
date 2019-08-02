@@ -296,6 +296,16 @@ namespace Dune
       {}
       using Base::integrands;
       template <class Point, class DRangeType>
+      auto hessStabilization ( const Point &x, const DRangeType &u ) const
+      {
+        return integrands().hessStabilization(x,u);
+      }
+      template <class Point, class DRangeType>
+      auto linHessStabilization ( const Point &x, const DRangeType &u ) const
+      {
+        return integrands().linHessStabilization(x,u);
+      }
+      template <class Point, class DRangeType>
       auto gradStabilization ( const Point &x, const DRangeType &u ) const
       {
         return integrands().gradStabilization(x,u);
@@ -385,6 +395,8 @@ namespace Dune
         virtual bool isDirichletIntersection( const IntersectionType& inter, DirichletComponentType &dirichletComponent ) = 0;
         virtual void dirichlet( int bndId, const DomainType &x,RRangeType &value) const = 0;
 
+        virtual RRangeType hessStabilization ( const DomainType &x, const DRangeType &u ) const = 0;
+        virtual RRangeType linHessStabilization ( const DomainType &x, const DRangeType &u ) const = 0;
         virtual RRangeType gradStabilization ( const DomainType &x, const DRangeType &u ) const = 0;
         virtual RRangeType linGradStabilization ( const DomainType &x, const DRangeType &u ) const = 0;
         virtual RRangeType massStabilization ( const DomainType &x, const DRangeType &u ) const = 0;
@@ -423,6 +435,8 @@ namespace Dune
         virtual bool isDirichletIntersection( const IntersectionType& inter, DirichletComponentType &dirichletComponent ) override { return impl().isDirichletIntersection(inter,dirichletComponent); }
         virtual void dirichlet( int bndId, const DomainType &x,RRangeType &value) const override { impl().dirichlet(bndId,x,value); }
 
+        virtual RRangeType hessStabilization ( const DomainType &x, const DRangeType &u ) const { return impl().hessStabilization(x,u); }
+        virtual RRangeType linHessStabilization ( const DomainType &x, const DRangeType &u ) const { return impl().linHessStabilization(x,u); }
         virtual RRangeType gradStabilization ( const DomainType &x, const DRangeType &u ) const { return impl().gradStabilization(x,u); }
         virtual RRangeType linGradStabilization ( const DomainType &x, const DRangeType &u ) const { return impl().linGradStabilization(x,u); }
         virtual RRangeType massStabilization ( const DomainType &x, const DRangeType &u ) const { return impl().massStabilization(x,u); }
@@ -551,6 +565,14 @@ namespace Dune
         return impl().dirichlet(bndId,x,value);
       }
 
+      RRangeType hessStabilization ( const DomainType &x, const DRangeType &u ) const
+      {
+        return impl().hessStabilization(x,u);
+      }
+      RRangeType linHessStabilization ( const DomainType &x, const DRangeType &u ) const
+      {
+        return impl().linHessStabilization(x,u);
+      }
       RRangeType gradStabilization ( const DomainType &x, const DRangeType &u ) const
       {
         return impl().gradStabilization(x,u);

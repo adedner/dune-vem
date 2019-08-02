@@ -327,6 +327,9 @@ namespace Dune
               Dune::Fem::OrthonormalShapeFunctions< DomainType::dimension >::
                 size(orders[0]);
 
+      numGradShapeFunctions = 6;
+      numHessShapeFunctions = 3;
+
       // set up matrices used for constructing gradient, value, and edge projections
       // Note: the code is set up with the assumption that the dofs suffice to compute the edge projection
       DynamicMatrix< DomainFieldType > D, C, Hp, HpGrad, HpHess, HpInv, HpGradInv, HpHessInv;
