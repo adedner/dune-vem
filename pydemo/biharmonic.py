@@ -34,7 +34,7 @@ methods = [ ### "[space,scheme,spaceKwrags]"
             # ["vem","vem",{"testSpaces":[ [0],  [order-2,order-2], [order-2] ] }, "C1C0-conforming"],
    ]
 parameters = {"newton.linear.tolerance": 1e-12,
-              "newton.linear.preconditioning.method": "jacobi",
+              "newton.linear.preconditioning.method": "ilu",
               "penalty": 40,  # for the bbdg scheme
               "newton.linear.verbose": True,
               "newton.verbose": True
@@ -52,12 +52,11 @@ exact = as_vector( [sin(2*pi*x[0])**2*sin(2*pi*x[1])**2] )
 laplace = lambda w: div(grad(w))
 u = TrialFunction(uflSpace)
 v = TestFunction(uflSpace)
-a = ( inner(laplace(u[0]),laplace(v[0])) ) * dx + inner(grad(u),grad(v)) * dx + inner(u,v) * dx
+a = inner(laplace(u[0]),laplace(v[0])) * dx # + inner(grad(u),grad(v)) * dx + inner(u,v) * dx
 
 # finally the right hand side and the boundary conditions
-b = laplace(laplace(exact[0]))*v[0] * dx - laplace(exact[0])*v[0] * dx + exact[0]*v[0] * dx
-# dbc = [dune.ufl.DirichletBC(uflSpace, [0], i+1) for i in range(4)]
-dbc = []
+b = laplace(laplace(exact[0]))*v[0] * dx # - laplace(exact[0])*v[0] * dx + exact[0]*v[0] * dx
+dbc = [dune.ufl.DirichletBC(uflSpace, [0], i+1) for i in range(4)]
 biLaplaceCoeff = 1
 diffCoeff = 1
 massCoeff = 1
@@ -74,7 +73,9 @@ def compute(grid, space, schemeName):
     df = space.interpolate([0],name="solution")
     # df.plot(level=3)
     info = {"linear_iterations":1}
-    scheme = create.scheme(schemeName, [a==b, *dbc], space, solver="cg",
+    scheme = create.scheme(schemeName, [a==b, *dbc], space,
+                        # solver="cg",
+                        # ("suitesparse","umfpack"),
                         hessStabilization=biLaplaceCoeff,
                         gradStabilization=diffCoeff,
                         massStabilization=massCoeff,
@@ -96,22 +97,23 @@ def compute(grid, space, schemeName):
 # Finally we iterate over the requested methods and solve the problems
 
 # <codecell>
-maxLevel = 2
-fig = pyplot.figure(figsize=(10*maxLevel*len(methods),10))
-figPos = 100+10*2*len(methods)+1
+maxLevel = 8
+fig = pyplot.figure(figsize=(10*maxLevel,10*len(methods)))
+figPos = 100*len(methods)+10*maxLevel+1
 for level in range(maxLevel):
-    constructor = cartesianDomain([-0.5,-0.5],[1,1],[40*2**level,40*2**level])
+    constructor = cartesianDomain([-0.5,-0.5],[1,1],[2**level,2**level])
     polyGrid = create.grid("polygrid", constructor, cubes=False )
     for i,m in enumerate(methods):
-        space = create.space(m[0], polyGrid, order=order, dimRange=1, storage="fem", **m[2])
+        space = create.space(m[0], polyGrid, order=order, dimRange=1,
+                storage="fem", **m[2])
         dfs,errors,info = compute(polyGrid, space, m[1])
         print("method:(",m[0],m[2],")",
               "Size: ",space.size, "L^2: ", errors[0], "H^1: ", errors[1],
               "H^2: ", errors[2],
               info["linear_iterations"], flush=True)
-        # dfs.plot(figure=(fig,figPos+level*len(methods)+i),gridLines=None, colorbar="horizontal",level=3)
-        plot(grad(grad(dfs))[0,0,0],grid=polyGrid,level=3,
-             figure=(fig,figPos+level*len(methods)+i),gridLines=None, colorbar="horizontal")
+        # plot(grad(grad(dfs))[0,0,0],grid=polyGrid,level=3,
+        plot(dfs,grid=polyGrid,level=3,
+             figure=(fig,figPos+i*maxLevel+level),gridLines=None, colorbar="horizontal")
         # interpol = space.interpolate(exact,name="interpolation")
         # plot(grad(grad(interpol))[0,0,0],grid=polyGrid,level=3,
         #      figure=(fig,figPos+level*len(methods)+i+1),gridLines=None, colorbar="horizontal")
