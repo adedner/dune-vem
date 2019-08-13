@@ -57,7 +57,7 @@ a = inner(laplace(u[0]),laplace(v[0])) * dx # + inner(grad(u),grad(v)) * dx + in
 # finally the right hand side and the boundary conditions
 b = laplace(laplace(exact[0]))*v[0] * dx # - laplace(exact[0])*v[0] * dx + exact[0]*v[0] * dx
 dbc = [dune.ufl.DirichletBC(uflSpace, [0], i+1) for i in range(4)]
-biLaplaceCoeff = 1
+biLaplaceCoeff = 10000
 diffCoeff = 1
 massCoeff = 1
 

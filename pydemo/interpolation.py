@@ -19,25 +19,26 @@ dune.fem.parameter.append({"fem.verboserank": 0})
 # should also use the parameters to determin input and output file names
 order = 3
 gridTypes = ["triangles","cartesian","quadrilaterals","voronoi"]
-useGrid = 0 # 0..3
+useGrid = 3 # 0..3
 # note that the hessian of the reference element based basis
 # function is not implemented for the 'quadrilaterals' grid
 
 # Note: suboptimal laplace error for bubble (space is reduced to polorder=3 but could be 4 = ts+2
 methods = [ ### "[space,scheme,spaceKwrags]"
             ["lagrange","galerkin",{}, "Lagrange"],
-            #["vem","vem",{"testSpaces":[ [0],  [order-2], [order-1] ] }, "Bubble"],
-            #["vem","vem",{"testSpaces":[ [0],  [order-2], [order-3] ] }, "Serendipity"],
+            ["vem","vem",{"testSpaces":[ [0],  [order-2], [order-1] ] }, "Bubble"],
+            ["vem","vem",{"testSpaces":[ [0],  [order-2], [order-3] ] }, "Serendipity"],
             # ["vem","vem",{"testSpaces":[ [-1], [order-1], [order-3] ] }, "Nc-Serendipity"],
-            #["vem","vem",{"conforming":True}, "conforming"],
-            #["vem","vem",{"conforming":False}, "non-conforming"],
-            #["vem","vem",{"testSpaces":[ [0],  [order-3,order-2], [order-4] ] }, "C1-non-conforming"],
+            ["vem","vem",{"conforming":True}, "conforming"],
+            ["vem","vem",{"conforming":False}, "non-conforming"],
+            ["vem","vem",{"testSpaces":[ [0],  [order-3,order-2], [order-4] ] }, "C1-non-conforming"],
             #["vem","vem",{"testSpaces":[ [0],  [order-2,order-2], [order-2] ] }, "C1C0-conforming"],
-            #["bbdg","bbdg",{},"bbdg"],
+            ["bbdg","bbdg",{},"bbdg"],
    ]
 
 uflSpace = dune.ufl.Space(2, dimRange=1)
 x = SpatialCoordinate(uflSpace)
+# exact = as_vector( [ 10 + x[0]*x[1] + x[0]**2*x[1] + x[1]**3 ] )
 exact = as_vector( [x[0]*x[1] * cos(pi*x[0]*x[1])] )
 
 def compute(grid, space, schemeName):
@@ -106,4 +107,4 @@ for level in range(2,5):
     results += [res]
     pickle.dump(results,open('interpolation.dump','wb'))
 print(results)
-pyplot.show()
+# pyplot.show()
