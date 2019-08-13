@@ -229,7 +229,7 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model>
         uLocal.evaluate(localPoint, vu);
 
         double bbH2 = pow(bbox.volume()/bbox.diameter(),2);
-        std::cout << "vemelliptic:" << pow(bbox.diameter(),2) << " " << bbox.volume() << std::endl;
+        // std::cout << "vemelliptic:" << pow(bbox.diameter(),2) << " " << bbox.volume() << std::endl;
         RangeRangeType Dcoeff = model().gradStabilization(localPoint,vu);
         Dcoeff.axpy(bbH2, model().massStabilization(localPoint,vu) );
         Dcoeff.axpy(1./bbH2, model().hessStabilization(localPoint,vu) );
@@ -340,7 +340,7 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
         uLocal.evaluate(localPoint, vu);
 
         double bbH2 = pow(bbox.volume()/bbox.diameter(),2);
-        std::cout << "vemelliptic:" << pow(bbox.diameter(),2) << " " << bbox.volume() << std::endl;
+        // std::cout << "vemelliptic:" << pow(bbox.diameter(),2) << " " << bbox.volume() << std::endl;
         RangeRangeType Dcoeff = model().gradStabilization(localPoint,vu);
         Dcoeff.axpy(bbH2, model().massStabilization(localPoint,vu) );
         Dcoeff.axpy(1./bbH2, model().hessStabilization(localPoint,vu) );
