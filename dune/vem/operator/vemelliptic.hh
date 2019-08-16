@@ -228,9 +228,11 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model>
         DomainRangeType vu;
         uLocal.evaluate(localPoint, vu);
 
+        double bbH2 = pow(bbox.volume()/bbox.diameter(),2);
+        // std::cout << "vemelliptic:" << pow(bbox.diameter(),2) << " " << bbox.volume() << std::endl;
         RangeRangeType Dcoeff = model().gradStabilization(localPoint,vu);
-        Dcoeff.axpy(bbox.volume(), model().massStabilization(localPoint,vu) );
-        Dcoeff.axpy(1./bbox.volume(), model().hessStabilization(localPoint,vu) );
+        Dcoeff.axpy(bbH2, model().massStabilization(localPoint,vu) );
+        Dcoeff.axpy(1./bbH2, model().hessStabilization(localPoint,vu) );
 
         VectorOfAveragedDiffusionCoefficients[agglomerate].axpy(factor,Dcoeff);
       }
@@ -337,12 +339,14 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
         DomainRangeType vu;
         uLocal.evaluate(localPoint, vu);
 
+        double bbH2 = pow(bbox.volume()/bbox.diameter(),2);
+        // std::cout << "vemelliptic:" << pow(bbox.diameter(),2) << " " << bbox.volume() << std::endl;
         RangeRangeType Dcoeff = model().gradStabilization(localPoint,vu);
-        Dcoeff.axpy(bbox.volume(), model().massStabilization(localPoint,vu) );
-        Dcoeff.axpy(1./bbox.volume(), model().hessStabilization(localPoint,vu) );
+        Dcoeff.axpy(bbH2, model().massStabilization(localPoint,vu) );
+        Dcoeff.axpy(1./bbH2, model().hessStabilization(localPoint,vu) );
         RangeRangeType LinDcoeff = model().linGradStabilization(localPoint,vu);
-        LinDcoeff.axpy(bbox.volume(), model().linMassStabilization(localPoint,vu) );
-        LinDcoeff.axpy(1./bbox.volume(), model().linHessStabilization(localPoint,vu) );
+        LinDcoeff.axpy(bbH2, model().linMassStabilization(localPoint,vu) );
+        LinDcoeff.axpy(1./bbH2, model().linHessStabilization(localPoint,vu) );
 
         VectorOfAveragedDiffusionCoefficients[agglomerate].axpy(factor,Dcoeff);
         VectorOfAveragedLinearlisedDiffusionCoefficients[agglomerate].axpy(factor,LinDcoeff);

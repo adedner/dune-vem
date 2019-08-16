@@ -125,4 +125,11 @@ def transform(space,hStab,gStab,mStab):
         model.gStab = gStab
         model.mStab = mStab
         model.baseName = "vemintegrands"
+        model.baseSignature = []
+        if mStab is not None:
+            model.baseSignature += [mStab]
+        if gStab is not None:
+            model.baseSignature += [gStab]
+        if hStab is not None:
+            model.baseSignature += [hStab]
     return transform_
