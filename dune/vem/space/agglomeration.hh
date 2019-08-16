@@ -327,6 +327,7 @@ namespace Dune
               Dune::Fem::OrthonormalShapeFunctions< DomainType::dimension >::
                 size(orders[0]);
 
+                std::cout << numHessShapeFunctions << std::endl;
 //       numGradShapeFunctions = 6;
 //       numHessShapeFunctions = 3;
 
