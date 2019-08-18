@@ -473,7 +473,6 @@ namespace Dune
           } // test G matrix
 #endif
 
-#if 0
           // need to compute value projection first
            // now compute projection by multiplying with inverse mass matrix
           for (std::size_t alpha=0; alpha<numShapeFunctions; ++alpha)
@@ -489,7 +488,6 @@ namespace Dune
                   // jacobianProjection[alpha][i].axpy(HpGradInv[alpha][beta],R[beta][i]);
             }
           }
-#endif
 
           // // add interior integrals for gradient projection
           // for (std::size_t alpha=0; alpha<numGradShapeFunctions; ++alpha)
