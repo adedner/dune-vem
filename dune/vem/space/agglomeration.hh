@@ -327,9 +327,10 @@ namespace Dune
               Dune::Fem::OrthonormalShapeFunctions< DomainType::dimension >::
                 size(orders[0]);
 
-      // numGradShapeFunctions = 6;
-      // numHessShapeFunctions = 3;
-
+      // numGradShapeFunctions = Dune::Fem::OrthonormalShapeFunctions< DomainType::dimension >::
+      //           size(polOrder-1);
+      // numHessShapeFunctions = Dune::Fem::OrthonormalShapeFunctions< DomainType::dimension >::
+      //           size(polOrder-2);
 
       // set up matrices used for constructing gradient, value, and edge projections
       // Note: the code is set up with the assumption that the dofs suffice to compute the edge projection
@@ -412,7 +413,7 @@ namespace Dune
           jacobianProjection[ alpha ].resize( numDofs, DomainType( 0 ) );
           hessianProjection[ alpha ].resize( numDofs, 0 ); // typename hessianProjection[alpha]::value_type( 0 ) );
         }
-        //type def for standard vector (to pick up re size for Hessian projection)
+        // type def for standard vector (to pick up re size for Hessian projection)
         // need to resize Hessian projection
 
         pseudoInverse( D, valueProjection );
@@ -472,6 +473,7 @@ namespace Dune
           } // test G matrix
 #endif
 
+#if 0
           // need to compute value projection first
            // now compute projection by multiplying with inverse mass matrix
           for (std::size_t alpha=0; alpha<numShapeFunctions; ++alpha)
@@ -487,7 +489,7 @@ namespace Dune
                   // jacobianProjection[alpha][i].axpy(HpGradInv[alpha][beta],R[beta][i]);
             }
           }
-
+#endif
 
           // // add interior integrals for gradient projection
           // for (std::size_t alpha=0; alpha<numGradShapeFunctions; ++alpha)
