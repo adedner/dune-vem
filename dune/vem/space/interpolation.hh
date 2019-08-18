@@ -302,7 +302,8 @@ namespace Dune
           }
         }
         //!TS needs changing
-        if (indexSet_.edgeOrders()[0] >= 0)
+        if (indexSet_.template order2size<1>(1)>0 ||
+            indexSet_.template order2size<1>(1)>0)
         {
           // to avoid any issue with twists we use an intersection iterator
           // here instead of going over the edges
@@ -470,7 +471,8 @@ namespace Dune
               mask[0].push_back(vtxk);
             }
           }
-          if (indexSet_.edgeOrders()[0]>=0) //!TS
+          if (indexSet_.template order2size<1>(1)>0 ||
+              indexSet_.template order2size<1>(1)>0)
           {
             edge(poly,intersection,i,edgeSize);
             int count = 0;
