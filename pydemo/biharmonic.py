@@ -19,7 +19,12 @@ from scipy.sparse.linalg import spsolve
 from ufl import *
 import dune.ufl
 
-order = 3
+order        = 3 # or 2
+# Tests        biharmonic | perturbed laplace | laplace
+# epsilon      1          | 1e-6   or 1e-8    | 0
+# laplaceCoeff 0          | 1         1       | 1
+epsilon      = 1
+laplaceCoeff = 0
 
 dune.fem.parameter.append({"fem.verboserank": 0})
 
@@ -31,7 +36,7 @@ dune.fem.parameter.append({"fem.verboserank": 0})
 # Note: suboptimal laplace error for bubble (space is reduced to polorder=3 but could be 4 = ts+2
 methods = [ ### "[space,scheme,spaceKwrags]"
             ["vem","vem",{"testSpaces":[ [0],  [order-3,order-2], [order-4] ] }, "C1-non-conforming"],
-            # ["vem","vem",{"testSpaces":[ [0],  [order-2,order-2], [order-2] ] }, "C1C0-conforming"],
+            ["vem","vem",{"testSpaces":[ [0],  [order-2,order-2], [order-2] ] }, "C1C0-conforming"],
    ]
 parameters = {"newton.linear.tolerance": 1e-12,
               "newton.linear.preconditioning.method": "ilu",
@@ -52,14 +57,16 @@ exact = as_vector( [sin(2*pi*x[0])**2*sin(2*pi*x[1])**2] )
 laplace = lambda w: div(grad(w))
 u = TrialFunction(uflSpace)
 v = TestFunction(uflSpace)
-a = inner(laplace(u[0]),laplace(v[0])) * dx # + inner(grad(u),grad(v)) * dx + inner(u,v) * dx
+a = ( epsilon*inner(laplace(u[0]),laplace(v[0])) +\
+      laplaceCoeff*inner(grad(u),grad(v)) ) * dx
 
 # finally the right hand side and the boundary conditions
-b = laplace(laplace(exact[0]))*v[0] * dx # - laplace(exact[0])*v[0] * dx + exact[0]*v[0] * dx
+b = ( epsilon*laplace(laplace(exact[0]))*v[0] -\
+      laplaceCoeff*laplace(exact[0])*v[0] ) * dx
 dbc = [dune.ufl.DirichletBC(uflSpace, [0], i+1) for i in range(4)]
-biLaplaceCoeff = 10000
-diffCoeff = 1
-massCoeff = 1
+biLaplaceCoeff = 10000*epsilon
+diffCoeff = laplaceCoeff
+massCoeff = 0
 
 # <markdowncell>
 # Now we define a grid build up of voronoi cells around $50$ random points
@@ -97,6 +104,7 @@ def compute(grid, space, schemeName):
 # Finally we iterate over the requested methods and solve the problems
 
 # <codecell>
+# epsilon.value = 1
 maxLevel = 8
 fig = pyplot.figure(figsize=(10*maxLevel,10*len(methods)))
 figPos = 100*len(methods)+10*maxLevel+1
