@@ -54,6 +54,16 @@ x = SpatialCoordinate(uflSpace)
 exact = as_vector( [sin(2*pi*x[0])**2*sin(2*pi*x[1])**2] )
 
 # next the bilinear form
+# Note: for function which continuous derivatives we have
+#       laplace(u)*laplace(v)*dx = inner(u,v)*dx
+#       as can be seen by using integration by parts on the mixed terms on the right
+#       and using continuety of u,v
+#       For the non conforming spaces we don't have continuety of the
+#       derivatives so the equivalence does not hold and one should use the
+#       right hand side directly to obtain a coercive bilinear form w.r.t.
+#       the norm on H^2 (the left is not a norm in this case).
+#       For computing the forcing term 'b' both formula are fine since
+#       'exact' is smooth enough.
 laplace = lambda w: div(grad(w))
 H = lambda w: grad(grad(w))
 u = TrialFunction(uflSpace)
