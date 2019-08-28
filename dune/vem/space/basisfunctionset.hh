@@ -81,54 +81,6 @@ namespace Dune
         return ReferenceElements< DomainFieldType, dimDomain >::general( entity().type() );
       }
 
-      template< class Quadrature, class Vector, class DofVector >
-      void axpy ( const Quadrature &quadrature, const Vector &values, DofVector &dofs ) const
-      {
-        const std::size_t nop = quadrature.nop();
-        for( std::size_t qp = 0; qp < nop; ++qp )
-          axpy( quadrature[ qp ], values[ qp ], dofs );
-      }
-
-      template< class Quadrature, class VectorA, class VectorB, class DofVector >
-      void axpy ( const Quadrature &quadrature, const VectorA &valuesA, const VectorB &valuesB, DofVector &dofs ) const
-      {
-        const std::size_t nop = quadrature.nop();
-        for( std::size_t qp = 0; qp < nop; ++qp )
-        {
-          axpy( quadrature[ qp ], valuesA[ qp ], dofs );
-          axpy( quadrature[ qp ], valuesB[ qp ], dofs );
-        }
-      }
-
-      template< class Point, class DofVector >
-      void axpy ( const Point &x, const RangeType &valueFactor, DofVector &dofs ) const
-      {
-        shapeFunctionSet_.evaluateEach( position( x ), [ this, &valueFactor, &dofs ] ( std::size_t alpha, RangeType phi_alpha ) {
-            for( std::size_t j = 0; j < size(); ++j )
-              dofs[ j ] += valueProjection_[ alpha ][ j ] * (valueFactor * phi_alpha);
-          } );
-      }
-
-      template< class Point, class DofVector >
-      void axpy ( const Point &x, const JacobianRangeType &jacobianFactor, DofVector &dofs ) const
-      {
-        shapeFunctionSet_.evaluateEach( position( x ), [ this, &jacobianFactor, &dofs ] ( std::size_t alpha, RangeType phi_alpha ) {
-            for( std::size_t j = 0; j < size(); ++j )
-              for( int k = 0; k < dimDomain; ++k )
-              {
-                FieldMatrixColumn< const JacobianRangeType > jacobianFactor_k( jacobianFactor, k );
-                dofs[ j ] += jacobianProjection_[ alpha ][ j ][ k ] * (jacobianFactor_k * phi_alpha);
-              }
-          } );
-      }
-
-      template< class Point, class DofVector >
-      void axpy ( const Point &x, const RangeType &valueFactor, const JacobianRangeType &jacobianFactor, DofVector &dofs ) const
-      {
-        axpy( x, valueFactor, dofs );
-        axpy( x, jacobianFactor, dofs );
-      }
-
       template< class Quadrature, class DofVector, class Values >
       void evaluateAll ( const Quadrature &quadrature, const DofVector &dofs, Values &values ) const
       {
