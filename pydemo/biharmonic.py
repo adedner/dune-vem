@@ -10,7 +10,7 @@ import math
 from dune import create
 from dune.grid import cartesianDomain, gridFunction
 from dune.fem.plotting import plotPointData as plot
-from dune.fem.function import integrate
+from dune.fem.function import integrate, discreteFunction
 from dune.fem import parameter
 from dune.vem import voronoiCells
 from dune.fem.operator import linear as linearOperator
@@ -36,7 +36,7 @@ dune.fem.parameter.append({"fem.verboserank": 0})
 # Note: suboptimal laplace error for bubble (space is reduced to polorder=3 but could be 4 = ts+2
 methods = [ ### "[space,scheme,spaceKwrags]"
             ["vem","vem",{"testSpaces":[ [0],  [order-3,order-2], [order-4] ] }, "C1-non-conforming"],
-            # ["vem","vem",{"testSpaces":[ [0],  [order-2,order-2], [order-2] ] }, "C1C0-conforming"],
+            ["vem","vem",{"testSpaces":[ [0],  [order-2,order-2], [order-2] ] }, "C1C0-conforming"],
    ]
 parameters = {"newton.linear.tolerance": 1e-12,
               "newton.linear.preconditioning.method": "ilu",
@@ -88,7 +88,7 @@ massCoeff      = 0
 # <codecell>
 def compute(grid, space, schemeName):
     # solve the pde
-    df = space.interpolate([0],name="solution")
+    df = discreteFunction(space, name="solution") # space.interpolate([0],name="solution")
     # df.plot(level=3)
     info = {"linear_iterations":1}
     scheme = create.scheme(schemeName, [a==b, *dbc], space,
@@ -100,7 +100,7 @@ def compute(grid, space, schemeName):
                       parameters=parameters)
     # info = scheme.solve(target=df)
     jacobian = linearOperator(scheme)
-    rhs = space.interpolate([0],name="rhs")
+    rhs = discreteFunction(space,name="rhs")
     scheme(df,rhs)
     rhs.as_numpy[:] *= -1
     # print(jacobian.as_numpy)
