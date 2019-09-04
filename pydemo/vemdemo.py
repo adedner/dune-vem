@@ -176,7 +176,6 @@ for i,m in enumerate(methods):
     a = (Dcoeff(u) * inner(grad(u), grad(v)) ) * dx
     b = -div( Dcoeff(exact) * grad(exact[0]) ) * v[0] * dx
     dbcs = [dune.ufl.DirichletBC(space, exact, i+1) for i in range(4)]
-    print("solving:",m[2])
     scheme = create.scheme(m[1], [a==b, *dbcs], space,
             gradStabilization=Dcoeff(u),
             solver="cg", parameters=parameters)
