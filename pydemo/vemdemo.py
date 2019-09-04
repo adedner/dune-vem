@@ -78,7 +78,7 @@ methods = [ ### "[space,scheme,spaceKwrags]"
 parameters = {"newton.linear.tolerance": 1e-12,
               "newton.linear.preconditioning.method": "jacobi",
               "penalty": 8*order*(order+1),  # for the bbdg scheme could be 4 instead of 8
-              "newton.linear.verbose": True,
+              "newton.linear.verbose": False,
               "newton.verbose": False
               }
 
