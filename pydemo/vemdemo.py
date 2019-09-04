@@ -14,11 +14,7 @@
 
 # First some setup code:
 # <codecell>
-try:
-    import dune.vem
-except:
-    import sys
-    sys.exit(0)
+import dune.vem
 import matplotlib
 matplotlib.rc( 'image', cmap='jet' )
 from matplotlib import pyplot
@@ -36,25 +32,6 @@ import dune.ufl
 order = 1
 
 dune.fem.parameter.append({"fem.verboserank": 0})
-
-# <markdowncell>
-# we can compare different method, e.g., a lagrange space (on the # subtriangulation),
-# a bounding box dg space and a conforming/non conforming VEM space
-
-# <codecell>
-methods = [ ### "[space,scheme,spaceKwrags]"
-            ["lagrange","h1",{}],
-            ["vem","vem",{"testSpaces":[0,order-2,order-1]}],  # bubble
-            ["vem","vem",{"conforming":True}],
-            ["vem","vem",{"conforming":False}],
-            ["bbdg","bbdg",{}],
-   ]
-parameters = {"newton.linear.tolerance": 1e-12,
-              "newton.linear.preconditioning.method": "jacobi",
-              "penalty": 40,  # for the bbdg scheme
-              "newton.linear.verbose": False,
-              "newton.verbose": False
-              }
 
 # <markdowncell>
 # Now we define the model starting with the exact solution:
@@ -75,6 +52,35 @@ a = (diffCoeff*inner(grad(u),grad(v)) + massCoeff*dot(u,v) ) * dx
 b = (-diffCoeff*div(grad(exact[0])) + massCoeff*exact[0] ) * v[0] * dx
 dbc = [dune.ufl.DirichletBC(uflSpace, exact, i+1) for i in range(4)]
 
+
+# <markdowncell>
+# we can compare different method, e.g., a lagrange space (on the # subtriangulation),
+# a bounding box dg space and a conforming/non conforming VEM space
+
+# <codecell>
+methods = [ ### "[space,scheme,spaceKwrags]"
+            ["lagrange","h1",{},{}],
+            ["vem","vem",
+                {"testSpaces":[0,order-2,order-2]},  # conforming
+                {"gradStabilization":diffCoeff, "massStabilization":massCoeff}],
+            ["vem","vem",
+                {"testSpaces":[-1,order-1,order-2]},  # non-conforming
+                {"gradStabilization":diffCoeff, "massStabilization":massCoeff}],
+            ["vem","vem",
+                {"testSpaces":[0,order-2,order-1]},  # bubble
+                {"gradStabilization":diffCoeff, "massStabilization":massCoeff}],
+            ["vem","vem",
+                {"testSpaces":[0,order-2,max(-1,order-3)]},  # 'serendipity'
+                {"gradStabilization":diffCoeff, "massStabilization":massCoeff}],
+            ["bbdg","bbdg", {}, {"penalty":diffCoeff}],
+            ["dgonb","dg", {}, {"penalty":diffCoeff}],
+   ]
+parameters = {"newton.linear.tolerance": 1e-12,
+              "newton.linear.preconditioning.method": "jacobi",
+              "penalty": 8*order*(order+1),  # for the bbdg scheme could be 4 instead of 8
+              "newton.linear.verbose": True,
+              "newton.verbose": False
+              }
 
 # <markdowncell>
 # Now we define a grid build up of voronoi cells around $50$ random points
@@ -121,15 +127,11 @@ def polygons(en,x):
 # given a grid and a space
 
 # <codecell>
-def compute(grid, space, schemeName):
+def compute(grid, space, schemeName, schemeParams):
     # solve the pde
-    if schemeName == "vem":
-        scheme = create.scheme(schemeName, [a==b, *dbc], space, solver="cg",
-                       gradStabilization=diffCoeff,
-                       massStabilization=massCoeff,
-                     parameters=parameters)
-    else:
-        scheme = create.scheme(schemeName, [a==b, *dbc], space, solver="cg", parameters=parameters)
+    scheme = create.scheme(schemeName, [a==b, *dbc], space,
+                **schemeParams,
+                solver="cg", parameters=parameters)
     df = space.interpolate([0],name="solution")
     info = scheme.solve(target=df)
     # df.interpolate(exact)
@@ -149,7 +151,7 @@ fig = pyplot.figure(figsize=(10*len(methods),10))
 figPos = 100+10*len(methods)+1
 for i,m in enumerate(methods):
     space = create.space(m[0], polyGrid, order=order, dimRange=1, storage="istl", **m[2])
-    dfs,errors,info = compute(polyGrid, space, m[1])
+    dfs,errors,info = compute(polyGrid, space, m[1], m[3])
     print("method:(",m[0],m[2],")",
           "Size: ",space.size, "L^2: ", errors[0], "H^1: ", errors[1],
           info["linear_iterations"], flush=True)
@@ -163,26 +165,28 @@ pyplot.show()
 # \end{align*}
 
 # <codecell>
-space = create.space("vem", polyGrid, order=1, dimRange=1, storage="istl",
-                     conforming=True)
-u = TrialFunction(space)
-v = TestFunction(space)
-x = SpatialCoordinate(space)
-exact = as_vector ( [  (x[0] - x[0]*x[0] ) * (x[1] - x[1]*x[1] ) ] )
-Dcoeff = lambda u: 1.0 + u[0]**2
-a = (Dcoeff(u) * inner(grad(u), grad(v)) ) * dx
-b = -div( Dcoeff(exact) * grad(exact[0]) ) * v[0] * dx
-dbcs = [dune.ufl.DirichletBC(space, exact, i+1) for i in range(4)]
-scheme = create.scheme("vem", [a==b, *dbcs], space,
-        gradStabilization=Dcoeff(u),
-        solver="cg", parameters=parameters)
-solution = space.interpolate([0], name="solution")
-info = scheme.solve(target=solution)
-edf = exact-solution
-errors = [ math.sqrt(e) for e in
-           integrate(polyGrid, [inner(edf,edf),inner(grad(edf),grad(edf))], order=5) ]
-print( errors )
-solution.plot(gridLines=None, colorbar="horizontal")
+for i,m in enumerate(methods):
+    if m[0] != "vem": continue
+    space = create.space(m[0], polyGrid, order=order, dimRange=1, storage="istl", **m[2])
+    u = TrialFunction(space)
+    v = TestFunction(space)
+    x = SpatialCoordinate(space)
+    exact = as_vector ( [  (x[0] - x[0]*x[0] ) * (x[1] - x[1]*x[1] ) ] )
+    Dcoeff = lambda u: 1.0 + u[0]**2
+    a = (Dcoeff(u) * inner(grad(u), grad(v)) ) * dx
+    b = -div( Dcoeff(exact) * grad(exact[0]) ) * v[0] * dx
+    dbcs = [dune.ufl.DirichletBC(space, exact, i+1) for i in range(4)]
+    print("solving:",m[2])
+    scheme = create.scheme(m[1], [a==b, *dbcs], space,
+            gradStabilization=Dcoeff(u),
+            solver="cg", parameters=parameters)
+    solution = space.interpolate([0], name="solution")
+    info = scheme.solve(target=solution)
+    edf = exact-solution
+    errors = [ math.sqrt(e) for e in
+               integrate(polyGrid, [inner(edf,edf),inner(grad(edf),grad(edf))], order=5) ]
+    print( m[0], m[2], errors )
+# solution.plot(gridLines=None, colorbar="horizontal")
 # <markdowncell>
 # # Linear Elasticity
 # As final example we solve a linear elasticity equation usign a
