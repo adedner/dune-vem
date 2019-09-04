@@ -29,7 +29,7 @@ from dune.vem import voronoiCells
 from ufl import *
 import dune.ufl
 
-order = 2
+order = 2 # tried 4,6 and failed (non linear and linear,  respectively)
 
 dune.fem.parameter.append({"fem.verboserank": 0})
 
@@ -49,7 +49,7 @@ diffCoeff = 1-0.9*cos(dot(x,x))
 a = (diffCoeff*inner(grad(u),grad(v)) + massCoeff*dot(u,v) ) * dx
 
 # finally the right hand side and the boundary conditions
-b = (-diffCoeff*div(grad(exact[0])) + massCoeff*exact[0] ) * v[0] * dx
+b = ( -div(diffCoeff*grad(exact[0])) + massCoeff*exact[0] ) * v[0] * dx
 dbc = [dune.ufl.DirichletBC(uflSpace, exact, i+1) for i in range(4)]
 
 
@@ -76,7 +76,7 @@ methods = [ ### "[space,scheme,spaceKwrags]"
             ["dgonb","dg", {}, {"penalty":diffCoeff}],
    ]
 parameters = {"newton.linear.tolerance": 1e-12,
-              "newton.linear.preconditioning.method": "jacobi",
+              "newton.linear.preconditioning.method": "jacobi", # "jacobi",
               "penalty": 8*order*(order+1),  # for the bbdg scheme could be 4 instead of 8
               "newton.linear.verbose": False,
               "newton.verbose": False
@@ -176,9 +176,9 @@ for i,m in enumerate(methods):
     u = TrialFunction(space)
     v = TestFunction(space)
     x = SpatialCoordinate(space)
-    exact = as_vector ( [  (x[0] - x[0]*x[0] ) * (x[1] - x[1]*x[1] ) ] )
+    exact = as_vector ( [ (x[0] - x[0]*x[0]) * (x[1] - x[1]*x[1]) ] )
     Dcoeff = lambda u: 1.0 + u[0]**2
-    a = (Dcoeff(u) * inner(grad(u), grad(v)) ) * dx
+    a = ( Dcoeff(u) * inner(grad(u), grad(v)) ) * dx
     b = -div( Dcoeff(exact) * grad(exact[0]) ) * v[0] * dx
     dbcs = [dune.ufl.DirichletBC(space, exact, i+1) for i in range(4)]
     scheme = create.scheme(m[1], [a==b, *dbcs], space,
