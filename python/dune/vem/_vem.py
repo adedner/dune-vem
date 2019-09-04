@@ -158,12 +158,12 @@ def space(view, order=1, dimRange=1,
           basisChoice=2,
           field="double", storage="adaptive"):
     '''
-        version is tuple,list
-        version == "dg"
-        version == "dgSimplex"
-        version == "continuous"
-        version == "continuousSimplex"
-        version == "non-conforming"
+        version is tuple,list for a general vem space (=tests[aces)
+        version == "dg" (bbdg)
+        version == "dgSimplex" (dg on triangulation)
+        version == "continuous" (vem)
+        version == "continuousSimplex" (lagrange)
+        version == "non-conformin" (vem)
     '''
     if isinstance(version,tuple) or isinstance(version,list):
         return vemSpace(view,order=order,dimRange=dimRange,field=field,storage=storage,

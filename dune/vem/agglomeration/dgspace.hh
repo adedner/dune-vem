@@ -202,6 +202,7 @@ namespace Dune
       : space_(space)
       , penalty_(penalty)
       {}
+      // implement: h_e = min(|e^+|,|e^-|) / |e|
       template <class Intersection>
       double operator()(const Intersection &intersection,
                         double intersectionArea, double area, double nbArea) const

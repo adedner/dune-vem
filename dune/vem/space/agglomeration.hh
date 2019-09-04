@@ -327,10 +327,16 @@ namespace Dune
               Dune::Fem::OrthonormalShapeFunctions< DomainType::dimension >::
                 size(orders[0]);
 
-      // numGradShapeFunctions = Dune::Fem::OrthonormalShapeFunctions< DomainType::dimension >::
-      //           size(polOrder-1);
-      // numHessShapeFunctions = Dune::Fem::OrthonormalShapeFunctions< DomainType::dimension >::
-      //           size(polOrder-2);
+#if 0
+      numGradShapeFunctions = Dune::Fem::OrthonormalShapeFunctions< DomainType::dimension >::
+                size(polOrder-1);
+      numHessShapeFunctions = Dune::Fem::OrthonormalShapeFunctions< DomainType::dimension >::
+                size(polOrder-2);
+      std::cout << "size of spaces: "
+                << numShapeFunctions << " "
+                << numGradShapeFunctions << " "
+                << numHessShapeFunctions << std::endl;
+#endif
 
       // set up matrices used for constructing gradient, value, and edge projections
       // Note: the code is set up with the assumption that the dofs suffice to compute the edge projection
@@ -472,7 +478,7 @@ namespace Dune
             }
           } // test G matrix
 #endif
-
+#if 0
           // need to compute value projection first
            // now compute projection by multiplying with inverse mass matrix
           for (std::size_t alpha=0; alpha<numShapeFunctions; ++alpha)
@@ -488,7 +494,7 @@ namespace Dune
                   // jacobianProjection[alpha][i].axpy(HpGradInv[alpha][beta],R[beta][i]);
             }
           }
-
+#endif
           // // add interior integrals for gradient projection
           // for (std::size_t alpha=0; alpha<numGradShapeFunctions; ++alpha)
           //   for (std::size_t beta=0; beta<numInnerShapeFunctions; ++beta)
@@ -826,14 +832,23 @@ namespace Dune
         for( std::size_t i = 0; i < numDofs; ++i )
           for( std::size_t alpha = 0; alpha < numShapeFunctions; ++alpha )
             for( std::size_t j = 0; j < numDofs; ++j )
+            {
               S[ i ][ j ] -= D[ i ][ alpha ] * valueProjection[ alpha ][ j ];
+              // std::cout << "space:" << i << " " << alpha << " " << j << "   "
+              //   << D[i][alpha] << " " << valueProjection[alpha][j]
+              //   << " -> " << S[i][j] << std::endl;
+            }
         Stabilization &stabilization = stabilizations_[ agglomerate ];
         stabilization.resize( numDofs, numDofs, 0 );
         for( std::size_t i = 0; i < numDofs; ++i )
           for( std::size_t j = 0; j < numDofs; ++j )
+          {
             for( std::size_t k = 0; k < numDofs; ++k )
               stabilization[ i ][ j ] += S[ k ][ i ] * S[ k ][ j ];
               // stabilization[ i ][ j ] += S[ k ][ i ] * std::max(1.,stabScaling[k]) * S[ k ][ j ];
+            // std::cout << "   " << i << " " << j << " "
+            //   << stabilization[i][j] << " " << S[i][j] << std::endl;
+          }
 #else
         Stabilization &stabilization = stabilizations_[ agglomerate ];
         stabilization.resize( numDofs, numDofs, 0 );
