@@ -29,7 +29,7 @@ from dune.vem import voronoiCells
 from ufl import *
 import dune.ufl
 
-order = 1
+order = 2
 
 dune.fem.parameter.append({"fem.verboserank": 0})
 
@@ -165,8 +165,13 @@ pyplot.show()
 # \end{align*}
 
 # <codecell>
+methods = [ ### "[space,scheme,spaceKwrags]"
+            ["vem","vem",
+                {"testSpaces":[0,order-2,order-2]}],  # conforming
+            ["vem","vem",
+                {"testSpaces":[-1,order-1,order-2]}],  # non-conforming
+   ]
 for i,m in enumerate(methods):
-    if m[0] != "vem": continue
     space = create.space(m[0], polyGrid, order=order, dimRange=1, storage="istl", **m[2])
     u = TrialFunction(space)
     v = TestFunction(space)
@@ -202,8 +207,7 @@ def polygons(en,x):
     return polyGrid.hierarchicalGrid.agglomerate(en)
 polygons.plot(colorbar="horizontal")
 
-space = create.space("vem", polyGrid, order=2, dimRange=2, storage="istl",
-                     conforming=True)
+space = create.space("vem", polyGrid, order=2, dimRange=2, storage="istl", conforming=True)
 
 # <markdowncell>
 
