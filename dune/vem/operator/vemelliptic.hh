@@ -50,7 +50,7 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model>
     //! contructor
     VEMEllipticOperator ( const DomainDiscreteFunctionSpaceType &dSpace,
                           const RangeDiscreteFunctionSpaceType &rSpace,
-                          const ModelType &model,
+                          ModelType &model,
                           const Dune::Fem::ParameterReader &parameter = Dune::Fem::Parameter::container() )
     : model_( model ),
       dSpace_(dSpace), rSpace_(rSpace),
@@ -72,7 +72,7 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model>
 #endif
     }
     VEMEllipticOperator ( const RangeDiscreteFunctionSpaceType &rangeSpace,
-                          const ModelType &model,
+                          ModelType &model,
                           const Dune::Fem::ParameterReader &parameter = Dune::Fem::Parameter::container() )
     : VEMEllipticOperator( rangeSpace, rangeSpace, model, parameter )
     {}
@@ -85,13 +85,15 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model>
 
     const ModelType &model() const
     { return model_; }
+    ModelType &model()
+    { return model_; }
     const DomainDiscreteFunctionSpaceType& domainSpace() const
     { return dSpace_; }
     const RangeDiscreteFunctionSpaceType& rangeSpace() const
     { return rSpace_; }
 
   private:
-    const ModelType &model_;
+    ModelType &model_;
     const DomainDiscreteFunctionSpaceType &dSpace_;
     const RangeDiscreteFunctionSpaceType &rSpace_;
     EllipticOperator<DomainDiscreteFunction,RangeDiscreteFunction,Model> baseOperator_;
@@ -142,14 +144,14 @@ template<class JacobianOperator, class Model>
   public:
   //! contructor
   DifferentiableVEMEllipticOperator ( const RangeDiscreteFunctionSpaceType &rangeSpace,
-                     const ModelType &model,
+                     ModelType &model,
                      const Dune::Fem::ParameterReader &parameter = Dune::Fem::Parameter::container() )
     : BaseType( rangeSpace, model )
     , baseOperator_(rangeSpace,model,parameter)
   {}
   DifferentiableVEMEllipticOperator ( const DomainDiscreteFunctionSpaceType &dSpace,
                                       const RangeDiscreteFunctionSpaceType &rSpace,
-                                      const ModelType &model,
+                                      ModelType &model,
                                       const Dune::Fem::ParameterReader &parameter = Dune::Fem::Parameter::container() )
   : BaseType( dSpace, rSpace, model, parameter )
   , baseOperator_(dSpace,rSpace,model,parameter)
