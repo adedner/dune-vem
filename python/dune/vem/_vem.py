@@ -472,7 +472,8 @@ from sortedcontainers import SortedDict
 import triangle
 import matplotlib.pyplot as plt
 class PolyAgglomerate:
-    def __init__(self,constructor):
+    def __init__(self,constructor,convex=False):
+        self.convex = convex
         self.suffix = "poly"+str(len(constructor["polygons"]))
         self.domain, self.index = self.construct(constructor["vertices"],
                                                  constructor["polygons"])
@@ -484,14 +485,15 @@ class PolyAgglomerate:
     def check(self):
         return len(self.ind)==self.N
     def roundBary(self,a):
-        return tuple(round(aa,5) for aa in a)
+        return tuple(round(aa,8) for aa in a)
     def construct(self,vertices,polygons):
         vertices = numpy.array(vertices)
         tr = []
         index = SortedDict()
         for nr, p in enumerate(polygons):
+            p = numpy.array(p)
             N = len(p)
-            if False: # use triangle
+            if not self.convex: # use triangle
                 e = [ [p[i],p[(i+1)%N]] for i in range(N) ]
                 domain = { "vertices":vertices,
                            "segments":numpy.array(e) }
