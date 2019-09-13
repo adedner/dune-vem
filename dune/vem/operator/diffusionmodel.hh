@@ -189,9 +189,10 @@ public:
 
   VirtualVEMDiffusionModelMethods(LocalDomainType)
 
+  typedef Dune::FieldVector<int, dimR> DirichletComponentType;
   virtual bool hasDirichletBoundary () const = 0;
   virtual bool hasNeumanBoundary () const = 0;
-  virtual bool isDirichletIntersection( const IntersectionType& inter, Dune::FieldVector<int, dimRange> &dirichletComponent ) const = 0;
+  virtual bool isDirichletIntersection( const IntersectionType& inter, DirichletComponentType &dirichletComponent ) const = 0;
 };
 
 template < class ModelImpl >
@@ -251,6 +252,7 @@ struct DiffusionModelWrapper : public VEMDiffusionModel<typename ModelImpl::Grid
   {
     return impl().name();
   }
+  typedef Dune::FieldVector<int, dimR> DirichletComponentType;
   virtual bool hasDirichletBoundary () const
   {
     return impl().hasDirichletBoundary();
@@ -259,7 +261,7 @@ struct DiffusionModelWrapper : public VEMDiffusionModel<typename ModelImpl::Grid
   {
     return impl().hasNeumanBoundary();
   }
-  virtual bool isDirichletIntersection( const IntersectionType& inter, Dune::FieldVector<int, dimR> &dirichletComponent ) const
+  virtual bool isDirichletIntersection( const IntersectionType& inter, DirichletComponentType &dirichletComponent ) const
   {
     return impl().isDirichletIntersection(inter, dirichletComponent);
   }

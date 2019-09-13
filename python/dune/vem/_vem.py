@@ -113,9 +113,17 @@ def vemSpace(view, order=1, testSpaces=None,
 
     if testSpaces is None:
         if conforming:
-          testSpaces = [  [0], [order-2], [order-2] ]
+            testSpaces = [  [0], [order-2], [order-2] ]
         else:
-          testSpaces = [ [-1], [order-1], [order-2] ]
+            testSpaces = [ [-1], [order-1], [order-2] ]
+    if testSpaces == "serendipity":
+        etaMin = view.hierarchicalGrid.agglomerate.minEdgeNumber
+        testSpaces = [  [0], [order-2], [max(-1,order-etaMin)] ]
+        print("serendipity:",testSpaces,etaMin)
+
+    for i,ts in enumerate(testSpaces):
+        if type(ts) == int:
+            testSpaces[i] = [ts]
 
     agglomerate = view.hierarchicalGrid.agglomerate
 
@@ -455,10 +463,11 @@ class VoronoiAgglomerate:
                     for p in self.voronoi_points ])
         self.voronoi_kdtree = cKDTree(self.voronoi_points)
         vor = Voronoi(self.voronoi_points)
-        points, triangles = triangulated_voronoi(constructor, self.voronoi_points)
+        points, triangles, minEdgeNumber = triangulated_voronoi(constructor, self.voronoi_points)
         domain = {'vertices':points, 'simplices':triangles}
         self.grid = aluSimplexGrid(self.domain, dimgrid=2)
         self.ind = set()
+        self.minEdgeNumber = minEdgeNumber
     def __call__(self,en):
         p = en.geometry.center
         test_point_dist, test_point_regions = self.voronoi_kdtree.query([p], k=1)
@@ -512,15 +521,20 @@ class PolyAgglomerate:
                   "simplices": numpy.vstack([ t["triangles"] for t in tr ])}
         return domain, index
 
-def polyGrid(constructor,N=None, cubes=False, **kwargs):
+def polyGrid(constructor,N=None, cubes=False, convex=False,**kwargs):
     if isinstance(N,int):
         agglomerate = VoronoiAgglomerate(N,constructor)
     elif N is None:
         if isinstance(constructor,dict) and \
             constructor.get("polygons",None) is not None:
-            agglomerate = PolyAgglomerate(constructor)
+            agglomerate = PolyAgglomerate(constructor,convex)
+            agglomerate.minEdgeNumber = min([len(p) for p in constructor["polygons"]])
         else:
             agglomerate = TrivialAgglomerate(constructor, cubes, **kwargs)
+            if cubes:
+                agglomerate.minEdgeNumber = 4
+            else:
+                agglomerate.minEdgeNumber = 3
     else:
         agglomerate = CartesianAgglomerate(N,constructor)
     grid = agglomerate.grid

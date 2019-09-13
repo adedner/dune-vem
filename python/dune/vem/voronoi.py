@@ -109,6 +109,7 @@ def triangulated_voronoi(constructor, towers):
     vorVertices, polys = voronoi["vertices"], voronoi["polygons"]
     indices = set()
     triangles = np.zeros([0,3],int)
+    minEdgeNumber = 1000
     for poly in polys:
         p = numpy.append(poly,[poly[0]])
         vert = vorVertices[p, :]
@@ -118,13 +119,14 @@ def triangulated_voronoi(constructor, towers):
         triangles = np.concatenate(
                 (triangles, p[tri] ),
                 axis=0 )
+        minEdgeNumber = min(minEdgeNumber,len(p))
 
     indices = np.array(list(indices))
     vertices = vorVertices[indices,:]
     newind = np.zeros(len(vorVertices),int)
     for i in range(len(indices)):
         newind[indices[i]] = i
-    return vertices, newind[triangles]
+    return vertices, newind[triangles],minEdgeNumber
 
 
 
