@@ -10,7 +10,7 @@ from dune.generator import Constructor, Method
 import dune.common.checkconfiguration as checkconfiguration
 import dune
 
-def bbdgSpace(view, order=1, scalar=scalar, dimRange=1, field="double", storage="adaptive"):
+def bbdgSpace(view, order=1, scalar=False, dimRange=None, field="double", storage="adaptive"):
     """create a discontinous galerkin space over an agglomerated grid
 
     Args:
@@ -74,7 +74,7 @@ def bbdgSpace(view, order=1, scalar=scalar, dimRange=1, field="double", storage=
                    ['"gridView"_a', '"agglomerate"_a',
                     'pybind11::keep_alive< 1, 2 >()'] )
 
-    spc = module(field, includes, typeName, constructor, storage=storage,ctorArgs=[view, agglomerate])
+    spc = module(field, includes, typeName, constructor, scalar=scalar, storage=storage,ctorArgs=[view, agglomerate])
     addStorage(spc, storage)
     return spc.as_ufl()
 
