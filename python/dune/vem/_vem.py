@@ -10,7 +10,7 @@ from dune.generator import Constructor, Method
 import dune.common.checkconfiguration as checkconfiguration
 import dune
 
-def bbdgSpace(view, order=1, dimRange=1, field="double", storage="adaptive"):
+def bbdgSpace(view, order=1, scalar=scalar, dimRange=1, field="double", storage="adaptive"):
     """create a discontinous galerkin space over an agglomerated grid
 
     Args:
@@ -25,6 +25,14 @@ def bbdgSpace(view, order=1, dimRange=1, field="double", storage="adaptive"):
     """
 
     from dune.fem.space import module, addStorage
+    if dimRange is None:
+        dimRange = 1
+        scalar = True
+
+    if dimRange > 1 and scalar:
+        raise KeyError(\
+                "trying to set up a scalar space with dimRange = " +\
+                str(dimRange) + ">1")
     if dimRange < 1:
         raise KeyError(\
             "Parameter error in DiscontinuosGalerkinSpace with "+
@@ -81,8 +89,8 @@ def bbdgScheme(model, space=None, penalty=0, solver=None, parameters={}):
     penaltyClass = "Dune::Vem::BBDGPenalty<"+spaceType+">"
     return dg(model,space,penalty,solver,parameters,penaltyClass)
 
-def vemSpace(view, order=1, testSpaces=None,
-             dimRange=1, conforming=True, field="double",
+def vemSpace(view, order=1, testSpaces=None, scalar=False,
+             dimRange=None, conforming=True, field="double",
              storage="adaptive", basisChoice=2):
     """create a virtual element space over an agglomerated grid
 
@@ -98,6 +106,14 @@ def vemSpace(view, order=1, testSpaces=None,
     """
 
     from dune.fem.space import module, addStorage
+    if dimRange is None:
+        dimRange = 1
+        scalar = True
+
+    if dimRange > 1 and scalar:
+        raise KeyError(\
+                "trying to set up a scalar space with dimRange = " +\
+                str(dimRange) + ">1")
     if dimRange < 1:
         raise KeyError(\
             "Parameter error in DiscontinuosGalerkinSpace with "+
@@ -155,14 +171,15 @@ def vemSpace(view, order=1, testSpaces=None,
                    ['"gridView"_a', '"agglomerate"_a', '"testSpaces"_a', '"basisChoice"_a',
                     'pybind11::keep_alive< 1, 2 >()'] )
 
-    spc = module(field, includes, typeName, constructor, storage=storage, ctorArgs=[view, agglomerate, testSpaces, basisChoice])
+    spc = module(field, includes, typeName, constructor, scalar=scalar, storage=storage, ctorArgs=[view, agglomerate, testSpaces, basisChoice])
     addStorage(spc, storage)
     return spc.as_ufl()
 
-def space(view, order=1, dimRange=1,
+def space(view, order=1, dimRange=None,
           testSpaces=None,
           conforming=True,
           version=None,
+          scalar=False,
           basisChoice=2,
           field="double", storage="adaptive"):
     '''
@@ -173,23 +190,28 @@ def space(view, order=1, dimRange=1,
         version == "continuousSimplex" (lagrange)
         version == "non-conformin" (vem)
     '''
+    if version is None and testSpaces is None:
+        raise AttributeError("version and testSpaces parameters can not both be None (default)")
+    if version is None: version = testSpaces
     if isinstance(version,tuple) or isinstance(version,list):
-        return vemSpace(view,order=order,dimRange=dimRange,field=field,storage=storage,
+        return vemSpace(view,order=order,scalar=scalar,dimRange=dimRange,field=field,storage=storage,
                         testSpaces=version, basisChoice=basisChoice)
     elif version == "dg":
-        return bbdgSpace(view,order=order,dimRange=dimRange,field=field,storage=storage)
+        return bbdgSpace(view,order=order,scalar=scalar,dimRange=dimRange,field=field,storage=storage)
     elif version == "dgSimplex":
         from dune.fem.space import onb
-        return onb(view,order=order,dimRange=dimRange,field=field,storage=storage)
+        return onb(view,order=order,scalar=scalar,dimRange=dimRange,field=field,storage=storage)
     elif version == "continuous":
-        return vemSpace(view,order=order,dimRange=dimRange,field=field,storage=storage,
+        return vemSpace(view,order=order,scalar=scalar,dimRange=dimRange,field=field,storage=storage,
                         conforming=True, basisChoice=basisChoice)
     elif version == "continuousSimplex":
         from dune.fem.space import lagrange
-        return lagrange(view,order=order,dimRange=dimRange,field=field,storage=storage)
+        return lagrange(view,order=order,scalar=scalar,dimRange=dimRange,field=field,storage=storage)
     elif version == "non-conforming":
-        return vemSpace(view,order=order,dimRange=dimRange,field=field,storage=storage,
+        return vemSpace(view,order=order,scalar=scalar,dimRange=dimRange,field=field,storage=storage,
                         conforming=False, basisChoice=basisChoice)
+    raise AttributeError("wrong version string provided:",version)
+
 #########################################################
 
 # from dune.fem.model import elliptic
@@ -338,27 +360,6 @@ def vemOperator(model, domainSpace=None, rangeSpace=None):
 
 #################################################################
 
-class CartesianAgglomerate:
-    def __init__(self,N,constructor):
-        self.N = N
-        self.suffix = "cartesian"+str(N)
-        self.grid = yaspGrid(constructor=constructor)
-        self.division = constructor.division
-        self.ind = set()
-    def __call__(self,en):
-        idx = self.grid.indexSet.index(en)
-        nx = int(idx / self.division[1])
-        ny = int(idx % self.division[1])
-        nx = int(nx/self.division[0]*self.N[0])
-        ny = int(ny/self.division[1]*self.N[1])
-        index = nx*self.N[1]+ny
-        self.ind.add(index)
-        return index
-    def check(self):
-        return len(self.ind)==self.N[0]*self.N[1]
-
-#################################################################
-
 def aluGrid(constructor, dimgrid=None, dimworld=None, elementType=None, **parameters):
     if not dimgrid:
         dimgrid = getDimgrid(constructor)
@@ -450,32 +451,6 @@ class TrivialAgglomerate:
 from dune.vem.voronoi import triangulated_voronoi
 from scipy.spatial import Voronoi, voronoi_plot_2d, cKDTree, Delaunay
 import numpy
-class VoronoiAgglomerate:
-    def __init__(self,N,constructor):
-        self.N = N
-        self.suffix = "voronoi"+str(self.N)
-        lowerleft  = numpy.array(constructor.lower)
-        upperright = numpy.array(constructor.upper)
-        numpy.random.seed(1234)
-        self.voronoi_points = numpy.random.rand(self.N, 2)
-        self.voronoi_points = numpy.array(
-                [ p*(upperright-lowerleft) + lowerleft
-                    for p in self.voronoi_points ])
-        self.voronoi_kdtree = cKDTree(self.voronoi_points)
-        vor = Voronoi(self.voronoi_points)
-        points, triangles, minEdgeNumber = triangulated_voronoi(constructor, self.voronoi_points)
-        domain = {'vertices':points, 'simplices':triangles}
-        self.grid = aluSimplexGrid(self.domain, dimgrid=2)
-        self.ind = set()
-        self.minEdgeNumber = minEdgeNumber
-    def __call__(self,en):
-        p = en.geometry.center
-        test_point_dist, test_point_regions = self.voronoi_kdtree.query([p], k=1)
-        index = test_point_regions[0]
-        self.ind.add(index)
-        return index
-    def check(self):
-        return len(self.ind)==self.N
 
 from sortedcontainers import SortedDict
 import triangle
@@ -521,22 +496,17 @@ class PolyAgglomerate:
                   "simplices": numpy.vstack([ t["triangles"] for t in tr ])}
         return domain, index
 
-def polyGrid(constructor,N=None, cubes=False, convex=False,**kwargs):
-    if isinstance(N,int):
-        agglomerate = VoronoiAgglomerate(N,constructor)
-    elif N is None:
-        if isinstance(constructor,dict) and \
-            constructor.get("polygons",None) is not None:
-            agglomerate = PolyAgglomerate(constructor,convex)
-            agglomerate.minEdgeNumber = min([len(p) for p in constructor["polygons"]])
-        else:
-            agglomerate = TrivialAgglomerate(constructor, cubes, **kwargs)
-            if cubes:
-                agglomerate.minEdgeNumber = 4
-            else:
-                agglomerate.minEdgeNumber = 3
+def polyGrid(constructor,cubes=False, convex=False,**kwargs):
+    if isinstance(constructor,dict) and \
+        constructor.get("polygons",None) is not None:
+        agglomerate = PolyAgglomerate(constructor,convex)
+        agglomerate.minEdgeNumber = min([len(p) for p in constructor["polygons"]])
     else:
-        agglomerate = CartesianAgglomerate(N,constructor)
+        agglomerate = TrivialAgglomerate(constructor, cubes, **kwargs)
+        if cubes:
+            agglomerate.minEdgeNumber = 4
+        else:
+            agglomerate.minEdgeNumber = 3
     grid = agglomerate.grid
     grid.hierarchicalGrid.agglomerate = agglomerate
     return grid
