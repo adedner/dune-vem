@@ -79,7 +79,7 @@ def bbdgSpace(view, order=1, scalar=False, dimRange=None, field="double", storag
     return spc.as_ufl()
 
 from dune.fem.scheme import dg
-def bbdgScheme(model, space=None, penalty=0, solver=None, parameters={}):
+def bbdgScheme(model, space=None, penalty=1, solver=None, parameters={}):
     if space == None:
         try:
             space = model.lhs.arguments()[0].ufl_function_space()
