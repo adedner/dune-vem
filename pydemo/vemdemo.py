@@ -3,13 +3,13 @@
 #
 # We first consider a simple Laplace problem with Dirichlet boundary conditions
 # \begin{align*}
-#   -\Delta u &= f, && \text{in } \Omega, \\
-#           u &= g, && \text{on } \partial\Omega,
+# -\Delta u &= f, && \text{in } \Omega, \\
+# u &= g, && \text{on } \partial\Omega,
 # \end{align*}
 # with $\Omega=[-\frac{1}{2},1]^2$ and choosing the forcing and the boundary conditions
 # so that the exact solution is equal to
 # \begin{align*}
-#   u(x,y) &= xy\cos(\pi xy)
+# u(x,y) &= xy\cos(\pi xy)
 # \end{align*}
 
 # First some setup code:
@@ -155,8 +155,6 @@ pyplot.show()
 # <markdowncell>
 # # Nonlinear elliptic problem
 # We can easily set up a non linear problem
-# \begin{align*}
-# \end{align*}
 
 # <codecell>
 space = create.space("vem", polyGrid, order=1, dimRange=1, storage="istl",
