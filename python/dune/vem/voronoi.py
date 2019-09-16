@@ -29,8 +29,6 @@ def centroid(vertices):
     signed_area = 1/2*signed_area
     C_x = (1.0/(6.0*signed_area))*C_x
     C_y = (1.0/(6.0*signed_area))*C_y
-    if C_x<0 or C_y<0:
-        print(C_x,C_y,signed_area,vertices)
     return np.array([C_x, C_y])
 
 def voronoiCells(constructor, towers, fileName=None, load=False, lloyd=False, show=False):
@@ -112,9 +110,7 @@ def voronoiCells(constructor, towers, fileName=None, load=False, lloyd=False, sh
             regions.append(region)
     if lloyd:
         for i,r in enumerate(regions):
-            # print(towers[i],end=" ")
             towers[i] = centroid(vor.vertices[r])
-            # print("->",towers[i])
         return voronoiCells(constructor, towers, fileName=None, load=False, lloyd=lloyd-1, show=show)
 
     lowerleft  = numpy.array(constructor.lower)
@@ -133,9 +129,7 @@ def voronoiCells(constructor, towers, fileName=None, load=False, lloyd=False, sh
         newind[indices[i]] = i
     if lloyd:
         for i,r in enumerate(regions):
-            # print(towers[i],end=" ")
             towers[i] = centroid(vorVertices[newind[r]])
-            # print("->",towers[i])
         return voronoiCells(constructor, towers, fileName=None, load=False, lloyd=lloyd-1, show=show)
 
     return {"vertices":vorVertices, "polygons":[newind[r] for r in regions]}

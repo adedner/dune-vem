@@ -42,19 +42,26 @@ dune.fem.parameter.append({"fem.verboserank": 0})
 # a bounding box dg space and a conforming/non conforming VEM space
 
 # <codecell>
-# Note: suboptimal laplace error for bubble (space is reduced to polorder=3 but could be 4 = ts+2
-methods = [ ### "[space,scheme,spaceKwrags]"
-            ["lagrange","galerkin",{}],
-            ["vem","vem",{"testSpaces":[ [0],  [order-2], [order-1] ] }],  # bubble
-            ["vem","vem",{"testSpaces":[ [0],  [order-2], [order-3] ] }],  # serendipity
-            ["vem","vem",{"testSpaces":[ [-1], [order-1], [order-3] ] }],  # nc-serendipity
-            ["vem","vem",{"conforming":True}],
-            ["vem","vem",{"conforming":False}],
-            # ["bbdg","bbdg",{}],
+uflSpace = dune.ufl.Space(2, dimRange=1)
+x = SpatialCoordinate(uflSpace)
+exact = as_vector( [x[0]*x[1] * cos(pi*x[0]*x[1])] )
+massCoeff = 1+sin(dot(x,x))
+diffCoeff = 1-0.9*cos(dot(x,x))
+
+methods = [ ### "[legend,space,scheme,spaceKwargs,schemeKwargs]"
+            ["lagrange","lagrange","galerkin",{},{}],
+            ["vem-conforming","vem","vem",
+                {"testSpaces":[0,order-2,order-2]},  # conforming
+                {"gradStabilization":diffCoeff, "massStabilization":massCoeff}],
+            ["vem-nonconforming","vem","vem",
+                 {"testSpaces":[-1,order-1,order-2]},  # non-conforming
+                 {"gradStabilization":diffCoeff, "massStabilization":massCoeff}],
+            ["bb-dg","bbdg","bbdg", {}, {"penalty":diffCoeff}],
+            ["dg","dgonb","dg", {}, {"penalty":diffCoeff}],
    ]
 parameters = {"newton.linear.tolerance": 1e-12,
               "newton.linear.preconditioning.method": "jacobi",
-              "penalty": 40,  # for the bbdg scheme
+              "penalty": 10*order*order,  # for the bbdg scheme
               "newton.linear.verbose": False,
               "newton.verbose": False
               }
@@ -63,32 +70,20 @@ parameters = {"newton.linear.tolerance": 1e-12,
 # Now we define the model starting with the exact solution:
 
 # <codecell>
-uflSpace = dune.ufl.Space(2, dimRange=1)
-x = SpatialCoordinate(uflSpace)
-exact = as_vector( [x[0]*x[1] * cos(pi*x[0]*x[1])] )
-
-# next the bilinear form
 u = TrialFunction(uflSpace)
 v = TestFunction(uflSpace)
-massCoeff = 1+sin(dot(x,x))
-diffCoeff = 1-0.9*cos(dot(x,x))
 a = (diffCoeff*inner(grad(u),grad(v)) + massCoeff*dot(u,v) ) * dx
-laplace = lambda w: div(grad(w[0]))
-# a += laplace(u)*laplace(v) * dx
 
 # finally the right hand side and the boundary conditions
-b = (-diffCoeff*div(grad(exact[0])) + massCoeff*exact[0] ) * v[0] * dx
+b = (-div(diffCoeff*grad(exact[0])) + massCoeff*exact[0] ) * v[0] * dx
 dbc = [dune.ufl.DirichletBC(uflSpace, exact, i+1) for i in range(4)]
-
 
 # <markdowncell>
 # Now we define a grid build up of voronoi cells around $50$ random points
 
 # <codecell>
 constructor = cartesianDomain([-0.5,-0.5],[1,1],[10,10])
-# polyGrid = create.grid("polygrid", voronoiCells(constructor,50,"voronoiseeds",True) )
-polyGrid = create.grid("polygrid", constructor, cubes=False )
-# polyGrid = create.grid("polygrid", constructor, cubes=True )
+polyGrid = create.grid("polygrid", voronoiCells(constructor,50,"voronoiseeds",True,lloyd=100) )
 
 # <markdowncell>
 # In general we can construct a `polygrid` by providing a dictionary with
@@ -121,32 +116,23 @@ def polygons(en,x):
     return polyGrid.hierarchicalGrid.agglomerate(en)
 polygons.plot(colorbar="horizontal")
 
-
-
 # <markdowncell>
 # We now define a function to compute the solution and the $L^2,H^1$ error
 # given a grid and a space
 
 # <codecell>
-def compute(grid, space, schemeName):
+def compute(grid, space, schemeName, schemeArgs):
     # solve the pde
     df = space.interpolate([0],name="solution")
-    # if schemeName == "vem":
-    #     scheme = create.scheme(schemeName, [a==b, *dbc], space, solver="cg",
-    #                    gradStabilization=diffCoeff,
-    #                    massStabilization=massCoeff,
-    #                  parameters=parameters)
-    # else:
-    #     scheme = create.scheme(schemeName, [a==b, *dbc], space,
-    #             solver="cg", parameters=parameters)
-    # info = scheme.solve(target=df)
-    df.interpolate(exact); info = {"linear_iterations":-1}
+    scheme = create.scheme(schemeName, [a==b, *dbc], space,
+                   solver="cg", **schemeArgs,
+                   parameters=parameters)
+    info = scheme.solve(target=df)
 
     # compute the error
     edf = exact-df
     err = [inner(edf,edf),
-           inner(grad(edf),grad(edf)),
-           inner(div(grad(edf)),div(grad(edf)))]
+           inner(grad(edf),grad(edf))]
     errors = [ math.sqrt(e) for e in integrate(grid, err, order=8) ]
 
     return df, errors, info
@@ -158,18 +144,13 @@ def compute(grid, space, schemeName):
 fig = pyplot.figure(figsize=(10*len(methods),10))
 figPos = 100+10*len(methods)+1
 for i,m in enumerate(methods):
-    space = create.space(m[0], polyGrid, order=order, dimRange=1, storage="istl", **m[2])
-    dfs,errors,info = compute(polyGrid, space, m[1])
+    space = create.space(m[1], polyGrid, order=order, dimRange=1, storage="istl", **m[3])
+    dfs,errors,info = compute(polyGrid, space, m[2], m[4])
     print("method:(",m[0],m[2],")",
           "Size: ",space.size, "L^2: ", errors[0], "H^1: ", errors[1],
-          "laplace: ", errors[2],
           info["linear_iterations"], flush=True)
     dfs.plot(figure=(fig,figPos+i),gridLines=None, colorbar="horizontal")
 pyplot.show()
-
-# get me out of here\
-import os
-os._exit(0)
 
 # <markdowncell>
 # # Nonlinear elliptic problem
