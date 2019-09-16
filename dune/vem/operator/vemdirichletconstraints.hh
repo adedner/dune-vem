@@ -28,8 +28,9 @@ namespace Dune {
     typedef FieldVector<int, localBlockSize> DirichletBlock;
     typedef FieldVector<int, localBlockSize> ModelDirichletBlock;
 
-    VemDirichletConstraints( const ModelType &model, const DiscreteFunctionSpaceType& space )
-      : BaseType(model,space) {}
+    VemDirichletConstraints( ModelType &model, const DiscreteFunctionSpaceType& space )
+      : BaseType(model,space)
+    {}
 
     template < class DiscreteFunctionType >
     void operator ()( const DiscreteFunctionType& u, DiscreteFunctionType& w ) const

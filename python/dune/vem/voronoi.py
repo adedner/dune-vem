@@ -16,7 +16,22 @@ def in_box(towers, bounding_box):
                           np.logical_and(bounding_box[2] <= towers[:, 1],
                                          towers[:, 1] <= bounding_box[3]))
 
-def voronoiCells(constructor, towers, fileName=None, load=False, show=False):
+def centroid(vertices):
+    signed_area = 0
+    C_x = 0
+    C_y = 0
+    for i in range(len(vertices)):
+        ip = (i+1) % len(vertices)
+        step = (vertices[i, 0]*vertices[ip, 1])-(vertices[ip, 0]*vertices[i, 1])
+        signed_area += step
+        C_x += (vertices[i, 0] + vertices[ip, 0])*step
+        C_y += (vertices[i, 1] + vertices[ip, 1])*step
+    signed_area = 1/2*signed_area
+    C_x = (1.0/(6.0*signed_area))*C_x
+    C_y = (1.0/(6.0*signed_area))*C_y
+    return np.array([C_x, C_y])
+
+def voronoiCells(constructor, towers, fileName=None, load=False, lloyd=False, show=False):
     lowerleft  = numpy.array(constructor.lower)
     upperright = numpy.array(constructor.upper)
     bounding_box = numpy.array(
@@ -47,8 +62,12 @@ def voronoiCells(constructor, towers, fileName=None, load=False, show=False):
 
     vor = sp.spatial.Voronoi(towers[i,:],incremental=True)
     if show:
-        voronoi_plot_2d(vor,show_points=False,show_vertices=False).\
-            savefig(fileName+"inc"+str(len(towers))+".pdf", bbox_inches='tight')
+        if lloyd is not False:
+            voronoi_plot_2d(vor,show_points=False,show_vertices=False).\
+                savefig("lloyd"+str(lloyd)+"inc"+str(len(towers))+".pdf", bbox_inches='tight')
+        else:
+            voronoi_plot_2d(vor,show_points=False,show_vertices=False).\
+                savefig(fileName+"inc"+str(len(towers))+".pdf", bbox_inches='tight')
 
     # Mirror points
     points_center = towers[i, :]
@@ -89,8 +108,15 @@ def voronoiCells(constructor, towers, fileName=None, load=False, show=False):
                     break
         if region != [] and flag:
             regions.append(region)
+    if lloyd:
+        for i,r in enumerate(regions):
+            towers[i] = centroid(vor.vertices[r])
+        return voronoiCells(constructor, towers, fileName=None, load=False, lloyd=lloyd-1, show=show)
 
-    # polys = [ r+[r[0]] for r in regions ]
+    lowerleft  = numpy.array(constructor.lower)
+    upperright = numpy.array(constructor.upper)
+    bounding_box = numpy.array(
+            [lowerleft[0],upperright[0],lowerleft[1],upperright[1]] )
 
     indices = set()
     for poly in regions:
@@ -101,6 +127,10 @@ def voronoiCells(constructor, towers, fileName=None, load=False, show=False):
     newind = np.zeros(len(vor.vertices),int)
     for i in range(len(indices)):
         newind[indices[i]] = i
+    if lloyd:
+        for i,r in enumerate(regions):
+            towers[i] = centroid(vorVertices[newind[r]])
+        return voronoiCells(constructor, towers, fileName=None, load=False, lloyd=lloyd-1, show=show)
 
     return {"vertices":vorVertices, "polygons":[newind[r] for r in regions]}
 
@@ -109,6 +139,7 @@ def triangulated_voronoi(constructor, towers):
     vorVertices, polys = voronoi["vertices"], voronoi["polygons"]
     indices = set()
     triangles = np.zeros([0,3],int)
+    minEdgeNumber = 1000
     for poly in polys:
         p = numpy.append(poly,[poly[0]])
         vert = vorVertices[p, :]
@@ -118,13 +149,14 @@ def triangulated_voronoi(constructor, towers):
         triangles = np.concatenate(
                 (triangles, p[tri] ),
                 axis=0 )
+        minEdgeNumber = min(minEdgeNumber,len(p))
 
     indices = np.array(list(indices))
     vertices = vorVertices[indices,:]
     newind = np.zeros(len(vorVertices),int)
     for i in range(len(indices)):
         newind[indices[i]] = i
-    return vertices, newind[triangles]
+    return vertices, newind[triangles],minEdgeNumber
 
 
 

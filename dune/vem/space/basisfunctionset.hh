@@ -27,7 +27,6 @@ namespace Dune
     // -------------------
 
     // TODO: add template arguments for ValueProjection and JacobianProjection
-
     template< class Entity, class ShapeFunctionSet >
     class VEMBasisFunctionSet
     {
@@ -51,18 +50,24 @@ namespace Dune
 
       typedef ReferenceElement< typename DomainType::field_type, dimDomain > ReferenceElementType;
 
+      typedef FieldMatrix < DomainFieldType, dimDomain, dimDomain > HessianMatrixType;
+
       typedef std::vector< std::vector< DomainFieldType > > ValueProjection;
       typedef std::vector< std::vector< DomainType > > JacobianProjection;
+      typedef std::vector< std::vector< HessianMatrixType > > HessianProjection;
+
 
       VEMBasisFunctionSet () = default;
 
       VEMBasisFunctionSet ( const EntityType &entity, std::pair< DomainType, DomainType > bbox,
                             ValueProjection valueProjection, JacobianProjection jacobianProjection,
+                            HessianProjection hessianProjection,
                             ShapeFunctionSet shapeFunctionSet = ShapeFunctionSet() )
-        : entity_( &entity ),
+        : entity_( &entity ), //polygon
           shapeFunctionSet_( std::move( shapeFunctionSet ) ),
           valueProjection_( std::move( valueProjection ) ),
           jacobianProjection_( std::move( jacobianProjection ) ),
+          hessianProjection_( std::move( hessianProjection ) ),
           bbox_( std::move( bbox ) ),
           size_( valueProjection_[0].size() * dimRange)
       {}
@@ -74,54 +79,6 @@ namespace Dune
       const ReferenceElementType &referenceElement () const
       {
         return ReferenceElements< DomainFieldType, dimDomain >::general( entity().type() );
-      }
-
-      template< class Quadrature, class Vector, class DofVector >
-      void axpy ( const Quadrature &quadrature, const Vector &values, DofVector &dofs ) const
-      {
-        const std::size_t nop = quadrature.nop();
-        for( std::size_t qp = 0; qp < nop; ++qp )
-          axpy( quadrature[ qp ], values[ qp ], dofs );
-      }
-
-      template< class Quadrature, class VectorA, class VectorB, class DofVector >
-      void axpy ( const Quadrature &quadrature, const VectorA &valuesA, const VectorB &valuesB, DofVector &dofs ) const
-      {
-        const std::size_t nop = quadrature.nop();
-        for( std::size_t qp = 0; qp < nop; ++qp )
-        {
-          axpy( quadrature[ qp ], valuesA[ qp ], dofs );
-          axpy( quadrature[ qp ], valuesB[ qp ], dofs );
-        }
-      }
-
-      template< class Point, class DofVector >
-      void axpy ( const Point &x, const RangeType &valueFactor, DofVector &dofs ) const
-      {
-        shapeFunctionSet_.evaluateEach( position( x ), [ this, &valueFactor, &dofs ] ( std::size_t alpha, RangeType phi_alpha ) {
-            for( std::size_t j = 0; j < size(); ++j )
-              dofs[ j ] += valueProjection_[ alpha ][ j ] * (valueFactor * phi_alpha);
-          } );
-      }
-
-      template< class Point, class DofVector >
-      void axpy ( const Point &x, const JacobianRangeType &jacobianFactor, DofVector &dofs ) const
-      {
-        shapeFunctionSet_.evaluateEach( position( x ), [ this, &jacobianFactor, &dofs ] ( std::size_t alpha, RangeType phi_alpha ) {
-            for( std::size_t j = 0; j < size(); ++j )
-              for( int k = 0; k < dimDomain; ++k )
-              {
-                FieldMatrixColumn< const JacobianRangeType > jacobianFactor_k( jacobianFactor, k );
-                dofs[ j ] += jacobianProjection_[ alpha ][ j ][ k ] * (jacobianFactor_k * phi_alpha);
-              }
-          } );
-      }
-
-      template< class Point, class DofVector >
-      void axpy ( const Point &x, const RangeType &valueFactor, const JacobianRangeType &jacobianFactor, DofVector &dofs ) const
-      {
-        axpy( x, valueFactor, dofs );
-        axpy( x, jacobianFactor, dofs );
       }
 
       template< class Quadrature, class DofVector, class Values >
@@ -157,7 +114,6 @@ namespace Dune
       }
 
       // TODO: use lower order shape function set for Jacobian
-
       template< class Quadrature, class DofVector, class Jacobians >
       void jacobianAll ( const Quadrature &quadrature, const DofVector &dofs, Jacobians &jacobians ) const
       {
@@ -171,15 +127,9 @@ namespace Dune
       {
         jacobian = JacobianRangeType( 0 );
         shapeFunctionSet_.evaluateEach( position( x ), [ this, &dofs, &jacobian ] ( std::size_t alpha, RangeType phi_alpha ) {
+            const auto &jacobianProjectionAlpha = jacobianProjection_[alpha];
             for( std::size_t j = 0; j < size(); ++j )
-            {
-              for( int k = 0; k < dimDomain; ++k )
-              {
-                double v = jacobianProjection_[ alpha ][ j ][ k ];
-                FieldMatrixColumn< JacobianRangeType > jacobian_k( jacobian, k );
-                jacobian_k.axpy( jacobianProjection_[ alpha ][ j ][ k ]*dofs[ j ], phi_alpha );
-              }
-            }
+              jacobian[0].axpy( dofs[j]*phi_alpha[0], jacobianProjectionAlpha[j]);
           } );
       }
 
@@ -191,82 +141,92 @@ namespace Dune
         shapeFunctionSet_.evaluateEach( position(x), [ this, &jacobians ] ( std::size_t alpha, RangeType phi_alpha ) {
             const auto &jacobianProjectionAlpha = jacobianProjection_[alpha];
             for( std::size_t j = 0; j < size(); ++j )
-            {
-              const auto &jacobianProjectionAlphaJ = jacobianProjectionAlpha[j];
-              for( int k = 0; k < dimDomain; ++k )
-              {
-                FieldMatrixColumn< JacobianRangeType > jacobian_jk( jacobians[ j ], k );
-                jacobian_jk.axpy( jacobianProjectionAlphaJ[ k ], phi_alpha );
-              }
-            }
+              jacobians[j][0].axpy( phi_alpha[0], jacobianProjectionAlpha[j]);
         } );
       }
 
       template< class Quadrature, class DofVector, class Hessians >
       void hessianAll ( const Quadrature &quadrature, const DofVector &dofs, Hessians &hessians ) const
       {
-        DUNE_THROW( NotImplemented, "hessians not implemented for VEMBasisFunctionSet" );
+        const std::size_t nop = quadrature.nop();
+        for(std::size_t qp = 0; qp <nop; ++qp )
+          hessianAll( quadrature[ qp ], dofs, hessians[ qp ] );
       }
 
       template< class Point, class DofVector >
       void hessianAll ( const Point &x, const DofVector &dofs, HessianRangeType &hessian ) const
       {
-        DUNE_THROW( NotImplemented, "hessians not implemented for VEMBasisFunctionSet" );
+        hessian = HessianRangeType( 0 );
+        shapeFunctionSet_.evaluateEach( position(x), [this, &dofs, &hessian ] ( std::size_t alpha, RangeType phi_alpha ) {
+            const auto &hessianProjectionAlpha = hessianProjection_[alpha];
+            for( std::size_t j = 0; j < size(); ++j )
+              hessian[0].axpy( dofs[j]*phi_alpha[0], hessianProjectionAlpha[j]);
+        } );
       }
 
       template< class Point, class Hessians > const
       void hessianAll ( const Point &x, Hessians &hessians ) const
       {
-        DUNE_THROW( NotImplemented, "hessians not implemented for VEMBasisFunctionSet" );
+        assert( hessians.size() >= size() );
+        std::fill( hessians.begin(), hessians.end(), HessianRangeType( 0 ) );
+        shapeFunctionSet_.evaluateEach( position(x), [ this, &hessians ] ( std::size_t alpha, RangeType phi_alpha ) {
+            const auto &hessianProjectionAlpha = hessianProjection_[alpha];
+            for( std::size_t j = 0; j < size(); ++j )
+              hessians[j][0].axpy( phi_alpha[0], hessianProjectionAlpha[j]);
+        } );
       }
 
       const EntityType &entity () const { assert( entity_ ); return *entity_; }
 
-#if 0 // probably not needed
-      /*******************************************************/
-      // required method to use this as shape function
-      /*******************************************************/
-      template< class Point, class Functor >
-      void evaluateEach ( const Point &x, Functor functor ) const
+      template< class Point, class Factor >
+      void axpy ( const Point &x, const Factor &factor, DynamicVector<DomainType> &dofs ) const
       {
-        std::vector<RangeType> values(size());
-        evaluateAll(x,values);
-        for (std::size_t i=0;i<size();++i)
-          functor(i,values[i]);
+        shapeFunctionSet_.evaluateEach( position( x ), [ this, &factor, &dofs ] ( std::size_t alpha, RangeType phi_alpha ) {
+            for( std::size_t j = 0; j < size(); ++j )
+              dofs[ j ].axpy( phi_alpha[0]*valueProjection_[ alpha ][ j ], factor );
+          } );
       }
-      template< class Point, class Functor >
-      void jacobianEach ( const Point &x, Functor functor ) const
+      template< class Point, class Factor >
+      void axpy ( const Point &x, const Factor &factor, DynamicVector<HessianMatrixType> &dofs ) const
       {
-        std::vector<JacobianRangeType> values(size());
-        jacobianAll(x,values);
-        for (std::size_t i=0;i<size();++i)
-          functor(i,values[i]);
+        shapeFunctionSet_.evaluateEach( position( x ), [ this, &factor, &dofs ] ( std::size_t alpha, RangeType phi_alpha ) {
+            for( std::size_t j = 0; j < size(); ++j )
+              for ( std::size_t l = 0; l < dimDomain; ++l )
+                for ( std::size_t k = 0; k < dimDomain; ++k )
+                  dofs[ j ][l][k] += phi_alpha[0] *
+                      0.5*( jacobianProjection_[ alpha ][ j ][ k ]*factor[l] +
+                            jacobianProjection_[ alpha ][ j ][ l ]*factor[k] );
+          } );
       }
-      template< class Point, class Functor >
-      void hessianEach ( const Point &x, Functor functor ) const
+      template< class Point, class Factor >
+      void axpy ( const Point &x, const DomainType &normal, const Factor &factor, DynamicVector<HessianMatrixType> &dofs ) const
       {
-        DUNE_THROW( NotImplemented, "hessians not implemented for VEMBasisFunctionSet" );
+        shapeFunctionSet_.evaluateEach( position( x ), [ this, &factor, &dofs, &normal ] ( std::size_t alpha, RangeType phi_alpha ) {
+            for( std::size_t j = 0; j < size(); ++j )
+            {
+              DomainFieldType Gn = 0;
+              for ( std::size_t n = 0; n < dimDomain; ++n )
+                Gn += phi_alpha[0] * jacobianProjection_[ alpha ][ j ][ n ]*normal[n];
+              for ( std::size_t l = 0; l < dimDomain; ++l )
+                for ( std::size_t k = 0; k < dimDomain; ++k )
+                    dofs[ j ][l][k] += Gn * 0.5*(normal[k]*factor[l] + normal[l]*factor[k] );
+            }
+          } );
       }
-      /**********************************************************/
-#endif
+
 
     private:
       template< class Point >
       DomainType position ( const Point &x ) const
       {
         return Fem::coordinate(x);
-#if 0
-        DomainType y = entity().geometry().global( Fem::coordinate( x ) ) - bbox_.first;
-        for( int k = 0; k < dimDomain; ++k )
-          y[ k ] /= (bbox_.second[ k ] - bbox_.first[ k ]);
-        return y;
-#endif
       }
 
       const EntityType *entity_ = nullptr;
       ShapeFunctionSet shapeFunctionSet_;
       ValueProjection valueProjection_;
       JacobianProjection jacobianProjection_;
+      HessianProjection hessianProjection_;
       std::pair< DomainType, DomainType > bbox_;
       size_t size_;
     };

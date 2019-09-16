@@ -11,6 +11,7 @@
 #include <dune/fem/operator/common/differentiableoperator.hh>
 #include <dune/fem/io/parameter.hh>
 #include <dune/fem/schemes/elliptic.hh>
+#include <dune/fem/schemes/galerkin.hh>
 
 #include <dune/vem/agglomeration/indexset.hh>
 
@@ -50,11 +51,11 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model>
     //! contructor
     VEMEllipticOperator ( const DomainDiscreteFunctionSpaceType &dSpace,
                           const RangeDiscreteFunctionSpaceType &rSpace,
-                          const ModelType &model,
+                          ModelType model,
                           const Dune::Fem::ParameterReader &parameter = Dune::Fem::Parameter::container() )
-    : model_( model ),
-      dSpace_(dSpace), rSpace_(rSpace),
-      baseOperator_(dSpace,rSpace,model,parameter)
+    : dSpace_(dSpace), rSpace_(rSpace),
+      // baseOperator_(dSpace,rSpace,model,parameter)
+      baseOperator_(dSpace.gridPart(),model)
     {
 #if 0
       std::size_t aSize = rSpace.agglomeration().size();
@@ -72,7 +73,7 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model>
 #endif
     }
     VEMEllipticOperator ( const RangeDiscreteFunctionSpaceType &rangeSpace,
-                          const ModelType &model,
+                          ModelType model,
                           const Dune::Fem::ParameterReader &parameter = Dune::Fem::Parameter::container() )
     : VEMEllipticOperator( rangeSpace, rangeSpace, model, parameter )
     {}
@@ -83,18 +84,18 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model>
       operator()(const DomainDiscreteFunctionType &u,
           RangeDiscreteFunctionType &w) const;
 
-    const ModelType &model() const
-    { return model_; }
+    ModelType &model() const
+    { return baseOperator_.model(); }
     const DomainDiscreteFunctionSpaceType& domainSpace() const
     { return dSpace_; }
     const RangeDiscreteFunctionSpaceType& rangeSpace() const
     { return rSpace_; }
 
   private:
-    const ModelType &model_;
     const DomainDiscreteFunctionSpaceType &dSpace_;
     const RangeDiscreteFunctionSpaceType &rSpace_;
-    EllipticOperator<DomainDiscreteFunction,RangeDiscreteFunction,Model> baseOperator_;
+    // EllipticOperator<DomainDiscreteFunction,RangeDiscreteFunction,Model> baseOperator_;
+    Dune::Fem::GalerkinOperator<Model,DomainDiscreteFunction,RangeDiscreteFunction> baseOperator_;
 };
 
 // DifferentiableVEMEllipticOperator
@@ -142,17 +143,18 @@ template<class JacobianOperator, class Model>
   public:
   //! contructor
   DifferentiableVEMEllipticOperator ( const RangeDiscreteFunctionSpaceType &rangeSpace,
-                     const ModelType &model,
+                     ModelType model,
                      const Dune::Fem::ParameterReader &parameter = Dune::Fem::Parameter::container() )
     : BaseType( rangeSpace, model )
-    , baseOperator_(rangeSpace,model,parameter)
+    , baseOperator_(rangeSpace,model)
   {}
   DifferentiableVEMEllipticOperator ( const DomainDiscreteFunctionSpaceType &dSpace,
                                       const RangeDiscreteFunctionSpaceType &rSpace,
-                                      const ModelType &model,
+                                      ModelType model,
                                       const Dune::Fem::ParameterReader &parameter = Dune::Fem::Parameter::container() )
   : BaseType( dSpace, rSpace, model, parameter )
-  , baseOperator_(dSpace,rSpace,model,parameter)
+  // , baseOperator_(dSpace,rSpace,model,parameter)
+  , baseOperator_(dSpace,rSpace,model)
   {}
 
   //! method to setup the jacobian of the operator for storage in a matrix
@@ -160,7 +162,8 @@ template<class JacobianOperator, class Model>
       JacobianOperatorType &jOp) const;
 
   using BaseType::model;
-  DifferentiableEllipticOperator<JacobianOperator,Model> baseOperator_;
+  // DifferentiableEllipticOperator<JacobianOperator,Model> baseOperator_;
+  Dune::Fem::DifferentiableGalerkinOperator<Model,JacobianOperator> baseOperator_;
 };
 
 // Implementation of VEMEllipticOperator
@@ -172,6 +175,7 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model>
       RangeDiscreteFunctionType &w) const
 {
   baseOperator_(u,w);
+#if 1
   if (! std::is_same<DomainDiscreteFunctionSpaceType,RangeDiscreteFunctionSpaceType>::value)
     return;
 
@@ -224,8 +228,11 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model>
         DomainRangeType vu;
         uLocal.evaluate(localPoint, vu);
 
+        double bbH2 = pow(bbox.volume()/bbox.diameter(),2);
+        // std::cout << "vemelliptic:" << pow(bbox.diameter(),2) << " " << bbox.volume() << std::endl;
         RangeRangeType Dcoeff = model().gradStabilization(localPoint,vu);
-        Dcoeff.axpy(bbox.volume(), model().massStabilization(localPoint,vu) );
+        Dcoeff.axpy(bbH2, model().massStabilization(localPoint,vu) );
+        Dcoeff.axpy(1./bbH2, model().hessStabilization(localPoint,vu) );
 
         VectorOfAveragedDiffusionCoefficients[agglomerate].axpy(factor,Dcoeff);
       }
@@ -255,6 +262,7 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model>
     }
   }
   w.communicate();
+#endif
 }
 
 // Implementation of DifferentiableVEMEllipticOperator
@@ -266,6 +274,7 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
 {
   Dune::Timer timer;
   baseOperator_.jacobian(u,jOp);
+#if 1
   if (! std::is_same<DomainDiscreteFunctionSpaceType,RangeDiscreteFunctionSpaceType>::value)
     return;
   // std::cout << "   in assembly: base operator    " << timer.elapsed() << std::endl;
@@ -330,10 +339,14 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
         DomainRangeType vu;
         uLocal.evaluate(localPoint, vu);
 
+        double bbH2 = pow(bbox.volume()/bbox.diameter(),2);
+        // std::cout << "vemelliptic:" << pow(bbox.diameter(),2) << " " << bbox.volume() << std::endl;
         RangeRangeType Dcoeff = model().gradStabilization(localPoint,vu);
-        Dcoeff.axpy(bbox.volume(), model().massStabilization(localPoint,vu) );
+        Dcoeff.axpy(bbH2, model().massStabilization(localPoint,vu) );
+        Dcoeff.axpy(1./bbH2, model().hessStabilization(localPoint,vu) );
         RangeRangeType LinDcoeff = model().linGradStabilization(localPoint,vu);
-        LinDcoeff.axpy(bbox.volume(), model().linMassStabilization(localPoint,vu) );
+        LinDcoeff.axpy(bbH2, model().linMassStabilization(localPoint,vu) );
+        LinDcoeff.axpy(1./bbH2, model().linHessStabilization(localPoint,vu) );
 
         VectorOfAveragedDiffusionCoefficients[agglomerate].axpy(factor,Dcoeff);
         VectorOfAveragedLinearlisedDiffusionCoefficients[agglomerate].axpy(factor,LinDcoeff);
@@ -377,5 +390,6 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
   // std::cout << "   in assembly: end stabilization    " << timer.elapsed() << std::endl;
   jOp.communicate();
   // std::cout << "   in assembly: final    " << timer.elapsed() << std::endl;
+#endif
 }
 #endif // #ifndef VEMELLIPTIC_HH

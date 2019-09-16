@@ -43,8 +43,8 @@ dune.fem.parameter.append({"fem.verboserank": 0})
 # <codecell>
 massCoeff = 0   # 1+sin(dot(x,x))
 diffCoeff = 1   # -0.9*cos(dot(x,x))
-basisChoice=1
-orders = range(1,7)
+basisChoice=2
+orders = range(1,12)
 resolutions = [4,8,16,32] # [2*2**n for n in range(6)]
 methods = lambda order:\
           [ ### "[spaceVersion,scheme]"
@@ -116,8 +116,14 @@ def compute(grid, order, spaceArgs, schemeName):
         from scipy.sparse.linalg import eigs
         ll = eigs(A, k=1, which='LR', return_eigenvectors=False).real
         ll.sort()
-        ls = eigs(A, k=1, which='LR', sigma=0,
-                return_eigenvectors=False,maxiter=20000,tol=1e-8).real
+        try:
+            ls = eigs(A, k=1, which='LR', sigma=0,
+                    return_eigenvectors=False,maxiter=20000,tol=1e-8).real
+        except:
+            print(A.todense())
+            ls = eigs(A, k=1, which='SR',
+                    return_eigenvectors=False,maxiter=20000,tol=1e-8).real
+            print(ls)
         ls.sort()
         conditioning = ll[-1]/ls[0]
         print( "eigenvalues:", ls,ll,

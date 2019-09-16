@@ -6,7 +6,7 @@ from ufl.core.expr import Expr
 from dune.source.cplusplus import Variable, UnformattedExpression, AccessModifier
 from ufl.algorithms import expand_compounds, expand_derivatives, expand_indices, expand_derivatives
 
-def codeVEM(self, name='Model', targs=[]):
+def codeVEM(self, name, targs):
     code = self._code(name,targs)
 
     u = self.trialFunction
@@ -52,45 +52,84 @@ def codeVEM(self, name='Model', targs=[]):
     else:
         dgStab = None
 
+    hStab = self.hStab
+    if isinstance(hStab,Expr):
+        if hStab.ufl_shape == ():
+            hStab = as_vector([hStab])
+        try:
+            hStab = expand_indices(expand_derivatives(expand_compounds(hStab)))
+        except:
+            pass
+        assert hStab.ufl_shape == u.ufl_shape
+        dhStab = as_vector([
+                    replace(
+                      expand_derivatives( diff(replace(hStab,{u:ubar}),ubar) )[i,i],
+                    {ubar:u} )
+                 for i in range(u.ufl_shape[0]) ])
+    else:
+        dhStab = None
+
     code.append(AccessModifier("public"))
     x = SpatialCoordinate(self.space.cell())
     predefined = {}
     spatial = Variable('const auto', 'y')
     predefined.update( {x: UnformattedExpression('auto', 'entity().geometry().global( Dune::Fem::coordinate( x ) )') })
+    generateMethod(code, hStab,
+            'RRangeType', 'hessStabilization',
+            args=['const Point &x',
+                  'const DRangeType &u'],
+            targs=['class Point','class DRangeType'], static=False, const=True,
+            predefined=predefined)
+    generateMethod(code, dhStab,
+            'RRangeType', 'linHessStabilization',
+            args=['const Point &x',
+                  'const DRangeType &u'],
+            targs=['class Point','class DRangeType'], static=False, const=True,
+            predefined=predefined)
     generateMethod(code, gStab,
             'RRangeType', 'gradStabilization',
             args=['const Point &x',
                   'const DRangeType &u'],
-            targs=['class Point'], static=False, const=True,
+            targs=['class Point','class DRangeType'], static=False, const=True,
             predefined=predefined)
     generateMethod(code, dgStab,
             'RRangeType', 'linGradStabilization',
             args=['const Point &x',
                   'const DRangeType &u'],
-            targs=['class Point'], static=False, const=True,
+            targs=['class Point','class DRangeType'], static=False, const=True,
             predefined=predefined)
     generateMethod(code, mStab,
             'RRangeType', 'massStabilization',
             args=['const Point &x',
                   'const DRangeType &u'],
-            targs=['class Point'], static=False, const=True,
+            targs=['class Point','class DRangeType'], static=False, const=True,
             predefined=predefined)
     generateMethod(code, dmStab,
             'RRangeType', 'linMassStabilization',
             args=['const Point &x',
                   'const DRangeType &u'],
-            targs=['class Point'], static=False, const=True,
+            targs=['class Point','class DRangeType'], static=False, const=True,
             predefined=predefined)
 
 
     return code
 
-def transform(space,gStab,mStab):
-    def transform_(Class):
-        Class._code = Class.code
-        Class.code = codeVEM
-        Class.space = space
-        Class.gStab = gStab
-        Class.mStab = mStab
-        Class.signature += 'vem'
+def transform(space,hStab,gStab,mStab):
+    def transform_(model):
+        if model.baseName == "vemintegrands":
+            return
+        model._code = model.code
+        model.code  = lambda *args,**kwargs: codeVEM(model,*args,**kwargs)
+        model.space = space
+        model.hStab = hStab
+        model.gStab = gStab
+        model.mStab = mStab
+        model.baseName = "vemintegrands"
+        model.baseSignature = []
+        if mStab is not None:
+            model.baseSignature += [mStab]
+        if gStab is not None:
+            model.baseSignature += [gStab]
+        if hStab is not None:
+            model.baseSignature += [hStab]
     return transform_

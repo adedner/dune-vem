@@ -59,13 +59,6 @@ struct PhiEdge : public Dune::Fem::BindableGridFunction< GridPart, Dune::Dim<1> 
     const int dimension = GridPart::dimension;
     const auto& entity = intersection_.inside();
     const auto &refElement = Dune::ReferenceElements< double, dimension >::general( entity.type() );
-#if 0
-    int edgeNumber = intersection_.indexInInside();
-    const auto &idSet = Base::gridPart().grid().localIdSet();
-    const auto left = idSet.subId( entity, refElement.subEntity( edgeNumber, dimension-1, 0, dimension ), dimension );
-    const auto right = idSet.subId( entity, refElement.subEntity( edgeNumber, dimension-1, 1, dimension ), dimension );
-    bool noTwist = true; // left < right;
-#endif
     ret = typename Base::RangeType(0.);
     // test if evaluation point on edge
     auto x  = Dune::Fem::coordinate(p);
@@ -75,6 +68,25 @@ struct PhiEdge : public Dune::Fem::BindableGridFunction< GridPart, Dune::Dim<1> 
     if ( xx.two_norm() > 1e-10 ) return;
     sfs_.evaluateEach( y, [ & ] ( std::size_t beta, const typename Base::RangeType &phi ) {
         ret[0] += matrix_[beta][i_] * phi[0];
+    } );
+  }
+  template <class Point>
+  void jacobian(const Point &p, typename Base::JacobianRangeType &ret) const
+  {
+    return;
+    const int dimension = GridPart::dimension;
+    const auto& normal = intersection_.centerUnitOuterNormal();
+    const auto& entity = intersection_.inside();
+    const auto &refElement = Dune::ReferenceElements< double, dimension >::general( entity.type() );
+    ret = typename Base::JacobianRangeType(0.);
+    // test if evaluation point on edge
+    auto x  = Dune::Fem::coordinate(p);
+    auto y  = intersection_.geometryInInside().local(x);
+    auto xx = intersection_.geometryInInside().global(y);
+    xx -= x;
+    if ( xx.two_norm() > 1e-10 ) return;
+    sfs_.evaluateEach( y, [ & ] ( std::size_t beta, const typename Base::RangeType &phi ) {
+        ret[0].axpy(matrix_[beta][i_] * phi[0], normal);
     } );
   }
   unsigned int order() const { return 2; }

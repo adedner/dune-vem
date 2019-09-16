@@ -58,6 +58,40 @@ namespace Dune
         else
           transform_.mv(tmp,g);
       }
+      typedef Dune::FieldMatrix<double,GridPart::dimensionworld,GridPart::dimensionworld>  HessianType;
+      void hessianTransform(HessianType &g, bool transpose) const
+      {
+        const std::size_t dimGlobal = GridPart::dimensionworld;
+        // c = J^{-T} a_r^T
+        FieldMatrix< double, dimGlobal, dimGlobal > c;
+        FieldMatrix< double, dimGlobal, dimGlobal > b; // result
+        if (transpose)
+        {
+          for( int i = 0; i < dimGlobal; ++i )
+            transform_.mtv( g[ i ], c[ i ] );
+          // b_r = J^{-T} c
+          for( int i = 0; i < dimGlobal; ++i )
+          {
+            FieldMatrixColumn< const FieldMatrix< double, dimGlobal, dimGlobal > > ci( c, i );
+            FieldMatrixColumn< FieldMatrix< double, dimGlobal, dimGlobal > > bi( b, i );
+            transform_.mtv( ci, bi );
+          }
+        }
+        else
+        {
+          for( int i = 0; i < dimGlobal; ++i )
+            transform_.mv( g[ i ], c[ i ] );
+          // b_r = J^{-T} c
+          for( int i = 0; i < dimGlobal; ++i )
+          {
+            FieldMatrixColumn< const FieldMatrix< double, dimGlobal, dimGlobal > > ci( c, i );
+            FieldMatrixColumn< FieldMatrix< double, dimGlobal, dimGlobal > > bi( b, i );
+            transform_.mv( ci, bi );
+          }
+        }
+        g = b;
+      }
+
       const double &diameter() const { return std::get<4>(rotation_); }
 
       void set(ReturnType rotation)
@@ -66,6 +100,7 @@ namespace Dune
         transform_[0] = xAxis();
         transform_[1] = yAxis();
         transform_.invert();
+
       }
       void set(pybind11::object obj) { set( obj.cast<ReturnType>() ); }
       const double r(int k) const

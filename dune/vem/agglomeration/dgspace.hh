@@ -84,8 +84,10 @@ namespace Dune
 
       struct ScalarShapeFunctionSet
         : public Dune::Fem::OrthonormalShapeFunctionSet< ScalarShapeFunctionSpaceType >
+        // : public Dune::Fem::LegendreShapeFunctionSet< ScalarShapeFunctionSpaceType,true >
       {
         typedef Dune::Fem::OrthonormalShapeFunctionSet< ScalarShapeFunctionSpaceType >   BaseType;
+        // typedef Dune::Fem::LegendreShapeFunctionSet< ScalarShapeFunctionSpaceType,true >   BaseType;
 
         static constexpr int numberShapeFunctions =
               Dune::Fem::OrthonormalShapeFunctions< ScalarShapeFunctionSpaceType::dimDomain >::size(polOrder);
@@ -200,6 +202,7 @@ namespace Dune
       : space_(space)
       , penalty_(penalty)
       {}
+      // implement: h_e = min(|e^+|,|e^-|) / |e|
       template <class Intersection>
       double operator()(const Intersection &intersection,
                         double intersectionArea, double area, double nbArea) const
