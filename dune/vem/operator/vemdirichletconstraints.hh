@@ -28,6 +28,27 @@ namespace Dune {
     typedef FieldVector<int, localBlockSize> DirichletBlock;
     typedef FieldVector<int, localBlockSize> ModelDirichletBlock;
 
+    class BoundaryWrapper
+    {
+      const ModelType& impl_;
+      int bndId_;
+      public:
+      typedef typename DiscreteFunctionSpaceType::EntityType EntityType;
+      typedef typename DiscreteFunctionSpaceType::FunctionSpaceType FunctionSpaceType;
+      typedef typename DiscreteFunctionSpaceType::DomainType DomainType;
+      typedef typename DiscreteFunctionSpace::RangeType RangeType;
+      typedef typename DiscreteFunctionSpace::JacobianRangeType JacobianRangeType;
+      typedef typename DiscreteFunctionSpace::HessianRangeType HessianRangeType;
+      static const int dimRange = RangeType::dimension;
+      BoundaryWrapper( const ModelType& impl, int bndId )
+      : impl_( impl ), bndId_(bndId) {}
+      template <class Point>
+      void evaluate( const Point& x, RangeType& ret ) const
+      { impl_.dirichlet(bndId_,Dune::Fem::coordinate(x),ret); }
+      template <class Point>
+      void jacobian( const Point& x, JacobianRangeType& ret ) const
+      { ret = JacobianRangeType(0); }
+    };
     VemDirichletConstraints( ModelType &model, const DiscreteFunctionSpaceType& space )
       : BaseType(model,space)
     {}
@@ -137,7 +158,7 @@ namespace Dune {
           if( dirichletBlocks_[ global ][ l ] && mask[ localBlock ])
           {
             std::fill(valuesModel.begin(),valuesModel.end(),0);
-            space_.interpolation()( entity, typename BaseType::BoundaryWrapper(model_,dirichletBlocks_[global][l]),
+            space_.interpolation()( entity, BoundaryWrapper(model_,dirichletBlocks_[global][l]),
                 valuesModel );
             // store result
             assert( (unsigned int)localDof < wLocal.size() );
@@ -183,7 +204,7 @@ namespace Dune {
             {
               std::fill(valuesModel.begin(),valuesModel.end(),0);
               space_.interpolation()
-                 ( entity, typename BaseType::BoundaryWrapper(model_,dirichletBlocks_[global][l]),
+                 ( entity, BoundaryWrapper(model_,dirichletBlocks_[global][l]),
                      valuesModel );
               values[ localDof ] -= valuesModel[ localDof ];
             }

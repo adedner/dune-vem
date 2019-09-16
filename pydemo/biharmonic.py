@@ -39,7 +39,7 @@ methods = [ ### "[space,scheme,spaceKwrags]"
             ["vem","vem",{"testSpaces":[ [0],  [order-2,order-2], [order-2] ] }, "C1C0-conforming"],
    ]
 parameters = {"newton.linear.tolerance": 1e-12,
-              "newton.linear.preconditioning.method": "ilu",
+              "newton.linear.preconditioning.method": "jacobi",
               "penalty": 40,  # for the bbdg scheme
               "newton.linear.verbose": True,
               "newton.verbose": True

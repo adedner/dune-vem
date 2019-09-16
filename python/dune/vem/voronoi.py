@@ -56,6 +56,7 @@ def voronoiCells(constructor, towers, fileName=None, load=False, lloyd=False, sh
             towers = numpy.array(
                     [ p*(upperright-lowerleft) + lowerleft
                         for p in numpy.random.rand(towers, 2) ])
+    towers = numpy.array(towers)
 
     # Select towers inside the bounding box
     i = in_box(towers, bounding_box)
@@ -93,7 +94,7 @@ def voronoiCells(constructor, towers, fileName=None, load=False, lloyd=False, sh
 
     # Filter regions
     regions = []
-    for region in vor.regions:
+    for i,region in enumerate(vor.regions):
         flag = True
         for index in region:
             if index == -1:
@@ -108,10 +109,19 @@ def voronoiCells(constructor, towers, fileName=None, load=False, lloyd=False, sh
                     break
         if region != [] and flag:
             regions.append(region)
-    if lloyd:
+
+    if lloyd > 0:
+        dist = 0
+        seeds = []
         for i,r in enumerate(regions):
-            towers[i] = centroid(vor.vertices[r])
-        return voronoiCells(constructor, towers, fileName=None, load=False, lloyd=lloyd-1, show=show)
+            # old = seeds[i].copy()
+            # new = centroid(vor.vertices[r])
+            # dist = max(dist,numpy.linalg.norm(new-old))
+            seeds.append(centroid(vor.vertices[r]))
+        if type(lloyd) == int:
+            return voronoiCells(constructor, seeds, fileName=None, load=False, lloyd=lloyd-1, show=show)
+        elif dist > lloyd:
+            return voronoiCells(constructor, towers, fileName=None, load=False, lloyd=lloyd, show=show)
 
     lowerleft  = numpy.array(constructor.lower)
     upperright = numpy.array(constructor.upper)
@@ -127,10 +137,6 @@ def voronoiCells(constructor, towers, fileName=None, load=False, lloyd=False, sh
     newind = np.zeros(len(vor.vertices),int)
     for i in range(len(indices)):
         newind[indices[i]] = i
-    if lloyd:
-        for i,r in enumerate(regions):
-            towers[i] = centroid(vorVertices[newind[r]])
-        return voronoiCells(constructor, towers, fileName=None, load=False, lloyd=lloyd-1, show=show)
 
     return {"vertices":vorVertices, "polygons":[newind[r] for r in regions]}
 
