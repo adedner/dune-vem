@@ -456,12 +456,16 @@ from sortedcontainers import SortedDict
 import triangle
 import matplotlib.pyplot as plt
 class PolyAgglomerate:
-    def __init__(self,constructor,convex=False):
+    def __init__(self,constructor,cubes=False,convex=False):
         self.convex = convex
+        self.cubes = cubes
         self.suffix = "poly"+str(len(constructor["polygons"]))
         self.domain, self.index = self.construct(constructor["vertices"],
                                                  constructor["polygons"])
-        self.grid = aluSimplexGrid(self.domain)
+        if cubes:
+            self.grid = aluCubeGrid(self.domain)
+        else:
+            self.grid = aluSimplexGrid(self.domain)
         self.ind = set()
     def __call__(self,en):
         bary = en.geometry.center
@@ -471,35 +475,42 @@ class PolyAgglomerate:
     def roundBary(self,a):
         return tuple(round(aa,8) for aa in a)
     def construct(self,vertices,polygons):
-        vertices = numpy.array(vertices)
-        tr = []
         index = SortedDict()
-        for nr, p in enumerate(polygons):
-            p = numpy.array(p)
-            N = len(p)
-            if not self.convex: # use triangle
-                e = [ [p[i],p[(i+1)%N]] for i in range(N) ]
-                domain = { "vertices":vertices,
-                           "segments":numpy.array(e) }
-                tr += [triangle.triangulate(domain,opts="p")]
-            else: # use scipy
-                poly = numpy.append(p,[p[0]])
-                vert = vertices[p, :]
-                tri = Delaunay(vert).simplices
-                tr += [{"triangles":p[tri]}]
-            bary = [ (vertices[p0]+vertices[p1]+vertices[p2])/3.
-                     for p0,p1,p2 in tr[-1]["triangles"] ]
-            for b in bary:
-                index[self.roundBary(b)] = nr
-
-        domain = {"vertices":  numpy.array(vertices),
-                  "simplices": numpy.vstack([ t["triangles"] for t in tr ])}
+        if self.cubes:
+            for i,poly in enumerate(polygons):
+                assert len(poly)==4
+                bary = [sum([vertices[p][i] for p in poly]) / 4 for i in range(2)]
+                index[self.roundBary(bary)] = i
+                polygons[i][2], polygons[i][3] = poly[3], poly[2]
+            domain = {"vertices": vertices, "cubes": polygons}
+        else:
+            vertices = numpy.array(vertices)
+            tr = []
+            for nr, p in enumerate(polygons):
+                p = numpy.array(p)
+                N = len(p)
+                if not self.convex: # use triangle
+                    e = [ [p[i],p[(i+1)%N]] for i in range(N) ]
+                    domain = { "vertices":vertices,
+                               "segments":numpy.array(e) }
+                    tr += [triangle.triangulate(domain,opts="p")]
+                else: # use scipy
+                    poly = numpy.append(p,[p[0]])
+                    vert = vertices[p, :]
+                    tri = Delaunay(vert).simplices
+                    tr += [{"triangles":p[tri]}]
+                bary = [ (vertices[p0]+vertices[p1]+vertices[p2])/3.
+                         for p0,p1,p2 in tr[-1]["triangles"] ]
+                for b in bary:
+                    index[self.roundBary(b)] = nr
+            domain = {"vertices":  numpy.array(vertices),
+                      "simplices": numpy.vstack([ t["triangles"] for t in tr ])}
         return domain, index
 
 def polyGrid(constructor,cubes=False, convex=False,**kwargs):
     if isinstance(constructor,dict) and \
         constructor.get("polygons",None) is not None:
-        agglomerate = PolyAgglomerate(constructor,convex)
+        agglomerate = PolyAgglomerate(constructor,cubes,convex)
         agglomerate.minEdgeNumber = min([len(p) for p in constructor["polygons"]])
     else:
         agglomerate = TrivialAgglomerate(constructor, cubes, **kwargs)
