@@ -443,6 +443,7 @@ class TrivialAgglomerate:
         else:
             self.grid = aluSimplexGrid(constructor, **kwargs)
         self.suffix = "simple"+str(self.grid.size(0))
+        self.size = self.grid.size(0)
     def __call__(self,en):
         return self.grid.indexSet.index(en)
     def check(self):
@@ -467,6 +468,7 @@ class PolyAgglomerate:
         else:
             self.grid = aluSimplexGrid(self.domain)
         self.ind = set()
+        self.size = len( constructor["polygons"] )
     def __call__(self,en):
         bary = en.geometry.center
         return self.index[self.roundBary(bary)]
