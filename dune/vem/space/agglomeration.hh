@@ -319,6 +319,8 @@ namespace Dune
             Dune::Fem::OrthonormalShapeFunctions< DomainType::dimension >::
               size( std::max(orders[2],polOrder-2) )
           );
+      // polOrder=1 can cause problems with numHessShapeFunctions=0
+      if (numHessShapeFunctions == 0) numHessShapeFunctions = 1;
       int numGradShapeFunctions = std::min( numShapeFunctions,
              Dune::Fem::OrthonormalShapeFunctions< DomainType::dimension >::
                size( std::max(orders[1],polOrder-1) )
