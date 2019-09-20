@@ -331,12 +331,12 @@ namespace Dune
       numGradShapeFunctions = Dune::Fem::OrthonormalShapeFunctions< DomainType::dimension >::
                 size(polOrder-1);
       numHessShapeFunctions = Dune::Fem::OrthonormalShapeFunctions< DomainType::dimension >::
-                size(polOrder-2);
+                size(std::max(polOrder-2,0));
+#endif
       std::cout << "size of spaces: "
                 << numShapeFunctions << " "
                 << numGradShapeFunctions << " "
                 << numHessShapeFunctions << std::endl;
-#endif
 
       // set up matrices used for constructing gradient, value, and edge projections
       // Note: the code is set up with the assumption that the dofs suffice to compute the edge projection
