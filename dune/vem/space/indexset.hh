@@ -89,8 +89,8 @@ namespace Dune
       {
           std::vector<int> ret(3,0);
           ret[0] += testSpaces_[2][0];
-          ret[1] += std::min( testSpaces_[2][0] + 1, edgeDegrees()[0] );
-          ret[2] += testSpaces_[2][0] + 2;
+          ret[1] += std::min( {testSpaces_[2][0] + 1, edgeDegrees()[0]} );
+          ret[2] += std::min( {testSpaces_[2][0] + 2, edgeDegrees()[0]+1, edgeDegrees()[1]} );
           return ret;
       }
 
