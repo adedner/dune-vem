@@ -78,7 +78,7 @@ def bbdgSpace(view, order=1, scalar=False, dimRange=None, field="double", storag
     addStorage(spc, storage)
     return spc.as_ufl()
 
-from dune.fem.scheme import dg
+from dune.fem.scheme import dg,galerkin
 def bbdgScheme(model, space=None, penalty=1, solver=None, parameters={}):
     if space == None:
         try:
@@ -88,6 +88,7 @@ def bbdgScheme(model, space=None, penalty=1, solver=None, parameters={}):
     spaceType = space._typeName
     penaltyClass = "Dune::Vem::BBDGPenalty<"+spaceType+">"
     return dg(model,space,penalty,solver,parameters,penaltyClass)
+    # return galerkin(model,space,solver,parameters)
 
 def vemSpace(view, order=1, testSpaces=None, scalar=False,
              dimRange=None, conforming=True, field="double",

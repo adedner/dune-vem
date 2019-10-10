@@ -72,6 +72,7 @@ def codeVEM(self, name, targs):
     code.append(AccessModifier("public"))
     x = SpatialCoordinate(self.space.cell())
     predefined = {}
+    self.predefineCoefficients(predefined, False)
     spatial = Variable('const auto', 'y')
     predefined.update( {x: UnformattedExpression('auto', 'entity().geometry().global( Dune::Fem::coordinate( x ) )') })
     generateMethod(code, hStab,
@@ -110,13 +111,11 @@ def codeVEM(self, name, targs):
                   'const DRangeType &u'],
             targs=['class Point','class DRangeType'], static=False, const=True,
             predefined=predefined)
-
-
     return code
 
 def transform(space,hStab,gStab,mStab):
     def transform_(model):
-        if model.baseName == "vemintegrands":
+        if model.baseName == "integrandsVem":
             return
         model._code = model.code
         model.code  = lambda *args,**kwargs: codeVEM(model,*args,**kwargs)
@@ -124,12 +123,13 @@ def transform(space,hStab,gStab,mStab):
         model.hStab = hStab
         model.gStab = gStab
         model.mStab = mStab
-        model.baseName = "vemintegrands"
+        model.baseName = "integrandsVem"
         model.baseSignature = []
-        if mStab is not None:
-            model.baseSignature += [mStab]
-        if gStab is not None:
-            model.baseSignature += [gStab]
-        if hStab is not None:
-            model.baseSignature += [hStab]
-    return transform_
+    uflExpr = []
+    if isinstance(hStab,Expr):
+        uflExpr += [hStab]
+    if isinstance(gStab,Expr):
+        uflExpr += [gStab]
+    if isinstance(mStab,Expr):
+        uflExpr += [mStab]
+    return [transform_, uflExpr]
