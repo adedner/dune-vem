@@ -42,11 +42,12 @@ dune.fem.parameter.append({"fem.verboserank": 0})
 # a bounding box dg space and a conforming/non conforming VEM space
 
 # <codecell>
+eps = dune.ufl.Constant(0.9,"test")
 uflSpace = dune.ufl.Space(2, dimRange=1)
 x = SpatialCoordinate(uflSpace)
 exact = as_vector( [x[0]*x[1] * cos(pi*x[0]*x[1])] )
 massCoeff = 1+sin(dot(x,x))
-diffCoeff = 1-0.9*cos(dot(x,x))
+diffCoeff = 1-eps*cos(dot(x,x))
 
 methods = [ ### "[legend,space,scheme,spaceKwargs,schemeKwargs]"
             ["lagrange","lagrange","galerkin",{},{}],

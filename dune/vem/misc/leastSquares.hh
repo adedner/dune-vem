@@ -25,12 +25,11 @@ namespace Dune {
                 }
                 LeastSquares(const LeastSquares &source) = delete;
 
-                template <class Vector>
-                Vector leastSquaresSolver(const Vector &b, const Vector &d ){
-
+                template <class Vector, class Solution>
+                void solve(const Vector &b, const Vector &d, Solution &solution){
                     assert( (b.size() == d.size()) );
+                    assert( solution.size() == A.cols() );
 
-                    Vector solution(b.size());
                     Vector systemVector = vectorSetUp(b,d);
 
                     Size systemMatrixDim = systemMatrixInv_.rows();
@@ -44,14 +43,19 @@ namespace Dune {
 
                     for ( Size i = 0; i < solution.size(); ++i)
                         solution[i] = systemMultiply[i];
+                }
+                template <class Vector>
+                Vector solve(const Vector &b, const Vector &d ){
 
+                    Vector solution(A.cols());
+                    leastSquaresSolver(b,d,solution);
                     return solution;
                 }
 
                 template <class Vector>
-                void leastSquaresSystem(const std::vector< Vector > &bVec,
-                                        const std::vector< Vector > &dVec,
-                                        std::vector< Vector > &solnVec){
+                void solve(const std::vector< Vector > &bVec,
+                           const std::vector< Vector > &dVec,
+                           std::vector< Vector > &solnVec){
                     // check dimensions match
                     assert( (bVec.size() == dVec.size()) && (dVec.size() == solnVec.size()));
 

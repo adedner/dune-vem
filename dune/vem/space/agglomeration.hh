@@ -273,6 +273,20 @@ namespace Dune
       }
 
     private:
+      template <class Matrix>
+      struct ColumnVector
+      {
+        ColumnVector(Matrix &matrix, int col)
+        : matrix_(matrix), col_(col) {}
+        int size() const { return matrix.rows(); }
+        typename Matrix::value_t& operator[](int i) {return matrix_[i][col_];}
+        Matrix &matrix_;
+        int col_;
+      };
+      template <class Matrix>
+      ColumnVector<Matrix> columnVector(Matrix &matrix, int col)
+      { return ColumnVector(matrix,col); }
+      // L.solve(d,b,columnVector(valueProjection,beta));
       void buildProjections ();
 
       // issue with making these const: use of delete default constructor in some python bindings...
