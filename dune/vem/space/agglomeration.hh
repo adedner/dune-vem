@@ -278,8 +278,8 @@ namespace Dune
       {
         ColumnVector(Matrix &matrix, int col)
         : matrix_(matrix), col_(col) {}
-        int size() const { return matrix.rows(); }
-        typename Matrix::value_t& operator[](int i) {return matrix_[i][col_];}
+        int size() const { return matrix_.rows(); }
+        typename Matrix::value_type& operator[](int i) {return matrix_[i][col_];}
         Matrix &matrix_;
         int col_;
       };

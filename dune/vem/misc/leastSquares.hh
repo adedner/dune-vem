@@ -13,6 +13,21 @@ namespace Dune {
 
     namespace Vem {
 
+        template <class Matrix>
+        struct ColumnVector
+        {
+            ColumnVector(Matrix &matrix, int col)
+                    : matrix_(matrix), col_(col) {}
+            int size() const { return matrix_.rows(); }
+            typename Matrix::value_type& operator[](int i) {return matrix_[i][col_];}
+            Matrix &matrix_;
+            int col_;
+        };
+
+        template <class Matrix>
+        ColumnVector<Matrix> columnVector(Matrix &matrix, int col)
+        { return ColumnVector(matrix,col); }
+
         template< class Matrix >
         class LeastSquares {
             public:
@@ -27,8 +42,9 @@ namespace Dune {
 
                 template <class Vector, class Solution>
                 void solve(const Vector &b, const Vector &d, Solution &solution){
-                    assert( (b.size() == d.size()) );
-                    assert( solution.size() == A.cols() );
+                    assert( b.size() == llsMatrix_.rows() );
+                    assert( solution.size() == llsMatrix_.cols() );
+                    assert( d.size() == constraintMatrix_.rows() );
 
                     Vector systemVector = vectorSetUp(b,d);
 
@@ -44,11 +60,11 @@ namespace Dune {
                     for ( Size i = 0; i < solution.size(); ++i)
                         solution[i] = systemMultiply[i];
                 }
+
                 template <class Vector>
                 Vector solve(const Vector &b, const Vector &d ){
-
-                    Vector solution(A.cols());
-                    leastSquaresSolver(b,d,solution);
+                    Vector solution(llsMatrix_.cols());
+                    solve(b,d,solution);
                     return solution;
                 }
 
@@ -60,7 +76,7 @@ namespace Dune {
                     assert( (bVec.size() == dVec.size()) && (dVec.size() == solnVec.size()));
 
                     for ( unsigned int i = 0; i < bVec.size(); ++i ){
-                        solnVec[i] = leastSquaresSolver(bVec[i],dVec[i]);
+                        solnVec[i] = solve(bVec[i],dVec[i]);
                     }
                 }
 
@@ -80,6 +96,7 @@ namespace Dune {
                     for(unsigned int i = 0; i < x.size(); ++i)
                         std::cout << x[i] << std::endl;
                 }
+
 
 
             private:
@@ -107,17 +124,19 @@ namespace Dune {
                         if (i < llsMatrix_.cols() ) {
                             for (Size j = 0; j < systemMatrix.cols(); ++j){
                                 if (j < llsMatrix_.cols() ) {
+                                    // fill upper left
                                     for (Size k = 0; k < llsMatrix_.rows(); ++k)
                                         systemMatrix[ i ][ j ] += 2 * llsMatrix_[k][i] * llsMatrix_[k][j];
                                 }
                                 else {
+                                    // fill upper right
                                     systemMatrix[ i ][ j ] += constraintMatrix_[ j - llsMatrix_.cols() ][ i ];
                                 }
                             }
                         }
                         else {
                             for (Size j = 0; j < llsMatrix_.cols(); ++j)
-                                systemMatrix[i][j] += constraintMatrix_[i - constraintMatrix_.rows() ][j];
+                                systemMatrix[i][j] += constraintMatrix_[i - llsMatrix_.cols() ][j];
                         }
                     }
 
