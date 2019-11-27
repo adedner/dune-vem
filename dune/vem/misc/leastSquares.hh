@@ -4,6 +4,7 @@
 #include <vector>
 
 #include <dune/common/dynmatrix.hh>
+#include <dune/vem/misc/pseudoinverse.hh>
 
 #include <assert.h>
 
@@ -28,11 +29,12 @@ namespace Dune {
         ColumnVector<Matrix> columnVector(Matrix &matrix, int col)
         { return ColumnVector(matrix,col); }
 
-        template< class Matrix >
+        template< class Matrix>
         class LeastSquares {
             public:
                 typedef typename Matrix::size_type Size;
 
+//                template < class Field >
                 LeastSquares(const Matrix &llsMatrix, const Matrix &constraintMatrix)
                 : llsMatrix_(llsMatrix), constraintMatrix_(constraintMatrix),
                   systemMatrixInv_(matrixSetUp())
@@ -44,20 +46,28 @@ namespace Dune {
                 void solve(const Vector &b, const Vector &d, Solution &solution){
                     assert( b.size() == llsMatrix_.rows() );
                     assert( solution.size() == llsMatrix_.cols() );
-                    assert( d.size() == constraintMatrix_.rows() );
 
-                    Vector systemVector = vectorSetUp(b,d);
+                    Vector systemMultiply;
 
-                    Size systemMatrixDim = systemMatrixInv_.rows();
+                    if ( constraintMatrix_.size() == 0 ){
+                        systemMultiply.resize(llsMatrix_.cols());
+                        systemMatrixInv_.mv(b,systemMultiply);
+                    }
+                    else {
+                        assert(d.size() == constraintMatrix_.rows());
 
-                    // since systemMatrix square, rows = cols
-                    Vector systemMultiply(systemMatrixDim, 0);
+                        Vector systemVector = vectorSetUp(b, d);
 
-                    for ( Size i = 0; i < systemMatrixDim; ++i)
-                        for (Size j = 0; j < systemMatrixDim; ++j)
-                            systemMultiply[i] += systemMatrixInv_[i][j] * systemVector[j];
+                        Size systemMatrixDim = systemMatrixInv_.rows();
 
-                    for ( Size i = 0; i < solution.size(); ++i)
+                        // since systemMatrix square, rows = cols
+                        systemMultiply.resize(systemMatrixDim,0);
+
+                        for (Size i = 0; i < systemMatrixDim; ++i)
+                            for (Size j = 0; j < systemMatrixDim; ++j)
+                                systemMultiply[i] += systemMatrixInv_[i][j] * systemVector[j];
+                    }
+                    for (Size i = 0; i < solution.size(); ++i)
                         solution[i] = systemMultiply[i];
                 }
 
@@ -104,53 +114,72 @@ namespace Dune {
                 const Matrix &constraintMatrix_;
                 const Matrix systemMatrixInv_;
 
+//                template <class Field>
                 Matrix matrixSetUp()
                 {
-                    // construct the matrix [2A^T*A C^T ; C 0] needed for least squares solution
-                    Matrix systemMatrix;
+                    if ( constraintMatrix_.size() == 0) {
+                        // this needs changing
+                        LeftPseudoInverse< double > pseudoInverse( llsMatrix_.cols() );
 
-                    // check dimensions compatible
-                    assert( llsMatrix_.cols() == constraintMatrix_.cols() );
-                    assert( ( llsMatrix_.rows() + constraintMatrix_.rows() >= constraintMatrix_.cols() )
-                    && constraintMatrix_.rows() <= constraintMatrix_.cols() );
+                        // no constraints in this case and so form pseudo inverse
+                        std::cout << "Matrix C has no size" << std::endl;
 
-                    systemMatrix.resize( (llsMatrix_.cols() + constraintMatrix_.rows()), (llsMatrix_.cols() + constraintMatrix_.rows() ), 0 );
+                        Matrix llsMatrixPseudoInv;
+                        llsMatrixPseudoInv.resize( llsMatrix_.cols(), llsMatrix_.rows() );
 
-                    std::cout << "System matrix: " << std::endl;
-                    printMatrix(systemMatrix);
+                        pseudoInverse( llsMatrix_, llsMatrixPseudoInv);
 
-                    // fill up system matrix
-                    for ( Size i = 0; i < systemMatrix.rows(); ++i) {
-                        if (i < llsMatrix_.cols() ) {
-                            for (Size j = 0; j < systemMatrix.cols(); ++j){
-                                if (j < llsMatrix_.cols() ) {
-                                    // fill upper left
-                                    for (Size k = 0; k < llsMatrix_.rows(); ++k)
-                                        systemMatrix[ i ][ j ] += 2 * llsMatrix_[k][i] * llsMatrix_[k][j];
+                        std::cout << "pseudo Inv of A " << std::endl;
+                        printMatrix(llsMatrixPseudoInv);
+
+                        return llsMatrixPseudoInv;
+                    }
+                    else {
+                        // construct the matrix [2A^T*A C^T ; C 0] needed for least squares solution
+                        Matrix systemMatrix;
+
+                        // check dimensions compatible
+                        assert(llsMatrix_.cols() == constraintMatrix_.cols());
+                        assert((llsMatrix_.rows() + constraintMatrix_.rows() >= constraintMatrix_.cols())
+                               && constraintMatrix_.rows() <= constraintMatrix_.cols());
+
+                        systemMatrix.resize((llsMatrix_.cols() + constraintMatrix_.rows()),
+                                            (llsMatrix_.cols() + constraintMatrix_.rows()), 0);
+
+                        std::cout << "System matrix: " << std::endl;
+                        printMatrix(systemMatrix);
+
+                        // fill up system matrix
+                        for (Size i = 0; i < systemMatrix.rows(); ++i) {
+                            if (i < llsMatrix_.cols()) {
+                                for (Size j = 0; j < systemMatrix.cols(); ++j) {
+                                    if (j < llsMatrix_.cols()) {
+                                        // fill upper left
+                                        for (Size k = 0; k < llsMatrix_.rows(); ++k)
+                                            systemMatrix[i][j] += 2 * llsMatrix_[k][i] * llsMatrix_[k][j];
+                                    } else {
+                                        // fill upper right
+                                        systemMatrix[i][j] += constraintMatrix_[j - llsMatrix_.cols()][i];
+                                    }
                                 }
-                                else {
-                                    // fill upper right
-                                    systemMatrix[ i ][ j ] += constraintMatrix_[ j - llsMatrix_.cols() ][ i ];
-                                }
+                            } else {
+                                for (Size j = 0; j < llsMatrix_.cols(); ++j)
+                                    systemMatrix[i][j] += constraintMatrix_[i - llsMatrix_.cols()][j];
                             }
                         }
-                        else {
-                            for (Size j = 0; j < llsMatrix_.cols(); ++j)
-                                systemMatrix[i][j] += constraintMatrix_[i - llsMatrix_.cols() ][j];
-                        }
+
+                        std::cout << "System matrix: " << std::endl;
+                        printMatrix(systemMatrix);
+
+                        assert(llsMatrix_.cols() + 1 < systemMatrix.size());
+
+                        systemMatrix.invert();
+
+                        std::cout << "System matrix invert: " << std::endl;
+                        printMatrix(systemMatrix);
+
+                        return systemMatrix;
                     }
-
-                    std::cout << "System matrix: " << std::endl;
-                    printMatrix(systemMatrix);
-
-                    assert( llsMatrix_.cols()+1 < systemMatrix.size());
-
-                    systemMatrix.invert();
-
-                    std::cout << "System matrix invert: " <<std::endl;
-                    printMatrix(systemMatrix);
-
-                    return systemMatrix;
                 }
 
                 template <class Vector>

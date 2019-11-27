@@ -148,7 +148,7 @@ int main( int argc, char **argv )
 
         valueProj.resize( 3, 2, 0);
         A.resize( 4, matrixDim, 0);
-        C.resize( 2, matrixDim, 1);
+//        C.resize( 2, matrixDim, 1);
 
         // set A equal to identity
         for (unsigned int i = 0; i < matrixDim; ++i)
@@ -161,9 +161,9 @@ int main( int argc, char **argv )
         printMatrix(A);
 
         // initialise the matrix C
-        C[0][1] = 2;
-        C[0][2] = 3;
-        C[1][1] = 3;
+//        C[0][1] = 2;
+//        C[0][2] = 3;
+//        C[1][1] = 3;
 
         std::cout << "Constraint C matrix: " << std::endl;
         printMatrix(C);
