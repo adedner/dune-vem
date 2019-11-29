@@ -22,6 +22,7 @@
 #include <dune/vem/agglomeration/dofmapper.hh>
 #include <dune/vem/misc/compatibility.hh>
 #include <dune/vem/misc/pseudoinverse.hh>
+#include <dune/vem/misc/leastSquares.hh>
 #include <dune/vem/agglomeration/dgspace.hh>
 #include <dune/vem/space/basisfunctionset.hh>
 #include <dune/vem/space/interpolation.hh>
@@ -356,13 +357,13 @@ namespace Dune
 
       // set up matrices used for constructing gradient, value, and edge projections
       // Note: the code is set up with the assumption that the dofs suffice to compute the edge projection
-      DynamicMatrix< DomainFieldType > D, C, Hp, HpGrad, HpHess, HpInv, HpGradInv, HpHessInv;
+      DynamicMatrix< DomainFieldType > D, C, constraintValueProj, Hp, HpGrad, HpHess, HpInv, HpGradInv, HpHessInv;
       DynamicMatrix< DomainType > R; // ,G //!!!
       DynamicMatrix< typename Traits::ScalarBasisFunctionSetType::HessianMatrixType > P;
 
       LeftPseudoInverse< DomainFieldType > pseudoInverse( numShapeFunctions );
 
-      // these are the matrices we need to comput              e
+      // these are the matrices we need to compute
       valueProjections_.resize( agglomeration().size() );
       jacobianProjections_.resize( agglomeration().size() );
       hessianProjections_.resize( agglomeration().size() );
@@ -382,6 +383,7 @@ namespace Dune
         //!!! G.resize( numGradShapeFunctions, numGradShapeFunctions, DomainType(0) );
         R.resize( numGradShapeFunctions, numDofs, DomainType(0) );
         P.resize( numHessShapeFunctions, numDofs, 0);
+        constraintValueProj.resize( numInnerShapeFunctions, numShapeFunctions, 0 );
 
         // iterate over the triangles of this polygon
         for( const ElementSeedType &entitySeed : entitySeeds[ agglomerate ] )
@@ -408,7 +410,9 @@ namespace Dune
                       HpGrad[alpha][beta] += phi[0]*psi[0]*weight;
                     if (alpha<numHessShapeFunctions && beta <numHessShapeFunctions)
                       HpHess[alpha][beta] += phi[0]*psi[0]*weight;
-                  } );
+                    if ( alpha<numInnerShapeFunctions )
+                      constraintValueProj[alpha][beta] += phi[0]*psi[0]*weight;
+                } );
 #if 0 // !!!!
                 if (alpha<numGradShapeFunctions)
                   shapeFunctionSet.jacobianEach( quadrature[ qp ], [ & ] ( std::size_t beta, typename ScalarShapeFunctionSetType::JacobianRangeType psi ) {
@@ -438,18 +442,51 @@ namespace Dune
         // type def for standard vector (to pick up re size for Hessian projection)
         // need to resize Hessian projection
 
-        pseudoInverse( D, valueProjection );
+        printMatrix(D);
+        printMatrix(constraintValueProj);
+
+        // re implementation of the value projection
+        auto leastSquaresMinimizer = LeastSquares( D, constraintValueProj );
+        DynamicVector< DomainFieldType > b( numDofs, 0 ), d( numInnerShapeFunctions, 0 );
+
+        for ( std::size_t beta = 0; beta < numShapeFunctions; ++beta ) {
+            auto colVecValueProjection = ColumnVector( valueProjection, beta );
+            // set up vectors b and d needed for least squares
+            b[ beta ] = 1;
+
+            if( beta > numDofs - numInnerShapeFunctions ){
+                d[ numDofs - beta ] = 1;
+            }
+
+            leastSquaresMinimizer.solve( b, d, colVecValueProjection );
+
+            // re-set vectors b and d
+            d[numDofs - beta ] = 0;
+            b[ beta ] = 0;
+        }
+
+          /////////////////////////////////////////
+          /////////////////////////////////////////
+// !!! Original value projection implementation
+//        pseudoInverse( D, valueProjection );
+          /////////////////////////////////////////
+          /////////////////////////////////////////
 
         if (1 || numInnerShapeFunctions > 0)
         {
           // modify C for inner dofs
           std::size_t alpha=0;
-          for (; alpha<numInnerShapeFunctions; ++alpha)
-            C[alpha][alpha+numDofs-numInnerShapeFunctions] = H0;
-          for (; alpha<numShapeFunctions; ++alpha)
-            for (std::size_t i=0; i<numDofs; ++i)
-              for (std::size_t beta=0; beta<numShapeFunctions; ++beta)
-                C[alpha][i] += Hp[alpha][beta]*valueProjection[beta][i];
+            /////////////////////////////////////////
+            /////////////////////////////////////////
+// !!! Original value projection implementation
+//          for (; alpha<numInnerShapeFunctions; ++alpha)
+//            C[alpha][alpha+numDofs-numInnerShapeFunctions] = H0;
+//          for (; alpha<numShapeFunctions; ++alpha)
+//            for (std::size_t i=0; i<numDofs; ++i)
+//              for (std::size_t beta=0; beta<numShapeFunctions; ++beta)
+//                C[alpha][i] += Hp[alpha][beta]*valueProjection[beta][i];
+            /////////////////////////////////////////
+            /////////////////////////////////////////
 
           HpInv = Hp;
           HpInv.invert();
@@ -516,20 +553,25 @@ namespace Dune
           //   for (std::size_t beta=0; beta<numInnerShapeFunctions; ++beta)
           //     R[alpha][beta+numDofs-numInnerShapeFunctions].axpy(-H0, G[beta][alpha]);
 
+          /////////////////////////////////////////
+          /////////////////////////////////////////
+// !!! Original value projection implementation
           // now compute projection by multiplying with inverse mass matrix
-          for (std::size_t alpha=0; alpha<numShapeFunctions; ++alpha)
-          {
-            for (std::size_t i=0; i<numDofs; ++i)
-            {
-              valueProjection[alpha][i] = 0;
-              for (std::size_t beta=0; beta<numShapeFunctions; ++beta)
-                valueProjection[alpha][i] += HpInv[alpha][beta]*C[beta][i];
-              //!!!!
-              // if (alpha<numGradShapeFunctions)
-                // for (std::size_t beta=0; beta<numGradShapeFunctions; ++beta)
-                  // jacobianProjection[alpha][i].axpy(HpGradInv[alpha][beta],R[beta][i]);
-            }
-          }
+//          for (std::size_t alpha=0; alpha<numShapeFunctions; ++alpha)
+//          {
+//            for (std::size_t i=0; i<numDofs; ++i)
+//            {
+//              valueProjection[alpha][i] = 0;
+//              for (std::size_t beta=0; beta<numShapeFunctions; ++beta)
+//                valueProjection[alpha][i] += HpInv[alpha][beta]*C[beta][i];
+//              //!!!!
+//              // if (alpha<numGradShapeFunctions)
+//                // for (std::size_t beta=0; beta<numGradShapeFunctions; ++beta)
+//                  // jacobianProjection[alpha][i].axpy(HpGradInv[alpha][beta],R[beta][i]);
+//            }
+//          }
+            /////////////////////////////////////////
+            /////////////////////////////////////////
         } // have some inner moments
 
         //////////////////////////////////////////////////////////////////////////

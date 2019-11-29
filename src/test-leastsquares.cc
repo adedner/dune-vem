@@ -3,6 +3,16 @@
 #include <dune/common/dynvector.hh>
 #include <dune/common/dynmatrix.hh>
 
+
+template <class Matrix>
+Matrix emptyMatrix()
+{
+    // return matrix with no size
+    Matrix A;
+//    std::cout << "size of empty matrix " << A.size() << std::endl;
+    return A;
+}
+
 template< class Matrix >
 void printMatrix(const Matrix &A)
 {
@@ -144,6 +154,9 @@ int main( int argc, char **argv )
         Dune::DynamicMatrix< double > valueProj;
         Dune::DynamicVector< double > exactSoln(3,0);
 
+
+        std::cout << "Sie of C " << C.size() << std::endl;
+
         const int matrixDim = 3;
 
         valueProj.resize( 3, 2, 0);
@@ -196,7 +209,7 @@ int main( int argc, char **argv )
         std::cout << "Vector exact solution: " << std::endl;
         printVector(exactSoln);
 
-        auto leastSquaresMinimizer = Dune::Vem::LeastSquares(A,C);
+        auto leastSquaresMinimizer = Dune::Vem::LeastSquares(A);
 
         std::cout << "I reached here" << std::endl;
 

@@ -8,8 +8,6 @@
 
 #include <assert.h>
 
-//using namespace std;
-
 namespace Dune {
 
     namespace Vem {
@@ -37,7 +35,11 @@ namespace Dune {
 //                template < class Field >
                 LeastSquares(const Matrix &llsMatrix, const Matrix &constraintMatrix)
                 : llsMatrix_(llsMatrix), constraintMatrix_(constraintMatrix),
-                  systemMatrixInv_(matrixSetUp())
+                  systemMatrixInv_(matrixSetUp(llsMatrix_, constraintMatrix_))
+                {
+                }
+                LeastSquares(const Matrix &llsMatrix)
+                : llsMatrix_(llsMatrix), constraintMatrix_(emptyMatrix()), systemMatrixInv_(matrixSetUp(llsMatrix_))
                 {
                 }
                 LeastSquares(const LeastSquares &source) = delete;
@@ -49,11 +51,14 @@ namespace Dune {
 
                     Vector systemMultiply;
 
-                    if ( constraintMatrix_.size() == 0 ){
+                    std::cout << constraintMatrix_.size() <<  "is empty" << isEmpty(constraintMatrix_) << std::endl;
+
+                    if ( isEmpty(constraintMatrix_) ){
                         systemMultiply.resize(llsMatrix_.cols());
                         systemMatrixInv_.mv(b,systemMultiply);
                     }
                     else {
+                        std::cout << "constraint rows" << constraintMatrix_.rows() << std::endl;
                         assert(d.size() == constraintMatrix_.rows());
 
                         Vector systemVector = vectorSetUp(b, d);
@@ -111,28 +116,49 @@ namespace Dune {
 
             private:
                 const Matrix &llsMatrix_;
-                const Matrix &constraintMatrix_;
+                const Matrix constraintMatrix_;
                 const Matrix systemMatrixInv_;
 
-//                template <class Field>
-                Matrix matrixSetUp()
+                Matrix emptyMatrix()
                 {
-                    if ( constraintMatrix_.size() == 0) {
-                        // this needs changing
-                        LeftPseudoInverse< double > pseudoInverse( llsMatrix_.cols() );
+                    // return matrix with no size
+                    Matrix A;
+                    std::cout << "size of empty matrix " << A.size() << std::endl;
+                    return A;
+                }
 
-                        // no constraints in this case and so form pseudo inverse
-                        std::cout << "Matrix C has no size" << std::endl;
+                bool isEmpty(const Matrix &A)
+                {
+                    if ( A.size() == 0 ) {
+                        return true;
+                    }
+                    return false;
+                }
 
-                        Matrix llsMatrixPseudoInv;
-                        llsMatrixPseudoInv.resize( llsMatrix_.cols(), llsMatrix_.rows() );
+//                template <class Field>
+                Matrix matrixSetUp(const Matrix &llsMatrix_)
+                {
+                    // !!! this needs changing
+                    LeftPseudoInverse< double > pseudoInverse( llsMatrix_.cols() );
+//                    LeftPseudoInverse< Field > pseudoInverse( llsMatrix_.cols() );
 
-                        pseudoInverse( llsMatrix_, llsMatrixPseudoInv);
+                    // no constraints in this case and so form pseudo inverse
+                    std::cout << "Matrix C has no size" << std::endl;
 
-                        std::cout << "pseudo Inv of A " << std::endl;
-                        printMatrix(llsMatrixPseudoInv);
+                    Matrix llsMatrixPseudoInv;
+                    llsMatrixPseudoInv.resize( llsMatrix_.cols(), llsMatrix_.rows() );
 
-                        return llsMatrixPseudoInv;
+                    pseudoInverse( llsMatrix_, llsMatrixPseudoInv);
+
+                    std::cout << "pseudo Inv of A " << std::endl;
+                    printMatrix(llsMatrixPseudoInv);
+                    return llsMatrixPseudoInv;
+                }
+
+                Matrix matrixSetUp(const Matrix &llsMatrix_, const Matrix &constraintMatrix_)
+                {
+                    if ( isEmpty(constraintMatrix_) ) {
+                        return matrixSetUp(llsMatrix_);
                     }
                     else {
                         // construct the matrix [2A^T*A C^T ; C 0] needed for least squares solution
@@ -210,9 +236,13 @@ namespace Dune {
 
         };
 
-    template <class Matrix>
+        template <class Matrix>
         LeastSquares<Matrix> leastSquares(const Matrix &llsMatrix, const Matrix &constraintMatrix)
         { return LeastSquares<Matrix>(llsMatrix,constraintMatrix); }
+
+        template <class Matrix>
+        LeastSquares<Matrix> leastSquares(const Matrix &llsMatrix)
+        { return LeastSquares<Matrix>(llsMatrix); }
     } // namespace Vem
 } // namespace Dune
 
