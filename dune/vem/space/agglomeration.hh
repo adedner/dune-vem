@@ -279,8 +279,15 @@ namespace Dune
       {
         ColumnVector(Matrix &matrix, int col)
         : matrix_(matrix), col_(col) {}
-        int size() const { return matrix_.rows(); }
-        typename Matrix::value_type& operator[](int i) {return matrix_[i][col_];}
+        int size() const { return matrix_.size(); }
+        // typename Matrix::value_type& operator[](int i) {return matrix_[i][col_];}
+        template <class Vector>
+        ColumnVector &operator=(const Vector &v)
+        {
+          assert( v.size() == size() );
+          for (std::size_t i=0;i<size();++i)
+            matrix_[i][col_] = v[i];
+        }
         Matrix &matrix_;
         int col_;
       };
@@ -433,35 +440,37 @@ namespace Dune
         auto &valueProjection    = valueProjections_[ agglomerate ];
         auto &jacobianProjection = jacobianProjections_[ agglomerate ];
         auto &hessianProjection = hessianProjections_[ agglomerate ];
+        valueProjection.resize( numShapeFunctions );
         jacobianProjection.resize( numShapeFunctions );
         hessianProjection.resize( numShapeFunctions );
         for( std::size_t alpha = 0; alpha < numShapeFunctions; ++alpha ){
+          valueProjection[ alpha ].resize( numDofs, 0 );
           jacobianProjection[ alpha ].resize( numDofs, DomainType( 0 ) );
           hessianProjection[ alpha ].resize( numDofs, 0 ); // typename hessianProjection[alpha]::value_type( 0 ) );
         }
         // type def for standard vector (to pick up re size for Hessian projection)
         // need to resize Hessian projection
 
-        printMatrix(D);
-        printMatrix(constraintValueProj);
+        // printMatrix(D);
+        // printMatrix(constraintValueProj);
 
         // re implementation of the value projection
         auto leastSquaresMinimizer = LeastSquares( D, constraintValueProj );
         DynamicVector< DomainFieldType > b( numDofs, 0 ), d( numInnerShapeFunctions, 0 );
 
-        for ( std::size_t beta = 0; beta < numShapeFunctions; ++beta ) {
+        for ( std::size_t beta = 0; beta < numDofs; ++beta ) {
             auto colVecValueProjection = ColumnVector( valueProjection, beta );
             // set up vectors b and d needed for least squares
             b[ beta ] = 1;
 
-            if( beta > numDofs - numInnerShapeFunctions ){
-                d[ numDofs - beta ] = 1;
+            if( beta >= numDofs - numInnerShapeFunctions ){
+                d[ beta - numDofs + numInnerShapeFunctions] = 1;
             }
 
-            leastSquaresMinimizer.solve( b, d, colVecValueProjection );
+            colVecValueProjection = leastSquaresMinimizer.solve( b, d );
 
             // re-set vectors b and d
-            d[numDofs - beta ] = 0;
+            d[ beta - numDofs + numInnerShapeFunctions] = 0;
             b[ beta ] = 0;
         }
 

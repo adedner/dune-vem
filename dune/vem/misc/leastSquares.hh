@@ -12,25 +12,11 @@ namespace Dune {
 
     namespace Vem {
 
-        template <class Matrix>
-        struct ColumnVector
-        {
-            ColumnVector(Matrix &matrix, int col)
-                    : matrix_(matrix), col_(col) {}
-            int size() const { return matrix_.rows(); }
-            typename Matrix::value_type& operator[](int i) {return matrix_[i][col_];}
-            Matrix &matrix_;
-            int col_;
-        };
-
-        template <class Matrix>
-        ColumnVector<Matrix> columnVector(Matrix &matrix, int col)
-        { return ColumnVector(matrix,col); }
-
         template< class Matrix>
         class LeastSquares {
             public:
                 typedef typename Matrix::size_type Size;
+                typedef typename Matrix::value_type Field;
 
 //                template < class Field >
                 LeastSquares(const Matrix &llsMatrix, const Matrix &constraintMatrix)
@@ -44,11 +30,9 @@ namespace Dune {
                 }
                 LeastSquares(const LeastSquares &source) = delete;
 
-                template <class Vector, class Solution>
-                void solve(const Vector &b, const Vector &d, Solution &solution){
+                template <class Vector>
+                Vector solve(const Vector &b, const Vector &d){
                     assert( b.size() == llsMatrix_.rows() );
-                    assert( solution.size() == llsMatrix_.cols() );
-
                     Vector systemMultiply;
 
                     std::cout << constraintMatrix_.size() <<  "is empty" << isEmpty(constraintMatrix_) << std::endl;
@@ -72,15 +56,7 @@ namespace Dune {
                             for (Size j = 0; j < systemMatrixDim; ++j)
                                 systemMultiply[i] += systemMatrixInv_[i][j] * systemVector[j];
                     }
-                    for (Size i = 0; i < solution.size(); ++i)
-                        solution[i] = systemMultiply[i];
-                }
-
-                template <class Vector>
-                Vector solve(const Vector &b, const Vector &d ){
-                    Vector solution(llsMatrix_.cols());
-                    solve(b,d,solution);
-                    return solution;
+                    return systemMultiply;
                 }
 
                 template <class Vector>
@@ -97,6 +73,7 @@ namespace Dune {
 
                 void printMatrix(const Matrix &A)
                 {
+                  return;
                     for(unsigned int i = 0; i < A.rows(); ++i) {
                         for (unsigned int j = 0; j < A.cols(); ++j) {
                             std::cout << A[i][j];
@@ -108,6 +85,7 @@ namespace Dune {
                 template< class Vector>
                 void printVector(const Vector &x)
                 {
+                  return;
                     for(unsigned int i = 0; i < x.size(); ++i)
                         std::cout << x[i] << std::endl;
                 }
@@ -129,24 +107,20 @@ namespace Dune {
 
                 bool isEmpty(const Matrix &A)
                 {
-                    if ( A.size() == 0 ) {
-                        return true;
-                    }
-                    return false;
+                    return ( A.size() == 0 );
                 }
 
 //                template <class Field>
                 Matrix matrixSetUp(const Matrix &llsMatrix_)
                 {
                     // !!! this needs changing
-                    LeftPseudoInverse< double > pseudoInverse( llsMatrix_.cols() );
+                    LeftPseudoInverse< Field > pseudoInverse( llsMatrix_.cols() );
 //                    LeftPseudoInverse< Field > pseudoInverse( llsMatrix_.cols() );
 
                     // no constraints in this case and so form pseudo inverse
                     std::cout << "Matrix C has no size" << std::endl;
 
-                    Matrix llsMatrixPseudoInv;
-                    llsMatrixPseudoInv.resize( llsMatrix_.cols(), llsMatrix_.rows() );
+                    Matrix llsMatrixPseudoInv( llsMatrix_.cols(), llsMatrix_.rows() );
 
                     pseudoInverse( llsMatrix_, llsMatrixPseudoInv);
 
