@@ -442,9 +442,6 @@ namespace Dune
         // type def for standard vector (to pick up re size for Hessian projection)
         // need to resize Hessian projection
 
-        printMatrix(D);
-        printMatrix(constraintValueProj);
-
         // re implementation of the value projection
         auto leastSquaresMinimizer = LeastSquares( D, constraintValueProj );
         DynamicVector< DomainFieldType > b( numDofs, 0 ), d( numInnerShapeFunctions, 0 );
@@ -461,7 +458,7 @@ namespace Dune
             leastSquaresMinimizer.solve( b, d, colVecValueProjection );
 
             // re-set vectors b and d
-            d[numDofs - beta ] = 0;
+            d[ numDofs - beta ] = 0;
             b[ beta ] = 0;
         }
 
@@ -478,7 +475,7 @@ namespace Dune
           std::size_t alpha=0;
             /////////////////////////////////////////
             /////////////////////////////////////////
-// !!! Original value projection implementation
+//// !!! Original value projection implementation
 //          for (; alpha<numInnerShapeFunctions; ++alpha)
 //            C[alpha][alpha+numDofs-numInnerShapeFunctions] = H0;
 //          for (; alpha<numShapeFunctions; ++alpha)
@@ -555,8 +552,8 @@ namespace Dune
 
           /////////////////////////////////////////
           /////////////////////////////////////////
-// !!! Original value projection implementation
-          // now compute projection by multiplying with inverse mass matrix
+//// !!! Original value projection implementation
+//          // now compute projection by multiplying with inverse mass matrix
 //          for (std::size_t alpha=0; alpha<numShapeFunctions; ++alpha)
 //          {
 //            for (std::size_t i=0; i<numDofs; ++i)

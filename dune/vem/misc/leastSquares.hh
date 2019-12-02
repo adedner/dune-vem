@@ -51,14 +51,14 @@ namespace Dune {
 
                     Vector systemMultiply;
 
-                    std::cout << constraintMatrix_.size() <<  "is empty" << isEmpty(constraintMatrix_) << std::endl;
+//                    std::cout << constraintMatrix_.size() <<  "is empty" << isEmpty(constraintMatrix_) << std::endl;
 
                     if ( isEmpty(constraintMatrix_) ){
                         systemMultiply.resize(llsMatrix_.cols());
                         systemMatrixInv_.mv(b,systemMultiply);
                     }
                     else {
-                        std::cout << "constraint rows" << constraintMatrix_.rows() << std::endl;
+//                        std::cout << "constraint rows" << constraintMatrix_.rows() << std::endl;
                         assert(d.size() == constraintMatrix_.rows());
 
                         Vector systemVector = vectorSetUp(b, d);
@@ -123,7 +123,7 @@ namespace Dune {
                 {
                     // return matrix with no size
                     Matrix A;
-                    std::cout << "size of empty matrix " << A.size() << std::endl;
+//                    std::cout << "size of empty matrix " << A.size() << std::endl;
                     return A;
                 }
 
@@ -143,15 +143,15 @@ namespace Dune {
 //                    LeftPseudoInverse< Field > pseudoInverse( llsMatrix_.cols() );
 
                     // no constraints in this case and so form pseudo inverse
-                    std::cout << "Matrix C has no size" << std::endl;
+//                    std::cout << "Matrix C has no size" << std::endl;
 
                     Matrix llsMatrixPseudoInv;
                     llsMatrixPseudoInv.resize( llsMatrix_.cols(), llsMatrix_.rows() );
 
                     pseudoInverse( llsMatrix_, llsMatrixPseudoInv);
 
-                    std::cout << "pseudo Inv of A " << std::endl;
-                    printMatrix(llsMatrixPseudoInv);
+//                    std::cout << "pseudo Inv of A " << std::endl;
+//                    printMatrix(llsMatrixPseudoInv);
                     return llsMatrixPseudoInv;
                 }
 
@@ -172,8 +172,8 @@ namespace Dune {
                         systemMatrix.resize((llsMatrix_.cols() + constraintMatrix_.rows()),
                                             (llsMatrix_.cols() + constraintMatrix_.rows()), 0);
 
-                        std::cout << "System matrix: " << std::endl;
-                        printMatrix(systemMatrix);
+//                        std::cout << "System matrix: " << std::endl;
+//                        printMatrix(systemMatrix);
 
                         // fill up system matrix
                         for (Size i = 0; i < systemMatrix.rows(); ++i) {
@@ -194,15 +194,15 @@ namespace Dune {
                             }
                         }
 
-                        std::cout << "System matrix: " << std::endl;
-                        printMatrix(systemMatrix);
+//                        std::cout << "System matrix: " << std::endl;
+//                        printMatrix(systemMatrix);
 
                         assert(llsMatrix_.cols() + 1 < systemMatrix.size());
 
                         systemMatrix.invert();
 
-                        std::cout << "System matrix invert: " << std::endl;
-                        printMatrix(systemMatrix);
+//                        std::cout << "System matrix invert: " << std::endl;
+//                        printMatrix(systemMatrix);
 
                         return systemMatrix;
                     }
@@ -228,8 +228,8 @@ namespace Dune {
                         }
                     }
 
-                    std::cout << "System Vector: " << std::endl;
-                    printVector(systemVector);
+//                    std::cout << "System Vector: " << std::endl;
+//                    printVector(systemVector);
 
                     return systemVector;
                 }
