@@ -19,7 +19,6 @@ dune_project()
 
 add_subdirectory("src")
 add_subdirectory("dune")
-add_subdirectory("doc")
 add_subdirectory("cmake/modules")
 add_subdirectory("lib")
 
