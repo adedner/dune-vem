@@ -358,34 +358,39 @@ namespace Dune
                 size(std::max(polOrder-2,0));
 #endif
       std::cout << "size of spaces: "
+                << numInnerShapeFunctions << " "
                 << numShapeFunctions << " "
                 << numGradShapeFunctions << " "
                 << numHessShapeFunctions << std::endl;
 
-      // set up matrices used for constructing gradient, value, and edge projections
-      // Note: the code is set up with the assumption that the dofs suffice to compute the edge projection
-      DynamicMatrix< DomainFieldType > D, C, constraintValueProj, Hp, HpGrad, HpHess, HpInv, HpGradInv, HpHessInv;
-      DynamicMatrix< DomainType > R; // ,G //!!!
-      DynamicMatrix< typename Traits::ScalarBasisFunctionSetType::HessianMatrixType > P;
 
-      LeftPseudoInverse< DomainFieldType > pseudoInverse( numShapeFunctions );
+        // set up matrices used for constructing gradient, value, and edge projections
+        // Note: the code is set up with the assumption that the dofs suffice to compute the edge projection
+        DynamicMatrix< DomainFieldType > D, C, constraintValueProj, Hp, HpGrad, HpHess, HpInv, HpGradInv, HpHessInv;
+        DynamicMatrix< DomainType > R; // ,G //!!!
+        DynamicMatrix< typename Traits::ScalarBasisFunctionSetType::HessianMatrixType > P;
 
-      // these are the matrices we need to compute
-      valueProjections_.resize( agglomeration().size() );
-      jacobianProjections_.resize( agglomeration().size() );
-      hessianProjections_.resize( agglomeration().size() );
-      stabilizations_.resize( agglomeration().size() );
+        LeftPseudoInverse< DomainFieldType > pseudoInverse( numShapeFunctions );
 
-      // start iteration over all polygons
-      for( std::size_t agglomerate = 0; agglomerate < agglomeration().size(); ++agglomerate )
+        // these are the matrices we need to compute
+        valueProjections_.resize( agglomeration().size() );
+        jacobianProjections_.resize( agglomeration().size() );
+        hessianProjections_.resize( agglomeration().size() );
+        stabilizations_.resize( agglomeration().size() );
+
+        // start iteration over all polygons
+        for( std::size_t agglomerate = 0; agglomerate < agglomeration().size(); ++agglomerate )
       {
-        const auto &bbox = blockMapper_.indexSet().boundingBox(agglomerate);
-        const std::size_t numDofs = blockMapper().numDofs( agglomerate );
+          const auto &bbox = blockMapper_.indexSet().boundingBox(agglomerate);
+          const std::size_t numDofs = blockMapper().numDofs( agglomerate );
 
-        D.resize( numDofs, numShapeFunctions, 0 );
-        C.resize( numShapeFunctions, numDofs, 0 );
-        Hp.resize( numShapeFunctions, numShapeFunctions, 0 );
-        HpGrad.resize( numGradShapeFunctions, numGradShapeFunctions, 0 );
+          std::cout << "Num dofs: "
+                  << numDofs << std::endl;
+
+          D.resize( numDofs, numShapeFunctions, 0 );
+          C.resize( numShapeFunctions, numDofs, 0 );
+          Hp.resize( numShapeFunctions, numShapeFunctions, 0 );
+          HpGrad.resize( numGradShapeFunctions, numGradShapeFunctions, 0 );
         HpHess.resize( numHessShapeFunctions, numHessShapeFunctions, 0);
         //!!! G.resize( numGradShapeFunctions, numGradShapeFunctions, DomainType(0) );
         R.resize( numGradShapeFunctions, numDofs, DomainType(0) );
@@ -456,6 +461,7 @@ namespace Dune
         DynamicVector< DomainFieldType > b( numDofs, 0 ), d( numInnerShapeFunctions, 0 );
 
         for ( std::size_t beta = 0; beta < numDofs; ++beta ) {
+
             auto colVecValueProjection = ColumnVector( valueProjection, beta );
             // set up vectors b and d needed for least squares
             b[ beta ] = 1;

@@ -12,6 +12,30 @@ namespace Dune {
 
     namespace Vem {
 
+        template <class Matrix>
+        struct ColumnVector
+        {
+            ColumnVector(Matrix &matrix, int col)
+                    : matrix_(matrix), col_(col) {}
+            int size() const { return matrix_.rows(); }
+            // typename Matrix::value_type& operator[](int i) {return matrix_[i][col_];}
+            template <class Vector>
+            ColumnVector &operator=(const Vector &v)
+            {
+                std::cout << "v size: " << v.size()
+                          <<  " size: "  << size() << std::endl;
+
+                assert( v.size() == size() );
+                for ( std::size_t i = 0; i < size(); ++i)
+                    matrix_[i][col_] = v[i];
+            }
+            Matrix &matrix_;
+            int col_;
+        };
+        template <class Matrix>
+        ColumnVector<Matrix> columnVector(Matrix &matrix, int col)
+        { return ColumnVector(matrix,col); }
+
         template< class Matrix>
         class LeastSquares {
             public:
@@ -33,7 +57,7 @@ namespace Dune {
                 template <class Vector>
                 Vector solve(const Vector &b, const Vector &d){
                     assert( b.size() == llsMatrix_.rows() );
-                    Vector systemMultiply;
+                    Vector systemMultiply, systemLagrange;
 
 //                    std::cout << constraintMatrix_.size() <<  "is empty" << isEmpty(constraintMatrix_) << std::endl;
 
@@ -50,11 +74,16 @@ namespace Dune {
                         Size systemMatrixDim = systemMatrixInv_.rows();
 
                         // since systemMatrix square, rows = cols
-                        systemMultiply.resize(systemMatrixDim,0);
+                        systemLagrange.resize(systemMatrixDim,0);
 
                         for (Size i = 0; i < systemMatrixDim; ++i)
                             for (Size j = 0; j < systemMatrixDim; ++j)
-                                systemMultiply[i] += systemMatrixInv_[i][j] * systemVector[j];
+                                systemLagrange[i] += systemMatrixInv_[i][j] * systemVector[j];
+
+                        systemMultiply.resize(llsMatrix_.cols(),0);
+                        // get rid of Lagrange multipliers
+                        for( Size i = 0; i < systemMultiply.size(); ++i)
+                            systemMultiply[i] = systemLagrange[i];
                     }
                     return systemMultiply;
                 }

@@ -106,12 +106,15 @@ int main( int argc, char **argv )
         printVector(exactSoln);
 
         auto leastSquaresMinimizer = Dune::Vem::LeastSquares(A,C);
+        Dune::DynamicVector< double > solutionVector;
+
 
         for( unsigned int i = 0; i < valueProj.cols(); ++i){
-            auto colVecAdjustment = Dune::Vem::ColumnVector(valueProj,i);
+            auto columnValueProj = Dune::Vem::ColumnVector(valueProj,i);
 
-//        Dune::Vem::ColumnVector<Dune::DynamicMatrix<double>> columnVectorVP(valueProj,i);
-            leastSquaresMinimizer.solve(b,d,colVecAdjustment);
+            solutionVector = leastSquaresMinimizer.solve(b,d);
+            printVector(solutionVector);
+            columnValueProj = (solutionVector);
         }
 
         std::cout << "value projection " << std::endl;
@@ -217,7 +220,7 @@ int main( int argc, char **argv )
             auto colVecAdjustment = Dune::Vem::ColumnVector(valueProj,i);
 
 //        Dune::Vem::ColumnVector<Dune::DynamicMatrix<double>> columnVectorVP(valueProj,i);
-            leastSquaresMinimizer.solve(b,d,colVecAdjustment);
+            leastSquaresMinimizer.solve(b,d);
         }
 
         std::cout << "value projection " << std::endl;
@@ -330,7 +333,7 @@ int main( int argc, char **argv )
 
 //        Dune::Vem::ColumnVector<Dune::DynamicMatrix<double>> columnVectorVP(valueProj,i);
 
-            leastSquaresMinimizer.solve(b,d,colVecAdjustment);
+            leastSquaresMinimizer.solve(b,d);
         }
 
         std::cout << "value projection " << std::endl;
