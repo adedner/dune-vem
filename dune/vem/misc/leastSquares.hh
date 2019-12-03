@@ -12,29 +12,29 @@ namespace Dune {
 
     namespace Vem {
 
-        template <class Matrix>
-        struct ColumnVector
-        {
-            ColumnVector(Matrix &matrix, int col)
-                    : matrix_(matrix), col_(col) {}
-            int size() const { return matrix_.rows(); }
-            // typename Matrix::value_type& operator[](int i) {return matrix_[i][col_];}
-            template <class Vector>
-            ColumnVector &operator=(const Vector &v)
-            {
-                std::cout << "v size: " << v.size()
-                          <<  " size: "  << size() << std::endl;
-
-                assert( v.size() == size() );
-                for ( std::size_t i = 0; i < size(); ++i)
-                    matrix_[i][col_] = v[i];
-            }
-            Matrix &matrix_;
-            int col_;
-        };
-        template <class Matrix>
-        ColumnVector<Matrix> columnVector(Matrix &matrix, int col)
-        { return ColumnVector(matrix,col); }
+//        template <class Matrix>
+//        struct ColumnVector
+//        {
+//            ColumnVector(Matrix &matrix, int col)
+//                    : matrix_(matrix), col_(col) {}
+//            int size() const { return matrix_.rows(); }
+//            // typename Matrix::value_type& operator[](int i) {return matrix_[i][col_];}
+//            template <class Vector>
+//            ColumnVector &operator=(const Vector &v)
+//            {
+//                std::cout << "v size: " << v.size()
+//                          <<  " size: "  << size() << std::endl;
+//
+//                assert( v.size() == size() );
+//                for ( std::size_t i = 0; i < size(); ++i)
+//                    matrix_[i][col_] = v[i];
+//            }
+//            Matrix &matrix_;
+//            int col_;
+//        };
+//        template <class Matrix>
+//        ColumnVector<Matrix> columnVector(Matrix &matrix, int col)
+//        { return ColumnVector(matrix,col); }
 
         template< class Matrix>
         class LeastSquares {

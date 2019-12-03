@@ -285,7 +285,7 @@ namespace Dune
         ColumnVector &operator=(const Vector &v)
         {
           assert( v.size() == size() );
-          for (std::size_t i=0;i<size();++i)
+          for ( std::size_t i=0; i < size(); ++i)
             matrix_[i][col_] = v[i];
         }
         Matrix &matrix_;
@@ -295,6 +295,26 @@ namespace Dune
       ColumnVector<Matrix> columnVector(Matrix &matrix, int col)
       { return ColumnVector(matrix,col); }
       // L.solve(d,b,columnVector(valueProjection,beta));
+
+
+      template< class Matrix >
+       void printMatrix(const Matrix &A)
+       {
+           for(unsigned int i = 0; i < A.rows(); ++i) {
+               for (unsigned int j = 0; j < A.cols(); ++j) {
+                   std::cout << A[i][j] << " ";
+               }
+               std::cout << std::endl;
+           }
+       }
+
+       template< class Vector>
+       void printVector(const Vector &x)
+       {
+         for(unsigned int i = 0; i < x.size(); ++i)
+           std::cout << x[i] << std::endl;
+       }
+
       void buildProjections ();
 
       // issue with making these const: use of delete default constructor in some python bindings...
@@ -453,16 +473,31 @@ namespace Dune
           jacobianProjection[ alpha ].resize( numDofs, DomainType( 0 ) );
           hessianProjection[ alpha ].resize( numDofs, 0 ); // typename hessianProjection[alpha]::value_type( 0 ) );
         }
+//        valueProjection.resize( numDofs );
+//        for( std::size_t beta = 0; beta < numDofs; ++beta)
+//            valueProjection[ beta ].resize( numShapeFunctions, 0);
+
         // type def for standard vector (to pick up re size for Hessian projection)
         // need to resize Hessian projection
 
         // re implementation of the value projection
         auto leastSquaresMinimizer = LeastSquares( D, constraintValueProj );
-        DynamicVector< DomainFieldType > b( numDofs, 0 ), d( numInnerShapeFunctions, 0 );
+        std::vector< DomainFieldType > b( numDofs, 0 ), d( numInnerShapeFunctions, 0 );
+//        DynamicVector< DomainFieldType > solutionVector;
 
+        std::cout << "D: " << std::endl;
+        printMatrix(D);
+
+        std::cout << "constraints: " << std::endl;
+        printMatrix(constraintValueProj);
+
+        std::cout << "Hp: " << std::endl;
+        printMatrix(Hp);
+
+        std::cout << "I reached here" << std::endl;
         for ( std::size_t beta = 0; beta < numDofs; ++beta ) {
 
-            auto colVecValueProjection = ColumnVector( valueProjection, beta );
+            auto colValueProjection = ColumnVector( valueProjection, beta );
             // set up vectors b and d needed for least squares
             b[ beta ] = 1;
 
@@ -470,13 +505,32 @@ namespace Dune
                 d[ beta - numDofs + numInnerShapeFunctions] = 1;
             }
 
-            colVecValueProjection = leastSquaresMinimizer.solve( b, d );
+            std::cout << "b: " << std::endl;
+            printVector(b);
 
+            std::cout << "d: " << std::endl;
+            printVector(d);
+
+            colValueProjection = leastSquaresMinimizer.solve( b, d );
+
+//            std::cout << "Solution vec " << std::endl;
+//            printVector(solutionVector);
+
+//            colValueProjection = solutionVector;
             // re-set vectors b and d
             d[ beta - numDofs + numInnerShapeFunctions] = 0;
             b[ beta ] = 0;
         }
 
+        std::cout << "Value projection " << std::endl;
+        for (std::size_t alpha=0; alpha<numShapeFunctions; ++alpha) {
+            for (std::size_t i=0; i<numDofs; ++i) {
+                std::cout << valueProjection[alpha][i] << " ";
+            }
+            std::cout << std::endl;
+        }
+
+            std::cout << "I reached here 2" << std::endl;
           /////////////////////////////////////////
           /////////////////////////////////////////
 // !!! Original value projection implementation
@@ -487,7 +541,7 @@ namespace Dune
         if (1 || numInnerShapeFunctions > 0)
         {
           // modify C for inner dofs
-          std::size_t alpha=0;
+//          std::size_t alpha=0;
             /////////////////////////////////////////
             /////////////////////////////////////////
 //// !!! Original value projection implementation

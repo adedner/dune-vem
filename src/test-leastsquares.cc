@@ -112,9 +112,9 @@ int main( int argc, char **argv )
         for( unsigned int i = 0; i < valueProj.cols(); ++i){
             auto columnValueProj = Dune::Vem::ColumnVector(valueProj,i);
 
-            solutionVector = leastSquaresMinimizer.solve(b,d);
-            printVector(solutionVector);
-            columnValueProj = (solutionVector);
+            columnValueProj = leastSquaresMinimizer.solve(b,d);
+//            printVector(solutionVector);
+//            columnValueProj = (solutionVector);
         }
 
         std::cout << "value projection " << std::endl;
