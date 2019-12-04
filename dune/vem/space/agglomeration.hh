@@ -287,13 +287,14 @@ namespace Dune
           assert( v.size() == size() );
           for ( std::size_t i=0; i < size(); ++i)
             matrix_[i][col_] = v[i];
+          return *this;
         }
         Matrix &matrix_;
         int col_;
       };
       template <class Matrix>
       ColumnVector<Matrix> columnVector(Matrix &matrix, int col)
-      { return ColumnVector(matrix,col); }
+      { return ColumnVector<Matrix>(matrix,col); }
       // L.solve(d,b,columnVector(valueProjection,beta));
 
 
@@ -384,33 +385,30 @@ namespace Dune
                 << numHessShapeFunctions << std::endl;
 
 
-        // set up matrices used for constructing gradient, value, and edge projections
-        // Note: the code is set up with the assumption that the dofs suffice to compute the edge projection
-        DynamicMatrix< DomainFieldType > D, C, constraintValueProj, Hp, HpGrad, HpHess, HpInv, HpGradInv, HpHessInv;
-        DynamicMatrix< DomainType > R; // ,G //!!!
-        DynamicMatrix< typename Traits::ScalarBasisFunctionSetType::HessianMatrixType > P;
+      // set up matrices used for constructing gradient, value, and edge projections
+      // Note: the code is set up with the assumption that the dofs suffice to compute the edge projection
+      DynamicMatrix< DomainFieldType > D, C, constraintValueProj, Hp, HpGrad, HpHess, HpInv, HpGradInv, HpHessInv;
+      DynamicMatrix< DomainType > R; // ,G //!!!
+      DynamicMatrix< typename Traits::ScalarBasisFunctionSetType::HessianMatrixType > P;
 
-        LeftPseudoInverse< DomainFieldType > pseudoInverse( numShapeFunctions );
+      LeftPseudoInverse< DomainFieldType > pseudoInverse( numShapeFunctions );
 
-        // these are the matrices we need to compute
-        valueProjections_.resize( agglomeration().size() );
-        jacobianProjections_.resize( agglomeration().size() );
-        hessianProjections_.resize( agglomeration().size() );
-        stabilizations_.resize( agglomeration().size() );
+      // these are the matrices we need to compute
+      valueProjections_.resize( agglomeration().size() );
+      jacobianProjections_.resize( agglomeration().size() );
+      hessianProjections_.resize( agglomeration().size() );
+      stabilizations_.resize( agglomeration().size() );
 
-        // start iteration over all polygons
-        for( std::size_t agglomerate = 0; agglomerate < agglomeration().size(); ++agglomerate )
+      // start iteration over all polygons
+      for( std::size_t agglomerate = 0; agglomerate < agglomeration().size(); ++agglomerate )
       {
-          const auto &bbox = blockMapper_.indexSet().boundingBox(agglomerate);
-          const std::size_t numDofs = blockMapper().numDofs( agglomerate );
+        const auto &bbox = blockMapper_.indexSet().boundingBox(agglomerate);
+        const std::size_t numDofs = blockMapper().numDofs( agglomerate );
 
-          std::cout << "Num dofs: "
-                  << numDofs << std::endl;
-
-          D.resize( numDofs, numShapeFunctions, 0 );
-          C.resize( numShapeFunctions, numDofs, 0 );
-          Hp.resize( numShapeFunctions, numShapeFunctions, 0 );
-          HpGrad.resize( numGradShapeFunctions, numGradShapeFunctions, 0 );
+        D.resize( numDofs, numShapeFunctions, 0 );
+        C.resize( numShapeFunctions, numDofs, 0 );
+        Hp.resize( numShapeFunctions, numShapeFunctions, 0 );
+        HpGrad.resize( numGradShapeFunctions, numGradShapeFunctions, 0 );
         HpHess.resize( numHessShapeFunctions, numHessShapeFunctions, 0);
         //!!! G.resize( numGradShapeFunctions, numGradShapeFunctions, DomainType(0) );
         R.resize( numGradShapeFunctions, numDofs, DomainType(0) );
@@ -481,46 +479,24 @@ namespace Dune
         auto leastSquaresMinimizer = LeastSquares( D, constraintValueProj );
         std::vector< DomainFieldType > b( numDofs, 0 ), d( numInnerShapeFunctions, 0 );
 
-        std::cout << "D: " << std::endl;
-        printMatrix(D);
-
-        std::cout << "constraints: " << std::endl;
-        printMatrix(constraintValueProj);
-
-        std::cout << "Hp: " << std::endl;
-        printMatrix(Hp);
-
-        std::cout << "I reached here" << std::endl;
-        for ( std::size_t beta = 0; beta < numDofs; ++beta ) {
-
-            auto colValueProjection = ColumnVector( valueProjection, beta );
+        for ( std::size_t beta = 0; beta < numDofs; ++beta )
+        {
+            auto colValueProjection = columnVector( valueProjection, beta );
             // set up vectors b and d needed for least squares
             b[ beta ] = 1;
-
-            if( beta >= numDofs - numInnerShapeFunctions ){
-                d[ beta - numDofs + numInnerShapeFunctions] = 1;
-            }
-
-            std::cout << "b: " << std::endl;
-            printVector(b);
-
-            std::cout << "d: " << std::endl;
-            printVector(d);
+            if( beta >= numDofs - numInnerShapeFunctions )
+                d[ beta - numDofs + numInnerShapeFunctions] = H0;
 
             colValueProjection = leastSquaresMinimizer.solve( b, d );
 
-//            std::cout << "Solution vec " << std::endl;
-//            printVector(solutionVector);
-
-//            colValueProjection = solutionVector;
-            // re-set vectors b and d
-            d[ beta - numDofs + numInnerShapeFunctions] = 0;
+            if( beta >= numDofs - numInnerShapeFunctions )
+              d[ beta - numDofs + numInnerShapeFunctions] = 0;
             b[ beta ] = 0;
         }
 
 
 
-            std::cout << "I reached here 2" << std::endl;
+
           /////////////////////////////////////////
           /////////////////////////////////////////
 // !!! Original value projection implementation
