@@ -26,14 +26,14 @@ useGrid = 0 # 0..3
 # Note: suboptimal laplace error for bubble (space is reduced to polorder=3 but could be 4 = ts+2
 methods = [ ### "[space,scheme,spaceKwrags]"
             ["lagrange","galerkin",{}, "Lagrange"],
-            ["vem","vem",{"testSpaces":[ [0],  [order-2], [order-1] ] }, "Bubble"],
-            ["vem","vem",{"testSpaces":[ [0],  [order-2], [order-3] ] }, "Serendipity"],
+            # ["vem","vem",{"testSpaces":[ [0],  [order-2], [order-1] ] }, "Bubble"],
+            # ["vem","vem",{"testSpaces":[ [0],  [order-2], [order-3] ] }, "Serendipity"],
             # ["vem","vem",{"testSpaces":[ [-1], [order-1], [order-3] ] }, "Nc-Serendipity"],
             ["vem","vem",{"conforming":True}, "conforming"],
             ["vem","vem",{"conforming":False}, "non-conforming"],
-            ["vem","vem",{"testSpaces":[ [0],  [order-3,order-2], [order-4] ] }, "C1-non-conforming"],
-            ["vem","vem",{"testSpaces":[ [0],  [order-2,order-2], [order-2] ] }, "C1C0-conforming"],
-            ["bbdg","bbdg",{},"bbdg"],
+            # ["vem","vem",{"testSpaces":[ [0],  [order-3,order-2], [order-4] ] }, "C1-non-conforming"],
+            # ["vem","vem",{"testSpaces":[ [0],  [order-2,order-2], [order-2] ] }, "C1C0-conforming"],
+            # ["bbdg","bbdg",{},"bbdg"],
    ]
 
 uflSpace = dune.ufl.Space(2, dimRange=1)
@@ -91,7 +91,9 @@ for level in range(2,5):
     figPos = 100*figRows+10*figCols+1
     res = []
     for i,m in enumerate(methods):
+        dune.generator.setFlags(flags="-g",noChecks=True)
         space = create.space(m[0], polyGrid, order=order, dimRange=1, storage="istl", **m[2])
+        dune.generator.unsetFlags()
         dfs,errors,info = compute(polyGrid, space, m[1])
         print("method:(",m[0],m[2],")",
               "Size: ",space.size,

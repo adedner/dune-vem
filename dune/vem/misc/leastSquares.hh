@@ -49,7 +49,7 @@ namespace Dune {
                 {
                 }
                 LeastSquares(const Matrix &llsMatrix)
-                : llsMatrix_(llsMatrix), constraintMatrix_(emptyMatrix()), systemMatrixInv_(matrixSetUp(llsMatrix_))
+                : llsMatrix_(llsMatrix), constraintMatrix_(), systemMatrixInv_(matrixSetUp(llsMatrix_))
                 {
                 }
                 LeastSquares(const LeastSquares &source) = delete;
@@ -82,6 +82,7 @@ namespace Dune {
 
                         systemMultiply.resize(llsMatrix_.cols(),0);
                         // get rid of Lagrange multipliers
+                        // TODO? avoid copy by cutting of in operator= of ColVec
                         for( Size i = 0; i < systemMultiply.size(); ++i)
                             systemMultiply[i] = systemLagrange[i];
                     }
@@ -123,16 +124,9 @@ namespace Dune {
 
             private:
                 const Matrix &llsMatrix_;
+                // TODO: avoid copy of constraintMatrix in constructor
                 const Matrix constraintMatrix_;
                 const Matrix systemMatrixInv_;
-
-                Matrix emptyMatrix()
-                {
-                    // return matrix with no size
-                    Matrix A;
-//                    std::cout << "size of empty matrix " << A.size() << std::endl;
-                    return A;
-                }
 
                 bool isEmpty(const Matrix &A)
                 {
@@ -158,6 +152,8 @@ namespace Dune {
                     return llsMatrixPseudoInv;
                 }
 
+                // TODO: avoid usage of '_' in parameter name - either use
+                // static method or have no parameters
                 Matrix matrixSetUp(const Matrix &llsMatrix_, const Matrix &constraintMatrix_)
                 {
                     if ( isEmpty(constraintMatrix_) ) {
@@ -200,8 +196,6 @@ namespace Dune {
 //                        std::cout << "System matrix: " << std::endl;
 //                        printMatrix(systemMatrix);
 
-                        assert(llsMatrix_.cols() + 1 < systemMatrix.size());
-
                         systemMatrix.invert();
 
 //                        std::cout << "System matrix invert: " << std::endl;
@@ -223,7 +217,7 @@ namespace Dune {
                     llsMatrix_.usmtv(2,b,y);
 
                     for (Size i = 0; i < systemVector.size(); ++i){
-                        if (i < llsMatrix_.cols() ) {
+                        if (i < y.size() ) {
                             systemVector[i] = y[i];
                         }
                         else {
