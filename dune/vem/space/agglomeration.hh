@@ -473,9 +473,6 @@ namespace Dune
           jacobianProjection[ alpha ].resize( numDofs, DomainType( 0 ) );
           hessianProjection[ alpha ].resize( numDofs, 0 ); // typename hessianProjection[alpha]::value_type( 0 ) );
         }
-//        valueProjection.resize( numDofs );
-//        for( std::size_t beta = 0; beta < numDofs; ++beta)
-//            valueProjection[ beta ].resize( numShapeFunctions, 0);
 
         // type def for standard vector (to pick up re size for Hessian projection)
         // need to resize Hessian projection
@@ -483,7 +480,6 @@ namespace Dune
         // re implementation of the value projection
         auto leastSquaresMinimizer = LeastSquares( D, constraintValueProj );
         std::vector< DomainFieldType > b( numDofs, 0 ), d( numInnerShapeFunctions, 0 );
-//        DynamicVector< DomainFieldType > solutionVector;
 
         std::cout << "D: " << std::endl;
         printMatrix(D);
@@ -522,13 +518,7 @@ namespace Dune
             b[ beta ] = 0;
         }
 
-        std::cout << "Value projection " << std::endl;
-        for (std::size_t alpha=0; alpha<numShapeFunctions; ++alpha) {
-            for (std::size_t i=0; i<numDofs; ++i) {
-                std::cout << valueProjection[alpha][i] << " ";
-            }
-            std::cout << std::endl;
-        }
+
 
             std::cout << "I reached here 2" << std::endl;
           /////////////////////////////////////////
@@ -538,9 +528,17 @@ namespace Dune
           /////////////////////////////////////////
           /////////////////////////////////////////
 
-        if (1 || numInnerShapeFunctions > 0)
+            std::cout << "Value projection " << std::endl;
+            for (std::size_t alpha=0; alpha<numShapeFunctions; ++alpha) {
+                for (std::size_t i=0; i<numDofs; ++i) {
+                    std::cout << valueProjection[alpha][i] << " ";
+                }
+                std::cout << std::endl;
+            }
+
+            if (1 || numInnerShapeFunctions > 0)
         {
-          // modify C for inner dofs
+            // modify C for inner dofs
 //          std::size_t alpha=0;
             /////////////////////////////////////////
             /////////////////////////////////////////
@@ -554,12 +552,12 @@ namespace Dune
             /////////////////////////////////////////
             /////////////////////////////////////////
 
-          HpInv = Hp;
-          HpInv.invert();
-          HpGradInv = HpGrad;
-          HpGradInv.invert();
-          HpHessInv = HpHess;
-          HpHessInv.invert();
+            HpInv = Hp;
+            HpInv.invert();
+            HpGradInv = HpGrad;
+            HpGradInv.invert();
+            HpHessInv = HpHess;
+            HpHessInv.invert();
 
 #if 0 //!!!
           auto Gtmp = G;
@@ -614,13 +612,13 @@ namespace Dune
             }
           }
 #endif
-          // // add interior integrals for gradient projection
-          // for (std::size_t alpha=0; alpha<numGradShapeFunctions; ++alpha)
-          //   for (std::size_t beta=0; beta<numInnerShapeFunctions; ++beta)
-          //     R[alpha][beta+numDofs-numInnerShapeFunctions].axpy(-H0, G[beta][alpha]);
+            // // add interior integrals for gradient projection
+            // for (std::size_t alpha=0; alpha<numGradShapeFunctions; ++alpha)
+            //   for (std::size_t beta=0; beta<numInnerShapeFunctions; ++beta)
+            //     R[alpha][beta+numDofs-numInnerShapeFunctions].axpy(-H0, G[beta][alpha]);
 
-          /////////////////////////////////////////
-          /////////////////////////////////////////
+            /////////////////////////////////////////
+            /////////////////////////////////////////
 //// !!! Original value projection implementation
 //          // now compute projection by multiplying with inverse mass matrix
 //          for (std::size_t alpha=0; alpha<numShapeFunctions; ++alpha)
@@ -639,6 +637,7 @@ namespace Dune
             /////////////////////////////////////////
             /////////////////////////////////////////
         } // have some inner moments
+
 
         //////////////////////////////////////////////////////////////////////////
         /// GradientProjecjtion //////////////////////////////////////////////////
