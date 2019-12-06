@@ -297,6 +297,27 @@ namespace Dune
       { return ColumnVector<Matrix>(matrix,col); }
       // L.solve(d,b,columnVector(valueProjection,beta));
 
+      template< class Matrix >
+      struct expandColumnVector
+      {
+        expandColumnVector(Matrix &matrix, int col)
+        : matrix_(matrix), col_(col) {}
+
+        template <class Vector>
+        Vector expand(){
+          Vector v(2*matrix_.size(),0);
+          for ( std::size_t i = 0; i < 2*matrix_.size(); ++i)
+            if ( i < matrix_.size() )
+              v[i] = matrix_[i][col_][0];
+            else
+              v[i] = matrix_[ i - matrix_.size() ][col_][1];
+        }
+        Matrix &matrix_;
+        int col_;
+      };
+      template < class Matrix >
+      expandColumnVector<Matrix> expandColumnVector(Matrix &matrix, int col)
+      { return expandColumnVector<Matrix>(matrix,col);}
 
       template< class Matrix >
        void printMatrix(const Matrix &A)
@@ -481,9 +502,9 @@ namespace Dune
 
         for ( std::size_t beta = 0; beta < numDofs; ++beta )
         {
-            auto colValueProjection = columnVector( valueProjection, beta );
+          auto colValueProjection = columnVector( valueProjection, beta );
             // set up vectors b and d needed for least squares
-            b[ beta ] = 1;
+          b[ beta ] = 1;
             if( beta >= numDofs - numInnerShapeFunctions )
                 d[ beta - numDofs + numInnerShapeFunctions] = H0;
 
@@ -494,9 +515,6 @@ namespace Dune
             b[ beta ] = 0;
         }
 
-
-
-
           /////////////////////////////////////////
           /////////////////////////////////////////
 // !!! Original value projection implementation
@@ -504,16 +522,7 @@ namespace Dune
           /////////////////////////////////////////
           /////////////////////////////////////////
 
-            std::cout << "Value projection " << std::endl;
-            for (std::size_t alpha=0; alpha<numShapeFunctions; ++alpha) {
-                for (std::size_t i=0; i<numDofs; ++i) {
-                    std::cout << valueProjection[alpha][i] << " ";
-                }
-                std::cout << std::endl;
-            }
-
-            if (1 || numInnerShapeFunctions > 0)
-        {
+            if (1 || numInnerShapeFunctions > 0) {
             // modify C for inner dofs
 //          std::size_t alpha=0;
             /////////////////////////////////////////
@@ -706,7 +715,7 @@ namespace Dune
                  if (alpha<numGradShapeFunctions)
                     // evaluate each here for edge shape fns
                     edgeShapeFunctionSet_.evaluateEach( x, [ & ] ( std::size_t beta, FieldVector< DomainFieldType, 1 > psi ) {
-                        if (beta<edgePhiVector[0].size())
+                        if (beta<edgePhiVector[0].size()) //assemble left hand side here for ls problem
                           for (int s=0;s<mask[0].size();++s) // note that edgePhi is the transposed of the basis transform matrix
                             R[alpha][mask[0][s]].axpy( edgePhiVector[0][beta][s]*psi[0]*phi[0]*weight, normal);
                     } );

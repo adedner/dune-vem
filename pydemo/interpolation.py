@@ -91,9 +91,9 @@ for level in range(2,5):
     figPos = 100*figRows+10*figCols+1
     res = []
     for i,m in enumerate(methods):
-        dune.generator.setFlags(flags="-g",noChecks=True)
+        # dune.generator.setFlags(flags="-g",noChecks=True)
         space = create.space(m[0], polyGrid, order=order, dimRange=1, storage="istl", **m[2])
-        dune.generator.unsetFlags()
+        # dune.generator.unsetFlags()
         dfs,errors,info = compute(polyGrid, space, m[1])
         print("method:(",m[0],m[2],")",
               "Size: ",space.size,

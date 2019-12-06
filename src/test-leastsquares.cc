@@ -49,6 +49,43 @@ int main( int argc, char **argv )
     testNumber = atoi(argv[1]);
     const double tol = 1e-10;
 
+    Dune::DynamicMatrix< Vector > R;
+    Vector v1(2),v2(2),v3(2),v4(2);
+    v1[0] = 0;
+    v1[1] = 1;
+    v2[0] = 1;
+    v2[1] = 0;
+    v3[0] = 1;
+    v3[1] = 1;
+    v4[0] = 2;
+    v4[1] = 1;
+
+    R.resize(2,2);
+    R[0][0] = v1;
+    R[0][1] = v2;
+    R[1][0] = v3;
+    R[1][1] = v4;
+
+    auto colR = Dune::Vem::columnVector( R, 1 );
+    Vector d = colR.concatenateColumn<Vector>();
+
+    printVector(d);
+
+    // 0
+    // 1
+    // 1
+    // 1
+
+
+//  Dune::Vem::ColumnVector<Dune::DynamicMatrix<std::vector<double>>> columnVector(R,1);
+
+//    d = expandRcol.expand();
+
+//    printVector(d);
+
+
+
+
     if (testNumber == 0){
         std::vector< Vector > bVec, dVec, solnVec;
         Dune::DynamicMatrix< double > A, C;
