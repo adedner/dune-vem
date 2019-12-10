@@ -93,11 +93,13 @@ int main( int argc, char **argv )
         Dune::DynamicMatrix< double > valueProj;
         Dune::DynamicVector< double > exactSoln(3,0);
 
+
+
         const int matrixDim = 3;
 
         valueProj.resize( 3, 2, 0);
         A.resize( matrixDim, matrixDim, 0);
-        C.resize( 2, matrixDim, 1);
+        C.resize( 3, 3, 1);
 
         // set A equal to identity
         for (unsigned int i = 0; i < matrixDim; ++i)
@@ -113,6 +115,14 @@ int main( int argc, char **argv )
 
         std::cout << "Constraint C matrix: " << std::endl;
         printMatrix(C);
+
+        Dune::Vem::BlockMatrix<Dune::DynamicMatrix<double>> blockMatrix(C,2);
+
+        blockMatrix[3];
+
+        printVector(blockMatrix[3]);
+
+
 
 //    Dune::Vem::ColumnVector<Dune::DynamicMatrix<double>> columnVector(C,1);
 //    columnVector[0] = 5;

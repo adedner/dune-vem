@@ -34,6 +34,32 @@ namespace Dune {
 //        expandColumnVector<Matrix> expandColumnVector(Matrix &matrix, int col)
 //        { return expandColumnVector(matrix,col);}
 
+        template < class Matrix >
+        struct BlockMatrix
+        {
+          BlockMatrix(Matrix &matrix, int block)
+            : matrix_(matrix), block_(block) {}
+
+          typename Matrix::row_type& operator[](int row) {
+            if ( row >= matrix_.size()) {
+              typename Matrix::row_type v((block_ * matrix_.size()), 0);
+              return v;
+            }
+
+            else {
+              return matrix_[row];
+            }
+          }
+
+
+
+          Matrix &matrix_;
+          int block_;
+        };
+        template <class Matrix >
+        BlockMatrix<Matrix> blockMatrix(Matrix &matrix, int block)
+        { return BlockMatrix(matrix,block); }
+
         template <class Matrix>
         struct ColumnVector
         {
