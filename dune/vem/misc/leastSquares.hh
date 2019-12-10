@@ -77,7 +77,6 @@ namespace Dune {
                 typedef typename Matrix::size_type Size;
                 typedef typename Matrix::value_type Field;
 
-//                template < class Field >
                 LeastSquares(const Matrix &llsMatrix, const Matrix &constraintMatrix)
                 : llsMatrix_(llsMatrix), constraintMatrix_(constraintMatrix),
                   systemMatrixInv_(matrixSetUp(llsMatrix_, constraintMatrix_))
@@ -87,43 +86,43 @@ namespace Dune {
                 : llsMatrix_(llsMatrix), constraintMatrix_(), systemMatrixInv_(matrixSetUp(llsMatrix_))
                 {
                 }
-//                LeastSquares(const Matrix &constraintMatrix)
-//                : llsMatrix_(), constraintMatrix_(constraintMatrix), systemMatrixInv_(matrixSetUp(constraintMatrix_))
-//                {
-//                }
                 LeastSquares(const LeastSquares &source) = delete;
 
                 template <class Vector>
                 Vector solve(const Vector &b, const Vector &d){
+
+                  Vector systemMultiply, systemLagrange;
+
+                  if ( isEmpty(constraintMatrix_) ){
                     assert( b.size() == llsMatrix_.rows() );
-                    Vector systemMultiply, systemLagrange;
-
-//                    std::cout << constraintMatrix_.size() <<  "is empty" << isEmpty(constraintMatrix_) << std::endl;
-
-                    if ( isEmpty(constraintMatrix_) ){
-                        systemMultiply.resize(llsMatrix_.cols());
+                    systemMultiply.resize(llsMatrix_.cols());
                         systemMatrixInv_.mv(b,systemMultiply);
                     }
+                    if ( isEmpty(llsMatrix_) ){
+                      assert(d.size() == constraintMatrix_.rows());
+                      systemMultiply.resize(constraintMatrix_.cols());
+                      systemMatrixInv_.mv(d,systemMultiply);
+                    }
                     else {
-//                        std::cout << "constraint rows" << constraintMatrix_.rows() << std::endl;
-                        assert(d.size() == constraintMatrix_.rows());
+                      assert( b.size() == llsMatrix_.rows() );
+                      assert(d.size() == constraintMatrix_.rows());
 
-                        Vector systemVector = vectorSetUp(b, d);
+                      Vector systemVector = vectorSetUp(b, d);
 
-                        Size systemMatrixDim = systemMatrixInv_.rows();
+                      Size systemMatrixDim = systemMatrixInv_.rows();
 
-                        // since systemMatrix square, rows = cols
-                        systemLagrange.resize(systemMatrixDim,0);
+                      // since systemMatrix square, rows = cols
+                      systemLagrange.resize(systemMatrixDim,0);
 
-                        for (Size i = 0; i < systemMatrixDim; ++i)
-                            for (Size j = 0; j < systemMatrixDim; ++j)
-                                systemLagrange[i] += systemMatrixInv_[i][j] * systemVector[j];
+                      for (Size i = 0; i < systemMatrixDim; ++i)
+                        for (Size j = 0; j < systemMatrixDim; ++j)
+                          systemLagrange[i] += systemMatrixInv_[i][j] * systemVector[j];
 
-                        systemMultiply.resize(llsMatrix_.cols(),0);
-                        // get rid of Lagrange multipliers
-                        // TODO? avoid copy by cutting of in operator= of ColVec
-                        for( Size i = 0; i < systemMultiply.size(); ++i)
-                            systemMultiply[i] = systemLagrange[i];
+                      systemMultiply.resize(llsMatrix_.cols(),0);
+                      // get rid of Lagrange multipliers
+                      // TODO? avoid copy by cutting of in operator= of ColVec
+                      for( Size i = 0; i < systemMultiply.size(); ++i)
+                        systemMultiply[i] = systemLagrange[i];
                     }
                     return systemMultiply;
                 }
@@ -172,23 +171,16 @@ namespace Dune {
                     return ( A.size() == 0 );
                 }
 
-//                template <class Field>
-                Matrix matrixSetUp(const Matrix &llsMatrix_)
+                // return pseudo inverse of a matrix
+                Matrix matrixSetUp(const Matrix &matrix)
                 {
-                    // !!! this needs changing
-                    LeftPseudoInverse< Field > pseudoInverse( llsMatrix_.cols() );
-//                    LeftPseudoInverse< Field > pseudoInverse( llsMatrix_.cols() );
+                    LeftPseudoInverse< Field > pseudoInverse( matrix.cols() );
 
-                    // no constraints in this case and so form pseudo inverse
-//                    std::cout << "Matrix C has no size" << std::endl;
+                    Matrix matrixPseudoInv( matrix.cols(), matrix.rows() );
 
-                    Matrix llsMatrixPseudoInv( llsMatrix_.cols(), llsMatrix_.rows() );
+                    pseudoInverse( matrix, matrixPseudoInv);
 
-                    pseudoInverse( llsMatrix_, llsMatrixPseudoInv);
-
-//                    std::cout << "pseudo Inv of A " << std::endl;
-//                    printMatrix(llsMatrixPseudoInv);
-                    return llsMatrixPseudoInv;
+                    return matrixPseudoInv;
                 }
 
                 // TODO: avoid usage of '_' in parameter name - either use
@@ -197,6 +189,9 @@ namespace Dune {
                 {
                     if ( isEmpty(constraintMatrix_) ) {
                         return matrixSetUp(llsMatrix_);
+                    }
+                    if ( isEmpty(llsMatrix_) ) {
+                      return matrixSetUp(constraintMatrix_);
                     }
                     else {
                         // construct the matrix [2A^T*A C^T ; C 0] needed for least squares solution

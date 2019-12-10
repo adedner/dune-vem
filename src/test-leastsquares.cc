@@ -293,6 +293,41 @@ int main( int argc, char **argv )
         return -1;
 
     }
+  if (testNumber == 2){
+    std::vector< Vector > bVec, dVec, solnVec;
+    Dune::DynamicMatrix< double > A, C(2,3,1);
+    Dune::DynamicVector< double > b(3), d(2), x(3,0);
+    Dune::DynamicMatrix< double > valueProj;
+//    Dune::DynamicVector< double > exactSoln(3,0);
+
+    // initialise the matrix C
+        C[0][1] = 2;
+        C[0][2] = 3;
+        C[1][1] = 3;
+
+    std::cout << "Constraint C matrix: " << std::endl;
+    printMatrix(C);
+
+    d[0] = 3;
+    d[1] = 2;
+
+    std::cout << "Vector d: " << std::endl;
+    printVector(d);
+
+    auto leastSquaresMinimizer = Dune::Vem::LeastSquares(A,C);
+
+
+    x = leastSquaresMinimizer.solve(b,d);
+
+    printVector(x);
+
+//    if (error < tol) {
+      return 0;
+//    }
+
+//    return -1;
+
+  }
     else {
 
         std::cout << "test number 0 not chosen" << std::endl;
