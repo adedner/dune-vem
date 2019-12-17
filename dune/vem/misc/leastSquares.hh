@@ -51,8 +51,6 @@ namespace Dune {
             }
           }
 
-
-
           Matrix &matrix_;
           int block_;
         };
@@ -88,6 +86,16 @@ namespace Dune {
                   v[i] = matrix_[i - size()][col_][1];
               }
               return v;
+            }
+
+            template < class Vector >
+            ColumnVector &operator=(const Vector &v)
+            {
+              assert( v.size() == 2*size() )
+              for (std::size_t i = 0; i < size(); ++i) {
+                matrix_[i][col_][0] = v[i];
+                matrix_[i][col_][1] = v[i - size()];
+              }
             }
 
             Matrix &matrix_;
