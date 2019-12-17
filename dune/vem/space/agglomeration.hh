@@ -274,6 +274,7 @@ namespace Dune
       }
 
     private:
+#if 0
       template <class Matrix>
       struct ColumnVector
       {
@@ -295,29 +296,7 @@ namespace Dune
       template <class Matrix>
       ColumnVector<Matrix> columnVector(Matrix &matrix, int col)
       { return ColumnVector<Matrix>(matrix,col); }
-      // L.solve(d,b,columnVector(valueProjection,beta));
-
-      template< class Matrix >
-      struct expandColumnVector
-      {
-        expandColumnVector(Matrix &matrix, int col)
-        : matrix_(matrix), col_(col) {}
-
-        template <class Vector>
-        Vector expand(){
-          Vector v(2*matrix_.size(),0);
-          for ( std::size_t i = 0; i < 2*matrix_.size(); ++i)
-            if ( i < matrix_.size() )
-              v[i] = matrix_[i][col_][0];
-            else
-              v[i] = matrix_[ i - matrix_.size() ][col_][1];
-        }
-        Matrix &matrix_;
-        int col_;
-      };
-      template < class Matrix >
-      expandColumnVector<Matrix> expandColumnVector(Matrix &matrix, int col)
-      { return expandColumnVector<Matrix>(matrix,col);}
+#endif
 
       template< class Matrix >
        void printMatrix(const Matrix &A)
@@ -502,7 +481,7 @@ namespace Dune
 
         for ( std::size_t beta = 0; beta < numDofs; ++beta )
         {
-          auto colValueProjection = columnVector( valueProjection, beta );
+          auto colValueProjection = vectorizeMatrixCol( valueProjection, beta );
             // set up vectors b and d needed for least squares
           b[ beta ] = 1;
             if( beta >= numDofs - numInnerShapeFunctions )
