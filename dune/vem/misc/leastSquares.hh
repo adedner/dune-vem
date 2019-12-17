@@ -37,26 +37,40 @@ namespace Dune {
         template < class Matrix >
         struct BlockMatrix
         {
-          BlockMatrix(Matrix &matrix, int block)
+          struct RowWrapper
+          {
+            RowMatrix(const Matrix &matrix,int block, int row)
+            : matrix_(matrix), block_(block), row_(row) {}
+            typename Matrix::value_type operator[](int col) const {
+              /*
+              for (int i=0;i<blocks;++i)
+                if (row < (i+1)*matrix_.rows() && col < (i+1)*matrix_.cols())
+                  return matrix_[i*matrix_.rows()+row][i*matrix_.cols()+col];
+              */
+              int c = col/blocks;
+              int r = row/blocks;
+              assert(c<matrix_.cols() && r<matrix_.rows());
+              if (col%blocks == row%blocks)
+                return matrix_[r][c];
+              return 0;
+            }
+            const Matrix &matrix_;
+            int block_, row_;
+          };
+          BlockMatrix(const Matrix &matrix, int block)
             : matrix_(matrix), block_(block) {}
-
-          typename Matrix::row_type& operator[](int row) {
-            if ( row >= matrix_.size()) {
-              typename Matrix::row_type v((block_ * matrix_.size()), 0);
-              return v;
-            }
-
-            else {
-              return matrix_[row];
-            }
+          const RowWrapper operator[](int row) const {
+            return RowWrapper(matrix_,block_,row);
           }
+          unsigned int rows() const {return matrix_.rows()*blocks;}
+          unsigned int cols() const {return matrix_.cols()*blocks;}
 
-          Matrix &matrix_;
+          const Matrix &matrix_;
           int block_;
         };
         template <class Matrix >
-        BlockMatrix<Matrix> blockMatrix(Matrix &matrix, int block)
-        { return BlockMatrix(matrix,block); }
+        BlockMatrix<Matrix> blockMatrix(const Matrix &matrix, int block)
+        { return BlockMatrix<Matrix>(matrix,block); }
 
         template <class Matrix>
         struct ColumnVector
