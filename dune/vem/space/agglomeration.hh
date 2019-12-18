@@ -766,6 +766,40 @@ namespace Dune {
 
               } // quadrature loop
 
+
+
+              ////////////////////////////////////////////////////////////
+              //// re-implementation of gradient projection //////////////
+              ////////////////////////////////////////////////////////////
+
+              // set up RHS of least squares
+              // int_e nabla V ph_j dot n m_beta
+
+              const int rowSizeLeastSquares;
+              const int colSizeLeastSquares;
+
+              std::vector<DomainFieldType > b(rowSizeLeastSquares,0);
+
+              Quadrature1Type quadrature(gridPart(), intersection, 2 * polOrder, Quadrature1Type::INSIDE);
+              for (std::size_t qp = 0; qp < quadrature.nop(); ++qp) {
+                auto x = quadrature.localPoint(qp);
+                auto y = intersection.geometryInInside().global(x);
+                const DomainFieldType weight = intersection.geometry().integrationElement(x) * quadrature.weight(qp);
+                shapeFunctionSet.jacobianEach(y, [&](std::size_t alpha, typename ScalarShapeFunctionSetType::JacobianRangeType gradPhi) {
+                  if (alpha < numGradShapeFunctions)
+                    // evaluate each here for edge shape fns
+                    edgeShapeFunctionSet_.evaluateEach(x, [&](std::size_t beta, FieldVector<DomainFieldType, 1> psi) {
+                      if (beta < edgePhiVector[0].size()) //assemble left hand side here for ls problem
+                        b[beta] += valueProjection[alpha][beta] * psi[0] * ( gradPhi[0] * normal[0] + gradPhi[1] * normal[1] );
+                    });
+                });
+              }
+
+              ////////////////////////////////////////////////////////////
+              ///////////////////////////////////////////////////////////
+
+
+
             } // loop over triangles in agglomerate
 
             if (1 || numInnerShapeFunctions > 0) {

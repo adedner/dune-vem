@@ -13,11 +13,6 @@ namespace Dune {
 
     namespace Vem {
 
-        template<class Matrix>
-        BlockMatrix<Matrix> blockMatrix(const Matrix &matrix, int block) {
-          return BlockMatrix<Matrix>(matrix, block);
-        }
-
         template<class F>
         struct VectorizedF {
             static const int size = 1;
@@ -128,6 +123,10 @@ namespace Dune {
             const Matrix &matrix_;
             int block_;
         };
+        template<class Matrix>
+        BlockMatrix<Matrix> blockMatrix(const Matrix &matrix, int block) {
+          return BlockMatrix<Matrix>(matrix, block);
+        }
 
         //        template< class Matrix >
 //        struct expandColumnVector
