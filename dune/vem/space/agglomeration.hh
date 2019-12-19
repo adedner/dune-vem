@@ -342,7 +342,8 @@ namespace Dune {
                   size(std::max(orders[2], polOrder - 2))
           );
           // polOrder=1 can cause problems with numHessShapeFunctions=0
-          if (numHessShapeFunctions == 0) numHessShapeFunctions = 1;
+          if (numHessShapeFunctions == 0)
+            numHessShapeFunctions = 1;
           int numGradShapeFunctions = std::min(numShapeFunctions,
                   Dune::Fem::OrthonormalShapeFunctions<DomainType::dimension>::
                   size(std::max(orders[1], polOrder - 1))
@@ -366,7 +367,7 @@ namespace Dune {
 
           // set up matrices used for constructing gradient, value, and edge projections
           // Note: the code is set up with the assumption that the dofs suffice to compute the edge projection
-          DynamicMatrix <DomainFieldType> D, C, constraintValueProj, Hp, HpGrad, HpHess, HpInv, HpGradInv, HpHessInv;
+          DynamicMatrix <DomainFieldType> D, C, constraintValueProj, constraintGradProj, leastSquaresGradProj, Hp, HpGrad, HpHess, HpInv, HpGradInv, HpHessInv;
           DynamicMatrix <DomainType> R; // ,G //!!!
           DynamicMatrix<typename Traits::ScalarBasisFunctionSetType::HessianMatrixType> P;
 
@@ -392,6 +393,8 @@ namespace Dune {
             R.resize(numGradShapeFunctions, numDofs, DomainType(0));
             P.resize(numHessShapeFunctions, numDofs, 0);
             constraintValueProj.resize(numInnerShapeFunctions, numShapeFunctions, 0);
+            constraintGradProj.resize(numGradShapeFunctions,numGradShapeFunctions,0);
+            leastSquaresGradProj.resize( d, 2*numGradShapeFunctions ,0);
 
             // iterate over the triangles of this polygon
             for (const ElementSeedType &entitySeed : entitySeeds[agglomerate]) {
@@ -414,7 +417,10 @@ namespace Dune {
                   shapeFunctionSet.evaluateEach(quadrature[qp], [&](std::size_t beta, FieldVector<DomainFieldType, 1> psi) {
                     Hp[alpha][beta] += phi[0] * psi[0] * weight;
                     if (alpha < numGradShapeFunctions && beta < numGradShapeFunctions) // basis set is hierarchic so we can compute HpGrad using the order p shapeFunctionSet
+                    {
                       HpGrad[alpha][beta] += phi[0] * psi[0] * weight;
+                      constraintGradProj[alpha][beta] += phi[0] * psi[0] * weight;
+                    }
                     if (alpha < numHessShapeFunctions && beta < numHessShapeFunctions)
                       HpHess[alpha][beta] += phi[0] * psi[0] * weight;
                     if (alpha < numInnerShapeFunctions)
@@ -670,9 +676,14 @@ namespace Dune {
                       if (alpha < numGradShapeFunctions)
                         // evaluate each here for edge shape fns
                         edgeShapeFunctionSet_.evaluateEach(x, [&](std::size_t beta, FieldVector<DomainFieldType, 1> psi) {
-                          if (beta < edgePhiVector[0].size()) //assemble left hand side here for ls problem
+                          if (beta < edgePhiVector[0].size()) {
+                            //assemble left hand side here for ls problem
                             for (int s = 0; s < mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
                               R[alpha][mask[0][s]].axpy(edgePhiVector[0][beta][s] * psi[0] * phi[0] * weight, normal);
+
+                            leastSquaresGradProj[beta][alpha] += psi[0] * phi[0] * weight * normal[0];
+                            leastSquaresGradProj[beta][alpha + numGradShapeFunctions ] += psi[0] * phi[0] * weight * normal[1];
+                          }
                         });
                       if (alpha < numHessShapeFunctions) // && agIndexSet_.edgeSize(1) > 0)
                       {
@@ -794,6 +805,8 @@ namespace Dune {
                     });
                 });
               }
+
+              // set up R and enlarged constraint matrix
 
               ////////////////////////////////////////////////////////////
               ///////////////////////////////////////////////////////////
