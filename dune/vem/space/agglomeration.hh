@@ -384,6 +384,9 @@ namespace Dune {
             const auto &bbox = blockMapper_.indexSet().boundingBox(agglomerate);
             const std::size_t numDofs = blockMapper().numDofs(agglomerate);
 
+            const int numEdges = agIndexSet_.subAgglomerates(agglomerate,AgglomerationIndexSet::dimension -1);
+//            const int edgeNormalSize;
+
             D.resize(numDofs, numShapeFunctions, 0);
             C.resize(numShapeFunctions, numDofs, 0);
             Hp.resize(numShapeFunctions, numShapeFunctions, 0);
@@ -394,7 +397,7 @@ namespace Dune {
             P.resize(numHessShapeFunctions, numDofs, 0);
             constraintValueProj.resize(numInnerShapeFunctions, numShapeFunctions, 0);
             constraintGradProj.resize(numGradShapeFunctions,numGradShapeFunctions,0);
-            leastSquaresGradProj.resize( d, 2*numGradShapeFunctions ,0);
+            leastSquaresGradProj.resize( numEdges*edgeNormalSize , 2*numGradShapeFunctions ,0);
 
             // iterate over the triangles of this polygon
             for (const ElementSeedType &entitySeed : entitySeeds[agglomerate]) {
@@ -602,6 +605,9 @@ namespace Dune {
                                                                                                   useOnb_,
                                                                                                   scalarShapeFunctionSet_);
 
+              int counter = 0;
+              std::vector< std::vector<int>> fullMask;
+
               // compute the boundary terms for the gradient projection
               for (const auto &intersection : intersections(static_cast< typename GridPart::GridViewType >( gridPart()),
                                                             element)) {
@@ -678,12 +684,15 @@ namespace Dune {
                         edgeShapeFunctionSet_.evaluateEach(x, [&](std::size_t beta, FieldVector<DomainFieldType, 1> psi) {
                           if (beta < edgePhiVector[0].size()) {
                             //assemble left hand side here for ls problem
-                            for (int s = 0; s < mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
+                            for (int s = 0; s <
+                                            mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
                               R[alpha][mask[0][s]].axpy(edgePhiVector[0][beta][s] * psi[0] * phi[0] * weight, normal);
-
-                            leastSquaresGradProj[beta][alpha] += psi[0] * phi[0] * weight * normal[0];
-                            leastSquaresGradProj[beta][alpha + numGradShapeFunctions ] += psi[0] * phi[0] * weight * normal[1];
                           }
+                          if (beta < edgePhiVector[1].size()) {
+                            leastSquaresGradProj[counter][alpha] += psi[0] * phi[0] * weight * normal[0];
+                            leastSquaresGradProj[counter][alpha + numGradShapeFunctions ] += psi[0] * phi[0] * weight * normal[1];
+                          }
+                          counter++;
                         });
                       if (alpha < numHessShapeFunctions) // && agIndexSet_.edgeSize(1) > 0)
                       {
@@ -756,6 +765,8 @@ namespace Dune {
                    }
                  } );
 #endif
+                // store the masks for each edge
+                fullMask.push_back(mask[1]);
               } // loop over intersections
 
 
@@ -786,25 +797,23 @@ namespace Dune {
               // set up RHS of least squares
               // int_e nabla V ph_j dot n m_beta
 
-              const int rowSizeLeastSquares;
-              const int colSizeLeastSquares;
 
-              std::vector<DomainFieldType > b(rowSizeLeastSquares,0);
-
-              Quadrature1Type quadrature(gridPart(), intersection, 2 * polOrder, Quadrature1Type::INSIDE);
-              for (std::size_t qp = 0; qp < quadrature.nop(); ++qp) {
-                auto x = quadrature.localPoint(qp);
-                auto y = intersection.geometryInInside().global(x);
-                const DomainFieldType weight = intersection.geometry().integrationElement(x) * quadrature.weight(qp);
-                shapeFunctionSet.jacobianEach(y, [&](std::size_t alpha, typename ScalarShapeFunctionSetType::JacobianRangeType gradPhi) {
-                  if (alpha < numGradShapeFunctions)
-                    // evaluate each here for edge shape fns
-                    edgeShapeFunctionSet_.evaluateEach(x, [&](std::size_t beta, FieldVector<DomainFieldType, 1> psi) {
-                      if (beta < edgePhiVector[0].size()) //assemble left hand side here for ls problem
-                        b[beta] += valueProjection[alpha][beta] * psi[0] * ( gradPhi[0] * normal[0] + gradPhi[1] * normal[1] );
-                    });
-                });
-              }
+//              std::vector<DomainFieldType > b(rowSizeLeastSquares,0);
+//
+//              Quadrature1Type quadrature(gridPart(), intersection, 2 * polOrder, Quadrature1Type::INSIDE);
+//              for (std::size_t qp = 0; qp < quadrature.nop(); ++qp) {
+//                auto x = quadrature.localPoint(qp);
+//                auto y = intersection.geometryInInside().global(x);
+//                const DomainFieldType weight = intersection.geometry().integrationElement(x) * quadrature.weight(qp);
+//                shapeFunctionSet.jacobianEach(y, [&](std::size_t alpha, typename ScalarShapeFunctionSetType::JacobianRangeType gradPhi) {
+//                  if (alpha < numGradShapeFunctions)
+//                    // evaluate each here for edge shape fns
+//                    edgeShapeFunctionSet_.evaluateEach(x, [&](std::size_t beta, FieldVector<DomainFieldType, 1> psi) {
+//                      if (beta < edgePhiVector[0].size()) //assemble left hand side here for ls problem
+//                        b[beta] += valueProjection[alpha][beta] * psi[0] * ( gradPhi[0] * normal[0] + gradPhi[1] * normal[1] );
+//                    });
+//                });
+//              }
 
               // set up R and enlarged constraint matrix
 
@@ -815,18 +824,46 @@ namespace Dune {
 
             } // loop over triangles in agglomerate
 
-            if (1 || numInnerShapeFunctions > 0) {
-              // need to compute value projection first
-              // now compute projection by multiplying with inverse mass matrix
-              for (std::size_t alpha = 0; alpha < numGradShapeFunctions; ++alpha)
+
+            // least squares
+            if (  ) {
+              if (1 || numInnerShapeFunctions > 0) {
+                // need to compute value projection first
+                // now compute projection by multiplying with inverse mass matrix
+                for (std::size_t alpha = 0; alpha < numGradShapeFunctions; ++alpha)
+                  for (std::size_t i = 0; i < numDofs; ++i)
+                    for (std::size_t beta = 0; beta < numGradShapeFunctions; ++beta)
+                      jacobianProjection[alpha][i].axpy(HpGradInv[alpha][beta], R[beta][i]);
+              } // have some inner moments
+              else { // with no inner moments we didn't need to compute the inverse of the mass matrix H_{p-1} -
+                // it's simply 1/H0 so we implement this case separately
                 for (std::size_t i = 0; i < numDofs; ++i)
-                  for (std::size_t beta = 0; beta < numGradShapeFunctions; ++beta)
-                    jacobianProjection[alpha][i].axpy(HpGradInv[alpha][beta], R[beta][i]);
-            } // have some inner moments
-            else { // with no inner moments we didn't need to compute the inverse of the mass matrix H_{p-1} -
-              // it's simply 1/H0 so we implement this case separately
-              for (std::size_t i = 0; i < numDofs; ++i)
-                jacobianProjection[0][i].axpy(1. / H0, R[0][i]);
+                  jacobianProjection[0][i].axpy(1. / H0, R[0][i]);
+              }
+            }
+            else {
+              Dune::Vem::BlockMatrix constraintBlockMatrix = blockMatrix(constraintGradProj, 2);
+              auto leastSquaresMinimizerGradient = LeastSquares(leastSquaresGradProj, constraintBlockMatrix);
+              std::vector<DomainFieldType> b(leastSquaresGradProj.rows(), 0);
+
+              for (std::size_t beta = 0; beta < numDofs; ++beta) {
+                Dune::Vem::VectorizeMatrixCol d = vectorizeMatrixCol(R, beta);
+                Dune::Vem::VectorizeMatrixCol colGradProjection = vectorizeMatrixCol(jacobianProjection, beta);
+
+                for (int e = 0; e < fullMask.size(); e++)
+                  for (int i = 0; i < fullMask[e].size(); i++)
+                    if (fullMask[e][i] == beta) {
+                      b[beta] = 1;
+                      break;
+                    }
+
+                colGradProjection = leastSquaresMinimizer.solve(b, d);
+
+                // re set b vector to 0
+                if (b[beta] == 1) {
+                  b[beta] = 0;
+                }
+              }
             }
 
             /////////////////////////////////////////////////////////////////////
