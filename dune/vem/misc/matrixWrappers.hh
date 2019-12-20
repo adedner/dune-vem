@@ -16,6 +16,7 @@ namespace Dune {
         template<class F>
         struct VectorizedF {
             static const int size = 1;
+            typedef F field_type;
 
             static const F &get(const F &x, int rows, int r) { return x; }
 
@@ -26,8 +27,9 @@ namespace Dune {
         template<class F, int N>
         struct VectorizedF<Dune::FieldVector<F, N>> {
             static const int size = N;
+            typedef F field_type;
 
-            static const F get(const Dune::FieldVector<F, N> &x, int rows, int r) { return x[r / rows]; }
+            static const F &get(const Dune::FieldVector<F, N> &x, int rows, int r) { return x[r / rows]; }
 
             template<class V>
             static void assign(Dune::FieldVector<F, N> &in, const V &v, int i) {
@@ -39,6 +41,7 @@ namespace Dune {
         template<class F, int R, int C>
         struct VectorizedF<Dune::FieldMatrix<F, R, C>> {
             static const int size = R * C;
+            typedef F field_type;
 
             static const F &get(const Dune::FieldMatrix<F, R, C> &x, int rows, int r) {
               return x[r / (R * rows)][r / rows % C];
@@ -61,7 +64,7 @@ namespace Dune {
 
             unsigned int size() const { return matrix_.size() * VF::size; }
 
-            const typename Matrix::value_type &operator[](int row) const {
+            const typename VF::field_type &operator[](int row) const {
               return VF::get(matrix_[row % matrix_.rows()][col_], matrix_.rows(), row);
             }
 
@@ -117,6 +120,7 @@ namespace Dune {
               return RowWrapper(matrix_, block_, row);
             }
 
+            unsigned int size() const { return matrix_.rows() * block_; }
             unsigned int rows() const { return matrix_.rows() * block_; }
             unsigned int cols() const { return matrix_.cols() * block_; }
 

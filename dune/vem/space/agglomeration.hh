@@ -690,10 +690,9 @@ namespace Dune {
                               R[alpha][mask[0][s]].axpy(edgePhiVector[0][beta][s] * psi[0] * phi[0] * weight, normal);
                           }
                           if (beta < edgePhiVector[1].size()) {
-                            leastSquaresGradProj[counter][alpha] += psi[0] * phi[0] * weight * normal[0];
-                            leastSquaresGradProj[counter][alpha + numGradShapeFunctions ] += psi[0] * phi[0] * weight * normal[1];
+                            leastSquaresGradProj[counter+beta][alpha] += psi[0] * phi[0] * weight * normal[0];
+                            leastSquaresGradProj[counter+beta][alpha + numGradShapeFunctions ] += psi[0] * phi[0] * weight * normal[1];
                           }
-                          counter++;
                         });
                       if (alpha < numHessShapeFunctions) // && agIndexSet_.edgeSize(1) > 0)
                       {
@@ -768,6 +767,7 @@ namespace Dune {
 #endif
                 // store the masks for each edge
                 fullMask.push_back(mask[1]);
+                counter += agIndexSet_.edgeSize(1);
               } // loop over intersections
 
 
@@ -858,7 +858,7 @@ namespace Dune {
                       break;
                     }
 
-                colGradProjection = leastSquaresMinimizer.solve(b, d);
+                colGradProjection = leastSquaresMinimizerGradient.solve(b, d);
 
                 // re set b vector to 0
                 if (b[beta] == 1) {

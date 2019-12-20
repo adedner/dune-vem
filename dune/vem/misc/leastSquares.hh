@@ -12,13 +12,14 @@ namespace Dune {
 
     namespace Vem {
 
-        template<class Matrix>
+        // template <class Matrix = Dune::DynaicMatrix<double, Vector = Dune::DynamicVector<double>>>
+        template<class Matrix, class CMatrix>
         class LeastSquares {
         public:
             typedef typename Matrix::size_type Size;
             typedef typename Matrix::value_type Field;
 
-            LeastSquares(const Matrix &llsMatrix, const Matrix &constraintMatrix)
+            LeastSquares(const Matrix &llsMatrix, const CMatrix &constraintMatrix)
                     : llsMatrix_(llsMatrix), constraintMatrix_(constraintMatrix),
                       systemMatrixInv_(matrixSetUp(llsMatrix_, constraintMatrix_)) {
             }
@@ -29,10 +30,10 @@ namespace Dune {
 
             LeastSquares(const LeastSquares &source) = delete;
 
-            template<class Vector>
-            Vector solve(const Vector &b, const Vector &d) {
+            template<class bVector, class dVector>
+            bVector solve(const bVector &b, const dVector &d) {
 
-              Vector systemMultiply, systemLagrange;
+              bVector systemMultiply, systemLagrange;
 
               if (isEmpty(constraintMatrix_)) {
                 assert(b.size() == llsMatrix_.rows());
@@ -47,7 +48,7 @@ namespace Dune {
                 assert(b.size() == llsMatrix_.rows());
                 assert(d.size() == constraintMatrix_.rows());
 
-                Vector systemVector = vectorSetUp(b, d);
+                auto systemVector = vectorSetUp(b, d);
 
                 Size systemMatrixDim = systemMatrixInv_.rows();
 
@@ -67,6 +68,7 @@ namespace Dune {
               return systemMultiply;
             }
 
+#if 0
             template<class Vector>
             void solve(const std::vector<Vector> &bVec,
                        const std::vector<Vector> &dVec,
@@ -78,7 +80,7 @@ namespace Dune {
                 solnVec[i] = solve(bVec[i], dVec[i]);
               }
             }
-
+#endif
             void printMatrix(const Matrix &A) {
               return;
               for (unsigned int i = 0; i < A.rows(); ++i) {
@@ -89,8 +91,8 @@ namespace Dune {
               }
             }
 
-            template<class Vector>
-            void printVector(const Vector &x) {
+            template<class xVector>
+            void printVector(const xVector &x) {
               return;
               for (unsigned int i = 0; i < x.size(); ++i)
                 std::cout << x[i] << std::endl;
@@ -100,15 +102,17 @@ namespace Dune {
         private:
             const Matrix &llsMatrix_;
             // TODO: avoid copy of constraintMatrix in constructor
-            const Matrix constraintMatrix_;
+            const CMatrix constraintMatrix_;
             const Matrix systemMatrixInv_;
 
-            bool isEmpty(const Matrix &A) {
+            template<class xMatrix>
+            bool isEmpty(const xMatrix &A) {
               return (A.size() == 0);
             }
 
             // return pseudo inverse of a matrix
-            Matrix matrixSetUp(const Matrix &matrix) {
+            template <class CCMatrix>
+            Matrix matrixSetUp(const CCMatrix &matrix) {
               LeftPseudoInverse <Field> pseudoInverse(matrix.cols());
 
               Matrix matrixPseudoInv(matrix.cols(), matrix.rows());
@@ -120,7 +124,8 @@ namespace Dune {
 
             // TODO: avoid usage of '_' in parameter name - either use
             // static method or have no parameters
-            Matrix matrixSetUp(const Matrix &llsMatrix_, const Matrix &constraintMatrix_) {
+            template <class LMatrix,class CCMatrix>
+            Matrix matrixSetUp(const LMatrix &llsMatrix_, const CCMatrix &constraintMatrix_) {
               if (isEmpty(constraintMatrix_)) {
                 return matrixSetUp(llsMatrix_);
               }
@@ -172,12 +177,12 @@ namespace Dune {
               }
             }
 
-            template<class Vector>
-            Vector vectorSetUp(const Vector &b, const Vector &d) {
+            template<class bVector, class dVector>
+            bVector vectorSetUp(const bVector &b, const dVector &d) {
               assert((llsMatrix_.rows() == b.size()) && ((llsMatrix_.cols() + d.size())
                                                          == (llsMatrix_.cols() + constraintMatrix_.rows())));
 
-              Vector systemVector(llsMatrix_.cols() + constraintMatrix_.rows()), y(llsMatrix_.cols(), 0);
+              bVector systemVector(llsMatrix_.cols() + constraintMatrix_.rows()), y(llsMatrix_.cols(), 0);
 
               // calculate y = 2 * A^T * b
               llsMatrix_.usmtv(2, b, y);
@@ -198,13 +203,13 @@ namespace Dune {
 
         };
 
-        template<class Matrix>
-        LeastSquares<Matrix> leastSquares(const Matrix &llsMatrix, const Matrix &constraintMatrix) {
-          return LeastSquares<Matrix>(llsMatrix, constraintMatrix);
+        template<class Matrix,class CMatrix>
+        LeastSquares<Matrix,CMatrix> leastSquares(const Matrix &llsMatrix, const CMatrix &constraintMatrix) {
+          return LeastSquares<Matrix,CMatrix>(llsMatrix, constraintMatrix);
         }
 
         template<class Matrix>
-        LeastSquares<Matrix> leastSquares(const Matrix &llsMatrix) { return LeastSquares<Matrix>(llsMatrix); }
+        LeastSquares<Matrix,Matrix> leastSquares(const Matrix &llsMatrix) { return LeastSquares<Matrix,Matrix>(llsMatrix); }
     } // namespace Vem
 } // namespace Dune
 
