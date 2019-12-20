@@ -384,8 +384,8 @@ namespace Dune {
             const auto &bbox = blockMapper_.indexSet().boundingBox(agglomerate);
             const std::size_t numDofs = blockMapper().numDofs(agglomerate);
 
-            const int numEdges = agIndexSet_.subAgglomerates(agglomerate,AgglomerationIndexSet::dimension -1);
-//            const int edgeNormalSize;
+            const int numEdges = agIndexSet_.subAgglomerates(agglomerate, AgglomerationIndexSetType::dimension - 1);
+            const std::size_t edgeNormalSize = agIndexSet_.template order2size<1>(1);
 
             D.resize(numDofs, numShapeFunctions, 0);
             C.resize(numShapeFunctions, numDofs, 0);
@@ -593,6 +593,8 @@ namespace Dune {
             /// GradientProjecjtion //////////////////////////////////////////////////
             //////////////////////////////////////////////////////////////////////////
 
+            std::vector< std::vector<int>> fullMask;
+
             // iterate over the triangles of this polygon
             for (const ElementSeedType &entitySeed : entitySeeds[agglomerate]) {
               const ElementType &element = gridPart().entity(entitySeed);
@@ -606,7 +608,6 @@ namespace Dune {
                                                                                                   scalarShapeFunctionSet_);
 
               int counter = 0;
-              std::vector< std::vector<int>> fullMask;
 
               // compute the boundary terms for the gradient projection
               for (const auto &intersection : intersections(static_cast< typename GridPart::GridViewType >( gridPart()),
@@ -826,7 +827,7 @@ namespace Dune {
 
 
             // least squares
-            if (  ) {
+            if ( leastSquaresGradProj.size() == 0 ) {
               if (1 || numInnerShapeFunctions > 0) {
                 // need to compute value projection first
                 // now compute projection by multiplying with inverse mass matrix
@@ -842,13 +843,13 @@ namespace Dune {
               }
             }
             else {
-              Dune::Vem::BlockMatrix constraintBlockMatrix = blockMatrix(constraintGradProj, 2);
-              auto leastSquaresMinimizerGradient = LeastSquares(leastSquaresGradProj, constraintBlockMatrix);
+              BlockMatrix constraintBlockMatrix = blockMatrix(constraintGradProj, 2);
+              auto leastSquaresMinimizerGradient = leastSquares(leastSquaresGradProj, constraintBlockMatrix);
               std::vector<DomainFieldType> b(leastSquaresGradProj.rows(), 0);
 
               for (std::size_t beta = 0; beta < numDofs; ++beta) {
-                Dune::Vem::VectorizeMatrixCol d = vectorizeMatrixCol(R, beta);
-                Dune::Vem::VectorizeMatrixCol colGradProjection = vectorizeMatrixCol(jacobianProjection, beta);
+                VectorizeMatrixCol d = vectorizeMatrixCol(R, beta);
+                VectorizeMatrixCol colGradProjection = vectorizeMatrixCol(jacobianProjection, beta);
 
                 for (int e = 0; e < fullMask.size(); e++)
                   for (int i = 0; i < fullMask[e].size(); i++)
