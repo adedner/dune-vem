@@ -70,7 +70,7 @@ namespace Dune {
 
             template<class Vector>
             VectorizeMatrixCol &operator=(const Vector &v) {
-              assert(v.size() == size());
+              assert(v.size() <= VF::size * size());
               for (std::size_t i = 0; i < matrix_.size(); ++i)
                 VF::assign(matrix_[i][col_], v, i);
               return *this;

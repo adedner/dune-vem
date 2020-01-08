@@ -358,11 +358,18 @@ namespace Dune {
           numHessShapeFunctions = Dune::Fem::OrthonormalShapeFunctions< DomainType::dimension >::
                     size(std::max(polOrder-2,0));
 #endif
+
+          const std::size_t numGradConstraints = numGradShapeFunctions;
+
+//            Dune::Fem::OrthonormalShapeFunctions<DomainType::dimension>::
+//            size(orders[1]);
+
           std::cout << "size of spaces: "
                     << numInnerShapeFunctions << " "
                     << numShapeFunctions << " "
                     << numGradShapeFunctions << " "
-                    << numHessShapeFunctions << std::endl;
+                    << numHessShapeFunctions << " "
+                    << numGradConstraints << std::endl;
 
 
           // set up matrices used for constructing gradient, value, and edge projections
@@ -393,11 +400,11 @@ namespace Dune {
             HpGrad.resize(numGradShapeFunctions, numGradShapeFunctions, 0);
             HpHess.resize(numHessShapeFunctions, numHessShapeFunctions, 0);
             //!!! G.resize( numGradShapeFunctions, numGradShapeFunctions, DomainType(0) );
-            R.resize(numGradShapeFunctions, numDofs, DomainType(0));
+            R.resize(numGradConstraints, numDofs, DomainType(0));
             P.resize(numHessShapeFunctions, numDofs, 0);
             constraintValueProj.resize(numInnerShapeFunctions, numShapeFunctions, 0);
-            constraintGradProj.resize(numGradShapeFunctions,numGradShapeFunctions,0);
-            leastSquaresGradProj.resize( numEdges*edgeNormalSize , 2*numGradShapeFunctions ,0);
+            constraintGradProj.resize(numGradConstraints,numGradConstraints,0);
+            leastSquaresGradProj.resize( numEdges*edgeNormalSize , 2*numGradShapeFunctions,0);
 
             // iterate over the triangles of this polygon
             for (const ElementSeedType &entitySeed : entitySeeds[agglomerate]) {
@@ -422,6 +429,9 @@ namespace Dune {
                     if (alpha < numGradShapeFunctions && beta < numGradShapeFunctions) // basis set is hierarchic so we can compute HpGrad using the order p shapeFunctionSet
                     {
                       HpGrad[alpha][beta] += phi[0] * psi[0] * weight;
+                    }
+                    if (alpha < numGradConstraints && beta < numGradShapeFunctions )
+                    {
                       constraintGradProj[alpha][beta] += phi[0] * psi[0] * weight;
                     }
                     if (alpha < numHessShapeFunctions && beta < numHessShapeFunctions)
@@ -683,11 +693,11 @@ namespace Dune {
                       if (alpha < numGradShapeFunctions)
                         // evaluate each here for edge shape fns
                         edgeShapeFunctionSet_.evaluateEach(x, [&](std::size_t beta, FieldVector<DomainFieldType, 1> psi) {
-                          if (beta < edgePhiVector[0].size()) {
-                            //assemble left hand side here for ls problem
+                          if (beta < edgePhiVector[0].size() && alpha < numGradConstraints ) {
                             for (int s = 0; s <
-                                            mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
-                              R[alpha][mask[0][s]].axpy(edgePhiVector[0][beta][s] * psi[0] * phi[0] * weight, normal);
+                                            mask[0].size(); ++s)// note that edgePhi is the transposed of the basis transform matrix
+                                R[alpha][mask[0][s]].axpy(edgePhiVector[0][beta][s] * psi[0] * phi[0] * weight, normal);
+                            //assemble left hand side here for ls problem
                           }
                           if (beta < edgePhiVector[1].size()) {
                             leastSquaresGradProj[counter+beta][alpha] += psi[0] * phi[0] * weight * normal[0];
@@ -781,7 +791,7 @@ namespace Dune {
                     // Note: the shapeFunctionSet is defined in physical space so
                     // the jit is not needed here
                     // R[alpha][j]  -=  Pi phi_j  grad(m_alpha) * weight
-                    if (alpha < numGradShapeFunctions) {
+                    if (alpha < numGradConstraints) {
                       gradPhi[0] *= -weight;
                       vemBasisFunction.axpy(quadrature[qp], gradPhi[0], R[alpha]);
                     }
@@ -847,18 +857,34 @@ namespace Dune {
               auto leastSquaresMinimizerGradient = leastSquares(leastSquaresGradProj, constraintBlockMatrix);
               std::vector<DomainFieldType> b(leastSquaresGradProj.rows(), 0);
 
+              std::cout << "b size " << b.size() << std::endl;
+              std::cout << "num dofs " << numDofs << std::endl;
+
               for (std::size_t beta = 0; beta < numDofs; ++beta) {
+
+                std::cout << " beta: " << beta << std::endl;
+                std::cout << " R size: " << R.size() << std::endl;
+                std::cout << " grad projection size: " << jacobianProjection.size() << std::endl;
+
                 VectorizeMatrixCol d = vectorizeMatrixCol(R, beta);
                 VectorizeMatrixCol colGradProjection = vectorizeMatrixCol(jacobianProjection, beta);
 
                 for (int e = 0; e < fullMask.size(); e++)
+                {
+                  std::cout << " e: " << e << std::endl;
                   for (int i = 0; i < fullMask[e].size(); i++)
+                  {
+                    std::cout << " i: " << i << std::endl;
                     if (fullMask[e][i] == beta) {
+                      std::cout << "beta " << beta << " fullmask " << fullMask[e][i] << std::endl;
                       b[beta] = 1;
                       break;
                     }
-
+                  }
+                }
                 colGradProjection = leastSquaresMinimizerGradient.solve(b, d);
+
+                std::cout << " I reached here " << std::endl;
 
                 // re set b vector to 0
                 if (b[beta] == 1) {
