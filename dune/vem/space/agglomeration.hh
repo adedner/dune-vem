@@ -359,10 +359,12 @@ namespace Dune {
                     size(std::max(polOrder-2,0));
 #endif
 
-          const std::size_t numGradConstraints = numGradShapeFunctions;
+          const std::size_t numGradConstraints = Dune::Fem::OrthonormalShapeFunctions<DomainType::dimension>::
+          size(orders[1]);
+//            numGradShapeFunctions;
 
-//            Dune::Fem::OrthonormalShapeFunctions<DomainType::dimension>::
-//            size(orders[1]);
+
+
 
           std::cout << "size of spaces: "
                     << numInnerShapeFunctions << " "
@@ -403,7 +405,7 @@ namespace Dune {
             R.resize(numGradConstraints, numDofs, DomainType(0));
             P.resize(numHessShapeFunctions, numDofs, 0);
             constraintValueProj.resize(numInnerShapeFunctions, numShapeFunctions, 0);
-            constraintGradProj.resize(numGradConstraints,numGradConstraints,0);
+            constraintGradProj.resize(numGradConstraints,numGradShapeFunctions,0);
             leastSquaresGradProj.resize( numEdges*edgeNormalSize , 2*numGradShapeFunctions,0);
 
             // iterate over the triangles of this polygon
@@ -475,18 +477,19 @@ namespace Dune {
             auto leastSquaresMinimizer = LeastSquares(D, constraintValueProj);
             std::vector<DomainFieldType> b(numDofs, 0), d(numInnerShapeFunctions, 0);
 
-        for ( std::size_t beta = 0; beta < numDofs; ++beta )
-        {
-          auto colValueProjection = vectorizeMatrixCol( valueProjection, beta );
-            // set up vectors b and d needed for least squares
-          b[ beta ] = 1;
-            if( beta >= numDofs - numInnerShapeFunctions )
+            for ( std::size_t beta = 0; beta < numDofs; ++beta )
+            {
+              auto colValueProjection = vectorizeMatrixCol( valueProjection, beta );
+              // set up vectors b and d needed for least squares
+              b[ beta ] = 1;
+              if( beta >= numDofs - numInnerShapeFunctions )
                 d[ beta - numDofs + numInnerShapeFunctions] = H0;
 
               colValueProjection = leastSquaresMinimizer.solve(b, d);
 
               if (beta >= numDofs - numInnerShapeFunctions)
                 d[beta - numDofs + numInnerShapeFunctions] = 0;
+
               b[beta] = 0;
             }
 
@@ -839,6 +842,9 @@ namespace Dune {
             // least squares
             if ( leastSquaresGradProj.size() == 0 ) {
               if (1 || numInnerShapeFunctions > 0) {
+
+                assert( numGradConstraints == numGradShapeFunctions );
+
                 // need to compute value projection first
                 // now compute projection by multiplying with inverse mass matrix
                 for (std::size_t alpha = 0; alpha < numGradShapeFunctions; ++alpha)
@@ -869,27 +875,33 @@ namespace Dune {
                 VectorizeMatrixCol d = vectorizeMatrixCol(R, beta);
                 VectorizeMatrixCol colGradProjection = vectorizeMatrixCol(jacobianProjection, beta);
 
+                int counter = 0;
+                bool finished = false;
                 for (int e = 0; e < fullMask.size(); e++)
                 {
+                  finished = false;
                   std::cout << " e: " << e << std::endl;
-                  for (int i = 0; i < fullMask[e].size(); i++)
+                  for (int i = 0; i < fullMask[e].size(); i++, ++counter)
                   {
                     std::cout << " i: " << i << std::endl;
                     if (fullMask[e][i] == beta) {
                       std::cout << "beta " << beta << " fullmask " << fullMask[e][i] << std::endl;
-                      b[beta] = 1;
+                      b[counter] = 1;
+                      finished = true;
                       break;
                     }
                   }
+                  if (finished) break;
                 }
+                std::cout << " counter: " << counter << std::endl;
+
                 colGradProjection = leastSquaresMinimizerGradient.solve(b, d);
 
                 std::cout << " I reached here " << std::endl;
 
                 // re set b vector to 0
-                if (b[beta] == 1) {
-                  b[beta] = 0;
-                }
+                if (finished)
+                  b[counter] = 0;
               }
             }
 
