@@ -410,6 +410,10 @@ namespace Dune {
             constraintGradProj.resize(numGradConstraints,numGradShapeFunctions,0);
             leastSquaresGradProj.resize( numEdges*(edgeNormalSize + edgeTangentialSize ) , 2*numGradShapeFunctions,0);
 
+            std::vector< std::vector<DomainFieldType > > RHSleastSquaresGrad(numDofs,0);
+            for (std::size_t i = 0; i < numDofs; ++i)
+              RHSleastSquaresGrad[i].resize(leastSquaresGradProj.rows(), 0);
+
             // iterate over the triangles of this polygon
             for (const ElementSeedType &entitySeed : entitySeeds[agglomerate]) {
               const ElementType &element = gridPart().entity(entitySeed);
@@ -716,6 +720,30 @@ namespace Dune {
                             leastSquaresGradProj[numEdges*edgeNormalSize +counter2+beta][alpha + numGradShapeFunctions ] += psi[0] * phi[0] * weight * normal[0];
                           }
                         });
+                      if( alpha < numGradShapeFunctions )
+                      {
+                        auto jit = intersection.geometry().jacobianInverseTransposed(x);
+                        //jacobian each here for edge shape fns
+                        edgeShapeFunctionSet_.jacobianEach(x, [&](std::size_t beta,
+                                                                  FieldMatrix<DomainFieldType, 1, 1> dpsi) {
+                          if (beta < edgePhiVector[0].size()) {
+                            // note: the edgeShapeFunctionSet is defined over
+                            // the reference element of the edge so the jit has
+                            // to be applied here
+                            Dune::FieldVector<double, 2> gradPsi;
+                            jit.mv(dpsi[0], gradPsi);
+                            double gradPsiDottau = gradPsi * tau;
+                            assert(std::abs(gradPsiDottau - dpsi[0][0] / h) < 1e-8);
+                            for (int s = 0; s < mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
+                            {
+                              if ( beta < edgeTangentialSize )
+                              {
+                                RHSleastSquaresGrad[ mask[0][s] ][ numEdges*edgeNormalSize + counter2 + beta ] += edgePhiVector[0][beta][s] * gradPsiDottau * phi[0];
+                              }
+                            }
+                          }
+                        });
+                      }
                       if (alpha < numHessShapeFunctions) // && agIndexSet_.edgeSize(1) > 0)
                       {
 #if 1 // can be replaced by integration by parts version further down
@@ -731,10 +759,11 @@ namespace Dune {
                               jit.mv(dpsi[0], gradPsi);
                               double gradPsiDottau = gradPsi * tau;
                               assert(std::abs(gradPsiDottau - dpsi[0][0] / h) < 1e-8);
-                              for (int s = 0; s <
-                                              mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
+                              for (int s = 0; s < mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
+                              {
                                 P[alpha][mask[0][s]].axpy(edgePhiVector[0][beta][s] * gradPsiDottau * phi[0] * weight,
                                                           factorTN);
+                              }
                             }
                         });
 #endif
