@@ -376,7 +376,7 @@ namespace Dune {
 
           // set up matrices used for constructing gradient, value, and edge projections
           // Note: the code is set up with the assumption that the dofs suffice to compute the edge projection
-          DynamicMatrix <DomainFieldType> D, C, constraintValueProj, constraintGradProj, leastSquaresGradProj, Hp, HpGrad, HpHess, HpInv, HpGradInv, HpHessInv;
+          DynamicMatrix <DomainFieldType> D, C, constraintValueProj, constraintGradProj, leastSquaresGradProj, RHSleastSquaresGrad, Hp, HpGrad, HpHess, HpInv, HpGradInv, HpHessInv;
           DynamicMatrix <DomainType> R; // ,G //!!!
           DynamicMatrix<typename Traits::ScalarBasisFunctionSetType::HessianMatrixType> P;
 
@@ -396,7 +396,7 @@ namespace Dune {
             const int numEdges = agIndexSet_.subAgglomerates(agglomerate, AgglomerationIndexSetType::dimension - 1);
             const std::size_t edgeNormalSize = agIndexSet_.template order2size<1>(1);
             const std::size_t edgeTangentialSize = Dune::Fem::OrthonormalShapeFunctions<DomainType::dimension>::
-            size(edgeDegrees()[0]+1);
+            size(agIndexSet_.edgeDegrees()[0]+1);
 
             D.resize(numDofs, numShapeFunctions, 0);
             C.resize(numShapeFunctions, numDofs, 0);
@@ -409,10 +409,7 @@ namespace Dune {
             constraintValueProj.resize(numInnerShapeFunctions, numShapeFunctions, 0);
             constraintGradProj.resize(numGradConstraints,numGradShapeFunctions,0);
             leastSquaresGradProj.resize( numEdges*(edgeNormalSize + edgeTangentialSize ) , 2*numGradShapeFunctions,0);
-
-            std::vector< std::vector<DomainFieldType > > RHSleastSquaresGrad(numDofs,0);
-            for (std::size_t i = 0; i < numDofs; ++i)
-              RHSleastSquaresGrad[i].resize(leastSquaresGradProj.rows(), 0);
+            RHSleastSquaresGrad.resize( numDofs, leastSquaresGradProj.rows(), 0);
 
             // iterate over the triangles of this polygon
             for (const ElementSeedType &entitySeed : entitySeeds[agglomerate]) {
@@ -900,16 +897,12 @@ namespace Dune {
             else {
               BlockMatrix constraintBlockMatrix = blockMatrix(constraintGradProj, 2);
               auto leastSquaresMinimizerGradient = leastSquares(leastSquaresGradProj, constraintBlockMatrix);
-              std::vector<DomainFieldType> b(leastSquaresGradProj.rows(), 0);
 
-              std::cout << "b size " << b.size() << std::endl;
-              std::cout << "num dofs " << numDofs << std::endl;
-
-              for (std::size_t beta = 0; beta < numDofs; ++beta) {
-
-                std::cout << " beta: " << beta << std::endl;
-                std::cout << " R size: " << R.size() << std::endl;
-                std::cout << " grad projection size: " << jacobianProjection.size() << std::endl;
+              for (std::size_t beta = 0; beta < numDofs; ++beta)
+              {
+//                std::cout << " beta: " << beta << std::endl;
+//                std::cout << " R size: " << R.size() << std::endl;
+//                std::cout << " grad projection size: " << jacobianProjection.size() << std::endl;
 
                 VectorizeMatrixCol d = vectorizeMatrixCol(R, beta);
                 VectorizeMatrixCol colGradProjection = vectorizeMatrixCol(jacobianProjection, beta);
@@ -919,28 +912,17 @@ namespace Dune {
                 for (int e = 0; e < fullMask.size(); e++)
                 {
                   finished = false;
-                  std::cout << " e: " << e << std::endl;
                   for (int i = 0; i < fullMask[e].size(); i++, ++counter)
                   {
-                    std::cout << " i: " << i << std::endl;
                     if (fullMask[e][i] == beta) {
-                      std::cout << "beta " << beta << " fullmask " << fullMask[e][i] << std::endl;
-                      b[counter] = 1;
+                      RHSleastSquaresGrad[ beta ][ counter ] = 1;
                       finished = true;
                       break;
                     }
                   }
                   if (finished) break;
                 }
-                std::cout << " counter: " << counter << std::endl;
-
-                colGradProjection = leastSquaresMinimizerGradient.solve(b, d);
-
-                std::cout << " I reached here " << std::endl;
-
-                // re set b vector to 0
-                if (finished)
-                  b[counter] = 0;
+                colGradProjection = leastSquaresMinimizerGradient.solve( RHSleastSquaresGrad[beta] , d );
               }
             }
 
