@@ -395,6 +395,8 @@ namespace Dune {
 
             const int numEdges = agIndexSet_.subAgglomerates(agglomerate, AgglomerationIndexSetType::dimension - 1);
             const std::size_t edgeNormalSize = agIndexSet_.template order2size<1>(1);
+            const std::size_t edgeTangentialSize = Dune::Fem::OrthonormalShapeFunctions<DomainType::dimension>::
+            size(edgeDegrees()[0]+1);
 
             D.resize(numDofs, numShapeFunctions, 0);
             C.resize(numShapeFunctions, numDofs, 0);
@@ -406,7 +408,7 @@ namespace Dune {
             P.resize(numHessShapeFunctions, numDofs, 0);
             constraintValueProj.resize(numInnerShapeFunctions, numShapeFunctions, 0);
             constraintGradProj.resize(numGradConstraints,numGradShapeFunctions,0);
-            leastSquaresGradProj.resize( numEdges*edgeNormalSize , 2*numGradShapeFunctions,0);
+            leastSquaresGradProj.resize( numEdges*(edgeNormalSize + edgeTangentialSize ) , 2*numGradShapeFunctions,0);
 
             // iterate over the triangles of this polygon
             for (const ElementSeedType &entitySeed : entitySeeds[agglomerate]) {
@@ -621,6 +623,7 @@ namespace Dune {
                                                                                                   scalarShapeFunctionSet_);
 
               int counter = 0;
+              int counter2 = 0;
 
               // compute the boundary terms for the gradient projection
               for (const auto &intersection : intersections(static_cast< typename GridPart::GridViewType >( gridPart()),
@@ -702,9 +705,15 @@ namespace Dune {
                                 R[alpha][mask[0][s]].axpy(edgePhiVector[0][beta][s] * psi[0] * phi[0] * weight, normal);
                             //assemble left hand side here for ls problem
                           }
-                          if (beta < edgePhiVector[1].size()) {
+                          if (beta < edgePhiVector[1].size())
+                          {
                             leastSquaresGradProj[counter+beta][alpha] += psi[0] * phi[0] * weight * normal[0];
                             leastSquaresGradProj[counter+beta][alpha + numGradShapeFunctions ] += psi[0] * phi[0] * weight * normal[1];
+                          }
+                          if (beta < edgeTangentialSize)
+                          {
+                            leastSquaresGradProj[numEdges*edgeNormalSize +counter2+beta][alpha] += - psi[0] * phi[0] * weight * normal[1];
+                            leastSquaresGradProj[numEdges*edgeNormalSize +counter2+beta][alpha + numGradShapeFunctions ] += psi[0] * phi[0] * weight * normal[0];
                           }
                         });
                       if (alpha < numHessShapeFunctions) // && agIndexSet_.edgeSize(1) > 0)
@@ -781,6 +790,7 @@ namespace Dune {
                 // store the masks for each edge
                 fullMask.push_back(mask[1]);
                 counter += agIndexSet_.edgeSize(1);
+                counter2 += edgeTangentialSize;
               } // loop over intersections
 
 
