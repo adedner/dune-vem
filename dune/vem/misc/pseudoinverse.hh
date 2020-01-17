@@ -44,8 +44,11 @@ namespace Dune
         resize( invA, numCols, numRows );
         for( Size i = 0; i < numCols; ++i )
           for( Size j = 0; j < numRows; ++j )
+          {
+            invA[i][j] = 0;
             for( Size k = 0; k < numCols; ++k )
-              invA[ i ][ j ] = ATA_[ i ][k] * A[ j ][k];
+              invA[ i ][ j ] += ATA_[ i ][k] * A[ j ][k];
+          }
       }
 
 
