@@ -40,7 +40,7 @@ namespace Dune {
                 systemMultiply.resize(llsMatrix_.cols());
                 systemMatrixInv_.mv(b, systemMultiply);
               }
-              if (isEmpty(llsMatrix_)) {
+              else if (isEmpty(llsMatrix_)) {
                 assert(d.size() == constraintMatrix_.rows());
                 systemMultiply.resize(constraintMatrix_.cols());
                 systemMatrixInv_.mv(d, systemMultiply);
