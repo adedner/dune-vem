@@ -17,7 +17,7 @@ dune.fem.parameter.append({"fem.verboserank": 0})
 # use some run time parameters here to enable batch processesing
 # the dump file should include the parameter values and the plot script
 # should also use the parameters to determin input and output file names
-order = 2
+order = 1
 gridTypes = ["triangles","cartesian","quadrilaterals","voronoi"]
 useGrid = 0 # 0..3
 # note that the hessian of the reference element based basis
@@ -30,8 +30,8 @@ methods = [ ### "[space,scheme,spaceKwrags]"
             # ["vem","vem",{"testSpaces":[ [0],  [order-2], [order-3] ] }, "Serendipity"],
             # ["vem","vem",{"testSpaces":[ [-1], [order-1], [order-3] ] }, "Nc-Serendipity"],
             ["vem","vem",{"conforming":True}, "conforming"],
-            ["vem","vem",{"conforming":False}, "non-conforming"],
-            ["vem","vem",{"testSpaces":[ [0],  [order-3,order-2], [order-4] ] }, "C1-non-conforming"],
+            # ["vem","vem",{"conforming":False}, "non-conforming"],
+            # ["vem","vem",{"testSpaces":[ [0],  [order-3,order-2], [order-4] ] }, "C1-non-conforming"],
             # ["vem","vem",{"testSpaces":[ [0],  [order-2,order-2], [order-2] ] }, "C1C0-conforming"],
             # ["bbdg","bbdg",{},"bbdg"],
    ]
@@ -60,7 +60,7 @@ def compute(grid, space, schemeName):
            ], info
 
 results = []
-for level in range(2,6):
+for level in range(2,5):
     N = 2**level
     constructor = cartesianDomain([-0.5,-0.5],[1,1],[N,N])
     if useGrid == 0:
