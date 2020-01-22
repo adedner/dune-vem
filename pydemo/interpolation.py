@@ -17,9 +17,9 @@ dune.fem.parameter.append({"fem.verboserank": 0})
 # use some run time parameters here to enable batch processesing
 # the dump file should include the parameter values and the plot script
 # should also use the parameters to determin input and output file names
-order = 2
-gridTypes = ["triangles","cartesian","quadrilaterals","voronoi"]
-useGrid = 0 # 0..3
+order = 1
+gridTypes = ["triangles","cartesian","quadrilaterals","voronoi","referenceTriangle"]
+useGrid = 4 # 0..4
 # note that the hessian of the reference element based basis
 # function is not implemented for the 'quadrilaterals' grid
 
@@ -30,8 +30,8 @@ methods = [ ### "[space,scheme,spaceKwrags]"
             # ["vem","vem",{"testSpaces":[ [0],  [order-2], [order-3] ] }, "Serendipity"],
             # ["vem","vem",{"testSpaces":[ [-1], [order-1], [order-3] ] }, "Nc-Serendipity"],
             ["vem","vem",{"conforming":True}, "conforming"],
-            ["vem","vem",{"conforming":False}, "non-conforming"],
-            ["vem","vem",{"testSpaces":[ [0],  [order-3,order-2], [order-4] ] }, "C1-non-conforming"],
+            # ["vem","vem",{"conforming":False}, "non-conforming"],
+            # ["vem","vem",{"testSpaces":[ [0],  [order-3,order-2], [order-4] ] }, "C1-non-conforming"],
             # ["vem","vem",{"testSpaces":[ [0],  [order-2,order-2], [order-2] ] }, "C1C0-conforming"],
             # ["bbdg","bbdg",{},"bbdg"],
    ]
@@ -39,8 +39,8 @@ methods = [ ### "[space,scheme,spaceKwrags]"
 uflSpace = dune.ufl.Space(2, dimRange=1)
 x = SpatialCoordinate(uflSpace)
 # exact = as_vector( [ 10 + x[0]*x[1] + x[0]**2*x[1] + x[1]**3 ] )
-exact = as_vector( [x[0]*x[1] * cos(pi*x[0]*x[1])] )
-
+# exact = as_vector( [x[0]*x[1] * cos(pi*x[0]*x[1])] )
+exact = as_vector( [x[0]] )
 def compute(grid, space, schemeName):
     # do the interpolation
     df = space.interpolate(exact,name="solution")
@@ -79,6 +79,12 @@ for level in range(2,6):
         polyGrid.hierarchicalGrid.globalRefine(level)
     elif useGrid == 3:
         polyGrid = create.grid("polygrid", voronoiCells(constructor,N*N,"voronoiseeds",load=True,show=True) )
+    elif useGrid == 4:
+        # reference triangle
+        refGrid = {"vertices": [ [0,0],[0,1],[1,0] ],
+                   "simplices":  [ [0,1,2] ]}
+        polyGrid = create.grid("polygrid", refGrid, cubes=False )
+        polyGrid.hierarchicalGrid.globalRefine(level)
     gridVidth = -1 # need something here
     @gridFunction(polyGrid, name="cells")
     def polygons(en,x):
