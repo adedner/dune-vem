@@ -722,7 +722,7 @@ namespace Dune {
                             leastSquaresGradProj[numEdges*edgeNormalSize +counter2+beta][alpha + numGradShapeFunctions ] += psi[0] * phi[0] * weight * tau[1];
                           }
                         });
-                      if( alpha < numGradShapeFunctions )
+                      if( alpha < edgeTangentialSize )
                       {
                         auto jit = intersection.geometry().jacobianInverseTransposed(x);
                         //jacobian each here for edge shape fns
@@ -738,10 +738,22 @@ namespace Dune {
                             assert(std::abs(gradPsiDottau - dpsi[0][0] / h) < 1e-8);
                             for (int s = 0; s < mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
                             {
-                              if ( beta < edgeTangentialSize )
-                              {
-                                RHSleastSquaresGrad[ mask[0][s] ][ numEdges*edgeNormalSize + counter2 + beta ] += edgePhiVector[0][beta][s] * gradPsiDottau * phi[0] * weight;
-                              }
+//                              if ( beta < edgeTangentialSize )
+//                              {
+//
+//                                std::cout << "I reached here " << std::endl;
+//                                std::cout << "mask0 size " << mask[0].size() << std::endl;
+//                                std::cout << "beta " << beta << std::endl;
+//                                std::cout << "mask[0][s] " << mask[0][s] << std::endl;
+//                                std::cout << "offset " <<  numEdges*edgeNormalSize << std::endl;
+//                                std::cout << "counter2 " << counter2 << std::endl;
+//                                std::cout << "offset + counter2 + beta" << numEdges*edgeNormalSize + counter2 + beta << std::endl;
+//                                std::cout << "entry " << edgePhiVector[0][beta][s] * gradPsiDottau * phi[0] * weight << std::endl;
+
+                                RHSleastSquaresGrad[ mask[0][s] ][ numEdges*edgeNormalSize + alpha ] += edgePhiVector[0][beta][s] * gradPsiDottau * phi[0] * weight;
+
+//                                s/td::cout << RHSleastSquaresGrad[ mask[0][s] ][ numEdges*edgeNormalSize + alpha ] << std::endl;
+//                              }
                             }
                           }
                         });
@@ -917,7 +929,7 @@ namespace Dune {
                 for (int e = 0; e < fullMask.size(); e++)
                 {
                   finished = false;
-                  for (int i = 0; i < fullMask[e].size(); i++, ++counter)
+                  for (int i = 0; i < fullMask[e].size(); ++i, ++counter)
                   {
                     if (fullMask[e][i] == beta) {
                       RHSleastSquaresGrad[ beta ][ counter ] = 1;
@@ -927,7 +939,7 @@ namespace Dune {
                   }
                   if (finished) break;
                 }
-                colGradProjection = leastSquaresMinimizerGradient.solve( RHSleastSquaresGrad[beta] , d );
+                colGradProjection = leastSquaresMinimizerGradient.solve( RHSleastSquaresGrad[ beta ] , d );
               }
             }
 

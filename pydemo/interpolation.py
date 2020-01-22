@@ -60,7 +60,7 @@ def compute(grid, space, schemeName):
            ], info
 
 results = []
-for level in range(2,6):
+for level in range(2,5):
     N = 2**level
     constructor = cartesianDomain([-0.5,-0.5],[1,1],[N,N])
     if useGrid == 0:

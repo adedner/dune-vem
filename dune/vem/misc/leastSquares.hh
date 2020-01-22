@@ -33,6 +33,7 @@ namespace Dune {
             template<class bVector, class dVector>
             bVector solve(const bVector &b, const dVector &d) {
 
+              printVector(b);
               bVector systemMultiply, systemLagrange;
 
               if (isEmpty(constraintMatrix_)) {
@@ -93,9 +94,12 @@ namespace Dune {
 
             template<class xVector>
             void printVector(const xVector &x) {
-              return;
+//              return;
               for (unsigned int i = 0; i < x.size(); ++i)
+              {
                 std::cout << x[i] << std::endl;
+                std::cout << " " << std::endl;
+              }
             }
 
 
