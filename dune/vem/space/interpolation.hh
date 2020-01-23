@@ -115,7 +115,7 @@ namespace Dune
         auto edge = [&] (int poly,auto intersection,int k,int numDofs)
         { //!TS add nomral derivatives
           int kStart = k;
-          int edgeNumber = intersection.indexInInside();
+          // int edgeNumber = intersection.indexInInside();
           EdgeQuadratureType edgeQuad( gridPart(), intersection, 2*polOrder_, EdgeQuadratureType::INSIDE );
           auto normal = intersection.centerUnitOuterNormal();
           if (intersection.neighbor()) // we need to check the orientation of the normal
@@ -127,7 +127,7 @@ namespace Dune
             auto x = edgeQuad.localPoint(qp);
             auto y = intersection.geometryInInside().global(x);
             double weight = edgeQuad.weight(qp) * intersection.geometry().integrationElement(x);
-            edgeBFS_.evaluateEach( x,
+            edgeBFS_.evaluateEach(x,
                 [&](std::size_t alpha, typename EdgeFSType::RangeType phi ) {
                 if (alpha < indexSet_.template order2size<1>(0))
                 {

@@ -33,10 +33,10 @@ namespace Dune {
             template<class bVector, class dVector>
             bVector solve(const bVector &b, const dVector &d) {
 
-              printVector(b);
+              // printVector(b);
               bVector systemMultiply, systemLagrange;
 
-              if (isEmpty(constraintMatrix_)) {
+              if (isEmpty(constraintMatrix_)) { // this will usually require computing A^Tb
                 assert(b.size() == llsMatrix_.rows());
                 systemMultiply.resize(llsMatrix_.cols());
                 systemMatrixInv_.mv(b, systemMultiply);
@@ -66,6 +66,11 @@ namespace Dune {
                 for (Size i = 0; i < systemMultiply.size(); ++i)
                   systemMultiply[i] = systemLagrange[i];
               }
+              /*
+              std::cout << "'''''''''''''''''\n";
+              printVector(systemMultiply);
+              std::cout << "'''''''''''''''''\n";
+              */
               return systemMultiply;
             }
 
@@ -83,10 +88,9 @@ namespace Dune {
             }
 #endif
             void printMatrix(const Matrix &A) {
-              return;
               for (unsigned int i = 0; i < A.rows(); ++i) {
                 for (unsigned int j = 0; j < A.cols(); ++j) {
-                  std::cout << A[i][j];
+                  std::cout << A[i][j] << " ";
                 }
                 std::cout << std::endl;
               }
@@ -94,12 +98,11 @@ namespace Dune {
 
             template<class xVector>
             void printVector(const xVector &x) {
-//              return;
               for (unsigned int i = 0; i < x.size(); ++i)
               {
-                std::cout << x[i] << std::endl;
-                std::cout << " " << std::endl;
+                std::cout << x[i] << " ";
               }
+              std::cout << std::endl;
             }
 
 
@@ -114,15 +117,24 @@ namespace Dune {
               return (A.size() == 0);
             }
 
+            // return inverse of a matrix
+            template <class CCMatrix>
+            Matrix matrixInv(const CCMatrix &matrix) {
+              // std::cout << "@@@@@@@@@@@@@@@@@\nVORHER\n";
+              // printMatrix(matrix);
+              Matrix inverse(matrix);
+              inverse.invert();
+              // std::cout << "@@@@@@@@@@@@@@@@@\nAFTER\n";
+              // printMatrix(inverse);
+              // std::cout << "@@@@@@@@@@@@@@@@@\n";
+              return inverse;
+            }
             // return pseudo inverse of a matrix
             template <class CCMatrix>
             Matrix matrixSetUp(const CCMatrix &matrix) {
               LeftPseudoInverse <Field> pseudoInverse(matrix.cols());
-
               Matrix matrixPseudoInv(matrix.cols(), matrix.rows());
-
               pseudoInverse(matrix, matrixPseudoInv);
-
               return matrixPseudoInv;
             }
 
@@ -133,7 +145,8 @@ namespace Dune {
               if (isEmpty(constraintMatrix_)) {
                 return matrixSetUp(llsMatrix_);
               }
-              if (isEmpty(llsMatrix_)) {
+              else if (isEmpty(llsMatrix_)) {
+                // Andreas: here a normal inverse should work - this produces a pseudo inverse
                 return matrixSetUp(constraintMatrix_);
               } else {
                 // construct the matrix [2A^T*A C^T ; C 0] needed for least squares solution
@@ -177,6 +190,9 @@ namespace Dune {
 //                        std::cout << "System matrix invert: " << std::endl;
 //                        printMatrix(systemMatrix);
 
+                // std::cout << "LLS+C @@@@@@@@@@@@@@@@@\nAFTER\n";
+                // printMatrix(systemMatrix);
+                // std::cout << "LLS+C @@@@@@@@@@@@@@@@@\n";
                 return systemMatrix;
               }
             }

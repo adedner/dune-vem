@@ -399,9 +399,11 @@ namespace Dune {
             const std::size_t edgeTangentialSize = Dune::Fem::OrthonormalShapeFunctions<1>::
               size( agIndexSet_.edgeOrders()[0] + 1);
 
-//            std::cout << "edge normal size" << edgeNormalSize << std::endl;
-//            std::cout << "edge tangent size" << edgeTangentialSize << std::endl;
-//            std::cout << "edge degrees()[0]+1" << agIndexSet_.edgeDegrees()[0]+1 << std::endl;
+            /*
+            std::cout << "edge normal size" << edgeNormalSize << std::endl;
+            std::cout << "edge tangent size" << edgeTangentialSize << std::endl;
+            std::cout << "edge degrees()[0]+1" << agIndexSet_.edgeDegrees()[0]+1 << std::endl;
+            */
 
             D.resize(numDofs, numShapeFunctions, 0);
             C.resize(numShapeFunctions, numDofs, 0);
@@ -500,7 +502,16 @@ namespace Dune {
 
               b[beta] = 0;
             }
-
+            /*
+            std::cout << "VALUE !!!!!!!!!!!!!!!!!!!!!!!!!\n";
+            for (int i=0;i<valueProjection.size();++i)
+            {
+              for ( std::size_t j = 0; j < numDofs; ++j )
+                std::cout << i << "," << j << ":" << valueProjection[i][j] << "    ";
+              std::cout << "\n";
+            }
+            std::cout << "VALUE !!!!!!!!!!!!!!!!!!!!!!!!!\n";
+            */
             /////////////////////////////////////////
             /////////////////////////////////////////
 // !!! Original value projection implementation
@@ -617,6 +628,9 @@ namespace Dune {
             std::vector< std::vector<int>> fullMask;
 
             // iterate over the triangles of this polygon
+            int counter = 0;
+            int counter2 = 0;
+
             for (const ElementSeedType &entitySeed : entitySeeds[agglomerate]) {
               const ElementType &element = gridPart().entity(entitySeed);
               const auto geometry = element.geometry();
@@ -627,9 +641,6 @@ namespace Dune {
               BoundingBoxBasisFunctionSet <GridPart, ScalarShapeFunctionSetType> shapeFunctionSet(element, bbox,
                                                                                                   useOnb_,
                                                                                                   scalarShapeFunctionSet_);
-
-              int counter = 0;
-              int counter2 = 0;
 
               // compute the boundary terms for the gradient projection
               for (const auto &intersection : intersections(static_cast< typename GridPart::GridViewType >( gridPart()),
@@ -645,10 +656,16 @@ namespace Dune {
                 double h = tau.two_norm();
                 tau /= h;
                 for (std::size_t i = 0; i < factorTN.rows; ++i)
-                  for (std::size_t j = 0; j < factorTN.cols; ++j) {
+                  for (std::size_t j = 0; j < factorTN.cols; ++j)
+                  {
                     factorTN[i][j] = 0.5 * (normal[i] * tau[j] + normal[j] * tau[i]);
                     factorNN[i][j] = 0.5 * (normal[i] * normal[j] + normal[j] * normal[i]);
                   }
+                auto globalNormal = normal;
+                if (intersection.neighbor()) // we need to check the orientation of the normal
+                  if (blockMapper_.indexSet().index(intersection.inside()) >
+                      blockMapper_.indexSet().index(intersection.outside()))
+                    globalNormal *= -1;
 
                 std::vector<std::vector<int>> mask(2); // contains indices with Phi_mask[i] is attached to given edge
                 edgePhiVector[0].resize(agIndexSet_.edgeSize(0), agIndexSet_.edgeSize(0), 0);
@@ -672,7 +689,8 @@ namespace Dune {
                 {
                   std::vector<double> lambda(numDofs);
                   bool succ = true;
-                  for (int i = 0; i < mask[0].size(); ++i) {
+                  for (int i = 0; i < mask[0].size(); ++i)
+                  {
                     std::fill(lambda.begin(), lambda.end(), 0);
                     PhiEdge <GridPartType, Dune::DynamicMatrix<double>, EdgeShapeFunctionSetType>
                             phiEdge(gridPart(), intersection, edgePhiVector[0], edgeShapeFunctionSet_,
@@ -706,58 +724,11 @@ namespace Dune {
                         // evaluate each here for edge shape fns
                         edgeShapeFunctionSet_.evaluateEach(x, [&](std::size_t beta, FieldVector<DomainFieldType, 1> psi) {
                           if (beta < edgePhiVector[0].size() && alpha < numGradConstraints ) {
-                            for (int s = 0; s <
-                                            mask[0].size(); ++s)// note that edgePhi is the transposed of the basis transform matrix
+                            for (int s = 0; s < mask[0].size(); ++s)// note that edgePhi is the transposed of the basis transform matrix
                                 R[alpha][mask[0][s]].axpy(edgePhiVector[0][beta][s] * psi[0] * phi[0] * weight, normal);
                             //assemble left hand side here for ls problem
                           }
-                          if (beta < edgePhiVector[1].size())
-                          {
-                            leastSquaresGradProj[counter+beta][alpha] += psi[0] * phi[0] * weight * normal[0];
-                            leastSquaresGradProj[counter+beta][alpha + numGradShapeFunctions ] += psi[0] * phi[0] * weight * normal[1];
-                          }
-                          if (beta < edgeTangentialSize)
-                          {
-                            leastSquaresGradProj[numEdges*edgeNormalSize +counter2+beta][alpha] += psi[0] * phi[0] * weight * tau[0];
-                            leastSquaresGradProj[numEdges*edgeNormalSize +counter2+beta][alpha + numGradShapeFunctions ] += psi[0] * phi[0] * weight * tau[1];
-                          }
                         });
-                      if( alpha < edgeTangentialSize )
-                      {
-                        auto jit = intersection.geometry().jacobianInverseTransposed(x);
-                        //jacobian each here for edge shape fns
-                        edgeShapeFunctionSet_.jacobianEach(x, [&](std::size_t beta,
-                                                                  FieldMatrix<DomainFieldType, 1, 1> dpsi) {
-                          if (beta < edgePhiVector[0].size()) {
-                            // note: the edgeShapeFunctionSet is defined over
-                            // the reference element of the edge so the jit has
-                            // to be applied here
-                            Dune::FieldVector<double, 2> gradPsi;
-                            jit.mv(dpsi[0], gradPsi);
-                            double gradPsiDottau = gradPsi * tau;
-                            assert(std::abs(gradPsiDottau - dpsi[0][0] / h) < 1e-8);
-                            for (int s = 0; s < mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
-                            {
-//                              if ( beta < edgeTangentialSize )
-//                              {
-//
-//                                std::cout << "I reached here " << std::endl;
-//                                std::cout << "mask0 size " << mask[0].size() << std::endl;
-//                                std::cout << "beta " << beta << std::endl;
-//                                std::cout << "mask[0][s] " << mask[0][s] << std::endl;
-//                                std::cout << "offset " <<  numEdges*edgeNormalSize << std::endl;
-//                                std::cout << "counter2 " << counter2 << std::endl;
-//                                std::cout << "offset + counter2 + beta" << numEdges*edgeNormalSize + counter2 + beta << std::endl;
-//                                std::cout << "entry " << edgePhiVector[0][beta][s] * gradPsiDottau * phi[0] * weight << std::endl;
-
-                                RHSleastSquaresGrad[ mask[0][s] ][ numEdges*edgeNormalSize + alpha ] += edgePhiVector[0][beta][s] * gradPsiDottau * phi[0] * weight;
-
-//                                s/td::cout << RHSleastSquaresGrad[ mask[0][s] ][ numEdges*edgeNormalSize + alpha ] << std::endl;
-//                              }
-                            }
-                          }
-                        });
-                      }
                       if (alpha < numHessShapeFunctions) // && agIndexSet_.edgeSize(1) > 0)
                       {
 #if 1 // can be replaced by integration by parts version further down
@@ -790,6 +761,68 @@ namespace Dune {
                         });
                       } // alpha < numHessSF and can compute normal derivative
                   });
+                  ////////////////////////////////
+                  shapeFunctionSet.evaluateEach(y, [&](std::size_t alpha, FieldVector<DomainFieldType, 1> phi) {
+                      if (alpha < numGradShapeFunctions)
+                      {
+                        edgeShapeFunctionSet_.evaluateEach(x, [&](std::size_t beta, FieldVector<DomainFieldType, 1> psi) {
+                          if (beta < edgePhiVector[1].size())
+                          {
+                            assert( edgeNormalSize == edgePhiVector[1].size() );
+                            assert( edgeNormalSize == agIndexSet_.edgeSize(1) );
+                            /*
+                            std::cout << "INDEX IN INSIDE:" << intersection.indexInInside()
+                                      << " mask0 = ";
+                            for (int i=0;i<mask[0].size();++i)
+                              std::cout << mask[0][i] << " ";
+                            std::cout << "   mask1 = ";
+                            for (int i=0;i<mask[1].size();++i)
+                              std::cout << mask[1][i] << " ";
+                            std::cout << std::endl;
+                            */
+                            leastSquaresGradProj[counter+beta][alpha]                          += psi[0] * phi[0] * weight * globalNormal[0];
+                            leastSquaresGradProj[counter+beta][alpha + numGradShapeFunctions ] += psi[0] * phi[0] * weight * globalNormal[1];
+                          }
+                          if (beta < edgeTangentialSize)
+                          {
+                            leastSquaresGradProj[numEdges*edgeNormalSize + counter2+beta][alpha]                          += psi[0] * phi[0] * weight * tau[0];
+                            leastSquaresGradProj[numEdges*edgeNormalSize + counter2+beta][alpha + numGradShapeFunctions ] += psi[0] * phi[0] * weight * tau[1];
+                          }
+                        });
+                     }
+                  });
+                  auto jit = intersection.geometry().jacobianInverseTransposed(x);
+                  edgeShapeFunctionSet_.evaluateEach(x, [&](std::size_t alpha, FieldVector<DomainFieldType, 1> phi) {
+                    if (alpha < edgeTangentialSize) // note: in contrast to the previous loop alpha is now the test space
+                    {
+                        edgeShapeFunctionSet_.jacobianEach(x, [&](std::size_t beta, FieldMatrix<DomainFieldType, 1, 1> dpsi) {
+                          if (beta < edgePhiVector[0].size())
+                          {
+                            Dune::FieldVector<double, 2> gradPsi;
+                            jit.mv(dpsi[0], gradPsi);
+                            double gradPsiDottau = gradPsi * tau;
+                            /*
+                            std::cout << "&& " << beta << " " << edgeTangentialSize
+                                      << " && "
+                                      << dpsi[0] << " " << gradPsi << " " << tau
+                                      << " -> " << gradPsiDottau << std::endl;
+                            */
+                            assert(std::abs(gradPsiDottau - dpsi[0][0] / h) < 1e-8);
+                            for (int s = 0; s < mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
+                            {
+                              /*
+                              std::cout << "+++ << " << s << " " << mask[0][s] << " " << alpha
+                                << " " << numEdges*edgeNormalSize + counter2 + alpha
+                                << " += " << edgePhiVector[0][beta][s] << "*"
+                                << gradPsiDottau << "*" <<  phi[0] <<"*" << weight
+                                << std::endl;
+                              */
+                              RHSleastSquaresGrad[ mask[0][s] ][ numEdges*edgeNormalSize + counter2+alpha ] += edgePhiVector[0][beta][s] * gradPsiDottau * phi[0] * weight;
+                            }
+                          }
+                        });
+                    }
+                   });
 #if 0 // implement tangential derivative using integration by part on edge - also need point evaluations below to be turned on
                   shapeFunctionSet.jacobianEach( y, [ & ] ( std::size_t alpha, FieldMatrix< DomainFieldType, 1, 2 > dphi ) {
                      if (alpha<numHessShapeFunctions)
@@ -832,7 +865,7 @@ namespace Dune {
 #endif
                 // store the masks for each edge
                 fullMask.push_back(mask[1]);
-                counter += agIndexSet_.edgeSize(1);
+                counter  += agIndexSet_.edgeSize(1);
                 counter2 += edgeTangentialSize;
               } // loop over intersections
 
@@ -913,22 +946,24 @@ namespace Dune {
             }
             else {
               BlockMatrix constraintBlockMatrix = blockMatrix(constraintGradProj, 2);
-              auto leastSquaresMinimizerGradient = leastSquares(leastSquaresGradProj, constraintBlockMatrix);
+              // auto leastSquaresMinimizerGradient = leastSquares(leastSquaresGradProj, constraintBlockMatrix);
+              auto leastSquaresMinimizerGradient = leastSquares(leastSquaresGradProj);
 
               for (std::size_t beta = 0; beta < numDofs; ++beta)
               {
-//                std::cout << " beta: " << beta << std::endl;
-//                std::cout << " R size: " << R.size() << std::endl;
-//                std::cout << " grad projection size: " << jacobianProjection.size() << std::endl;
+                /*
+                std::cout << " beta: " << beta << std::endl;
+                std::cout << " R size: " << R.size() << std::endl;
+                std::cout << " grad projection size: " << jacobianProjection.size() << std::endl;
+                */
 
                 VectorizeMatrixCol d = vectorizeMatrixCol(R, beta);
                 VectorizeMatrixCol colGradProjection = vectorizeMatrixCol(jacobianProjection, beta);
 
                 int counter = 0;
                 bool finished = false;
-                for (int e = 0; e < fullMask.size(); e++)
+                for (int e = 0; e < fullMask.size(); ++e)
                 {
-                  finished = false;
                   for (int i = 0; i < fullMask[e].size(); ++i, ++counter)
                   {
                     if (fullMask[e][i] == beta) {
@@ -939,10 +974,28 @@ namespace Dune {
                   }
                   if (finished) break;
                 }
+                /*
+                std::cout <<"\n££££££££££££££££££££\n";
+                for (int i=0;i<RHSleastSquaresGrad[beta].size();++i)
+                  std::cout << RHSleastSquaresGrad[beta][i] << " ";
+                std::cout <<"\n££££££££££££££££££££\n";
+                */
                 colGradProjection = leastSquaresMinimizerGradient.solve( RHSleastSquaresGrad[ beta ] , d );
               }
             }
-
+            /*
+            std::cout << "GRAD !!!!!!!!!!!!!!!!!!!!!!!!!\n";
+            for (int i=0;i<jacobianProjection.size();++i)
+            {
+              for ( std::size_t j = 0; j < numDofs; ++j )
+                std::cout << i << "," << j << ":"
+                          << "(" << jacobianProjection[i][j][0]
+                          << "," << jacobianProjection[i][j][1] << ")"
+                          << "    ";
+              std::cout << "\n";
+            }
+            std::cout << "GRAD !!!!!!!!!!!!!!!!!!!!!!!!!\n";
+            */
             /////////////////////////////////////////////////////////////////////
             // HessianProjection ////////////////////////////////////////////////
             /////////////////////////////////////////////////////////////////////
