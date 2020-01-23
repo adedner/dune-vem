@@ -106,10 +106,10 @@ namespace Dune {
                 if (row < (i+1)*matrix_.rows() && col < (i+1)*matrix_.cols())
                   return matrix_[i*matrix_.rows()+row][i*matrix_.cols()+col];
               */
-              int c = col % matrix_.cols();
+              int c = col  % matrix_.cols();
               int r = row_ % matrix_.rows();
               assert(c < matrix_.cols() && r < matrix_.rows());
-              if (col / matrix_.cols() == row_ % matrix_.cols())
+              if (col / matrix_.cols() == row_ / matrix_.rows())
                 return matrix_[r][c];
               return 0;
             }

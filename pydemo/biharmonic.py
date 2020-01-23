@@ -21,7 +21,7 @@ import dune.ufl
 
 maxLevel     = 7
 order        = 4
-epsilon      = 0
+epsilon      = 1
 laplaceCoeff = 1
 
 dune.fem.parameter.append({"fem.verboserank": 0})
@@ -35,7 +35,7 @@ dune.fem.parameter.append({"fem.verboserank": 0})
 methods = [ ### "[space,scheme,spaceKwrags]"
             ["vem","vem",{"testSpaces":[ [0],  [order-3,order-2], [order-4] ] }, "C1-non-conforming"],
             ["vem","vem",{"testSpaces":[ [0],  [order-2,order-2], [order-2] ] }, "C1C0-conforming"],
-#            ["vem","vem",{"testSpaces":[ [0],  [order-2,-1], [order-2] ] },      "C0-conforming"],
+            ["vem","vem",{"testSpaces":[ [0],  [order-2,-1], [order-2] ] },      "C0-conforming"],
    ]
 parameters = {"newton.linear.tolerance": 1e-12,
               "newton.linear.preconditioning.method": "jacobi",
