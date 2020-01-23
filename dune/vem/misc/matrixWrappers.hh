@@ -29,7 +29,8 @@ namespace Dune {
             static const int size = N;
             typedef F field_type;
 
-            static const F &get(const Dune::FieldVector<F, N> &x, int rows, int r) { return x[r / rows]; }
+            static const F &get(const Dune::FieldVector<F, N> &x, int rows, int r)
+            { return x[r / rows]; }
 
             template<class V>
             static void assign(Dune::FieldVector<F, N> &in, const V &v, int i) {
@@ -64,7 +65,8 @@ namespace Dune {
 
             unsigned int size() const { return matrix_.size() * VF::size; }
 
-            const typename VF::field_type &operator[](int row) const {
+            const typename VF::field_type &operator[](int row) const
+            {
               return VF::get(matrix_[row % matrix_.rows()][col_], matrix_.rows(), row);
             }
 
@@ -90,42 +92,45 @@ namespace Dune {
         //      ( ....... )
         //      (0 ... 0 C)
         template<class Matrix>
-        struct BlockMatrix {
-              struct RowWrapper {
-                RowWrapper(const Matrix &matrix, int block, int row)
-                        : matrix_(matrix), block_(block), row_(row) {}
+        struct BlockMatrix
+        {
+          struct RowWrapper
+          {
+            RowWrapper(const Matrix &matrix, int block, int row)
+            : matrix_(matrix), block_(block), row_(row) {}
 
-                typename Matrix::value_type operator[](int col) const {
-                  /*
-                  for (int i=0;i<block_;++i)
-                    if (row < (i+1)*matrix_.rows() && col < (i+1)*matrix_.cols())
-                      return matrix_[i*matrix_.rows()+row][i*matrix_.cols()+col];
-                  */
-                  int c = col / block_;
-                  int r = row_ / block_;
-                  assert(c < matrix_.cols() && r < matrix_.rows());
-                  if (col % block_ == row_ % block_)
-                    return matrix_[r][c];
-                  return 0;
-                }
-
-                const Matrix &matrix_;
-                int block_, row_;
-            };
-
-            BlockMatrix(const Matrix &matrix, int block)
-                    : matrix_(matrix), block_(block) {}
-
-            const RowWrapper operator[](int row) const {
-              return RowWrapper(matrix_, block_, row);
+            typename Matrix::value_type operator[](int col) const
+            {
+              /*
+              for (int i=0;i<block_;++i)
+                if (row < (i+1)*matrix_.rows() && col < (i+1)*matrix_.cols())
+                  return matrix_[i*matrix_.rows()+row][i*matrix_.cols()+col];
+              */
+              int c = col % matrix_.cols();
+              int r = row_ % matrix_.rows();
+              assert(c < matrix_.cols() && r < matrix_.rows());
+              if (col / matrix_.cols() == row_ % matrix_.cols())
+                return matrix_[r][c];
+              return 0;
             }
 
-            unsigned int size() const { return matrix_.rows() * block_; }
-            unsigned int rows() const { return matrix_.rows() * block_; }
-            unsigned int cols() const { return matrix_.cols() * block_; }
-
             const Matrix &matrix_;
-            int block_;
+            int block_, row_;
+          };
+
+          BlockMatrix(const Matrix &matrix, int block)
+          : matrix_(matrix), block_(block) {}
+
+          const RowWrapper operator[](int row) const {
+            return RowWrapper(matrix_, block_, row);
+          }
+
+          unsigned int size() const { return matrix_.rows() * block_; }
+          unsigned int rows() const { return matrix_.rows() * block_; }
+          unsigned int cols() const { return matrix_.cols() * block_; }
+
+          const Matrix &matrix_;
+          int block_;
         };
         template<class Matrix>
         BlockMatrix<Matrix> blockMatrix(const Matrix &matrix, int block) {

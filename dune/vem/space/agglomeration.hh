@@ -677,7 +677,16 @@ namespace Dune {
                   edgePhiVector[0].invert();
                 if (edgePhiVector[1].size() > 0)
                   edgePhiVector[1].invert();
-
+                /*
+                std::cout << "INDEX IN INSIDE:" << intersection.indexInInside()
+                          << " mask0 = ";
+                for (int i=0;i<mask[0].size();++i)
+                  std::cout << mask[0][i] << " ";
+                std::cout << "   mask1 = ";
+                for (int i=0;i<mask[1].size();++i)
+                  std::cout << mask[1][i] << " ";
+                std::cout << std::endl;
+                */
                 /* WARNING WARNING WARNING
                  * This is a horrible HACK and needs to be revised:
                  * It might be necessary to flip the vertex entries in the masks around
@@ -770,21 +779,11 @@ namespace Dune {
                           {
                             assert( edgeNormalSize == edgePhiVector[1].size() );
                             assert( edgeNormalSize == agIndexSet_.edgeSize(1) );
-                            /*
-                            std::cout << "INDEX IN INSIDE:" << intersection.indexInInside()
-                                      << " mask0 = ";
-                            for (int i=0;i<mask[0].size();++i)
-                              std::cout << mask[0][i] << " ";
-                            std::cout << "   mask1 = ";
-                            for (int i=0;i<mask[1].size();++i)
-                              std::cout << mask[1][i] << " ";
-                            std::cout << std::endl;
-                            */
                             leastSquaresGradProj[counter+beta][alpha]                          += psi[0] * phi[0] * weight * globalNormal[0];
                             leastSquaresGradProj[counter+beta][alpha + numGradShapeFunctions ] += psi[0] * phi[0] * weight * globalNormal[1];
                           }
                           if (beta < edgeTangentialSize)
-                          {
+                          { // initialize counter2 = numEdges+edgeNormalSize
                             leastSquaresGradProj[numEdges*edgeNormalSize + counter2+beta][alpha]                          += psi[0] * phi[0] * weight * tau[0];
                             leastSquaresGradProj[numEdges*edgeNormalSize + counter2+beta][alpha + numGradShapeFunctions ] += psi[0] * phi[0] * weight * tau[1];
                           }
@@ -946,8 +945,8 @@ namespace Dune {
             }
             else {
               BlockMatrix constraintBlockMatrix = blockMatrix(constraintGradProj, 2);
-              // auto leastSquaresMinimizerGradient = leastSquares(leastSquaresGradProj, constraintBlockMatrix);
-              auto leastSquaresMinimizerGradient = leastSquares(leastSquaresGradProj);
+              auto leastSquaresMinimizerGradient = leastSquares(leastSquaresGradProj, constraintBlockMatrix);
+              // auto leastSquaresMinimizerGradient = leastSquares(leastSquaresGradProj);
 
               for (std::size_t beta = 0; beta < numDofs; ++beta)
               {
@@ -960,6 +959,7 @@ namespace Dune {
                 VectorizeMatrixCol d = vectorizeMatrixCol(R, beta);
                 VectorizeMatrixCol colGradProjection = vectorizeMatrixCol(jacobianProjection, beta);
 
+                // TODO: set RHS for the normal derivatives in loop using mask[1] then remove fullMask
                 int counter = 0;
                 bool finished = false;
                 for (int e = 0; e < fullMask.size(); ++e)

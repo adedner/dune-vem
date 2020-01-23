@@ -62,7 +62,7 @@ namespace Dune {
 
                 systemMultiply.resize(llsMatrix_.cols(), 0);
                 // get rid of Lagrange multipliers
-                // TODO? avoid copy by cutting of in operator= of ColVec
+                // TODO? avoid copy by cutting off in operator= of ColVec
                 for (Size i = 0; i < systemMultiply.size(); ++i)
                   systemMultiply[i] = systemLagrange[i];
               }

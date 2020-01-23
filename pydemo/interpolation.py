@@ -17,7 +17,7 @@ dune.fem.parameter.append({"fem.verboserank": 0})
 # use some run time parameters here to enable batch processesing
 # the dump file should include the parameter values and the plot script
 # should also use the parameters to determin input and output file names
-order = 2
+order = 3
 gridTypes = ["triangles","cartesian","quadrilaterals","voronoi","referenceTriangle"]
 useGrid = 3 # 0..4
 # note that the hessian of the reference element based basis
@@ -38,8 +38,8 @@ methods = [ ### "[space,scheme,spaceKwrags]"
 
 uflSpace = dune.ufl.Space(2, dimRange=1)
 x = SpatialCoordinate(uflSpace)
-exact = as_vector( [ 10 + x[0]*x[1] + x[0]**2*x[1] + x[1]**3 ] )
-# exact = as_vector( [x[0]*x[1] * cos(pi*x[0]*x[1])] )
+# exact = as_vector( [ 10 + x[0]*x[1] + x[0]**2*x[1] + x[1]**3 ] )
+exact = as_vector( [x[0]*x[1] * cos(pi*x[0]*x[1])] )
 # exact = as_vector( [x[0]*x[0]] )
 def compute(grid, space, schemeName):
     # do the interpolation
@@ -54,7 +54,7 @@ def compute(grid, space, schemeName):
            ]
     errors = [ math.sqrt(e) for e in integrate(grid, err, order=8) ]
     if 0:
-        plot(grad(df[0])[0],grid=grid)
+        plot(grad(df[0])[0],grid=grid,level=3)
         from dune.ufl import CoordWrapper
         import numpy
         df.interpolate([x[0]])
@@ -87,9 +87,12 @@ def compute(grid, space, schemeName):
                 g = [ df.ufl_evaluate(e,[0],[0]), df.ufl_evaluate(e,[0],[1]) ]
                 print(numpy.round(g[1],3),",",numpy.round(g[0],3),end="  ")
                 print(";;;")
-            print(":::::::::::::::::::::::::::::")
+            # print(d)
+            # print(":::::::::::::::::::::::::::::")
+            # print("value")
             # df.plot(level=3)
-            # plot(grad(df[0])[0],grid=grid)
+            # print("gradient")
+            # plot(grad(df[0])[0],grid=grid,level=3)
     return df, [ ["L^2",errors[0]],
                  ["H^1",errors[1]],
                  ["laplace",errors[2]],
@@ -122,8 +125,8 @@ for level in range(0,4):
     elif useGrid == 4:
         if 1:
             # reference triangle
-            # refGrid = {"vertices": [ [-1,-1],[0,1],[1,-1] ], "simplices":  [ [0,1,2] ]}
-            refGrid = {"vertices": [ [0,0],[1,0],[1,1],[0,1] ], "polygons": [ [0,1,2,3] ]}
+            refGrid = {"vertices": [ [0,0],[1,0],[0,1] ], "simplices":  [ [0,1,2] ]}
+            # refGrid = {"vertices": [ [0,0],[1,0],[1,1],[0,1] ], "polygons": [ [0,1,2,3] ]}
             polyGrid = create.grid("polygrid", refGrid, cubes=False )
         else:
             refGrid = {"vertices": [ [0,0],[1,0],[0,1],[1,1] ], "cubes": [ [0,1,2,3] ]}
