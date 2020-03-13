@@ -17,9 +17,9 @@ dune.fem.parameter.append({"fem.verboserank": 0})
 # use some run time parameters here to enable batch processesing
 # the dump file should include the parameter values and the plot script
 # should also use the parameters to determin input and output file names
-order = 4
+order = 2
 gridTypes = ["triangles","cartesian","quadrilaterals","voronoi","referenceTriangle"]
-useGrid = 4 # 0..4
+useGrid = 3 # 0..4
 # note that the hessian of the reference element based basis
 # function is not implemented for the 'quadrilaterals' grid
 
@@ -32,7 +32,7 @@ methods = [ ### "[space,scheme,spaceKwrags]"
             # ["vem","vem",{"conforming":True}, "conforming"],
             # ["vem","vem",{"conforming":False}, "non-conforming"],
             ["vem","vem",{"testSpaces":[ [0],  [order-3,order-2], [order-4] ] }, "C1-non-conforming"],
-            # ["vem","vem",{"testSpaces":[ [0],  [order-2,order-2], [order-2] ] }, "C1C0-conforming"],
+            ["vem","vem",{"testSpaces":[ [0],  [order-2,order-2], [order-2] ] }, "C1C0-conforming"],
             # ["bbdg","bbdg",{},"bbdg"],
    ]
 

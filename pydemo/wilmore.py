@@ -18,7 +18,7 @@ import dune.ufl
 maxLevel     = 5
 order        = 3
 
-dune.fem.parameter.append({"fem.verboserank": -1})
+dune.fem.parameter.append({"fem.verboserank": 0})
 
 methods = [ ### "[space,scheme,spaceKwrags]"
             ["vem","vem",{"testSpaces":[ [0],  [order-3,order-2], [order-4] ] }, "C1-non-conforming"],
@@ -36,13 +36,14 @@ parameters = {"newton.linear.tolerance": 1e-8,
 
 
 def compute(grid, s, schemeName):
+    dt = 4e-4
     space = create.space(s[0], polyGrid, order=order, **s[1])
     t   = dune.ufl.Constant(0,"time")
 
     x   = SpatialCoordinate(space)
     initial = sin(2*pi*x[0])**2*sin(2*pi*x[1])**2
 
-    # Wilmore functional
+    # Wilmore functional W(psi)
     psi = Coefficient(space)
     Q = lambda p: 1+inner(p,p)
     E = lambda p: 1/Q(p)**0.25 * ( Identity(2) - outer(p,p)/Q(p) )
@@ -56,7 +57,7 @@ def compute(grid, s, schemeName):
     # third order time stepping (Gauss radau collocation)
     tau = dune.ufl.Constant(0,"dt")
     df  = discreteFunction(space, name="solution") # main solution
-    # space for time stepping
+    # space for time stepping (df=U^n, U[0]=intermediate, U[1]=U^{n+1}
     rkSpace = create.space(s[0], polyGrid, order=order, dimRange=2, **s[1])
     U       = TrialFunction(rkSpace)
     V       = TestFunction(rkSpace)
@@ -66,35 +67,30 @@ def compute(grid, s, schemeName):
     dtForm = lambda w,u,v: inner(w/Q(u),v)*dx
     rkForm  = sum(f*dtForm(u,U[i],V[i]) for i in range(2) for u,f in zip(dfs,factors[i]))
     rkForm += tau*sum(replace(a,{psi:U[i],phi:V[i]}) for i in range(2))
-    # rkForm  = -2*dtForm(df,U[0],V[0]) + 3./2.*dtForm(U[0],U[0],V[0]) + 1./2.*dtForm(U[1],U[0],V[0])
-    # rkForm +=  2*dtForm(df,U[1],V[1]) - 9./2.*dtForm(U[0],U[1],V[1]) + 5./2.*dtForm(U[1],U[1],V[1])
-    # rkForm += tau*replace(a,{psi:U[0],phi:V[0]})
-    # rkForm += tau*replace(a,{psi:U[1],phi:V[1]})
 
     dbc = [dune.ufl.DirichletBC(rkSpace, rkSpace.dimRange*[0], i+1) for i in range(4)]
-    biLaplaceCoeff = 10
-    diffCoeff      = 0
-    massCoeff      = 0
+    biLaplaceCoeff = [dt,dt]
+    diffCoeff      = [0,0]
+    massCoeff      = [1,1] # 1/Q(U[i]) for i in range(2)]
 
     print("# solving: ",s, "size",space.size, "parameters:(", biLaplaceCoeff,",",diffCoeff,",",massCoeff,")")
 
     scheme = create.scheme(schemeName,
                         [rkForm == 0, *dbc], # space, # this gives is a compiler error
                         solver=("suitesparse","umfpack"),
-                        hessStabilization=[biLaplaceCoeff],
-                        gradStabilization=[diffCoeff],
-                        massStabilization=[massCoeff],
+                        hessStabilization=biLaplaceCoeff,
+                        gradStabilization=diffCoeff,
+                        massStabilization=massCoeff,
                         parameters=parameters)
     df.interpolate(initial)
     energy = integrate(grid,replace(Wint,{psi:df}),order=5)
-    # vtk = grid.sequencedVTK("wilmoreAPolyC1_crsP3", pointdata=[df],subsampling=2)
-    vtk = grid.sequencedVTK("tmpD", pointdata=[df],subsampling=2)
+    vtk = grid.sequencedVTK("voro", pointdata=[df],subsampling=2)
     t.value = 0
-    tau.value = 1e-5 # 2e-5 # for triangles I used 1e-4
+    tau.value = dt
     count = 0
     info = None
-    tmp = discreteFunction(rkSpace, name="rk")
-    # tmp.interpolate([initial,initial]) # ????
+    # tmp = discreteFunction(rkSpace, name="rk")
+    tmp = rkSpace.interpolate([initial,initial], name="rk")
     while t.value < 0.01:
         count += 1
         if count % 1 == 0:
@@ -106,7 +102,7 @@ def compute(grid, s, schemeName):
         df.interpolate(tmp[1])
     return df
 
-for level in range(1,2): # maxLevel):
+for level in range(1,2): # maxLevel): # 2,3
     constructor = cartesianDomain([0,0],[1,1],[20*2**level,20*2**level])
     polyGrid = create.grid("polygrid", constructor, cubes=False )
     # polyGrid = create.grid("polygrid", voronoiCells(constructor,400*2**level*2**level,"voronoiseeds",load=True,show=False,lloyd=5) )

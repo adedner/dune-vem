@@ -31,7 +31,7 @@ namespace Dune
 
       Agglomeration ( GridPartType &gridPart, std::vector< std::size_t > indices )
         : gridPart_( gridPart ),
-          mapper_( static_cast< typename GridPartType::GridViewType >( gridPart ) ),
+          mapper_( static_cast< typename GridPartType::GridViewType >( gridPart ), mcmgElementLayout() ),
           indices_( std::move( indices ) ),
           size_( 0 )
       {
@@ -48,7 +48,7 @@ namespace Dune
       template <class Callback>
       Agglomeration ( GridPartType &gridPart, const Callback callBack )
         : gridPart_( gridPart ),
-          mapper_( static_cast< typename GridPartType::GridViewType >( gridPart ) ),
+          mapper_( static_cast< typename GridPartType::GridViewType >( gridPart ), mcmgElementLayout() ),
           indices_( mapper_.size() ),
           size_( 0 )
       {
@@ -89,7 +89,7 @@ namespace Dune
       }
 
       GridPart &gridPart_;
-      MultipleCodimMultipleGeomTypeMapper< typename GridPartType::GridViewType, MCMGElementLayout > mapper_;
+      MultipleCodimMultipleGeomTypeMapper< typename GridPartType::GridViewType > mapper_;
       std::vector< std::size_t > indices_;
       std::size_t size_;
     };
