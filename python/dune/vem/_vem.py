@@ -250,6 +250,15 @@ def vemScheme(model, space=None, solver=None, parameters={},
                 space = model.lhs.arguments()[0].ufl_function_space()
             except AttributeError:
                 raise ValueError("no space provided and could not deduce from form provided")
+        else:
+            try:
+                eqSpace = model.lhs.arguments()[0].ufl_function_space()
+                if not eqSpace.dimRange == space.dimRange:
+                    raise ValueError("""range of space used for arguments in equation
+                    and the range of space passed to the scheme have to match -
+                    space argument to scheme can be 'None'""")
+            except AttributeError:
+                pass
         if modelParam:
             model = vemModel(space.grid,model,space,hessStabilization,gradStabilization,massStabilization,*modelParam)
         else:

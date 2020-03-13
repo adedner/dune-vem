@@ -3,6 +3,7 @@ from __future__ import division, print_function, unicode_literals
 from dune.ufl.codegen import generateMethod
 from ufl import SpatialCoordinate, Coefficient, replace, diff, as_vector
 from ufl.core.expr import Expr
+from ufl.tensors import ListTensor
 from dune.source.cplusplus import Variable, UnformattedExpression, AccessModifier
 from ufl.algorithms import expand_compounds, expand_derivatives, expand_indices, expand_derivatives
 
@@ -75,6 +76,7 @@ def codeVEM(self, name, targs):
     self.predefineCoefficients(predefined, False)
     spatial = Variable('const auto', 'y')
     predefined.update( {x: UnformattedExpression('auto', 'entity().geometry().global( Dune::Fem::coordinate( x ) )') })
+    self.predefineCoefficients(predefined)
     generateMethod(code, hStab,
             'RRangeType', 'hessStabilization',
             args=['const Point &x',
@@ -114,8 +116,26 @@ def codeVEM(self, name, targs):
     return code
 
 def transform(space,hStab,gStab,mStab):
+    if not type(hStab) in [list,tuple,ListTensor]: # note __getitem__ exists for any ufl expressions
+        hStab = [hStab]
+    if not type(gStab) in [list,tuple,ListTensor]: # note __getitem__ exists for any ufl expressions
+        gStab = [gStab]
+    if not type(mStab) in [list,tuple,ListTensor]: # note __getitem__ exists for any ufl expressions
+        mStab = [mStab]
+    exprs = []
+    baseSignature = []
+    if mStab is not None:
+        baseSignature += [mStab]
+        exprs += [x for x in mStab if not type(x) in [int,float]]
+    if gStab is not None:
+        baseSignature += [gStab]
+        exprs += [x for x in gStab if not type(x) in [int,float]]
+    if hStab is not None:
+        baseSignature += [hStab]
+        exprs += [x for x in hStab if not type(x) in [int,float]]
     def transform_(model):
-        if model.baseName == "integrandsVem":
+        model.baseSignature = baseSignature
+        if model.baseName == "vemintegrands":
             return
         model._code = model.code
         model.code  = lambda *args,**kwargs: codeVEM(model,*args,**kwargs)

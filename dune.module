@@ -1,6 +1,6 @@
 Module: dune-vem
-Version: 2.7
+Version: 2.8-git
 Maintainer: a.s.dedner@warwick.ac.uk
 Whitespace-Hook: Yes
-Depends: dune-fem dune-alugrid
+Depends: dune-fem (>= 2.8) dune-alugrid
 Suggests:

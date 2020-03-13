@@ -376,14 +376,14 @@ namespace Dune
                 //! SubDofWrapper has no size assert( kk < localDofVector.size() );
                 if (alpha < indexSet_.template order2size<1>(0))
                 {
-                  assert(k < localDofVector.size() );
+                  //! see above assert(k < localDofVector.size() );
                   localDofVector[ k ] += value[0]*phi[0] * weight
                                          / intersection.geometry().volume();
                   ++k;
                 }
                 if (alpha < indexSet_.template order2size<1>(1))
                 {
-                  assert(k < localDofVector.size() );
+                  //! see above assert(k < localDofVector.size() );
                   localDofVector[ k ] += dnvalue * phi[0] * weight;
                   ++k;
                 }

@@ -62,7 +62,7 @@ namespace Dune
           return std::make_pair( index( element ), true );
 
         const auto &refElement = ReferenceElements< typename GridPart::ctype, dimension >::general( element.type() );
-        const typename GridPartType::IndexSetType indexSet = agglomeration_.gridPart().indexSet();
+        const typename GridPartType::IndexSetType& indexSet = agglomeration_.gridPart().indexSet();
         const int globalIndex = globalIndex_[ GlobalGeometryTypeIndex::index( refElement.type( i, codim ) ) ][ indexSet.subIndex( element, i, codim ) ];
         return std::make_pair( static_cast< std::size_t >( globalIndex ), globalIndex != -1 );
       }
@@ -76,7 +76,7 @@ namespace Dune
       std::pair< std::size_t, bool > globalIndex ( const Entity &entity ) const
       {
         assert( Entity::codimension > 0 );
-        const typename GridPartType::IndexSetType indexSet = agglomeration_.gridPart().indexSet();
+        const typename GridPartType::IndexSetType& indexSet = agglomeration_.gridPart().indexSet();
         const int globalIndex = globalIndex_[ GlobalGeometryTypeIndex::index( entity.type() ) ][ indexSet.index( entity ) ];
         return std::make_pair( static_cast< std::size_t >( globalIndex ), globalIndex != -1 );
       }
@@ -265,7 +265,7 @@ namespace Dune
       , boundingBoxes_( boundingBoxes( agglomeration ) )
       , allocator_( std::move( allocator ) )
     {
-      const typename GridPartType::IndexSetType indexSet = agglomeration_.gridPart().indexSet();
+      const typename GridPartType::IndexSetType& indexSet = agglomeration_.gridPart().indexSet();
       std::vector< std::vector< typename GridPartType::IndexSetType::IndexType > > subAgglomerates( GlobalGeometryTypeIndex::size( dimension-1 ) );
 
       // find subagglomerates
