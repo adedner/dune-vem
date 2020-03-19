@@ -48,7 +48,7 @@ namespace Dune
         // std::cout << y << std::endl;
         assert(-1e-8 < y[0] && y[0] < 1+1e-8);
         assert(-1e-8 < y[1] && y[1] < 1+1e-8);
-        return std::move(y);
+        return y;
       }
       void gradientTransform(CoordinateType &g, bool transpose) const
       {

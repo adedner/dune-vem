@@ -44,8 +44,6 @@ namespace Dune
       std::vector< typename DiscreteFunction::RangeFieldType > ldv;
       ldv.reserve( mapper.maxNumDofs() * blockSize );
 
-      typedef typename DiscreteFunction::DiscreteFunctionSpaceType::AgglomerationIndexSetType IndexSetType;
-      const int polOrder = DiscreteFunction::DiscreteFunctionSpaceType::polynomialOrder;
       typedef typename DiscreteFunction::GridPartType GridPartType;
       typedef typename GridPartType::template Codim< 0 >::EntitySeedType ElementSeedType;
       std::vector< std::vector< ElementSeedType > > entitySeeds( agglomeration.size() );

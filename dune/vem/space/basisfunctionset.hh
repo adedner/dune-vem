@@ -78,7 +78,7 @@ namespace Dune
 
       const ReferenceElementType &referenceElement () const
       {
-        return ReferenceElements< DomainFieldType, dimDomain >::general( entity().type() );
+        return referenceElement( entity().type() );
       }
 
       template< class Quadrature, class DofVector, class Values >

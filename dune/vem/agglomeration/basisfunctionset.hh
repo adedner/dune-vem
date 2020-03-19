@@ -122,7 +122,7 @@ namespace Dune
 
       const ReferenceElementType &referenceElement () const
       {
-        return ReferenceElements< DomainFieldType, dimDomain >::general( entity().type() );
+        return referenceElement( entity().type() );
       }
 
       template< class Quadrature, class Vector, class DofVector >
@@ -374,10 +374,8 @@ namespace Dune
 
 #if 1 // FemQuads
       typedef Dune::Fem::ElementQuadrature<GridPart,0> Quadrature0Type;
-      typedef Dune::Fem::ElementQuadrature<GridPart,1> Quadrature1Type;
 #else
       typedef Dune::Fem::ElementQuadrature<GridPart,0,Dune::Fem::HighOrderQuadratureTraits> Quadrature0Type;
-      typedef Dune::Fem::ElementQuadrature<GridPart,1,Dune::Fem::HighOrderQuadratureTraits> Quadrature1Type;
 #endif
 
       const int polOrder = shapeFunctionSet.order();
@@ -436,7 +434,7 @@ namespace Dune
           {
             weights[e] = geometry.integrationElement( quadrature.point( qp ) ) * quadrature.weight( qp );
             basisFunctionSet.evaluateAll(quadrature[qp], val);
-            for (int i=0;i<val.size();++i)
+            for (unsigned int i=0;i<val.size();++i)
               values[i][e] = val[i];
           }
         }

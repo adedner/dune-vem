@@ -121,7 +121,7 @@ namespace Dune
           if (intersection.neighbor()) // we need to check the orientation of the normal
             if (indexSet_.index(intersection.inside()) > indexSet_.index(intersection.outside()))
               normal *= -1;
-          for (int qp=0;qp<edgeQuad.nop();++qp)
+          for (unsigned int qp=0;qp<edgeQuad.nop();++qp)
           {
             k = kStart;
             auto x = edgeQuad.localPoint(qp);
@@ -191,7 +191,7 @@ namespace Dune
       template< class ShapeFunctionSet >
       void operator() (const IntersectionType &intersection,
                        const ShapeFunctionSet &shapeFunctionSet, std::vector < Dune::DynamicMatrix<double> > &localDofVectorMatrix,
-                       std::vector<std::vector<int>> &mask) const
+                       std::vector<std::vector<unsigned int>> &mask) const
       {
         const int dimension = AgglomerationIndexSet::dimension;
         mask.clear();
@@ -228,7 +228,7 @@ namespace Dune
         { //!TS add normal derivatives
           EdgeQuadratureType edgeQuad( gridPart(),
                 intersection, 2*polOrder_, EdgeQuadratureType::INSIDE );
-          for (int qp=0;qp<edgeQuad.nop();++qp)
+          for (unsigned int qp=0;qp<edgeQuad.nop();++qp)
           {
             auto x = edgeQuad.localPoint(qp);
             auto xx = x;
@@ -361,7 +361,7 @@ namespace Dune
               normal *= -1;
           EdgeQuadratureType edgeQuad( gridPart(),
                 intersection, 2*polOrder_, EdgeQuadratureType::INSIDE );
-          for (int qp=0;qp<edgeQuad.nop();++qp)
+          for (unsigned int qp=0;qp<edgeQuad.nop();++qp)
           {
             k = kStart;
             auto x = edgeQuad.localPoint(qp);
@@ -396,7 +396,7 @@ namespace Dune
           assert(numDofs == innerShapeFunctionSet.size());
           //! SubVector has no size: assert(k+numDofs == localDofVector.size());
           InnerQuadratureType innerQuad( element, 2*polOrder_ );
-          for (int qp=0;qp<innerQuad.nop();++qp)
+          for (unsigned int qp=0;qp<innerQuad.nop();++qp)
           {
             auto y = innerQuad.point(qp);
             localFunction.evaluate( innerQuad[qp], value );
@@ -444,7 +444,7 @@ namespace Dune
       template< class Vertex, class Edge>
       void applyOnIntersection( const IntersectionType &intersection,
                                 const Vertex &vertex, const Edge &edge,
-                                std::vector<std::vector<int>> &mask) const
+                                std::vector<std::vector<unsigned int>> &mask) const
       {
         const int dimension = AgglomerationIndexSet::dimension;
         const ElementType &element = intersection.inside();

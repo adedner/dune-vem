@@ -1,8 +1,3 @@
-try:
-    import dune.vem
-except:
-    import sys
-    sys.exit(0)
 import matplotlib
 matplotlib.rc( 'image', cmap='jet' )
 from matplotlib import pyplot
@@ -20,11 +15,10 @@ from ufl import *
 import dune.ufl
 
 maxLevel     = 5
-order        = 2
-
+order        = 4
 epsilon      = 0
-laplaceCoeff = 0
-mu           = 1
+laplaceCoeff = 1
+mu           = 0
 
 dune.fem.parameter.append({"fem.verboserank": 0})
 
@@ -35,10 +29,15 @@ dune.fem.parameter.append({"fem.verboserank": 0})
 # <codecell>
 # Note: suboptimal laplace error for bubble (space is reduced to polorder=3 but could be 4 = ts+2
 methods = [ ### "[space,scheme,spaceKwrags]"
-            # ["vem","vem",{"testSpaces":[ [0],  [order-3,order-2], [order-4] ] }, "C1-non-conforming"],
-            # ["vem","vem",{"testSpaces":[ [0],  [order-2,order-2], [order-2] ] }, "C1C0-conforming"],
-            ["vem","vem",{"testSpaces":[ [-1], [order-1,-1],      [order-2] ] },   "C0-non-conforming"],
-   ]
+        ["vem","vem",{"order":order, "testSpaces":[ [0],  [order-3,order-2], [order-4] ] }, "C1-non-conforming"],
+        ["vem","vem",{"order":order, "testSpaces":[ [0],  [order-2,order-2], [order-2] ] }, "C1C0-conforming"],
+        ["vem","vem",{"order":order, "testSpaces":[ [0],  [order-3,order-2], [order-3] ] }, "C1mod-conforming"],
+          ]
+if epsilon == 0:
+    methods += [
+            ["vem","vem",{"order":order, "testSpaces":[ [0],  [order-2,-1], [order-2] ] },      "C0-conforming"],
+            ["vem","vem",{"order":order-1, "testSpaces":[ [0],  [order-3,-1], [order-3] ] },      "C0pm1-conforming"],
+               ]
 parameters = {"newton.linear.tolerance": 1e-12,
               "newton.linear.preconditioning.method": "jacobi",
               "penalty": 40,  # for the bbdg scheme
@@ -97,18 +96,18 @@ def compute(grid, space, schemeName):
     info = {"linear_iterations":1}
     scheme = create.scheme(schemeName, [a==b, *dbc], space,
                         # solver="cg",
-                        ("suitesparse","umfpack"),
+                        # solver=("suitesparse","umfpack"),
                         hessStabilization=biLaplaceCoeff,
                         gradStabilization=diffCoeff,
                         massStabilization=massCoeff,
                         parameters=parameters)
+    # df.interpolate(exact)
     # info = scheme.solve(target=df)
     jacobian = linearOperator(scheme)
     rhs = discreteFunction(space,name="rhs")
     scheme(df,rhs)
     rhs.as_numpy[:] *= -1
     df.as_numpy[:] = spsolve(jacobian.as_numpy, rhs.as_numpy[:])
-    # df.interpolate(exact)
     edf = exact-df
     err = [inner(edf,edf),
            inner(grad(edf),grad(edf)),
@@ -124,15 +123,13 @@ def compute(grid, space, schemeName):
 # figPos = 100*len(methods)+10*maxLevel+1
 results = []
 for level in range(maxLevel):
-    # constructor = cartesianDomain([-0.5,-0.5],[1,1],[2**level,2**level])
-    # polyGrid = create.grid("polygrid", constructor, cubes=False )
-    constructor = cartesianDomain([0,0],[1,1],[20,20])
-    polyGrid = create.grid("polygrid",
-                  voronoiCells(constructor,16*2**level*2**level,"voronoiseeds",load=True,show=False,lloyd=5) )
+    constructor = cartesianDomain([0,0],[1,1],[4*2**level,4*2**level])
+    polyGrid = create.grid("polygrid", constructor, cubes=False )
+    # constructor = cartesianDomain([0,0],[1,1],[4,4])
+    # polyGrid = create.grid("polygrid", voronoiCells(constructor,16*2**level*2**level,"voronoiseeds",load=True,show=False,lloyd=5) )
     res = []
     for i,m in enumerate(methods):
-        space = create.space(m[0], polyGrid, order=order, dimRange=1,
-                storage="fem", **m[2])
+        space = create.space(m[0], polyGrid, dimRange=1, storage="fem", **m[2])
         dfs,errors,info = compute(polyGrid, space, m[1])
         print("[",level,"]","method:(",m[0],m[2],")",
               "Size: ",space.size, polyGrid.size(0), "L^2: ", errors[0], "H^1: ", errors[1],

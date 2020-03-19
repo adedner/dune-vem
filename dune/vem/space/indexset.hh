@@ -78,13 +78,6 @@ namespace Dune
                  std::make_pair( dimension-2, iSize ) };
       }
 
-#if 0
-      // !TS
-      const std::vector<int> testSpaces() const
-      {
-        return {testSpaces_[0][0],testSpaces_[1][0],testSpaces_[2][0]};
-      }
-#endif
       std::vector<int> orders()
       {
           std::vector<int> ret(3,0);
@@ -115,13 +108,13 @@ namespace Dune
             degrees[i] += std::max(0,testSpaces_[1][i]+1);
         return degrees;
       }
-      int edgeSize(int deriv) const
+      std::size_t edgeSize(int deriv) const
       {
         auto degrees = edgeDegrees();
         return degrees[deriv] < 0 ? 0 :
               Dune::Fem::OrthonormalShapeFunctions<1>::size( degrees[deriv] );
       }
-      int maxEdgeDegree() const
+      std::size_t maxEdgeDegree() const
       {
         auto degrees = edgeDegrees();
         return *std::max_element(degrees.begin(),degrees.end());
@@ -143,7 +136,7 @@ namespace Dune
       }
 
       template <int dim>
-      std::size_t order2size(int deriv) const
+      std::size_t order2size(unsigned int deriv) const
       {
         if (testSpaces_[dim].size()<=deriv || testSpaces_[dim][deriv]<0)
           return 0;
@@ -159,7 +152,7 @@ namespace Dune
 
 
     private:
-      int sumTestSpaces(unsigned int codim) const
+      std::size_t sumTestSpaces(unsigned int codim) const
       {
         return std::accumulate(testSpaces_[codim].begin(),testSpaces_[codim].end(),0);
       }
