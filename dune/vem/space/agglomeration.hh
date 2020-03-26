@@ -867,30 +867,6 @@ namespace Dune {
 
     namespace Fem {
 
-        // External Forward Declarations
-        // -----------------------------
-
-#if HAVE_DUNE_ISTL
-        template< class Matrix, class Space >
-        struct ISTLParallelMatrixAdapter;
-
-        template< class Matrix >
-        class LagrangeParallelMatrixAdapter;
-#endif // #if HAVE_DUNE_ISTL
-
-
-
-        // ISTLParallelMatrixAdapter for AgglomerationVEMSpace
-        // ---------------------------------------------------
-
-#if HAVE_DUNE_ISTL
-        template< class Matrix, class FunctionSpace, class GridPart, int polOrder >
-        struct ISTLParallelMatrixAdapter< Matrix, Vem::AgglomerationVEMSpace< FunctionSpace, GridPart, polOrder > >
-        {
-          typedef LagrangeParallelMatrixAdapter< Matrix > Type;
-        };
-#endif // #if HAVE_DUNE_ISTL
-
         namespace Capabilities {
             template<class FunctionSpace, class GridPart, int polOrder>
             struct hasInterpolation<Vem::AgglomerationVEMSpace<FunctionSpace, GridPart, polOrder> > {

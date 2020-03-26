@@ -160,7 +160,7 @@ namespace Dune
         }
 
       }
-      for (int i=0;i<boundingBoxes.size();++i)
+      for (unsigned int i=0;i<boundingBoxes.size();++i)
       {
         BoundingBox< GridPart > &bbox = boundingBoxes[ i ];
         std::vector<std::vector<double>> &points = polygonPoints[ i ];
@@ -171,7 +171,7 @@ namespace Dune
         // std::cout << bbox.xAxis() << "   " << bbox.yAxis() << "     ";
         // std::cout << bbox.diameter() << std::endl;
       }
-      return std::move( boundingBoxes );
+      return boundingBoxes;
     }
 
   } // namespace Vem
