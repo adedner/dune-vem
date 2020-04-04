@@ -79,10 +79,10 @@ dbc = [dune.ufl.DirichletBC(uflSpace, exact, i+1) for i in range(4)]
 
 # <codecell>
 constructor = cartesianDomain([-0.5,-0.5],[1,1],[1,1])
-polyGrid = create.grid("polygrid", voronoiCells(constructor,50) )
+polyGrid = create.grid("agglomerate", voronoiCells(constructor,50) )
 
 # <markdowncell>
-# In general we can construct a `polygrid` by providing a dictionary with
+# In general we can construct a `agglomerate` by providing a dictionary with
 # the `vertices` and the `polygons`. The `voronoiCells` function creates
 # such a dictonary using random seeds to generate voronoi cells which are
 # cut off using the provided `cartesianDomain`. The seeds can be
@@ -176,7 +176,7 @@ print("END B")
 L, W = 1, 0.2
 
 constructor = cartesianDomain([0,0],[L,W],[1,1])
-polyGrid = create.grid("polygrid", voronoiCells(constructor,64) )
+polyGrid = create.grid("agglomerate", voronoiCells(constructor,64) )
 @gridFunction(polyGrid, name="cells")
 def polygons(en,x):
     return polyGrid.hierarchicalGrid.agglomerate(en)

@@ -104,8 +104,8 @@ def compute(grid, s, schemeName):
 
 for level in range(1,2): # maxLevel): # 2,3
     constructor = cartesianDomain([0,0],[1,1],[20*2**level,20*2**level])
-    polyGrid = create.grid("polygrid", constructor, cubes=False )
-    # polyGrid = create.grid("polygrid", voronoiCells(constructor,400*2**level*2**level,"voronoiseeds",load=True,show=False,lloyd=5) )
+    polyGrid = create.grid("agglomerate", constructor, cubes=False )
+    # polyGrid = create.grid("agglomerate", voronoiCells(constructor,400*2**level*2**level,"voronoiseeds",load=True,show=False,lloyd=5) )
     @gridFunction(polyGrid, name="cells")
     def polygons(en,x):
         return polyGrid.hierarchicalGrid.agglomerate(en)

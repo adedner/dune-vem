@@ -124,9 +124,9 @@ def compute(grid, space, schemeName):
 results = []
 for level in range(maxLevel):
     constructor = cartesianDomain([0,0],[1,1],[4*2**level,4*2**level])
-    polyGrid = create.grid("polygrid", constructor, cubes=False )
+    polyGrid = create.grid("agglomerate", constructor, cubes=False )
     # constructor = cartesianDomain([0,0],[1,1],[4,4])
-    # polyGrid = create.grid("polygrid", voronoiCells(constructor,16*2**level*2**level,"voronoiseeds",load=True,show=False,lloyd=5) )
+    # polyGrid = create.grid("agglomerate", voronoiCells(constructor,16*2**level*2**level,"voronoiseeds",load=True,show=False,lloyd=5) )
     res = []
     for i,m in enumerate(methods):
         space = create.space(m[0], polyGrid, dimRange=1, storage="fem", **m[2])

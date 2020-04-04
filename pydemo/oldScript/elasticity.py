@@ -37,7 +37,7 @@ parameters = {"newton.linear.tolerance": 1e-12,
 L, W = 1, 0.2
 
 constructor = cartesianDomain([0,0],[L,W],[1,1])
-polyGrid = create.grid("polygrid", voronoiCells(constructor,64) )
+polyGrid = create.grid("agglomerate", voronoiCells(constructor,64) )
 @gridFunction(polyGrid, name="cells")
 def polygons(en,x):
     return polyGrid.hierarchicalGrid.agglomerate(en)

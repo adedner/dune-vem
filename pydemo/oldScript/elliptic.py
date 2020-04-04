@@ -152,10 +152,10 @@ for i in range(endEoc-start):
     N = 2*n
     print("Test: ",n,N)
     constructor = cartesianDomain([0,0],[1,1],[N,N])
-    # polyGrid = create.grid("polygrid",constructor,[n,n])
-    # polyGrid = create.grid("polygrid",constructor,n*n)
-    polyGrid = create.grid("polygrid", voronoiCells(constructor,n*n,"voronoiseeds",True) )
-    # polyGrid = create.grid("polygrid",constructor)
+    # polyGrid = create.grid("agglomerate",constructor,[n,n])
+    # polyGrid = create.grid("agglomerate",constructor,n*n)
+    polyGrid = create.grid("agglomerate", voronoiCells(constructor,n*n,"voronoiseeds",True) )
+    # polyGrid = create.grid("agglomerate",constructor)
     compute(polyGrid)
     if i>0:
         l = len(methods)

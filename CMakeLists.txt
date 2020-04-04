@@ -1,6 +1,6 @@
-cmake_minimum_required(VERSION 2.8.12)
+cmake_minimum_required(VERSION 3.1)
 
-project(dune-vem CXX)
+project(dune-vem CXX C)
 
 if(NOT (dune-common_DIR OR dune-common_ROOT OR
       "${CMAKE_PREFIX_PATH}" MATCHES ".*dune-common.*"))
@@ -22,16 +22,8 @@ add_subdirectory("dune")
 add_subdirectory("doc")
 add_subdirectory("cmake/modules")
 add_subdirectory("lib")
-
-if(dune-python_FOUND)
-  add_subdirectory(python)
-  dune_python_install_package(PATH "python")
-elseif(dune-corepy_FOUND)
-  add_subdirectory(python)
-  if(NOT (${DUNE_COMMON_VERSION} VERSION_LESS 2.6))
-    dune_python_install_package(PATH "python")
-  endif()
-endif()
+add_subdirectory(python)
+dune_python_install_package(PATH "python")
 
 # finalize the dune project, e.g. generating config.h etc.
 finalize_dune_project(GENERATE_CONFIG_H_CMAKE)

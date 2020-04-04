@@ -154,7 +154,7 @@ results = []
 for N in resolutions:
     constructor = cartesianDomain([0,0],[1,1],[N,N])
     # constructor = voronoiCells(constructor,N*N,"voronoiseeds",True)
-    polyGrid = create.grid("polygrid", constructor, cubes=False )
+    polyGrid = create.grid("agglomerate", constructor, cubes=False )
     for order in orders:
         # fig = pyplot.figure(figsize=(10*len(methods(order)),10))
         # figPos = 100+10*len(methods(order))+1

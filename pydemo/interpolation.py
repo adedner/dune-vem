@@ -104,10 +104,10 @@ for level in range(0,4):
     N = 2**(level+2)
     if useGrid == 0:
         constructor = cartesianDomain([-0.5,-0.5],[1,1],[N,N])
-        polyGrid = create.grid("polygrid", constructor, cubes=False )
+        polyGrid = create.grid("agglomerate", constructor, cubes=False )
     elif useGrid == 1:
         constructor = cartesianDomain([-0.5,-0.5],[1,1],[N,N])
-        polyGrid = create.grid("polygrid", constructor, cubes=True )
+        polyGrid = create.grid("agglomerate", constructor, cubes=True )
     elif useGrid == 2:
         # the following is a non affine cube grid, i.e., not parallelograms,
         cubeGrid = {"vertices": [ [-0.5,-0.5],[0   ,-0.5],[1,-0.5],
@@ -116,21 +116,21 @@ for level in range(0,4):
                                   [-0.5, 0],
                                   [0.25,0.25] ],
                     "cubes":  [ [0,1,7,8],[1,2,8,3],[8,3,5,4],[7,8,6,5] ]}
-        polyGrid = create.grid("polygrid", cubeGrid, cubes=True )
+        polyGrid = create.grid("agglomerate", cubeGrid, cubes=True )
         polyGrid.hierarchicalGrid.globalRefine(level)
     elif useGrid == 3:
         constructor = cartesianDomain([0,0],[1,1],[N,N])
-        polyGrid = create.grid("polygrid",
+        polyGrid = create.grid("agglomerate",
                   voronoiCells(constructor,N*N,"voronoiseeds",load=True,show=False,lloyd=5) )
     elif useGrid == 4:
         if 1:
             # reference triangle
             refGrid = {"vertices": [ [0,0],[1,0],[0,1] ], "simplices":  [ [0,1,2] ]}
             # refGrid = {"vertices": [ [0,0],[1,0],[1,1],[0,1] ], "polygons": [ [0,1,2,3] ]}
-            polyGrid = create.grid("polygrid", refGrid, cubes=False )
+            polyGrid = create.grid("agglomerate", refGrid, cubes=False )
         else:
             refGrid = {"vertices": [ [0,0],[1,0],[0,1],[1,1] ], "cubes": [ [0,1,2,3] ]}
-            polyGrid = create.grid("polygrid", refGrid, cubes=True )
+            polyGrid = create.grid("agglomerate", refGrid, cubes=True )
         polyGrid.hierarchicalGrid.globalRefine(level)
     gridVidth = -1 # need something here
     @gridFunction(polyGrid, name="cells")
