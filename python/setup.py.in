@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 setup(name="dune.vem",
     namespace_packages=['dune'],
     description="Python lib for dune: virtual element implementation",
-    version="2.5",
+    version="${DUNE_VEM_VERSION}",
     author="Andreas Dedner and Martin Nolte",
     packages = find_packages(),
     zip_safe = 0,

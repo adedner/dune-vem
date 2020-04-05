@@ -388,7 +388,7 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
 #endif
   }
   // std::cout << "   in assembly: end stabilization    " << timer.elapsed() << std::endl;
-  jOp.communicate();
+  jOp.flushAssembly();
   // std::cout << "   in assembly: final    " << timer.elapsed() << std::endl;
 #endif
 }

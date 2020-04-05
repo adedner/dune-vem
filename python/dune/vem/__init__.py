@@ -11,5 +11,5 @@ registry["scheme"] = {
          "bbdg"   : bbdgScheme
     }
 registry["grid"] = {
-        "polygrid" : polyGrid
+        "agglomerate" : polyGrid
    }

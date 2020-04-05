@@ -121,7 +121,7 @@ namespace Dune
         }
       }
       // jOp.exportMatrix().print(fMassGlobal);
-      jOp.communicate();
+      jOp.flushAssembly();
     }
 
   } // namespace Vem

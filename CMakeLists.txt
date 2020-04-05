@@ -22,14 +22,9 @@ add_subdirectory("dune")
 add_subdirectory("cmake/modules")
 add_subdirectory("lib")
 
-if(dune-python_FOUND)
-  add_subdirectory(python)
+if( DUNE_ENABLE_PYTHONBINDINGS )
+  add_subdirectory("python")
   dune_python_install_package(PATH "python")
-elseif(dune-corepy_FOUND)
-  add_subdirectory(python)
-  if(NOT (${DUNE_COMMON_VERSION} VERSION_LESS 2.6))
-    dune_python_install_package(PATH "python")
-  endif()
 endif()
 
 # finalize the dune project, e.g. generating config.h etc.
