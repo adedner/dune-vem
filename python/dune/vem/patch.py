@@ -125,19 +125,20 @@ def transform(space,hStab,gStab,mStab):
         mStab = [mStab]
     exprs = []
     baseSignature = []
-    if mStab is not None:
-        baseSignature += [mStab]
+    if mStab[0] is not None:
+        baseSignature += [["mass",mStab]]
         exprs += [x for x in mStab if not type(x) in [int,float]]
-    if gStab is not None:
-        baseSignature += [gStab]
+    if gStab[0] is not None:
+        baseSignature += [["grad",gStab]]
         exprs += [x for x in gStab if not type(x) in [int,float]]
-    if hStab is not None:
-        baseSignature += [hStab]
+    if hStab[0] is not None:
+        baseSignature += [["hess",hStab]]
         exprs += [x for x in hStab if not type(x) in [int,float]]
     def transform_(model):
         model.baseSignature = baseSignature
         if model.baseName == "vemintegrands":
             return
+        print("base signature",model.baseSignature)
         model._code = model.code
         model.code  = lambda *args,**kwargs: codeVEM(model,*args,**kwargs)
         model.space = space

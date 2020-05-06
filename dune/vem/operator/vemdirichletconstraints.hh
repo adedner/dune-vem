@@ -53,6 +53,12 @@ namespace Dune {
       : BaseType(model,space)
     {}
 
+    bool applyConstraint(char maskValue) const
+    {
+      if (maskValue>2) {std::cout << "applyConstraint got wrong mask value: " << maskValue << std::endl; assert(false);}
+      return (maskValue >= 1);
+    }
+
     template < class DiscreteFunctionType >
     void operator ()( const DiscreteFunctionType& u, DiscreteFunctionType& w ) const
     {
@@ -107,7 +113,7 @@ namespace Dune {
       std::vector<std::size_t> globalBlockDofs(localBlocks);
       // obtain all DofBlocks for this element
       space_.blockMapper().map( entity, globalBlockDofs );
-      std::vector<bool> mask( localBlocks );
+      std::vector< char > mask( localBlocks );
       space_.interpolation()( entity, mask );
 
       // counter for all local dofs (i.e. localBlockDof * localBlockSize + ... )
@@ -118,7 +124,8 @@ namespace Dune {
         int global = globalBlockDofs[localBlockDof];
         for( int l = 0; l < localBlockSize; ++ l, ++ localDof )
         {
-          if( dirichletBlocks_[global][l] && mask[localBlockDof] )
+          if( dirichletBlocks_[global][l] &&
+              applyConstraint(mask[localBlockDof]) )
           {
             // clear all other columns
             localMatrix.clearRow( localDof );
@@ -145,7 +152,7 @@ namespace Dune {
       std::vector< std::size_t > globalBlockDofs( localBlocks );
       space_.blockMapper().map( entity, globalBlockDofs );
       std::vector< double > valuesModel( localBlocks*localBlockSize );
-      std::vector< bool > mask( localBlocks );
+      std::vector< char > mask( localBlocks );
       space_.interpolation()( entity, mask );
 
       int localDof = 0;
@@ -155,7 +162,8 @@ namespace Dune {
         // store result to dof vector
         int global = globalBlockDofs[ localBlock ];
         for( int l = 0; l < localBlockSize; ++l, ++localDof )
-          if( dirichletBlocks_[ global ][ l ] && mask[ localBlock ])
+          if( dirichletBlocks_[ global ][ l ] &&
+              applyConstraint(mask[ localBlock ]))
           {
             std::fill(valuesModel.begin(),valuesModel.end(),0);
             space_.interpolation()( entity, BoundaryWrapper(model_,dirichletBlocks_[global][l]),
@@ -184,7 +192,7 @@ namespace Dune {
 
       std::vector<double> values( localBlocks*localBlockSize );
       std::vector<double> valuesModel( localBlocks*localBlockSize );
-      std::vector< bool > mask( localBlocks );
+      std::vector< char > mask( localBlocks );
       assert( uLocal.size() == values.size() );
       for (unsigned int i=0;i<uLocal.size();++i)
         values[i] = uLocal[i];
@@ -198,7 +206,8 @@ namespace Dune {
         int global = globalBlockDofs[ localBlock ];
         for( int l = 0; l < localBlockSize; ++l, ++localDof )
         {
-          if( dirichletBlocks_[ global ][l] && mask[ localBlock ])
+          if( dirichletBlocks_[ global ][l] &&
+              applyConstraint(mask[ localBlock ]) )
           {
             if (op == Operation::sub)
             {

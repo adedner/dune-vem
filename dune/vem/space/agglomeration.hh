@@ -306,7 +306,7 @@ namespace Dune {
                   Dune::Fem::OrthonormalShapeFunctions<DomainType::dimension>::
                   size(std::max(orders[2], polOrder - 2))
           );
-          int numGradShapeFunctions = std::min(numShapeFunctions,
+          std::size_t numGradShapeFunctions = std::min(numShapeFunctions,
                   Dune::Fem::OrthonormalShapeFunctions<DomainType::dimension>::
                   size(std::max(orders[1], polOrder - 1))
           );
@@ -314,16 +314,25 @@ namespace Dune {
                   Dune::Fem::OrthonormalShapeFunctions<DomainType::dimension>::
                   size(orders[0]);
 
-          const std::size_t numGradConstraints =
-               Dune::Fem::OrthonormalShapeFunctions<DomainType::dimension>::size(orders[1]);
-          std::cout << "size of spaces: "
-                    << numInnerShapeFunctions << " "
+          const std::size_t numGradConstraints = std::min(numGradShapeFunctions,
+               Dune::Fem::OrthonormalShapeFunctions<DomainType::dimension>::
+               size(orders[1]) ); //!!!!!!!!!!!!!! for C^1-nc-mod
+          const std::size_t edgeTangentialSize = Dune::Fem::OrthonormalShapeFunctions<1>::
+               size( agIndexSet_.edgeOrders()[0] + 1);
+          std::size_t edgeNormalSize = agIndexSet_.template order2size<1>(1);
+          //   (edgeTangentialSize*3+numGradConstraints >= 2*numGradShapeFunctions)?
+          //                             0 : agIndexSet_.template order2size<1>(1);
+          std::cout << "size of spaces (SF,gSF,hSF): "
                     << numShapeFunctions << " "
                     << numGradShapeFunctions << " "
-                    << numHessShapeFunctions << " "
-                    << numGradConstraints << "   "
+                    << numHessShapeFunctions << "   "
+                    << "value setup (constraints): "
+                    << numInnerShapeFunctions << " "
+                    << "grad setup (constraints, normal-ls, tangential-ls): "
+                    << numGradConstraints << " " << edgeNormalSize << " " << edgeTangentialSize << "   "
+                    << "order<1,2,3> and edgeDegrees<0,1>: "
                     << orders[0] << " " << orders[1] << " " << orders[2] << "   "
-                    << agIndexSet_.edgeDegrees()[0]
+                    << agIndexSet_.edgeDegrees()[0] << " " << agIndexSet_.edgeDegrees()[1]
                     << std::endl;
 
 
@@ -347,9 +356,6 @@ namespace Dune {
             const std::size_t numDofs = blockMapper().numDofs(agglomerate);
 
             const int numEdges = agIndexSet_.subAgglomerates(agglomerate, AgglomerationIndexSetType::dimension - 1);
-            const std::size_t edgeNormalSize = agIndexSet_.template order2size<1>(1);
-            const std::size_t edgeTangentialSize = Dune::Fem::OrthonormalShapeFunctions<1>::
-              size( agIndexSet_.edgeOrders()[0] + 1);
 
             D.resize(numDofs, numShapeFunctions, 0);
             C.resize(numShapeFunctions, numDofs, 0);
@@ -470,9 +476,8 @@ namespace Dune {
                       element.type());
               std::vector<Dune::DynamicMatrix<double> > edgePhiVector(2);
               // get the bounding box monomials and apply all dofs to them
-              BoundingBoxBasisFunctionSet <GridPart, ScalarShapeFunctionSetType> shapeFunctionSet(element, bbox,
-                                                                                                  useOnb_,
-                                                                                                  scalarShapeFunctionSet_);
+              BoundingBoxBasisFunctionSet <GridPart, ScalarShapeFunctionSetType>
+                  shapeFunctionSet(element, bbox, useOnb_, scalarShapeFunctionSet_);
 
               // compute the boundary terms for the gradient projection
               for (const auto &intersection : intersections(static_cast< typename GridPart::GridViewType >( gridPart()),
@@ -597,10 +602,10 @@ namespace Dune {
                       if (alpha < numGradShapeFunctions)
                       {
                         edgeShapeFunctionSet_.evaluateEach(x, [&](std::size_t beta, FieldVector<DomainFieldType, 1> psi) {
-                          if (beta < edgePhiVector[1].size())
+                          if (beta < edgeNormalSize)
                           {
-                            assert( edgeNormalSize == edgePhiVector[1].size() );
-                            assert( edgeNormalSize == agIndexSet_.edgeSize(1) );
+                            assert( edgeNormalSize==0 || edgeNormalSize == edgePhiVector[1].size() );
+                            // assert( edgeNormalSize == agIndexSet_.edgeSize(1) );
                             leastSquaresGradProj[counter+beta][alpha]                          += psi[0] * phi[0] * weight * globalNormal[0];
                             leastSquaresGradProj[counter+beta][alpha + numGradShapeFunctions ] += psi[0] * phi[0] * weight * globalNormal[1];
                           }

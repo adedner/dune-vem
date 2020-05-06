@@ -45,7 +45,17 @@ namespace Dune
           AllocatorType allocator = AllocatorType() )
       : BaseType( agglomeration, allocator )
       , testSpaces_( testSpaces )
+      , h4Correction_( false )
       {
+        // HACK!!!!!
+        if (testSpaces_[0].size() > 1 && testSpaces_[0][1]==1)
+        {
+          h4Correction_ = true;
+          testSpaces_[0][1] = -1;
+        }
+        // for (auto &ts : testSpaces_)
+        //   for (auto &m : ts)
+        //     m = std::max(m,-1);
 #if 0
         std::cout << "######## dofs per codim ############\n";
         std::cout << testSpaces_[0][0] << " " << dofsPerCodim()[0].second << std::endl;
@@ -78,11 +88,14 @@ namespace Dune
                  std::make_pair( dimension-2, iSize ) };
       }
 
+      bool h4Correction_; // HACK!!!!!
       std::vector<int> orders()
       {
           std::vector<int> ret(3,0);
           ret[0] += testSpaces_[2][0];
           ret[1] += std::min( {testSpaces_[2][0] + 1, edgeDegrees()[0]} );
+          if (h4Correction_) // add a gradient constraint for h4 condition
+             ret[1] += 1;
           ret[2] += std::min( {testSpaces_[2][0] + 2, edgeDegrees()[0]+1, edgeDegrees()[1]} );
           return ret;
       }
@@ -100,7 +113,7 @@ namespace Dune
       {
         assert( testSpaces_[0].size()<2 );
         std::vector<int> degrees(2, -1);
-        for (std::size_t i=0;i<testSpaces_[0].size();++i)
+        for (std::size_t i=0;i<1;++i) // testSpaces_[0].size();++i) //!!!  HACK!!!!
           if (i<testSpaces_[0].size())
             degrees[i] += 2*(testSpaces_[0][i]+1);
         for (std::size_t i=0;i<testSpaces_[1].size();++i)
@@ -157,7 +170,7 @@ namespace Dune
         return std::accumulate(testSpaces_[codim].begin(),testSpaces_[codim].end(),0);
       }
       // !TS
-      const TestSpacesType testSpaces_;
+      TestSpacesType testSpaces_;
     };
 
 

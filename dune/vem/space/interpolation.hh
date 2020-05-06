@@ -83,11 +83,34 @@ namespace Dune
       // 'active' on the given element, i.e., are attached to a given
       // subentity of this element. Needed for dirichlet boundary data for
       // example
-      void operator() ( const ElementType &element, std::vector<bool> &mask) const
+      void operator() ( const ElementType &element, std::vector<char> &mask) const
       {
-        auto set = [&mask] (int poly,auto i,int k,int numDofs)
-        { std::fill(mask.begin()+k,mask.begin()+k+numDofs,true); };
-        apply(element,set,set,set);
+        std::fill(mask.begin(),mask.end(),-1);
+        auto vertex = [&mask] (int poly,auto i,int k,int numDofs)
+        { std::fill(mask.begin()+k,mask.begin()+k+numDofs,1); };
+        auto edge = [&] (int poly,auto i,int k,int numDofs)
+        {
+          // std::fill(mask.begin()+k,mask.begin()+k+numDofs,1);
+          int kStart = k;
+          for (std::size_t alpha=0;alpha<edgeBFS_.size();++alpha)
+          {
+            if (alpha < indexSet_.template order2size<1>(0))
+            {
+              mask[k] = 1;
+              ++k;
+            }
+            if (alpha < indexSet_.template order2size<1>(1))
+            {
+              mask[k] = 2;
+              ++k;
+            }
+          }
+          assert(k-kStart == numDofs);
+        };
+        auto inner = [&mask] (int poly,auto i,int k,int numDofs)
+        { std::fill(mask.begin()+k,mask.begin()+k+numDofs,1); };
+        apply(element,vertex,edge,inner);
+        assert( std::none_of(mask.begin(),mask.end(), [](char m){return m==-1;}) );
       }
 
       // preform interpolation of a full shape function set filling a transformation matrix

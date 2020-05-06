@@ -32,8 +32,12 @@ def centroid(vertices):
     return np.array([C_x, C_y])
 
 def voronoiCells(constructor, towers, fileName=None, load=False, lloyd=False, show=False):
-    lowerleft  = numpy.array(constructor.lower)
-    upperright = numpy.array(constructor.upper)
+    try:
+        constructor = [constructor.lower,constructor.upper]
+    except AttributeError:
+        pass
+    lowerleft  = numpy.array(constructor[0])
+    upperright = numpy.array(constructor[1])
     bounding_box = numpy.array(
             [lowerleft[0],upperright[0],lowerleft[1],upperright[1]] )
 
@@ -123,8 +127,8 @@ def voronoiCells(constructor, towers, fileName=None, load=False, lloyd=False, sh
         elif dist > lloyd:
             return voronoiCells(constructor, towers, fileName=None, load=False, lloyd=lloyd, show=show)
 
-    lowerleft  = numpy.array(constructor.lower)
-    upperright = numpy.array(constructor.upper)
+    lowerleft  = numpy.array(constructor[0])
+    upperright = numpy.array(constructor[1])
     bounding_box = numpy.array(
             [lowerleft[0],upperright[0],lowerleft[1],upperright[1]] )
 
