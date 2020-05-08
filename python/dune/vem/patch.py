@@ -138,7 +138,6 @@ def transform(space,hStab,gStab,mStab):
         model.baseSignature = baseSignature
         if model.baseName == "vemintegrands":
             return
-        print("base signature",model.baseSignature)
         model._code = model.code
         model.code  = lambda *args,**kwargs: codeVEM(model,*args,**kwargs)
         model.space = space

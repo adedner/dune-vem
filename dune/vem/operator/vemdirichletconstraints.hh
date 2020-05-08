@@ -56,7 +56,7 @@ namespace Dune {
     bool applyConstraint(char maskValue) const
     {
       if (maskValue>2) {std::cout << "applyConstraint got wrong mask value: " << maskValue << std::endl; assert(false);}
-      return (maskValue >= 1);
+      return (maskValue == 1);
     }
 
     template < class DiscreteFunctionType >
