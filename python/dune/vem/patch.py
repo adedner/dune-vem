@@ -1,10 +1,10 @@
 from __future__ import division, print_function, unicode_literals
 
 from dune.ufl.codegen import generateMethod
-from ufl import SpatialCoordinate, Coefficient, replace, diff, as_vector
+from ufl import SpatialCoordinate, Coefficient, replace, diff, as_vector, MaxCellEdgeLength
 from ufl.core.expr import Expr
 from ufl.tensors import ListTensor
-from dune.source.cplusplus import Variable, UnformattedExpression, AccessModifier
+from dune.source.cplusplus import Variable, UnformattedExpression, AccessModifier, maxEdgeLength
 from ufl.algorithms import expand_compounds, expand_derivatives, expand_indices, expand_derivatives
 
 def codeVEM(self, name, targs):
@@ -72,9 +72,11 @@ def codeVEM(self, name, targs):
 
     code.append(AccessModifier("public"))
     x = SpatialCoordinate(self.space.cell())
+    maxCellEdgeLength = MaxCellEdgeLength(self.space.cell())
     predefined = {}
     spatial = Variable('const auto', 'y')
-    predefined.update( {x: UnformattedExpression('auto', 'entity().geometry().global( Dune::Fem::coordinate( x ) )') })
+    predefined[x] = UnformattedExpression('auto', 'entity().geometry().global( Dune::Fem::coordinate( x ) )')
+    predefined[maxCellEdgeLength] = maxEdgeLength(self.cellGeometry())
     self.predefineCoefficients(predefined)
     generateMethod(code, hStab,
             'RRangeType', 'hessStabilization',

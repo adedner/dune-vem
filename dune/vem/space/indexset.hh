@@ -45,14 +45,7 @@ namespace Dune
           AllocatorType allocator = AllocatorType() )
       : BaseType( agglomeration, allocator )
       , testSpaces_( testSpaces )
-      , h4Correction_( false )
       {
-        // HACK!!!!!
-        if (testSpaces_[0].size() > 1 && testSpaces_[0][1]==1)
-        {
-          h4Correction_ = true;
-          testSpaces_[0][1] = -1;
-        }
         // for (auto &ts : testSpaces_)
         //   for (auto &m : ts)
         //     m = std::max(m,-1);
@@ -77,8 +70,9 @@ namespace Dune
         int vSize = 0;
         int eSize = 0;
         int iSize = 0;
-        for (size_t i=0;i<testSpaces_[0].size();++i) // order2size fails for dim=dimension
-          vSize += (testSpaces_[0][i]>=0) ? pow(BaseType::dimension,i):0;
+        for (size_t i=0;i<testSpaces_[0].size();++i)
+          // vSize += (testSpaces_[0][i]>=0) ? pow(BaseType::dimension,i):0;
+          vSize += order2size<0>(i);
         for (size_t i=0;i<testSpaces_[1].size();++i)
           eSize += order2size<1>(i);
         for (size_t i=0;i<testSpaces_[2].size();++i)
@@ -88,14 +82,11 @@ namespace Dune
                  std::make_pair( dimension-2, iSize ) };
       }
 
-      bool h4Correction_; // HACK!!!!!
       std::vector<int> orders()
       {
           std::vector<int> ret(3,0);
           ret[0] += testSpaces_[2][0];
           ret[1] += std::min( {testSpaces_[2][0] + 1, edgeDegrees()[0]} );
-          if (h4Correction_) // add a gradient constraint for h4 condition
-             ret[1] += 1;
           ret[2] += std::min( {testSpaces_[2][0] + 2, edgeDegrees()[0]+1, edgeDegrees()[1]} );
           return ret;
       }
@@ -111,11 +102,12 @@ namespace Dune
 
       std::vector<int> edgeDegrees() const
       {
-        assert( testSpaces_[0].size()<2 );
+        assert( testSpaces_[2].size()<2 );
         std::vector<int> degrees(2, -1);
-        for (std::size_t i=0;i<1;++i) // testSpaces_[0].size();++i) //!!!  HACK!!!!
-          if (i<testSpaces_[0].size())
+        for (std::size_t i=0;i<testSpaces_[0].size();++i)
             degrees[i] += 2*(testSpaces_[0][i]+1);
+        if (testSpaces_[0][1]>-1) // add tangential derivatives
+          degrees[0] += 2;
         for (std::size_t i=0;i<testSpaces_[1].size();++i)
           if (i<testSpaces_[1].size())
             degrees[i] += std::max(0,testSpaces_[1][i]+1);
@@ -155,7 +147,7 @@ namespace Dune
           return 0;
         else
         {
-          if (dim>0)
+          if constexpr (dim>0)
             return Dune::Fem::OrthonormalShapeFunctions<dim>::
               size(testSpaces_[dim][deriv]);
           else
@@ -170,7 +162,7 @@ namespace Dune
         return std::accumulate(testSpaces_[codim].begin(),testSpaces_[codim].end(),0);
       }
       // !TS
-      TestSpacesType testSpaces_;
+      const TestSpacesType testSpaces_;
     };
 
 

@@ -91,7 +91,8 @@ def bbdgScheme(model, space=None, penalty=1, solver=None, parameters={}):
 
 def vemSpace(view, order=1, testSpaces=None, scalar=False,
              dimRange=None, conforming=True, field="double",
-             storage="adaptive", basisChoice=2):
+             storage="adaptive", basisChoice=2,
+             edgeInterpolation=False):
     """create a virtual element space over an agglomerated grid
 
     Args:
@@ -156,10 +157,10 @@ def vemSpace(view, order=1, testSpaces=None, scalar=False,
                    ['pybind11::object gridView',
                     'const pybind11::function agglomerate',
                     'const std::array<std::vector<int>,'+str(view.dimension+1)+'> &testSpaces',
-                    'int basisChoice'],
+                    'int basisChoice','bool edgeInterpolation'],
                    ['auto agglo = new Dune::Vem::Agglomeration<' + gridPartName + '>',
                     '         (Dune::FemPy::gridPart<' + viewType + '>(gridView), [agglomerate](const auto& e) { return agglomerate(e).template cast<unsigned int>(); } ); ',
-                    'auto obj = new DuneType( *agglo, testSpaces, basisChoice );',
+                    'auto obj = new DuneType( *agglo, testSpaces, basisChoice, edgeInterpolation );',
                     'pybind11::cpp_function remove_agglo( [ agglo ] ( pybind11::handle weakref ) {',
                     '  delete agglo;',
                     '  weakref.dec_ref();',
@@ -168,10 +169,12 @@ def vemSpace(view, order=1, testSpaces=None, scalar=False,
                     '// assert(nurse);',
                     'pybind11::weakref( agglomerate, remove_agglo ).release();',
                     'return obj;'],
-                   ['"gridView"_a', '"agglomerate"_a', '"testSpaces"_a', '"basisChoice"_a',
+                   ['"gridView"_a', '"agglomerate"_a', '"testSpaces"_a',
+                    '"basisChoice"_a', '"edgeInterpolation"_a',
                     'pybind11::keep_alive< 1, 2 >()'] )
 
-    spc = module(field, includes, typeName, constructor, scalar=scalar, storage=storage, ctorArgs=[view, agglomerate, testSpaces, basisChoice])
+    spc = module(field, includes, typeName, constructor, scalar=scalar, storage=storage,
+                ctorArgs=[view, agglomerate, testSpaces, basisChoice, edgeInterpolation])
     addStorage(spc, storage)
     return spc.as_ufl()
 

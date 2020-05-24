@@ -67,15 +67,19 @@ struct PhiEdge : public Dune::Fem::BindableGridFunction< GridPart, Dune::Dim<1> 
     xx -= x;
     if ( xx.two_norm() > 1e-10 ) return;
     sfs_.evaluateEach( y, [ & ] ( std::size_t beta, const typename Base::RangeType &phi ) {
-        ret[0] += matrix_[beta][i_] * phi[0];
+        if ( beta < matrix_.size() )
+        {
+          assert( i_ < matrix_[beta].size() );
+          ret[0] += matrix_[beta][i_] * phi[0];
+        }
     } );
   }
   template <class Point>
   void jacobian(const Point &p, typename Base::JacobianRangeType &ret) const
   {
-    return;
     const int dimension = GridPart::dimension;
     const auto& normal = intersection_.centerUnitOuterNormal();
+    const auto tau = Dune::FieldVector<double,dimension>{normal[1],-normal[0]};
     const auto& entity = intersection_.inside();
     const auto &refElement = Dune::ReferenceElements< double, dimension >::general( entity.type() );
     ret = typename Base::JacobianRangeType(0.);
@@ -85,8 +89,12 @@ struct PhiEdge : public Dune::Fem::BindableGridFunction< GridPart, Dune::Dim<1> 
     auto xx = intersection_.geometryInInside().global(y);
     xx -= x;
     if ( xx.two_norm() > 1e-10 ) return;
-    sfs_.evaluateEach( y, [ & ] ( std::size_t beta, const typename Base::RangeType &phi ) {
-        ret[0].axpy(matrix_[beta][i_] * phi[0], normal);
+    sfs_.jacobianEach( y, [ & ] ( std::size_t beta, const auto &dphi ) {
+        if ( beta < matrix_.size() )
+        {
+          assert( i_ < matrix_[beta].size() );
+          ret[0].axpy(matrix_[beta][i_] * dphi[0][0], tau);
+        }
     } );
   }
   unsigned int order() const { return 2; }

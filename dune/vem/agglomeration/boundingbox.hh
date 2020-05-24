@@ -9,6 +9,7 @@
 #include <vector>
 
 #include <dune/python/pybind11/pybind11.h>
+// #include <pybind11/pybind11.h>
 
 #include <dune/common/fvector.hh>
 
@@ -46,8 +47,9 @@ namespace Dune
         CoordinateType y;
         transform_.mtv(x,y);
         // std::cout << y << std::endl;
-        assert(-1e-8 < y[0] && y[0] < 1+1e-8);
-        assert(-1e-8 < y[1] && y[1] < 1+1e-8);
+        // some quadrature points could be outside of box
+        // assert(-1e-8 < y[0] && y[0] < 1+1e-8);
+        // assert(-1e-8 < y[1] && y[1] < 1+1e-8);
         return y;
       }
       void gradientTransform(CoordinateType &g, bool transpose) const

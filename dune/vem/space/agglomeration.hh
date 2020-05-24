@@ -167,8 +167,10 @@ namespace Dune {
             //!TS: change to vector of vectors
             AgglomerationVEMSpace(AgglomerationType &agglomeration,
                 const typename AgglomerationIndexSetType::TestSpacesType &testSpaces,
-                int basisChoice)
+                int basisChoice,
+                bool edgeInterpolation)
                 : BaseType(agglomeration.gridPart()),
+                edgeInterpolation_(edgeInterpolation),
                 agIndexSet_(agglomeration, testSpaces),
                 blockMapper_(agIndexSet_, agIndexSet_.dofsPerCodim()),
                 interpolation_(blockMapper().indexSet(), polOrder, basisChoice != 3),
@@ -178,24 +180,6 @@ namespace Dune {
                 polOrder_(polOrder),
                 useOnb_(basisChoice == 2)
             {
-#if 0
-              const int innerTestSpace = testSpaces[2];
-              assert(innerTestSpace>=-1);
-              const std::size_t numShapeFunctions = scalarShapeFunctionSet_.size(); // uses polOrder
-              // const std::size_t  //! this casuses a weird internal compiler error...
-              int numGradShapeFunctions =
-                      Dune::Fem::OrthonormalShapeFunctions< DomainType::dimension >::size(innerTestSpace+1);
-              const std::size_t numInnerShapeFunctions = innerTestSpace<0?0:
-                      Dune::Fem::OrthonormalShapeFunctions< DomainType::dimension >::size(innerTestSpace);
-              std::cout << "******************************************\n";
-              std::cout << "AgglomerationVEMSpace: "
-                << polOrder << " (" << testSpaces[0] << "," << testSpaces[1] << "," << testSpaces[2] << ") "
-                << "inner:" << numInnerShapeFunctions << "    "
-                << "edge:" << edgeShapeFunctionSet_.size() << " " << "value:" << scalarShapeFunctionSet_.size() << " "
-                << "grad:" << numGradShapeFunctions
-                << std::endl;
-              std::cout << "******************************************\n";
-#endif
               onbBasis(agglomeration, scalarShapeFunctionSet_, agIndexSet_.boundingBox());
               buildProjections();
             }
@@ -273,6 +257,7 @@ namespace Dune {
             void buildProjections();
 
             // issue with making these const: use of delete default constructor in some python bindings...
+            bool edgeInterpolation_;
             AgglomerationIndexSetType agIndexSet_;
             mutable BlockMapperType blockMapper_;
             AgglomerationInterpolationType interpolation_;
@@ -301,37 +286,43 @@ namespace Dune {
 
           std::vector<int> orders = agIndexSet_.orders();
           const std::size_t numShapeFunctions = scalarShapeFunctionSet_.size(); // uses polOrder
-          const std::size_t numHessShapeFunctions = polOrder==1? 1:
-               std::min(numShapeFunctions,
-                  Dune::Fem::OrthonormalShapeFunctions<DomainType::dimension>::
-                  size(std::max(orders[2], polOrder - 2))
-          );
-          std::size_t numGradShapeFunctions = std::min(numShapeFunctions,
-                  Dune::Fem::OrthonormalShapeFunctions<DomainType::dimension>::
-                  size(std::max(orders[1], polOrder - 1))
-          );
+          const std::size_t numHessShapeFunctions = // numShapeFunctions;
+                polOrder==1? 1:
+                std::min(numShapeFunctions,
+                   Dune::Fem::OrthonormalShapeFunctions<DomainType::dimension>::
+                   size(std::max(orders[2], polOrder - 2))
+           );
+          std::size_t numGradShapeFunctions = // numShapeFunctions;
+                   std::min(numShapeFunctions,
+                   Dune::Fem::OrthonormalShapeFunctions<DomainType::dimension>::
+                   size(std::max(orders[1], polOrder - 1))
+           );
           const std::size_t numInnerShapeFunctions = orders[0] < 0 ? 0 :
                   Dune::Fem::OrthonormalShapeFunctions<DomainType::dimension>::
                   size(orders[0]);
 
-          const std::size_t numGradConstraints = std::min(numGradShapeFunctions,
-               Dune::Fem::OrthonormalShapeFunctions<DomainType::dimension>::
-               size(orders[1]) ); //!!!!!!!!!!!!!! for C^1-nc-mod
+          const std::size_t numGradConstraints = numGradShapeFunctions;
+               // std::min(numGradShapeFunctions,
+               // Dune::Fem::OrthonormalShapeFunctions<DomainType::dimension>::
+               // size(orders[1]) ); //!!!!!!!!!!!!!! for C^1-nc-mod
           const std::size_t edgeTangentialSize = Dune::Fem::OrthonormalShapeFunctions<1>::
                size( agIndexSet_.edgeOrders()[0] + 1);
           std::size_t edgeNormalSize = agIndexSet_.template order2size<1>(1);
           //   (edgeTangentialSize*3+numGradConstraints >= 2*numGradShapeFunctions)?
           //                             0 : agIndexSet_.template order2size<1>(1);
           std::cout << "size of spaces (SF,gSF,hSF): "
-                    << numShapeFunctions << " "
-                    << numGradShapeFunctions << " "
-                    << numHessShapeFunctions << "   "
+                    << numShapeFunctions << ", "
+                    << numGradShapeFunctions << ", "
+                    << numHessShapeFunctions << ",   "
                     << "value setup (constraints): "
-                    << numInnerShapeFunctions << " "
+                    << numInnerShapeFunctions << ", "
+                    << "edge interpolation:"
+                    << (edgeInterpolation_? "interpolation, ":
+                                            "projection, ")
                     << "grad setup (constraints, normal-ls, tangential-ls): "
-                    << numGradConstraints << " " << edgeNormalSize << " " << edgeTangentialSize << "   "
+                    << numGradConstraints << " " << edgeNormalSize << " " << edgeTangentialSize << ",   "
                     << "order<1,2,3> and edgeDegrees<0,1>: "
-                    << orders[0] << " " << orders[1] << " " << orders[2] << "   "
+                    << orders[0] << " " << orders[1] << " " << orders[2] << ",  "
                     << agIndexSet_.edgeDegrees()[0] << " " << agIndexSet_.edgeDegrees()[1]
                     << std::endl;
 
@@ -479,6 +470,8 @@ namespace Dune {
               BoundingBoxBasisFunctionSet <GridPart, ScalarShapeFunctionSetType>
                   shapeFunctionSet(element, bbox, useOnb_, scalarShapeFunctionSet_);
 
+              auto vemBasisFunction = scalarBasisFunctionSet(element);
+
               // compute the boundary terms for the gradient projection
               for (const auto &intersection : intersections(static_cast< typename GridPart::GridViewType >( gridPart()),
                                                             element)) {
@@ -504,16 +497,64 @@ namespace Dune {
                       blockMapper_.indexSet().index(intersection.outside()))
                     globalNormal *= -1;
 
-                std::vector<std::vector<unsigned int>> mask(2); // contains indices with Phi_mask[i] is attached to given edge
+                std::vector<std::vector<unsigned int>>
+                  mask(2,std::vector<unsigned int>(0)); // contains indices with Phi_mask[i] is attached to given edge
                 edgePhiVector[0].resize(agIndexSet_.edgeSize(0), agIndexSet_.edgeSize(0), 0);
                 edgePhiVector[1].resize(agIndexSet_.edgeSize(1), agIndexSet_.edgeSize(1), 0);
                 interpolation_(intersection, edgeShapeFunctionSet_, edgePhiVector, mask);
-                assert(mask[0].size() == agIndexSet_.edgeSize(0));
-                assert(mask[1].size() == agIndexSet_.edgeSize(1));
                 if (edgePhiVector[0].size() > 0)
+                {
                   edgePhiVector[0].invert();
+                  if (mask[1].size() > agIndexSet_.edgeSize(1))
+                  { // need to take tangential derivatives at vertices into account
+                    assert(mask[0].size() == agIndexSet_.edgeSize(0)+2);
+                    auto A = edgePhiVector[0];
+                    edgePhiVector[0].resize(agIndexSet_.edgeSize(0), mask[0].size(), 0);
+                    // vertex basis functions (values)
+                    for (std::size_t j=0;j<agIndexSet_.edgeSize(0);++j)
+                    {
+                      edgePhiVector[0][j][0] = A[j][0];
+                      edgePhiVector[0][j][3] = A[j][2];
+                    }
+                    // vertex basis functions (tangential derivatives)
+                    for (std::size_t j=0;j<agIndexSet_.edgeSize(0);++j)
+                    {
+                      edgePhiVector[0][j][1] = A[j][1]*tau[0];
+                      edgePhiVector[0][j][2] = A[j][1]*tau[1];
+                      edgePhiVector[0][j][4] = A[j][3]*tau[0];
+                      edgePhiVector[0][j][5] = A[j][3]*tau[1];
+                    }
+                    for (std::size_t i=6;i<mask[0].size();++i)
+                      for (std::size_t j=0;j<agIndexSet_.edgeSize(0);++j)
+                      {
+                        assert( i-2 < A[j].size() );
+                        edgePhiVector[0][j][i] = A[j][i-2];
+                      }
+                  }
+                }
                 if (edgePhiVector[1].size() > 0)
+                {
                   edgePhiVector[1].invert();
+                  if (mask[1].size() > agIndexSet_.edgeSize(1))
+                  {
+                    assert(mask[1].size() == agIndexSet_.edgeSize(1)+2);
+                    auto A = edgePhiVector[1];
+                    edgePhiVector[1].resize(agIndexSet_.edgeSize(1), mask[1].size(), 0);
+                    std::size_t i=0;
+                    // vertex basis functions
+                    for (;i<4;i+=2)
+                    {
+                      for (std::size_t j=0;j<agIndexSet_.edgeSize(1);++j)
+                      {
+                        edgePhiVector[1][j][i]   = A[j][i/2]*globalNormal[0];
+                        edgePhiVector[1][j][i+1] = A[j][i/2]*globalNormal[1];
+                      }
+                    }
+                    for (;i<mask[1].size();++i)
+                      for (std::size_t j=0;j<agIndexSet_.edgeSize(1);++j)
+                        edgePhiVector[1][j][i] = A[j][i-2];
+                  }
+                }
                 /* WARNING WARNING WARNING
                  * This is a horrible HACK and needs to be revised:
                  * It might be necessary to flip the vertex entries in the masks around
@@ -525,27 +566,37 @@ namespace Dune {
                 {
                   std::vector<double> lambda(numDofs);
                   bool succ = true;
-                  for (std::size_t i = 0; i < mask[0].size(); ++i)
+                  std::fill(lambda.begin(), lambda.end(), 0);
+                  PhiEdge <GridPartType, Dune::DynamicMatrix<double>, EdgeShapeFunctionSetType>
+                          phiEdge(gridPart(), intersection, edgePhiVector[0], edgeShapeFunctionSet_,
+                                  0); // behaves like Phi_mask[i] restricted to edge
+                  interpolation_(element, phiEdge, lambda);
+                  // test with phi_mask[0] (vertex) has the correct interpolation result:
+                  succ = std::abs(lambda[mask[0][0]] - 1) < 1e-10;
+                  DomainType otherTau = element.geometry().corner(
+                               refElement.subEntity(intersection.indexInInside(),1,1,2)
+                             );
+                  otherTau -= element.geometry().corner(
+                                refElement.subEntity(intersection.indexInInside(),1,0,2)
+                              );
+                  otherTau /= otherTau.two_norm();
+                  assert( (succ && otherTau*tau>0) || (!succ && otherTau*tau<0) );
+                  if (otherTau*tau<0)
                   {
-                    std::fill(lambda.begin(), lambda.end(), 0);
-                    PhiEdge <GridPartType, Dune::DynamicMatrix<double>, EdgeShapeFunctionSetType>
-                            phiEdge(gridPart(), intersection, edgePhiVector[0], edgeShapeFunctionSet_,
-                                    i); // behaves like Phi_mask[i] restricted to edge
-                    interpolation_(element, phiEdge, lambda);
-                    for (std::size_t k = 0; k < numDofs; ++k) // lambda should be 1 for k=mask[i] otherwise 0
-                      succ &= (mask[0][i] == k ? std::abs(lambda[k] - 1) < 1e-10 : std::abs(lambda[k]) < 1e-10);
+                    if (mask[1].size() > agIndexSet_.edgeSize(1))
+                    {
+                      std::swap(mask[0][0], mask[0][3]); // the HACK
+                      std::swap(mask[0][1], mask[0][4]); // the HACK
+                      std::swap(mask[0][2], mask[0][5]); // the HACK
+                      std::swap(mask[1][0], mask[1][2]); // the HACK
+                      std::swap(mask[1][1], mask[1][3]); // the HACK
+                    }
+                    else
+                      std::swap(mask[0][0], mask[0][1]); // the HACK
                   }
-                  if (!succ) std::swap(mask[0][0], mask[0][1]); // the HACK
-                  succ = true;
-                  for (std::size_t i = 0; i < mask[0].size(); ++i) {
-                    std::fill(lambda.begin(), lambda.end(), 0);
-                    PhiEdge <GridPartType, Dune::DynamicMatrix<double>, EdgeShapeFunctionSetType>
-                            phiEdge(gridPart(), intersection, edgePhiVector[0], edgeShapeFunctionSet_,
-                                    i); // behaves like Phi_mask[i] restricted to edge
-                    interpolation_(element, phiEdge, lambda);
-                    for (std::size_t k = 0; k < numDofs; ++k) // lambda should be 1 for k=mask[i] otherwise 0
-                      succ &= (mask[0][i] == k ? std::abs(lambda[k] - 1) < 1e-10 : std::abs(lambda[k]) < 1e-10);
-                  }
+                  std::fill(lambda.begin(), lambda.end(), 0);
+                  interpolation_(element, phiEdge, lambda);
+                  succ = std::abs(lambda[mask[0][0]] - 1) < 1e-10;
                   assert(succ);
                 }
 
@@ -558,14 +609,24 @@ namespace Dune {
                   shapeFunctionSet.evaluateEach(y, [&](std::size_t alpha, FieldVector<DomainFieldType, 1> phi) {
                       if (alpha < numGradShapeFunctions)
                         // evaluate each here for edge shape fns
-                        edgeShapeFunctionSet_.evaluateEach(x, [&](std::size_t beta, FieldVector<DomainFieldType, 1> psi) {
-                          if (beta < edgePhiVector[0].size() && alpha < numGradConstraints ) {
-                            for (std::size_t s = 0; s < mask[0].size(); ++s)// note that edgePhi is the transposed of the basis transform matrix
+                        // first check if we should be using interpolation (for the
+                        // existing edge moments - or for H4 space)
+                        if (alpha < Dune::Fem::OrthonormalShapeFunctions<DomainType::dimension>::
+                                    size( agIndexSet_.edgeOrders()[0] ) // have enough edge moments
+                            || edgePhiVector[0].size() == polOrder+1    // interpolation is exact
+                            || edgeInterpolation_)                      // user want interpolation no matter what
+                          edgeShapeFunctionSet_.evaluateEach(x, [&](std::size_t beta, FieldVector<DomainFieldType, 1> psi) {
+                            if (beta < edgePhiVector[0].size())
+                              for (std::size_t s = 0; s < mask[0].size(); ++s)// note that edgePhi is the transposed of the basis transform matrix
                                 R[alpha][mask[0][s]].axpy(edgePhiVector[0][beta][s] * psi[0] * phi[0] * weight, normal);
-                            //assemble left hand side here for ls problem
-                          }
-                        });
-                      if (alpha < numHessShapeFunctions) // && agIndexSet_.edgeSize(1) > 0)
+                          });
+                        else // use value projection
+                        {
+                          auto factor = normal;
+                          factor *= phi[0]*weight;
+                          vemBasisFunction.axpy(y, factor, R[alpha]);
+                        }
+                      if (alpha < numHessShapeFunctions && agIndexSet_.edgeSize(1) > 0)
                       {
 #if 1 // can be replaced by integration by parts version further down
                         auto jit = intersection.geometry().jacobianInverseTransposed(x);
@@ -598,13 +659,14 @@ namespace Dune {
                       } // alpha < numHessSF and can compute normal derivative
                   });
                   ////////////////////////////////
+                  #if 0
                   shapeFunctionSet.evaluateEach(y, [&](std::size_t alpha, FieldVector<DomainFieldType, 1> phi) {
                       if (alpha < numGradShapeFunctions)
                       {
                         edgeShapeFunctionSet_.evaluateEach(x, [&](std::size_t beta, FieldVector<DomainFieldType, 1> psi) {
                           if (beta < edgeNormalSize)
                           {
-                            assert( edgeNormalSize==0 || edgeNormalSize == edgePhiVector[1].size() );
+                            // assert( edgeNormalSize==0 || edgeNormalSize == edgePhiVector[1].size() );
                             // assert( edgeNormalSize == agIndexSet_.edgeSize(1) );
                             leastSquaresGradProj[counter+beta][alpha]                          += psi[0] * phi[0] * weight * globalNormal[0];
                             leastSquaresGradProj[counter+beta][alpha + numGradShapeFunctions ] += psi[0] * phi[0] * weight * globalNormal[1];
@@ -617,23 +679,24 @@ namespace Dune {
                         });
                      }
                   });
+                  #endif
                   auto jit = intersection.geometry().jacobianInverseTransposed(x);
                   edgeShapeFunctionSet_.evaluateEach(x, [&](std::size_t alpha, FieldVector<DomainFieldType, 1> phi) {
                     if (alpha < edgeTangentialSize) // note: in contrast to the previous loop alpha is now the test space
                     {
-                        edgeShapeFunctionSet_.jacobianEach(x, [&](std::size_t beta, FieldMatrix<DomainFieldType, 1, 1> dpsi) {
-                          if (beta < edgePhiVector[0].size())
+                      edgeShapeFunctionSet_.jacobianEach(x, [&](std::size_t beta, FieldMatrix<DomainFieldType, 1, 1> dpsi) {
+                        if (beta < edgePhiVector[0].size())
+                        {
+                          Dune::FieldVector<double, 2> gradPsi;
+                          jit.mv(dpsi[0], gradPsi);
+                          double gradPsiDottau = gradPsi * tau;
+                          assert(std::abs(gradPsiDottau - dpsi[0][0] / h) < 1e-8);
+                          for (std::size_t s = 0; s < mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
                           {
-                            Dune::FieldVector<double, 2> gradPsi;
-                            jit.mv(dpsi[0], gradPsi);
-                            double gradPsiDottau = gradPsi * tau;
-                            assert(std::abs(gradPsiDottau - dpsi[0][0] / h) < 1e-8);
-                            for (std::size_t s = 0; s < mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
-                            {
-                              RHSleastSquaresGrad[ mask[0][s] ][ numEdges*edgeNormalSize + counter2+alpha ] += edgePhiVector[0][beta][s] * gradPsiDottau * phi[0] * weight;
-                            }
+                            RHSleastSquaresGrad[ mask[0][s] ][ numEdges*edgeNormalSize + counter2+alpha ] += edgePhiVector[0][beta][s] * gradPsiDottau * phi[0] * weight;
                           }
-                        });
+                        }
+                      });
                     }
                    });
 #if 0 // implement tangential derivative using integration by part on edge - also need point evaluations below to be turned on
@@ -683,7 +746,6 @@ namespace Dune {
               } // loop over intersections
 
 
-              auto vemBasisFunction = scalarBasisFunctionSet(element);
               Quadrature0Type quadrature(element, 2 * polOrder);
               for (std::size_t qp = 0; qp < quadrature.nop(); ++qp) {
                 const DomainFieldType weight =
@@ -743,6 +805,7 @@ namespace Dune {
                 VectorizeMatrixCol d = vectorizeMatrixCol(R, beta);
                 VectorizeMatrixCol colGradProjection = vectorizeMatrixCol(jacobianProjection, beta);
 
+#if 0 // memory access issues with C^1-conf space - but not needed anymore anyway
                 // TODO: set RHS for the normal derivatives in loop using mask[1] then remove fullMask
                 std::size_t counter = 0;
                 bool finished = false;
@@ -758,6 +821,7 @@ namespace Dune {
                   }
                   if (finished) break;
                 }
+#endif
                 colGradProjection = leastSquaresMinimizerGradient.solve( RHSleastSquaresGrad[ beta ] , d );
               }
             }
