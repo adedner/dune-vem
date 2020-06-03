@@ -105,12 +105,11 @@ namespace Dune
         assert( testSpaces_[2].size()<2 );
         std::vector<int> degrees(2, -1);
         for (std::size_t i=0;i<testSpaces_[0].size();++i)
-            degrees[i] += 2*(testSpaces_[0][i]+1);
-        if (testSpaces_[0][1]>-1) // add tangential derivatives
+          degrees[i] += 2*(testSpaces_[0][i]+1);
+        if (testSpaces_[0].size()>1 && testSpaces_[0][1]>-1) // add tangential derivatives
           degrees[0] += 2;
         for (std::size_t i=0;i<testSpaces_[1].size();++i)
-          if (i<testSpaces_[1].size())
-            degrees[i] += std::max(0,testSpaces_[1][i]+1);
+          degrees[i] += std::max(0,testSpaces_[1][i]+1);
         return degrees;
       }
       std::size_t edgeSize(int deriv) const
