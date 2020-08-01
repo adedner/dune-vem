@@ -172,8 +172,11 @@ def vemSpace(view, order=1, testSpaces=None, scalar=False,
                    ['"gridView"_a', '"agglomerate"_a', '"testSpaces"_a',
                     '"basisChoice"_a', '"edgeInterpolation"_a',
                     'pybind11::keep_alive< 1, 2 >()'] )
+    diameterMethod = Method('diameters',
+       '''[]( DuneType &self ) { return self.blockMapper().indexSet().diameters(); }''' )
 
-    spc = module(field, includes, typeName, constructor, scalar=scalar, storage=storage,
+    spc = module(field, includes, typeName, constructor, diameterMethod,
+                scalar=scalar, storage=storage,
                 ctorArgs=[view, agglomerate, testSpaces, basisChoice, edgeInterpolation])
     addStorage(spc, storage)
     return spc.as_ufl()

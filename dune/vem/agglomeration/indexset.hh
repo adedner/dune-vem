@@ -142,8 +142,10 @@ namespace Dune
       const AgglomerationType &agglomeration () const { return agglomeration_; }
       const GridPartType &gridPart () const { return agglomeration().gridPart(); }
 
-      double volume( std::size_t index ) const {
-      assert(boundingBox(index).volume() == volumes_[index]); return volumes_[index]; }
+      double volume( std::size_t index ) const
+      {
+        assert(boundingBox(index).volume() == volumes_[index]); return volumes_[index];
+      }
       double volume( const ElementType &element ) const
       {
         return volume( index( element ) );
@@ -172,6 +174,8 @@ namespace Dune
         return boundingBoxes_;
       }
 
+      std::pair<double,double> diameters() const { return {minDiameter_,maxDiameter_}; }
+
     private:
       const Agglomerate &agglomerate ( std::size_t agglomerateIndex ) const { return agglomerates_[ agglomerateIndex ]; }
       const Agglomerate &agglomerate ( const ElementType &element ) const { return agglomerate( index( element ) ); }
@@ -185,6 +189,7 @@ namespace Dune
       std::vector< std::vector< int > > globalIndex_;
       std::vector< double > volumes_;
       std::vector< double > vertexDiameters_;
+      double minDiameter_, maxDiameter_;
     };
 
 
@@ -430,6 +435,10 @@ namespace Dune
       }
       for ( std::size_t k = 0; k < vertexCount.size(); ++k)
         vertexDiameters_[k] /= double(vertexCount[k]);
+
+      maxDiameter_ = *std::max_element(vertexDiameters_.begin(),vertexDiameters_.end());
+      minDiameter_ = *std::min_element(vertexDiameters_.begin(),vertexDiameters_.end());
+
       std::cout << "maximal vertex diameter: "
                 << *std::max_element(vertexDiameters_.begin(),vertexDiameters_.end())
                 << std::endl;
