@@ -73,7 +73,7 @@ namespace Dune
       std::vector<std::size_t> polygonindices() const
       {
         std::vector< std::size_t > w(size(),0);
-        return std::move(w);
+        return w;
       }
       // std::vector< std::size_t > polygonindices () const { return indices_; }
 
@@ -85,7 +85,7 @@ namespace Dune
         w.reserve( v.size() );
         for( const T &i : v )
           w.emplace_back( i );
-        return std::move( w );
+        return w;
       }
 
       GridPart &gridPart_;
