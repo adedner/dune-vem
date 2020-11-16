@@ -23,8 +23,8 @@ namespace Dune
 
       explicit LeftPseudoInverse ( Size numCols ) : ATA_( numCols, numCols ) {}
 
-      template< class InvA >
-      void operator() ( const Matrix &A, InvA &invA )
+      template< class AMatrix, class InvA >
+      void operator() ( const AMatrix &A, InvA &invA )
       {
         Size numRows = A.rows();
         Size numCols = A.cols();
@@ -44,7 +44,11 @@ namespace Dune
         resize( invA, numCols, numRows );
         for( Size i = 0; i < numCols; ++i )
           for( Size j = 0; j < numRows; ++j )
-            invA[ i ][ j ] = ATA_[ i ] * A[ j ];
+          {
+            invA[i][j] = 0;
+            for( Size k = 0; k < numCols; ++k )
+              invA[ i ][ j ] += ATA_[ i ][k] * A[ j ][k];
+          }
       }
 
 

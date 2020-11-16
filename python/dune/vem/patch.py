@@ -1,10 +1,10 @@
 from __future__ import division, print_function, unicode_literals
 
 from dune.ufl.codegen import generateMethod
-from ufl import SpatialCoordinate, Coefficient, replace, diff, as_vector
+from ufl import SpatialCoordinate, Coefficient, replace, diff, as_vector, MaxCellEdgeLength
 from ufl.core.expr import Expr
 from ufl.tensors import ListTensor
-from dune.source.cplusplus import Variable, UnformattedExpression, AccessModifier
+from dune.source.cplusplus import Variable, UnformattedExpression, AccessModifier, maxEdgeLength
 from ufl.algorithms import expand_compounds, expand_derivatives, expand_indices, expand_derivatives
 
 def codeVEM(self, name, targs):
@@ -72,10 +72,12 @@ def codeVEM(self, name, targs):
 
     code.append(AccessModifier("public"))
     x = SpatialCoordinate(self.space.cell())
+    maxCellEdgeLength = MaxCellEdgeLength(self.space.cell())
     predefined = {}
     self.predefineCoefficients(predefined, False)
     spatial = Variable('const auto', 'y')
-    predefined.update( {x: UnformattedExpression('auto', 'entity().geometry().global( Dune::Fem::coordinate( x ) )') })
+    predefined[x] = UnformattedExpression('auto', 'entity().geometry().global( Dune::Fem::coordinate( x ) )')
+    predefined[maxCellEdgeLength] = maxEdgeLength(self.cellGeometry())
     self.predefineCoefficients(predefined)
     generateMethod(code, hStab,
             'RRangeType', 'hessStabilization',
@@ -124,14 +126,14 @@ def transform(space,hStab,gStab,mStab):
         mStab = [mStab]
     exprs = []
     baseSignature = []
-    if mStab is not None:
-        baseSignature += [mStab]
+    if mStab[0] is not None:
+        baseSignature += [["mass",mStab]]
         exprs += [x for x in mStab if not type(x) in [int,float]]
-    if gStab is not None:
-        baseSignature += [gStab]
+    if gStab[0] is not None:
+        baseSignature += [["grad",gStab]]
         exprs += [x for x in gStab if not type(x) in [int,float]]
-    if hStab is not None:
-        baseSignature += [hStab]
+    if hStab[0] is not None:
+        baseSignature += [["hess",hStab]]
         exprs += [x for x in hStab if not type(x) in [int,float]]
     def transform_(model):
         model.baseSignature = baseSignature
@@ -143,13 +145,5 @@ def transform(space,hStab,gStab,mStab):
         model.hStab = hStab
         model.gStab = gStab
         model.mStab = mStab
-        model.baseName = "integrandsVem"
-        model.baseSignature = []
-    uflExpr = []
-    if isinstance(hStab,Expr):
-        uflExpr += [hStab]
-    if isinstance(gStab,Expr):
-        uflExpr += [gStab]
-    if isinstance(mStab,Expr):
-        uflExpr += [mStab]
-    return [transform_, uflExpr]
+        model.baseName = "vemintegrands"
+    return [transform_, exprs]

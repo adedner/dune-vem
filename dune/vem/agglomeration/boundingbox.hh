@@ -9,6 +9,7 @@
 #include <vector>
 
 #include <dune/python/pybind11/pybind11.h>
+// #include <pybind11/pybind11.h>
 
 #include <dune/common/fvector.hh>
 
@@ -46,9 +47,10 @@ namespace Dune
         CoordinateType y;
         transform_.mtv(x,y);
         // std::cout << y << std::endl;
-        assert(-1e-8 < y[0] && y[0] < 1+1e-8);
-        assert(-1e-8 < y[1] && y[1] < 1+1e-8);
-        return std::move(y);
+        // some quadrature points could be outside of box
+        // assert(-1e-8 < y[0] && y[0] < 1+1e-8);
+        // assert(-1e-8 < y[1] && y[1] < 1+1e-8);
+        return y;
       }
       void gradientTransform(CoordinateType &g, bool transpose) const
       {
@@ -160,7 +162,7 @@ namespace Dune
         }
 
       }
-      for (int i=0;i<boundingBoxes.size();++i)
+      for (unsigned int i=0;i<boundingBoxes.size();++i)
       {
         BoundingBox< GridPart > &bbox = boundingBoxes[ i ];
         std::vector<std::vector<double>> &points = polygonPoints[ i ];
@@ -171,7 +173,7 @@ namespace Dune
         // std::cout << bbox.xAxis() << "   " << bbox.yAxis() << "     ";
         // std::cout << bbox.diameter() << std::endl;
       }
-      return std::move( boundingBoxes );
+      return boundingBoxes;
     }
 
   } // namespace Vem

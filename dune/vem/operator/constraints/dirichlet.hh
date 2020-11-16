@@ -1,6 +1,8 @@
 #ifndef DUNE_VEM_OPERATOR_CONSTRAINTS_DIRICHLET_HH
 #define DUNE_VEM_OPERATOR_CONSTRAINTS_DIRICHLET_HH
 
+#error NOT USED - version of dirichlet constraints in dune-fem is used instead as base clase
+
 #include <cstdlib>
 #include <cstddef>
 

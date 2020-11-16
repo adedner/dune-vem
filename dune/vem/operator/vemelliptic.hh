@@ -311,7 +311,7 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
     model().init(entity);
     const DomainLocalFunctionType uLocal = u.localFunction(entity);
 
-    const int agglomerate = agglomeration.index(entity); // the polygon we are integrating
+    const unsigned int agglomerate = agglomeration.index(entity); // the polygon we are integrating
     const auto &bbox = agIndexSet.boundingBox( agglomerate );
     const int numVertices = agIndexSet.numPolyVertices(entity, GridPartType::dimension);
     stabilization[ agglomerate ] = entity.seed();
