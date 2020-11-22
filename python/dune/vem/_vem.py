@@ -234,7 +234,8 @@ def vemModel(view, equation, space,
                       *args, **kwargs)
 
 def vemScheme(model, space=None, solver=None, parameters={},
-              hessStabilization=None, gradStabilization=None, massStabilization=None):
+              hessStabilization=None, gradStabilization=None, massStabilization=None,
+              boundary="full"):
     """create a scheme for solving second order pdes with the virtual element method
 
     Args:
@@ -245,6 +246,8 @@ def vemScheme(model, space=None, solver=None, parameters={},
 
     from dune.fem.scheme import module
     from dune.fem.scheme import femschemeModule
+
+    assert boundary=="full" or boundary=="value" or boundary=="derivative" or boundary is None
 
     modelParam = None
     if isinstance(model, (list, tuple)):
@@ -276,13 +279,18 @@ def vemScheme(model, space=None, solver=None, parameters={},
                              ",".join([linOp,model]) + ">"
 
     if model.hasDirichletBoundary:
+        assert boundary is not None
         includes += [ "dune/fem/schemes/dirichletwrapper.hh",
                       "dune/vem/operator/vemdirichletconstraints.hh"]
+        if boundary   == "full":       boundary = 3
+        elif boundary == "value":      boundary = 1
+        elif boundary == "derivative": boundary = 2
         constraints = lambda model: "Dune::VemDirichletConstraints< " +\
-                ",".join([model,space._typeName]) + " > "
+                    ",".join([model,space._typeName,str(boundary)]) + " > "
         operator = lambda linOp,model: "DirichletWrapperOperator< " +\
                 ",".join([op(linOp,model),constraints(model)]) + " >"
     else:
+        assert boundary is None
         operator = op
 
     spaceType = space._typeName

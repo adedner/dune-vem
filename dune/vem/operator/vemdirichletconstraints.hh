@@ -7,9 +7,14 @@
 
 namespace Dune {
 
-  template < class Model, class DiscreteFunctionSpace >
+  template < class Model, class DiscreteFunctionSpace,
+             int bndMask > // mask | 1: fix value
+                           // mask | 2: fix normal derivative
+                           // -> 2nd order: use mask=1
+                           //    4th order: use mask=3 for fixing both
   class VemDirichletConstraints : public DirichletConstraints<Model,DiscreteFunctionSpace>
   {
+    static_assert( 1<=bndMask && bndMask<=3 );
     typedef DirichletConstraints<Model,DiscreteFunctionSpace> BaseType;
   public:
     enum Operation { set = 0, sub = 1 };
@@ -59,7 +64,13 @@ namespace Dune {
       //           = 1: a value dof on bnd
       //           = 2: a derivative dof on bnd
       if (maskValue>2) {std::cout << "applyConstraint got wrong mask value: " << maskValue << std::endl; assert(false);}
-      return (maskValue >= 1);
+      switch (bndMask)
+      {
+        case 1: return (maskValue == 1);
+        case 2: return (maskValue == 2);
+        case 3: return (maskValue >= 1);
+      }
+      return false; // can't be reached
     }
 
     template < class DiscreteFunctionType >
