@@ -1,6 +1,7 @@
 set(HEADERS
   agglomeration.hh
   basisfunctionset.hh
+  indexset.hh
   interpolate.hh
   interpolation.hh
   test.hh

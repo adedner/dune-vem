@@ -1,4 +1,8 @@
-install(
-  FILES matrixWrappers.hh leastSquares.hh compatibility.hh pseudoinverse.hh grid.hh
+install(FILES
+  compatibility.hh
+  grid.hh
+  leastSquares.hh
+  matrixWrappers.hh
+  pseudoinverse.hh
   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/dune/vem/misc
 )
