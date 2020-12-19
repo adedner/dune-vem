@@ -55,7 +55,7 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model>
                           const Dune::Fem::ParameterReader &parameter = Dune::Fem::Parameter::container() )
     : dSpace_(dSpace), rSpace_(rSpace),
       // baseOperator_(dSpace,rSpace,model,parameter)
-      baseOperator_(dSpace.gridPart(),true,model)
+      baseOperator_(dSpace.gridPart(),model)
     {
 #if 0
       std::size_t aSize = rSpace.agglomeration().size();
@@ -154,7 +154,7 @@ template<class JacobianOperator, class Model>
                                       const Dune::Fem::ParameterReader &parameter = Dune::Fem::Parameter::container() )
   : BaseType( dSpace, rSpace,  model, parameter )
   // , baseOperator_(dSpace,rSpace,true, model,parameter)
-  , baseOperator_(dSpace,rSpace,true,model)
+  , baseOperator_(dSpace,rSpace,model)
   {}
 
   //! method to setup the jacobian of the operator for storage in a matrix
