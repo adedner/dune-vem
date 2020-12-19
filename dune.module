@@ -1,6 +1,10 @@
 Module: dune-vem
 Version: 2.8-git
+Author: Andreas Dedner
 Maintainer: a.s.dedner@warwick.ac.uk
-Whitespace-Hook: Yes
-Depends: dune-fem (>= 2.8) dune-alugrid
+Description: Implementation of a number of virtual element spaces and bilinear forms
+URL: ssh://git@gitlab.dune-project.org:22022/dune-fem/dune-vem.git
+Depends: dune-fem (>= 2.8) dune-alugrid (>= 2.8)
 Suggests:
+Python-Requires:
+Whitespace-Hook: Yes
