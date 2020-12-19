@@ -6,5 +6,5 @@ Description: Implementation of a number of virtual element spaces and bilinear f
 URL: ssh://git@gitlab.dune-project.org:22022/dune-fem/dune-vem.git
 Depends: dune-fem (>= 2.8) dune-alugrid (>= 2.8)
 Suggests:
-Python-Requires:
+Python-Requires: matplotlib triangle scipy sortedcontainers
 Whitespace-Hook: Yes
