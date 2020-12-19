@@ -8,7 +8,4 @@ if status != 0: raise RuntimeError(status)
 
 print("#################################################################")
 print("## An example script is now located in the 'vem_tutorial' folder.")
-try:
-    import matplotlib
-except ImportError:
 print("#################################################################")
