@@ -43,6 +43,7 @@ namespace Dune
       };
 
 
+#if 0
 
       // Element Types
       // -------------
@@ -62,7 +63,7 @@ namespace Dune
       static const ElementTypeImpl point( 15, Impl :: CubeTopology < 0 > :: type :: id, 0, { { 0, 0 } } );
 
       static const ElementTypeImpl reducedOrder2Quadrangle( 16, Impl :: CubeTopology < 2 > :: type :: id, 2, { { 0, 2 }, { 1, 2 }, { 3, 2 }, { 2, 2 }, { 2, 1 }, { 1, 1 }, { 3, 1 }, { 0, 1 } } );
-
+#endif
 
 
       // makeElementTypes
@@ -71,6 +72,7 @@ namespace Dune
       static std::map< std::size_t, const ElementType * > makeElementTypes ()
       {
         std::map< std::size_t, const ElementType * > types;
+#if 0
         types.insert( order1Line );
         types.insert( order1Triangle );
         types.insert( order1Quadrangle );
@@ -82,6 +84,7 @@ namespace Dune
         types.insert( order2Quadrangle );
         types.insert( point );
         types.insert( reducedOrder2Quadrangle );
+#endif
         return std::move( types );
       }
 
