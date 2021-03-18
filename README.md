@@ -4,7 +4,7 @@ Preparing the Sources
 Additional to the software mentioned in README you'll need the
 following programs installed on your system:
 
-  cmake >= 2.8.12
+  cmake >= 3.13.3
 
 Getting started
 ---------------
