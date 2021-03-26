@@ -439,9 +439,7 @@ namespace Dune
       maxDiameter_ = *std::max_element(vertexDiameters_.begin(),vertexDiameters_.end());
       minDiameter_ = *std::min_element(vertexDiameters_.begin(),vertexDiameters_.end());
 
-      std::cout << "maximal vertex diameter: "
-                << *std::max_element(vertexDiameters_.begin(),vertexDiameters_.end())
-                << std::endl;
+      // std::cout << "maximal vertex diameter: " << *std::max_element(vertexDiameters_.begin(),vertexDiameters_.end()) << std::endl;
     }
   } // namespace Vem
 

@@ -310,6 +310,7 @@ namespace Dune {
           std::size_t edgeNormalSize = agIndexSet_.template order2size<1>(1);
           //   (edgeTangentialSize*3+numGradConstraints >= 2*numGradShapeFunctions)?
           //                             0 : agIndexSet_.template order2size<1>(1);
+#ifndef NDEBUG
           std::cout << "size of spaces (SF,gSF,hSF): "
                     << numShapeFunctions << ", "
                     << numGradShapeFunctions << ", "
@@ -317,15 +318,14 @@ namespace Dune {
                     << "value setup (constraints): "
                     << numInnerShapeFunctions << ", "
                     << "edge interpolation:"
-                    << (edgeInterpolation_? "interpolation, ":
-                                            "projection, ")
+                    << (edgeInterpolation_? "interpolation, ": "projection, ")
                     << "grad setup (constraints, normal-ls, tangential-ls): "
                     << numGradConstraints << " " << edgeNormalSize << " " << edgeTangentialSize << ",   "
                     << "order<1,2,3> and edgeDegrees<0,1>: "
                     << orders[0] << " " << orders[1] << " " << orders[2] << ",  "
                     << agIndexSet_.edgeDegrees()[0] << " " << agIndexSet_.edgeDegrees()[1]
                     << std::endl;
-
+#endif
 
           // set up matrices used for constructing gradient, value, and edge projections
           // Note: the code is set up with the assumption that the dofs suffice to compute the edge projection
@@ -502,9 +502,11 @@ namespace Dune {
                 edgePhiVector[0].resize(agIndexSet_.edgeSize(0), agIndexSet_.edgeSize(0), 0);
                 edgePhiVector[1].resize(agIndexSet_.edgeSize(1), agIndexSet_.edgeSize(1), 0);
                 interpolation_(intersection, edgeShapeFunctionSet_, edgePhiVector, mask);
+                //!!! std::cout << "edgePhiVector[0].size:" << edgePhiVector[0].size() << std::endl;
                 if (edgePhiVector[0].size() > 0)
                 {
                   edgePhiVector[0].invert();
+                  //!!! std::cout << "mask[1].size:" << mask[1].size() << " " << "agIndexSet_.edgeSize(1):" << agIndexSet_.edgeSize(1) << std::endl;
                   if (mask[1].size() > agIndexSet_.edgeSize(1))
                   { // need to take tangential derivatives at vertices into account
                     assert(mask[0].size() == agIndexSet_.edgeSize(0)+2);
@@ -580,19 +582,22 @@ namespace Dune {
                                 refElement.subEntity(intersection.indexInInside(),1,0,2)
                               );
                   otherTau /= otherTau.two_norm();
-                  assert( (succ && otherTau*tau>0) || (!succ && otherTau*tau<0) );
-                  if (otherTau*tau<0)
+                  if (agIndexSet_.vertexOrders()[0]>=0) // vertices might have to be flipped
                   {
-                    if (mask[1].size() > agIndexSet_.edgeSize(1))
+                    assert( (succ && otherTau*tau>0) || (!succ && otherTau*tau<0) );
+                    if (otherTau*tau<0)
                     {
-                      std::swap(mask[0][0], mask[0][3]); // the HACK
-                      std::swap(mask[0][1], mask[0][4]); // the HACK
-                      std::swap(mask[0][2], mask[0][5]); // the HACK
-                      std::swap(mask[1][0], mask[1][2]); // the HACK
-                      std::swap(mask[1][1], mask[1][3]); // the HACK
+                      if (mask[1].size() > agIndexSet_.edgeSize(1))
+                      {
+                        std::swap(mask[0][0], mask[0][3]); // the HACK
+                        std::swap(mask[0][1], mask[0][4]); // the HACK
+                        std::swap(mask[0][2], mask[0][5]); // the HACK
+                        std::swap(mask[1][0], mask[1][2]); // the HACK
+                        std::swap(mask[1][1], mask[1][3]); // the HACK
+                      }
+                      else
+                        std::swap(mask[0][0], mask[0][1]); // the HACK
                     }
-                    else
-                      std::swap(mask[0][0], mask[0][1]); // the HACK
                   }
                   std::fill(lambda.begin(), lambda.end(), 0);
                   interpolation_(element, phiEdge, lambda);
@@ -607,6 +612,14 @@ namespace Dune {
                   auto y = intersection.geometryInInside().global(x);
                   const DomainFieldType weight = intersection.geometry().integrationElement(x) * quadrature.weight(qp);
                   shapeFunctionSet.evaluateEach(y, [&](std::size_t alpha, FieldVector<DomainFieldType, 1> phi) {
+                  /*
+                      std::cout << alpha << "," << qp << "," << x << ":"
+                                << " " << Dune::Fem::OrthonormalShapeFunctions<DomainType::dimension>::size( agIndexSet_.edgeOrders()[0] )
+                                << " " << edgePhiVector[0].size()
+                                << " " << polOrder+1
+                                << " " << edgeInterpolation_
+                                << std::endl;
+                   */
                       if (alpha < numGradShapeFunctions)
                         // evaluate each here for edge shape fns
                         // first check if we should be using interpolation (for the
@@ -800,6 +813,7 @@ namespace Dune {
               auto leastSquaresMinimizerGradient = leastSquares(leastSquaresGradProj, constraintBlockMatrix);
               // auto leastSquaresMinimizerGradient = leastSquares(leastSquaresGradProj);
 
+              // std::cout << "ls grad proj:" << leastSquaresGradProj.rows() << "," << leastSquaresGradProj.cols() << " constraint:" << constraintBlockMatrix.rows() << "," << constraintBlockMatrix.cols() << std::endl;
               for (std::size_t beta = 0; beta < numDofs; ++beta)
               {
                 VectorizeMatrixCol d = vectorizeMatrixCol(R, beta);

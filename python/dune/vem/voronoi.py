@@ -45,7 +45,7 @@ def voronoiCells(constructor, towers, fileName=None, load=False, lloyd=False, sh
         if fileName:
             fileName = fileName + str(towers) + '.pickle'
             if not load or not os.path.exists(fileName):
-                print("generating new seeds for voronoi grid")
+                # print("generating new seeds for voronoi grid")
                 numpy.random.seed(1234)
                 towers = numpy.array(
                         [ p*(upperright-lowerleft) + lowerleft
@@ -53,7 +53,7 @@ def voronoiCells(constructor, towers, fileName=None, load=False, lloyd=False, sh
                 with open(fileName, 'wb') as f:
                     pickle.dump(towers, f)
             else:
-                print("loading seeds for voronoi grid")
+                # print("loading seeds for voronoi grid")
                 with open(fileName, 'rb') as f:
                     towers = pickle.load(f)
         else:
