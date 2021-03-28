@@ -477,8 +477,8 @@ from dune.vem.voronoi import triangulated_voronoi
 from scipy.spatial import Voronoi, voronoi_plot_2d, cKDTree, Delaunay
 import numpy
 
-from sortedcontainers import SortedDict
 import triangle
+from sortedcontainers import SortedDict
 import matplotlib.pyplot as plt
 class PolyAgglomerate:
     def __init__(self,constructor,cubes=False,convex=False):
