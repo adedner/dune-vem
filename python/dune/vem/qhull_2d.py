@@ -33,21 +33,21 @@ edge = lambda a,b: concatenate(([a],[b]))
 
 def qhull2D(sample):
     def dome(sample,base):
-        print(sample)
-        print(base)
+        print("dome(sample):",sample)
+        print("dome(base):",base)
         h, t = base
         dists = dot(sample-h, dot(((0,-1),(1,0)),(t-h)))
         outer = repeat(sample, dists>0, 0)
-        print(len(outer),sample,base)
+        print("dome(outer):",len(outer),outer)
         if len(outer):
             pivot = sample[argmax(dists)]
-            print("len(outer)")
+            print("dome(pivot):",pivot)
             return link(dome(outer, edge(h, pivot)),
-                    dome(outer, edge(pivot, t)))
+                        dome(outer, edge(pivot, t)))
         else:
             return base
+    print("sample",sample)
     if len(sample) > 2:
-        print("len(sample)>2")
         axis = sample[:,0]
         base = take(sample, [argmin(axis), argmax(axis)], 0)
         return link(dome(sample, base), dome(sample, base[::-1]))
