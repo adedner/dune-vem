@@ -38,7 +38,7 @@ def qhull2D(sample):
         h, t = base
         dists = dot(sample-h, dot(((0,-1),(1,0)),(t-h)))
         outer = repeat(sample, dists>0, 0)
-        print("dome(outer):",len(outer),outer)
+        print("dome(outer):",len(outer),outer,dists)
         if len(outer):
             pivot = sample[argmax(dists)]
             print("dome(pivot):",pivot)
