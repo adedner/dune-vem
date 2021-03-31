@@ -189,7 +189,7 @@ public:
 
   VirtualVEMDiffusionModelMethods(LocalDomainType)
 
-  typedef Dune::FieldVector<int, dimR> DirichletComponentType;
+  typedef std::array<int, dimR> DirichletComponentType;
   virtual bool hasDirichletBoundary () const = 0;
   virtual bool hasNeumanBoundary () const = 0;
   virtual bool isDirichletIntersection( const IntersectionType& inter, DirichletComponentType &dirichletComponent ) const = 0;
@@ -252,7 +252,7 @@ struct DiffusionModelWrapper : public VEMDiffusionModel<typename ModelImpl::Grid
   {
     return impl().name();
   }
-  typedef Dune::FieldVector<int, dimR> DirichletComponentType;
+  typedef std::array<int, dimR> DirichletComponentType;
   virtual bool hasDirichletBoundary () const
   {
     return impl().hasDirichletBoundary();
@@ -344,7 +344,7 @@ namespace Dune
 
       using RRangeType = typename detail::GetDimRange<std::tuple_element_t<0,RangeValueType>>::type;
       using DRangeType = typename detail::GetDimRange<std::tuple_element_t<0,DomainValueType>>::type;
-      typedef Dune::FieldVector<int,RRangeType::dimension> DirichletComponentType;
+      typedef std::array<int,RRangeType::dimension> DirichletComponentType;
       typedef typename EntityType::Geometry::LocalCoordinate DomainType;
 
     private:
