@@ -30,8 +30,6 @@ namespace Dune {
     typedef typename DiscreteFunctionSpaceType :: GridType GridType;
 
     static const int localBlockSize = DiscreteFunctionSpaceType :: localBlockSize ;
-    typedef FieldVector<int, localBlockSize> DirichletBlock;
-    typedef FieldVector<int, localBlockSize> ModelDirichletBlock;
 
     class BoundaryWrapper
     {

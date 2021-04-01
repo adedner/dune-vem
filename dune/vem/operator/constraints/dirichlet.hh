@@ -42,8 +42,7 @@ namespace Dune
       static const int localBlockSize = DiscreteFunctionSpaceType::localBlockSize;
       static_assert( localBlockSize == dimRange,
                      "local block size of the space must be identical to the dimension of the range of the function space." );
-      typedef FieldVector< bool, localBlockSize > DirichletBlock;
-      typedef FieldVector< int, dimRange > ModelDirichletBlock;
+      typedef std::array< bool, localBlockSize > DirichletBlock;
       static_assert( dimRange >= localBlockSize,
                      "local block size of the space must be less or equahl to the dimension of the range of the model." );
 
@@ -307,7 +306,8 @@ namespace Dune
           if( intersection.boundary() )
           {
             // get dirichlet information from model
-            ModelDirichletBlock block( 1 );
+            DirichletBlock block;
+            block.fill( 0 );
             const bool isDirichletIntersection = model.isDirichletIntersection( intersection, block );
             if( isDirichletIntersection )
             {
@@ -319,7 +319,7 @@ namespace Dune
                 if( !globalBlockDofsFilter[ i ] )
                   continue;
                 // mark global DoF number
-                for( int k = 0; k < DirichletBlock::dimension; ++k )
+                for( int k = 0; k < localBlockSize; ++k )
                   dirichletBlocks_[ globalBlockDofs[ i ] ][ k ] = block [ k ];
 
                 // we have Dirichlet values
