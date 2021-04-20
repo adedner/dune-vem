@@ -10,6 +10,8 @@
 
 #include <dune/geometry/type.hh>
 
+#include <dune/fem/gridpart/common/gridpart.hh>
+
 #include <dune/vem/agglomeration/indexset.hh>
 
 namespace Dune
@@ -294,8 +296,8 @@ namespace Dune
           const int numEdges = refElement.size( dimension-1 );
           for( int i = 0; i < numEdges; ++i )
           {
-            const auto left = idSet.subId( element, refElement.subEntity( i, dimension-1, 0, dimension ), dimension );
-            const auto right = idSet.subId( element, refElement.subEntity( i, dimension-1, 1, dimension ), dimension );
+            const auto left = idSet.subId( Dune::Fem::gridEntity(element), refElement.subEntity( i, dimension-1, 0, dimension ), dimension );
+            const auto right = idSet.subId( Dune::Fem::gridEntity(element), refElement.subEntity( i, dimension-1, 1, dimension ), dimension );
             edgeTwist_[ indexSet().subIndex( element, i, dimension-1 ) ] = (right < left);
           }
         }

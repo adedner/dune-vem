@@ -145,7 +145,7 @@ def vemSpace(view, order=1, testSpaces=None, scalar=False,
 
     agglomerate = view.hierarchicalGrid.agglomerate
 
-    includes = [ "dune/vem/space/agglomeration.hh" ] + view._includes
+    includes = [ "dune/fem/gridpart/common/gridpart.hh", "dune/vem/space/agglomeration.hh" ] + view._includes
     dimw = view.dimWorld
     viewType = view._typeName
 
@@ -160,7 +160,7 @@ def vemSpace(view, order=1, testSpaces=None, scalar=False,
                     'const std::array<std::vector<int>,'+str(view.dimension+1)+'> &testSpaces',
                     'int basisChoice','bool edgeInterpolation'],
                    ['auto agglo = new Dune::Vem::Agglomeration<' + gridPartName + '>',
-                    '         (Dune::FemPy::gridPart<' + viewType + '>(gridView), [agglomerate](const auto& e) { return agglomerate(e).template cast<unsigned int>(); } ); ',
+                    '         (Dune::FemPy::gridPart<' + viewType + '>(gridView), [agglomerate](const auto& e) { return agglomerate(Dune::Fem::gridEntity(e)).template cast<unsigned int>(); } ); ',
                     'auto obj = new DuneType( *agglo, testSpaces, basisChoice, edgeInterpolation );',
                     'pybind11::cpp_function remove_agglo( [ agglo ] ( pybind11::handle weakref ) {',
                     '  delete agglo;',
@@ -491,11 +491,18 @@ class PolyAgglomerate:
             self.grid = aluCubeGrid(self.domain)
         else:
             self.grid = aluSimplexGrid(self.domain)
+
+        self.indexSet = self.grid.indexSet
+        self.polys = numpy.zeros(self.grid.size(0),int)
+        for e in self.grid.elements:
+            self.polys[self.indexSet.index(e)] = self.index[self.roundBary(e.geometry.center)]
+
         self.ind = set()
         self.size = len( constructor["polygons"] )
-    def __call__(self,en):
-        bary = en.geometry.center
-        return self.index[self.roundBary(bary)]
+    def __call__(self,element):
+        return self.polys[self.indexSet.index(element)]
+        # bary = element.geometry.center
+        # return self.index[self.roundBary(bary)]
     def check(self):
         return len(self.ind)==self.N
     def roundBary(self,a):
