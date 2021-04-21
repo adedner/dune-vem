@@ -144,7 +144,8 @@ namespace Dune
 
       double volume( std::size_t index ) const
       {
-        assert(boundingBox(index).volume() == volumes_[index]); return volumes_[index];
+        assert(boundingBox(index).volume() == volumes_[index]);
+        return volumes_[index];
       }
       double volume( const ElementType &element ) const
       {
@@ -176,6 +177,7 @@ namespace Dune
 
       std::pair<double,double> diameters() const { return {minDiameter_,maxDiameter_}; }
 
+      void update();
     private:
       const Agglomerate &agglomerate ( std::size_t agglomerateIndex ) const { return agglomerates_[ agglomerateIndex ]; }
       const Agglomerate &agglomerate ( const ElementType &element ) const { return agglomerate( index( element ) ); }
@@ -343,20 +345,20 @@ namespace Dune
       // build connectivity
 
       maxSubAgglomerates_[ dimension ] = 1;
-      size_[ dimension ] = agglomeration.size();
+      size_[ dimension ] = agglomeration_.size();
       std::vector< std::array< std::vector< std::size_t >, dimension > > connectivity( size_[ dimension ] );
-      volumes_.resize( agglomeration.size() );
+      volumes_.resize( agglomeration_.size() );
       std::fill(volumes_.begin(), volumes_.end(), 0.);
 
       for( const auto element : elements( static_cast< typename GridPart::GridViewType >( agglomeration_.gridPart() ), Partitions::interiorBorder ) )
       {
-        const std::size_t agIndex = agglomeration.index( element );
+        const std::size_t agIndex = agglomeration_.index( element );
         const auto &refElement = ReferenceElements< typename GridPart::ctype, dimension >::general( element.type() );
         //for( const auto intersection : intersections( agglomeration_.gridPart(), element ) )
         for( const auto intersection : intersections( static_cast< typename GridPart::GridViewType >( agglomeration_.gridPart() ), element ))
         {
           assert( intersection.conforming() );
-          if( !intersection.neighbor() || ( agglomeration.index( intersection.outside() ) != agIndex ) )
+          if( !intersection.neighbor() || ( agglomeration_.index( intersection.outside() ) != agIndex ) )
           {
             const int face = intersection.indexInInside();
             for( int codim = 1; codim <= dimension; ++codim )
@@ -424,7 +426,35 @@ namespace Dune
       for( const auto element : elements( static_cast< typename GridPart::GridViewType >( agglomeration_.gridPart() ), Partitions::interiorBorder ) )
       {
         auto &localAgg = agglomerate( element );
-        assert( localAgg.size( 0 ) == 3 );
+        for( std::size_t k = 0; k < localAgg.size( 0 ); ++k )
+        {
+          auto idx = localAgg.index( k, 0 );
+          assert( idx < vertexDiameters_.size() );
+          vertexDiameters_[idx] += elementDiameter(element);
+          vertexCount[idx] += 1;
+        }
+      }
+      for ( std::size_t k = 0; k < vertexCount.size(); ++k)
+        vertexDiameters_[k] /= double(vertexCount[k]);
+      maxDiameter_ = *std::max_element(vertexDiameters_.begin(),vertexDiameters_.end());
+      minDiameter_ = *std::min_element(vertexDiameters_.begin(),vertexDiameters_.end());
+      // std::cout << "maximal vertex diameter: " << *std::max_element(vertexDiameters_.begin(),vertexDiameters_.end()) << std::endl;
+    }
+    template< class GridPart, class Allocator >
+    inline void AgglomerationIndexSet< GridPart, Allocator >::update ()
+    {
+      std::fill(volumes_.begin(), volumes_.end(), 0);
+      std::fill(vertexDiameters_.begin(), vertexDiameters_.end(), 0);
+      boundingBoxes_ = boundingBoxes( agglomeration() );
+      for( const auto element : elements( static_cast< typename GridPart::GridViewType >( agglomeration_.gridPart() ), Partitions::interiorBorder ) )
+      {
+        const std::size_t agIndex = agglomeration().index( element );
+        volumes_[agIndex] += element.geometry().volume();
+      }
+      std::vector<std::size_t> vertexCount( size(dimension), 0);
+      for( const auto element : elements( static_cast< typename GridPart::GridViewType >( agglomeration_.gridPart() ), Partitions::interiorBorder ) )
+      {
+        auto &localAgg = agglomerate( element );
         for( std::size_t k = 0; k < localAgg.size( 0 ); ++k )
         {
           auto idx = localAgg.index( k, 0 );
@@ -438,7 +468,6 @@ namespace Dune
 
       maxDiameter_ = *std::max_element(vertexDiameters_.begin(),vertexDiameters_.end());
       minDiameter_ = *std::min_element(vertexDiameters_.begin(),vertexDiameters_.end());
-
       // std::cout << "maximal vertex diameter: " << *std::max_element(vertexDiameters_.begin(),vertexDiameters_.end()) << std::endl;
     }
   } // namespace Vem

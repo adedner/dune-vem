@@ -73,8 +73,10 @@ def bbdgSpace(view, order=1, scalar=False, dimRange=None, field="double", storag
                     'return obj;'],
                    ['"gridView"_a', '"agglomerate"_a',
                     'pybind11::keep_alive< 1, 2 >()'] )
+    updateMethod = Method('update',
+       '''[]( DuneType &self ) { self.update(); }''' )
 
-    spc = module(field, includes, typeName, constructor, scalar=scalar, storage=storage,ctorArgs=[view, agglomerate])
+    spc = module(field, includes, typeName, constructor, updateMethod, scalar=scalar, storage=storage,ctorArgs=[view, agglomerate])
     addStorage(spc, storage)
     return spc.as_ufl()
 
@@ -173,10 +175,12 @@ def vemSpace(view, order=1, testSpaces=None, scalar=False,
                    ['"gridView"_a', '"agglomerate"_a', '"testSpaces"_a',
                     '"basisChoice"_a', '"edgeInterpolation"_a',
                     'pybind11::keep_alive< 1, 2 >()'] )
+    updateMethod = Method('update',
+       '''[]( DuneType &self ) { self.update(); }''' )
     diameterMethod = Method('diameters',
        '''[]( DuneType &self ) { return self.blockMapper().indexSet().diameters(); }''' )
 
-    spc = module(field, includes, typeName, constructor, diameterMethod,
+    spc = module(field, includes, typeName, constructor, diameterMethod, updateMethod,
                 scalar=scalar, storage=storage,
                 ctorArgs=[view, agglomerate, testSpaces, basisChoice, edgeInterpolation])
     addStorage(spc, storage)

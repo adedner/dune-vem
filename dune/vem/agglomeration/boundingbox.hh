@@ -141,8 +141,8 @@ namespace Dune
         emptyBox.first[ k ] = std::numeric_limits< typename GridPart::ctype >::max();
         emptyBox.second[ k ] = std::numeric_limits< typename GridPart::ctype >::min();
       }
-
       std::vector< BoundingBox< GridPart > > boundingBoxes( agglomeration.size(), emptyBox );
+
       std::vector<std::vector<std::vector<double>>> polygonPoints( agglomeration.size() );
       for( const auto element : elements( static_cast< typename GridPart::GridViewType >( agglomeration.gridPart() ), Partitions::interiorBorder ) )
       {

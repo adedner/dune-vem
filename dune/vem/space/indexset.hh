@@ -45,22 +45,8 @@ namespace Dune
           AllocatorType allocator = AllocatorType() )
       : BaseType( agglomeration, allocator )
       , testSpaces_( testSpaces )
-      {
-        // for (auto &ts : testSpaces_)
-        //   for (auto &m : ts)
-        //     m = std::max(m,-1);
-#if 0
-        std::cout << "######## dofs per codim ############\n";
-        std::cout << testSpaces_[0][0] << " " << dofsPerCodim()[0].second << std::endl;
-        std::cout << testSpaces_[1][0] << " " << dofsPerCodim()[1].second << std::endl;
-        std::cout << testSpaces_[2][0] << " " << dofsPerCodim()[2].second << std::endl;
-        std::cout << "--------- orders for derivatives ---\n";
-        std::cout << orders()[0] << " " << orders()[1] << " " << orders()[2] << std::endl;
-        std::cout << "----------edge orders --------------\n";
-        std::cout << edgeDegrees()[0] << " " << edgeDegrees()[1] << std::endl;
-        std::cout << "####################\n";
-#endif
-      }
+      {}
+      using BaseType::update;
 
       // return the number of dofs per codimension
       // !TS change to take into account vector of vector storage
@@ -92,7 +78,7 @@ namespace Dune
       }
 
       const std::vector<int> maxDegreePerCodim() const
-        {
+      {
           std::vector<int> ret(3);
             for ( int k = 0; k < ret.size(); k++){
               ret[k] = *std::max_element( testSpaces_[k].begin(), testSpaces_[k].end() );

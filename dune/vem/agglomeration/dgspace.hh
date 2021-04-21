@@ -154,10 +154,14 @@ namespace Dune
           blockMapper_( agglomeration ),
           boundingBoxes_( boundingBoxes( agglomeration ) ),
           // scalarShapeFunctionSet_( polOrder )
-          scalarShapeFunctionSet_(
-              Dune::GeometryType(Dune::GeometryType::cube,GridPart::dimension), polOrder )
+          scalarShapeFunctionSet_( Dune::GeometryType(Dune::GeometryType::cube,GridPart::dimension), polOrder )
       {
         onbBasis( agglomeration, scalarShapeFunctionSet_, boundingBoxes_ );
+      }
+      void update()
+      {
+        boundingBoxes_ = boundingBoxes( agglomeration );
+        onbBasis( agglomeration(), scalarShapeFunctionSet_, boundingBoxes_ );
       }
 
       const BoundingBox< GridPart >& boundingBox( const EntityType &entity ) const
