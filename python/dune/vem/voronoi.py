@@ -142,7 +142,8 @@ def voronoiCells(constructor, towers, fileName=None, load=False, lloyd=False, sh
     for i in range(len(indices)):
         newind[indices[i]] = i
 
-    return {"vertices":vorVertices, "polygons":[newind[r] for r in regions]}
+    return {"vertices":vorVertices, "polygons":[newind[r] for r in regions],
+            "convex":True}
 
 def triangulated_voronoi(constructor, towers):
     voronoi = voronoiCells(constructor, towers)
@@ -167,14 +168,3 @@ def triangulated_voronoi(constructor, towers):
     for i in range(len(indices)):
         newind[indices[i]] = i
     return vertices, newind[triangles],minEdgeNumber
-
-
-
-# n_towers = 100
-# towers = np.random.rand(n_towers, 2)
-# bounding_box = np.array([0., 1., 0., 1.]) # [x_min, x_max, y_min, y_max]
-
-# points, triangles = triangulated_voronoi(towers, bounding_box)
-# pl.triplot(points[:,0], points[:,1], triangles.copy())
-# pl.plot(points[:,0], points[:,1], 'o')
-# pl.show()

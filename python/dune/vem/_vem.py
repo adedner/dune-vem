@@ -485,8 +485,14 @@ import triangle
 from sortedcontainers import SortedDict
 import matplotlib.pyplot as plt
 class PolyAgglomerate:
-    def __init__(self,constructor,cubes=False,convex=False):
-        self.convex = convex
+    def __init__(self,constructor,cubes=False,convex=None):
+        if convex is None:
+            try:
+                self.convex = constructor["convex"]
+            except AttributeError:
+                convex = False
+        else:
+            self.convex = convex
         self.cubes = cubes
         self.suffix = "poly"+str(len(constructor["polygons"]))
         self.domain, self.index = self.construct(constructor["vertices"],
@@ -528,14 +534,13 @@ class PolyAgglomerate:
                 N = len(p)
                 if not self.convex: # use triangle
                     e = [ [p[i],p[(i+1)%N]] for i in range(N) ]
-                    domain = { "vertices":vertices,
-                               "segments":numpy.array(e) }
-                    tr += [triangle.triangulate(domain,opts="p")]
+                    domain = { "vertices":vertices, "segments":numpy.array(e) }
+                    tri = triangle.triangulate(domain,opts="p")["triangles"]
                 else: # use scipy
                     poly = numpy.append(p,[p[0]])
                     vert = vertices[p, :]
-                    tri = Delaunay(vert).simplices
-                    tr += [{"triangles":p[tri]}]
+                    tri = p[Delaunay(vert).simplices]
+                tr += [{"triangles":tri}]
                 bary = [ (vertices[p0]+vertices[p1]+vertices[p2])/3.
                          for p0,p1,p2 in tr[-1]["triangles"] ]
                 for b in bary:
@@ -544,7 +549,7 @@ class PolyAgglomerate:
                       "simplices": numpy.vstack([ t["triangles"] for t in tr ])}
         return domain, index
 
-def polyGrid(constructor,cubes=False, convex=False,**kwargs):
+def polyGrid(constructor,cubes=False, convex=None,**kwargs):
     if isinstance(constructor,dict) and \
         constructor.get("polygons",None) is not None:
         agglomerate = PolyAgglomerate(constructor,cubes,convex)
