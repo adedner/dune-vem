@@ -160,7 +160,7 @@ namespace Dune
       }
       void update()
       {
-        boundingBoxes_ = boundingBoxes( agglomeration );
+        boundingBoxes_ = boundingBoxes( agglomeration() );
         onbBasis( agglomeration(), scalarShapeFunctionSet_, boundingBoxes_ );
       }
 

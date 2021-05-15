@@ -47,7 +47,7 @@ namespace Dune
 
       static constexpr int dimDomain = DomainType::dimension;
 
-      typedef ReferenceElement< typename DomainType::field_type, dimDomain > ReferenceElementType;
+      typedef typename ReferenceElements< typename DomainType::field_type, dimDomain >::ReferenceElement ReferenceElementType;
 
     private:
       struct Transformation
