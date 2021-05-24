@@ -50,7 +50,7 @@ namespace Dune
 
       // return the number of dofs per codimension
       // !TS change to take into account vector of vector storage
-      std::vector< std::pair< int, unsigned int > > dofsPerCodim () const
+      std::array< std::pair< int, unsigned int >, BaseType::dimension+1 > dofsPerCodim () const
       {
         const int dimension = BaseType::dimension;
         int vSize = 0;
@@ -63,7 +63,8 @@ namespace Dune
           eSize += order2size<1>(i);
         for (size_t i=0;i<testSpaces_[2].size();++i)
           iSize += order2size<2>(i);
-        return { std::make_pair( dimension,   vSize ),
+        return std::array< std::pair< int, unsigned int >, BaseType::dimension+1 >
+               { std::make_pair( dimension,   vSize ),
                  std::make_pair( dimension-1, eSize ),
                  std::make_pair( dimension-2, iSize ) };
       }

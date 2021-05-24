@@ -145,6 +145,7 @@ namespace Dune
       double volume( std::size_t index ) const
       {
         assert(boundingBox(index).volume() == volumes_[index]);
+        assert(index<volumes_.size());
         return volumes_[index];
       }
       double volume( const ElementType &element ) const
@@ -161,7 +162,11 @@ namespace Dune
       {
         return vertexDiameter( localIndex(element,index,dimension) );
       }
-      const BoundingBox<GridPart>& boundingBox( std::size_t index ) const { return boundingBoxes_[index]; }
+      const BoundingBox<GridPart>& boundingBox( std::size_t index ) const
+      {
+        assert(index<boundingBoxes_.size());
+        return boundingBoxes_[index];
+      }
       const BoundingBox<GridPart>& boundingBox( const ElementType &element ) const
       {
         return boundingBox( index( element ) );

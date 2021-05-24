@@ -233,7 +233,8 @@ namespace Dune
                        std::vector<std::vector<unsigned int>> &mask) const
       {
         const int dimension = AgglomerationIndexSet::dimension;
-        mask.clear();
+        for (std::size_t i=0;i<mask.size();++i)
+          mask[i].clear();
         const ElementType &element = intersection.inside();
         const auto &refElement = ReferenceElements< ctype, dimension >::general( element.type() );
         int edgeNumber = intersection.indexInInside();
@@ -333,6 +334,7 @@ namespace Dune
       {
         const int dimension = AgglomerationIndexSet::dimension;
         auto dofs   = indexSet_.dofsPerCodim();  // assume always three entries in dim order (i.e. 2d)
+        assert(dofs.size()==3);
         vertexSize  = dofs[0].second;
         edgeOffset  = indexSet_.subAgglomerates(poly,dimension)*vertexSize;
         edgeSize    = dofs[1].second;

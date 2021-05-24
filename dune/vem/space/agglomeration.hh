@@ -184,6 +184,18 @@ namespace Dune {
               onbBasis(agIndexSet_.agglomeration(), scalarShapeFunctionSet_, agIndexSet_.boundingBox());
               buildProjections();
             }
+            std::unique_ptr<AgglomerationType> agglPtr_ = nullptr;
+            AgglomerationVEMSpace(std::unique_ptr<AgglomerationType> agglPtr,
+                const typename AgglomerationIndexSetType::TestSpacesType &testSpaces,
+                int basisChoice,
+                bool edgeInterpolation)
+            : AgglomerationVEMSpace(*agglPtr, testSpaces, basisChoice, edgeInterpolation)
+            {
+              agglPtr_ = std::move(agglPtr);
+            }
+            AgglomerationVEMSpace(const AgglomerationVEMSpace&) = delete;
+            AgglomerationVEMSpace& operator=(const AgglomerationVEMSpace&) = delete;
+            ~AgglomerationVEMSpace() { }
             void update()
             {
               agIndexSet_.update();
@@ -194,6 +206,9 @@ namespace Dune {
             const BasisFunctionSetType basisFunctionSet(const EntityType &entity) const
             {
               const std::size_t agglomerate = agglomeration().index(entity);
+              assert(agglomerate<valueProjections_.size());
+              assert(agglomerate<jacobianProjections_.size());
+              assert(agglomerate<hessianProjections_.size());
               const auto &valueProjection = valueProjections_[agglomerate];
               const auto &jacobianProjection = jacobianProjections_[agglomerate];
               const auto &hessianProjection = hessianProjections_[agglomerate];
@@ -210,6 +225,9 @@ namespace Dune {
             const typename Traits::ScalarBasisFunctionSetType scalarBasisFunctionSet(const EntityType &entity) const
             {
               const std::size_t agglomerate = agglomeration().index(entity);
+              assert(agglomerate<valueProjections_.size());
+              assert(agglomerate<jacobianProjections_.size());
+              assert(agglomerate<hessianProjections_.size());
               const auto &valueProjection = valueProjections_[agglomerate];
               const auto &jacobianProjection = jacobianProjections_[agglomerate];
               const auto &hessianProjection = hessianProjections_[agglomerate];
@@ -240,7 +258,11 @@ namespace Dune {
 
             const AgglomerationType &agglomeration() const { return blockMapper_.agglomeration(); }
 
-            const Stabilization &stabilization(const EntityType &entity) const { return stabilizations_[agglomeration().index(entity)]; }
+            const Stabilization &stabilization(const EntityType &entity) const
+            {
+              assert( agglomeration().index(entity)<stabilizations_.size());
+              return stabilizations_[agglomeration().index(entity)];
+            }
 
             //////////////////////////////////////////////////////////
             // Non-interface methods (used in DirichletConstraints) //

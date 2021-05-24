@@ -1,7 +1,6 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import sys
-import logging
+import sys, logging
 logger = logging.getLogger(__name__)
 
 from ufl.equation import Equation
@@ -61,7 +60,8 @@ def bbdgSpace(view, order=1, scalar=False, dimRange=None, field="double", storag
                    ['pybind11::object gridView',
                     'const pybind11::function agglomerate'],
                    ['auto agglo = new Dune::Vem::Agglomeration<' + gridPartName + '>',
-                    '         (Dune::FemPy::gridPart<' + viewType + '>(gridView), [agglomerate](const auto& e) { return agglomerate(e).template cast<unsigned int>(); } ); ',
+                    '         (Dune::FemPy::gridPart<' + viewType + '>(gridView), [agglomerate](const auto& e)',
+                    ' { return agglomerate(e).template cast<unsigned int>(); } );',
                     'auto obj = new DuneType( *agglo );',
                     'pybind11::cpp_function remove_agglo( [ agglo ] ( pybind11::handle weakref ) {',
                     '  delete agglo;',
@@ -161,16 +161,11 @@ def vemSpace(view, order=1, testSpaces=None, scalar=False,
                     'const pybind11::function agglomerate',
                     'const std::array<std::vector<int>,'+str(view.dimension+1)+'> &testSpaces',
                     'int basisChoice','bool edgeInterpolation'],
-                   ['auto agglo = new Dune::Vem::Agglomeration<' + gridPartName + '>',
-                    '         (Dune::FemPy::gridPart<' + viewType + '>(gridView), [agglomerate](const auto& e) { return agglomerate(Dune::Fem::gridEntity(e)).template cast<unsigned int>(); } ); ',
-                    'auto obj = new DuneType( *agglo, testSpaces, basisChoice, edgeInterpolation );',
-                    'pybind11::cpp_function remove_agglo( [ agglo ] ( pybind11::handle weakref ) {',
-                    '  delete agglo;',
-                    '  weakref.dec_ref();',
-                    '} );',
-                    '// pybind11::handle nurse = pybind11::detail::get_object_handle( &obj, pybind11::detail::get_type_info( typeid( ' + typeName + ' ) ) );',
-                    '// assert(nurse);',
-                    'pybind11::weakref( agglomerate, remove_agglo ).release();',
+                   ['auto agglo = std::make_unique<Dune::Vem::Agglomeration<' + gridPartName + '>>(',
+                    '         Dune::FemPy::gridPart<' + viewType + '>(gridView),',
+                    '    [agglomerate](const auto& idx)',
+                    '    { return agglomerate(idx).template cast<unsigned int>(); } ); ',
+                    'auto obj = new DuneType( std::move(agglo), testSpaces, basisChoice, edgeInterpolation );',
                     'return obj;'],
                    ['"gridView"_a', '"agglomerate"_a', '"testSpaces"_a',
                     '"basisChoice"_a', '"edgeInterpolation"_a',
@@ -408,19 +403,19 @@ def aluGrid(constructor, dimgrid=None, dimworld=None, elementType=None, **parame
         raise KeyError("Parameter error in ALUGrid with refinement=" + refinement + " and type=" + elementType + ": conforming refinement is only available with simplex element type")
     typeName = "Dune::ALUGrid< " + str(dimgrid) + ", " + str(dimworld) + ", " + elementType + ", " + refinement + " >"
     includes = ["dune/alugrid/grid.hh", "dune/alugrid/dgf.hh"]
-    gridModule = module(includes, typeName, dynamicAttr=True)
+    gridModule = module(includes, typeName) # , dynamicAttr=True)
     return gridModule.LeafGrid(gridModule.reader(constructor))
 def aluSimplexGrid(constructor, dimgrid=2, dimworld=2):
     from dune.grid.grid_generator import module, getDimgrid
     typeName = "Dune::Vem::Grid<"+str(dimgrid)+","+str(dimworld)+">"
     includes = ["dune/vem/misc/grid.hh"]
-    gridModule = module(includes, typeName, dynamicAttr=True)
+    gridModule = module(includes, typeName) # , dynamicAttr=True)
     return gridModule.LeafGrid(gridModule.reader(constructor))
 def aluCubeGrid(constructor, dimgrid=2, dimworld=2):
     from dune.grid.grid_generator import module, getDimgrid
     typeName = "Dune::Vem::CubeGrid<"+str(dimgrid)+","+str(dimworld)+">"
     includes = ["dune/vem/misc/grid.hh"]
-    gridModule = module(includes, typeName, dynamicAttr=True)
+    gridModule = module(includes, typeName) # , dynamicAttr=True)
     return gridModule.LeafGrid(gridModule.reader(constructor))
 def yaspGrid(constructor, dimgrid=None, coordinates="equidistant", ctype="double"):
     from dune.generator import Constructor
@@ -451,7 +446,7 @@ def yaspGrid(constructor, dimgrid=None, coordinates="equidistant", ctype="double
                'return new DuneType(lowerleft,upperright,elements,periodic_,overlap);'],
               ['"lowerleft"_a', '"upperright"_a', '"elements"_a', '"periodic"_a', '"overlap"_a'])
 
-    gridModule = module(includes, typeName, ctor, dynamicAttr=True)
+    gridModule = module(includes, typeName, ctor) # , dynamicAttr=True)
 
     try:
         lowerleft  = constructor.lower
@@ -467,15 +462,20 @@ def yaspGrid(constructor, dimgrid=None, coordinates="equidistant", ctype="double
 class TrivialAgglomerate:
     def __init__(self,constructor, cubes=False, **kwargs):
         if cubes:
-            self.grid = aluCubeGrid(constructor, **kwargs)
+            self.minEdgeNumber = 4
         else:
-            self.grid = aluSimplexGrid(constructor, **kwargs)
-        self.suffix = "simple"+str(self.grid.size(0))
-        self.size = self.grid.size(0)
-    def __call__(self,en):
-        return self.grid.indexSet.index(en)
-    def check(self):
-        return True
+            self.minEdgeNumber = 3
+    def __call__(self, idx):
+        return idx
+def trivialAgglomerate(constructor, cubes=False, **kwargs):
+    if cubes:
+        grid = aluCubeGrid(constructor, **kwargs)
+    else:
+        grid = aluSimplexGrid(constructor, **kwargs)
+    agglomerate = TrivialAgglomerate(constructor, cubes, **kwargs)
+    grid.hierarchicalGrid.agglomerate = agglomerate
+    return grid
+
 # http://zderadicka.eu/voronoi-diagrams/
 from dune.vem.voronoi import triangulated_voronoi
 from scipy.spatial import Voronoi, voronoi_plot_2d, cKDTree, Delaunay
@@ -485,54 +485,31 @@ import triangle
 from sortedcontainers import SortedDict
 import matplotlib.pyplot as plt
 class PolyAgglomerate:
-    def __init__(self,constructor,cubes=False,convex=None):
-        if convex is None:
-            try:
-                self.convex = constructor["convex"]
-            except AttributeError:
-                convex = False
-        else:
-            self.convex = convex
-        self.cubes = cubes
-        self.suffix = "poly"+str(len(constructor["polygons"]))
-        self.domain, self.index = self.construct(constructor["vertices"],
-                                                 constructor["polygons"])
-        if cubes:
-            self.grid = aluCubeGrid(self.domain)
-        else:
-            self.grid = aluSimplexGrid(self.domain)
-
-        self.indexSet = self.grid.indexSet
-        self.polys = numpy.zeros(self.grid.size(0),int)
-        for e in self.grid.elements:
-            self.polys[self.indexSet.index(e)] = self.index[self.roundBary(e.geometry.center)]
-
-        self.ind = set()
-        self.size = len( constructor["polygons"] )
-    def __call__(self,element):
-        return self.polys[self.indexSet.index(element)]
-        # bary = element.geometry.center
-        # return self.index[self.roundBary(bary)]
-    def check(self):
-        return len(self.ind)==self.N
-    def roundBary(self,a):
+    def __init__(self,grid,index):
+        indexSet = grid.indexSet
+        self.polys = numpy.zeros(grid.size(0),int)
+        for e in grid.elements:
+            self.polys[indexSet.index(e)] = index[PolyAgglomerate.roundBary(e.geometry.center)]
+    def __call__(self,idx):
+        return self.polys[idx]
+    def roundBary(a):
         return tuple(round(aa,8) for aa in a)
-    def construct(self,vertices,polygons):
+    def construct(cubes,convex,vertices,polygons):
         index = SortedDict()
-        if self.cubes:
+        if cubes:
             for i,poly in enumerate(polygons):
                 assert len(poly)==4
                 bary = [sum([vertices[p][i] for p in poly]) / 4 for i in range(2)]
-                index[self.roundBary(bary)] = i
+                index[PolyAgglomerate.roundBary(bary)] = i
                 polygons[i][2], polygons[i][3] = poly[3], poly[2]
-            domain = {"vertices": vertices, "cubes": polygons}
+            domain = {"vertices": vertices.astype(float), "cubes": polygons.astype(int)}
         else:
             vertices = numpy.array(vertices)
             tr = []
             for nr, p in enumerate(polygons):
                 p = numpy.array(p)
                 N = len(p)
-                if not self.convex: # use triangle
+                if not convex: # use triangle
                     e = [ [p[i],p[(i+1)%N]] for i in range(N) ]
                     domain = { "vertices":vertices, "segments":numpy.array(e) }
                     tri = triangle.triangulate(domain,opts="p")["triangles"]
@@ -544,22 +521,30 @@ class PolyAgglomerate:
                 bary = [ (vertices[p0]+vertices[p1]+vertices[p2])/3.
                          for p0,p1,p2 in tr[-1]["triangles"] ]
                 for b in bary:
-                    index[self.roundBary(b)] = nr
-            domain = {"vertices":  numpy.array(vertices),
-                      "simplices": numpy.vstack([ t["triangles"] for t in tr ])}
+                    index[PolyAgglomerate.roundBary(b)] = nr
+            domain = {"vertices":  numpy.array(vertices).astype(numpy.float64),
+                      "simplices": numpy.vstack([ t["triangles"] for t in tr ]).astype(int)}
         return domain, index
+def polyAgglomerate(constructor,cubes=False,convex=None):
+    if convex is None:
+        convex = constructor.get("convex",False)
+    suffix = "poly"+str(len(constructor["polygons"]))
+    domain, index = PolyAgglomerate.construct(cubes,convex,
+                                                constructor["vertices"],
+                                                constructor["polygons"])
+    if cubes:
+        grid = aluCubeGrid(domain)
+    else:
+        grid = aluSimplexGrid(domain)
+    agglomerate = PolyAgglomerate(grid,index)
+    agglomerate.minEdgeNumber = min([len(p) for p in constructor["polygons"]])
+    grid.hierarchicalGrid.agglomerate = agglomerate
+    return grid
+
 
 def polyGrid(constructor,cubes=False, convex=None,**kwargs):
-    if isinstance(constructor,dict) and \
-        constructor.get("polygons",None) is not None:
-        agglomerate = PolyAgglomerate(constructor,cubes,convex)
-        agglomerate.minEdgeNumber = min([len(p) for p in constructor["polygons"]])
+    if isinstance(constructor,dict) and constructor.get("polygons",None) is not None:
+        grid = polyAgglomerate(constructor,cubes,convex)
     else:
-        agglomerate = TrivialAgglomerate(constructor, cubes, **kwargs)
-        if cubes:
-            agglomerate.minEdgeNumber = 4
-        else:
-            agglomerate.minEdgeNumber = 3
-    grid = agglomerate.grid
-    grid.hierarchicalGrid.agglomerate = agglomerate
+        grid = trivialAgglomerate(constructor, cubes, **kwargs)
     return grid
