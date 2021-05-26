@@ -29,6 +29,7 @@ namespace Dune
 
       typedef typename GridPartType::template Codim< 0 >::EntityType ElementType;
 
+#if 0
       Agglomeration ( GridPartType &gridPart, std::vector< std::size_t > indices )
         : gridPart_( gridPart ),
           mapper_( static_cast< typename GridPartType::GridViewType >( gridPart ), mcmgElementLayout() ),
@@ -45,6 +46,7 @@ namespace Dune
         : Agglomeration( gridPart, convert( indices ) )
       {}
 
+#endif
       template <class Callback>
       Agglomeration ( GridPartType &gridPart, const Callback callBack )
         : gridPart_( gridPart ),
@@ -52,31 +54,35 @@ namespace Dune
           indices_( mapper_.size() ),
           size_( 0 )
       {
+        auto is = gridPart.indexSet();
         const auto &end = gridPart.template end<0>();
         for ( auto it = gridPart.template begin<0>(); it != end; ++it )
         {
           const auto &element = *it;
-          indices_[ mapper_.index( element ) ] = callBack( element );
+          indices_[ mapper_.index( element ) ] = callBack( is.index(element) );
         }
         assert( indices_.size() == static_cast< std::size_t >( mapper_.size() ) );
         if( !indices_.empty() )
           size_ = *std::max_element( indices_.begin(), indices_.end() ) + 1u;
       }
+      ~Agglomeration() {}
+      Agglomeration(const Agglomeration&) = delete;
+      Agglomeration &operator=( Agglomeration&) = delete;
 
-      // GridPart &gridPart () { return gridPart_; }
       GridPart &gridPart () const { return gridPart_; }
 
       std::size_t index ( const ElementType &element ) const { return indices_[ mapper_.index( element ) ]; }
 
       std::size_t size () const { return size_; }
 
+/*
       std::vector<std::size_t> polygonindices() const
       {
         std::vector< std::size_t > w(size(),0);
         return w;
       }
       // std::vector< std::size_t > polygonindices () const { return indices_; }
-
+*/
     private:
       template< class T >
       static std::vector< std::size_t > convert ( const std::vector< T > &v )

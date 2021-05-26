@@ -54,7 +54,7 @@ namespace Dune
       template< class Iterator >
       AgglomerationDofMapper ( const IndexSetType &indexSet, Iterator begin, Iterator end );
 
-      AgglomerationDofMapper ( const IndexSetType &indexSet, const std::vector<std::pair<int,unsigned int>> &dofsPerCodim )
+      AgglomerationDofMapper ( const IndexSetType &indexSet, const std::array<std::pair<int,unsigned int>,dimension+1> &dofsPerCodim )
         : AgglomerationDofMapper( indexSet, dofsPerCodim.begin(), dofsPerCodim.end() )
       {}
 

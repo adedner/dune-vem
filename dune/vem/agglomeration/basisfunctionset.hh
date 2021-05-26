@@ -128,7 +128,9 @@ namespace Dune
       template< class Quadrature, class Vector, class DofVector >
       void axpy ( const Quadrature &quadrature, const Vector &values, DofVector &dofs ) const
       {
+        assert(dofs.size()==size());
         const std::size_t nop = quadrature.nop();
+        assert(values.size()==nop);
         for( std::size_t qp = 0; qp < nop; ++qp )
           axpy( quadrature[ qp ], values[ qp ], dofs );
       }
@@ -136,7 +138,10 @@ namespace Dune
       template< class Quadrature, class VectorA, class VectorB, class DofVector >
       void axpy ( const Quadrature &quadrature, const VectorA &valuesA, const VectorB &valuesB, DofVector &dofs ) const
       {
+        assert(dofs.size()==size());
         const std::size_t nop = quadrature.nop();
+        assert(valuesA.size()==nop);
+        assert(valuesB.size()==nop);
         for( std::size_t qp = 0; qp < nop; ++qp )
         {
           axpy( quadrature[ qp ], valuesA[ qp ], dofs );
@@ -147,6 +152,7 @@ namespace Dune
       template< class Point, class DofVector >
       void axpy ( const Point &x, const RangeType &valueFactor, DofVector &dofs ) const
       {
+        assert(dofs.size()==size());
         // onb
         sfEvaluateAll(x,vals_);
         Fem::FunctionalAxpyFunctor< RangeType, DofVector > f( valueFactor, dofs );
@@ -157,6 +163,7 @@ namespace Dune
       template< class Point, class DofVector >
       void axpy ( const Point &x, const JacobianRangeType &jacobianFactor, DofVector &dofs ) const
       {
+        assert(dofs.size()==size());
         // onb
         sfEvaluateAll(x,jacs_);
         const JacobianRangeType transformedFactor = transformation_( jacobianFactor,true );
@@ -168,6 +175,7 @@ namespace Dune
       template< class Point, class DofVector >
       void axpy ( const Point &x, const RangeType &valueFactor, const JacobianRangeType &jacobianFactor, DofVector &dofs ) const
       {
+        assert(dofs.size()==size());
         axpy( x, valueFactor, dofs );
         axpy( x, jacobianFactor, dofs );
       }
@@ -175,7 +183,9 @@ namespace Dune
       template< class Quadrature, class DofVector, class Values >
       void evaluateAll ( const Quadrature &quadrature, const DofVector &dofs, Values &values ) const
       {
+        assert(dofs.size()==size());
         const std::size_t nop = quadrature.nop();
+        assert(values.size()==size());
         for( std::size_t qp = 0; qp < nop; ++qp )
           evaluateAll( quadrature[ qp ], dofs, values[ qp ] );
       }
@@ -183,6 +193,7 @@ namespace Dune
       template< class Point, class DofVector >
       void evaluateAll ( const Point &x, const DofVector &dofs, RangeType &value ) const
       {
+        assert(dofs.size()==size());
         // onb
         sfEvaluateAll(x,vals_);
         value = RangeType( 0 );
@@ -205,7 +216,9 @@ namespace Dune
       template< class Quadrature, class DofVector, class Jacobians >
       void jacobianAll ( const Quadrature &quadrature, const DofVector &dofs, Jacobians &jacobians ) const
       {
+        assert(dofs.size()==size());
         const std::size_t nop = quadrature.nop();
+        assert( jacobians.size() == nop );
         for( std::size_t qp = 0; qp < nop; ++qp )
           jacobianAll( quadrature[ qp ], dofs, jacobians[ qp ] );
       }
@@ -213,6 +226,7 @@ namespace Dune
       template< class Point, class DofVector >
       void jacobianAll ( const Point &x, const DofVector &dofs, JacobianRangeType &jacobian ) const
       {
+        assert(dofs.size()==size());
         // onb
         sfEvaluateAll(x,jacs_);
         jacobian = JacobianRangeType( 0 );
@@ -227,7 +241,7 @@ namespace Dune
       {
         // onb
         sfEvaluateAll(x,jacs_);
-        assert( jacobians.size() >= size() );
+        assert( jacobians.size() == size() );
         Fem::AssignFunctor< Jacobians, TransformedAssign< Transformation > > f( jacobians, transformation_ );
         for (std::size_t beta=0;beta<size();++beta)
           f(beta,jacs_[beta]);
@@ -236,7 +250,9 @@ namespace Dune
       template< class Quadrature, class DofVector, class Hessians >
       void hessianAll ( const Quadrature &quadrature, const DofVector &dofs, Hessians &hessians ) const
       {
+        assert(dofs.size()==size());
         const std::size_t nop = quadrature.nop();
+        assert( hessians.size() == nop );
         for( std::size_t qp = 0; qp < nop; ++qp )
           hessianAll( quadrature[ qp ], dofs, hessians[ qp ] );
       }
@@ -244,6 +260,7 @@ namespace Dune
       template< class Point, class DofVector >
       void hessianAll ( const Point &x, const DofVector &dofs, HessianRangeType &hessian ) const
       {
+        assert(dofs.size()==size());
         // onb
         sfEvaluateAll(x,hess_);
         hessian = HessianRangeType( RangeFieldType( 0 ) );
@@ -258,7 +275,7 @@ namespace Dune
       {
         // onb
         sfEvaluateAll(x,hess_);
-        assert( hessians.size() >= size() );
+        assert( hessians.size() == size() );
         Fem::AssignFunctor< Hessians, TransformedAssign< Transformation > > f( hessians, transformation_ );
         for (std::size_t beta=0;beta<size();++beta)
           f(beta,hess_[beta]);
@@ -305,6 +322,7 @@ namespace Dune
       template <class Vector>
       void onb(Vector &values) const
       {
+        assert(values.size()==size());
         if (!useOnb_)
           return;
         std::size_t k = 0;
@@ -318,6 +336,7 @@ namespace Dune
       template< class Point>
       void sfEvaluateAll(const Point &x, std::vector<RangeType> &values) const
       {
+        assert(values.size()==size());
         Fem::AssignFunctor< decltype(values) > f( values );
         auto y = position(x);
         for (std::size_t beta=0;beta<size();++beta)
@@ -327,6 +346,7 @@ namespace Dune
       template< class Point>
       void sfEvaluateAll(const Point &x, std::vector<JacobianRangeType> &values) const
       {
+        assert(values.size()==size());
         Fem::AssignFunctor< decltype(values) > f( values );
         auto y = position(x);
         for (std::size_t beta=0;beta<size();++beta)
@@ -336,6 +356,7 @@ namespace Dune
       template< class Point>
       void sfEvaluateAll(const Point &x, std::vector<HessianRangeType> &values) const
       {
+        assert(values.size()==size());
         Fem::AssignFunctor< decltype(values) > f( values );
         auto y = position(x);
         for (std::size_t beta=0;beta<size();++beta)
