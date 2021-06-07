@@ -10,6 +10,7 @@
 
 #include <dune/grid/common/mcmgmapper.hh>
 #include <dune/vem/agglomeration/boundingbox.hh>
+#include <dune/vem/agglomeration/basisfunctionset.hh>
 
 namespace Dune
 {
@@ -57,6 +58,10 @@ namespace Dune
       void update()
       {
         boundingBoxes_ = Dune::Vem::boundingBoxes( *this );
+      }
+      void onbBasis(int order)
+      {
+        Dune::Vem::onbBasis(*this, order, boundingBoxes());
       }
 
       GridPart &gridPart () const { return gridPart_; }

@@ -44,7 +44,7 @@ namespace Dune
       struct Agglomerate;
 
     public:
-      explicit AgglomerationIndexSet ( const AgglomerationType &agglomeration, AllocatorType allocator = AllocatorType() );
+      explicit AgglomerationIndexSet ( AgglomerationType &agglomeration, AllocatorType allocator = AllocatorType() );
 
       std::size_t index ( const ElementType &element ) const { return agglomeration_.index( element ); }
 
@@ -138,6 +138,7 @@ namespace Dune
         return size_[ dimension-codim ];
       }
 
+      AgglomerationType &agglomeration () { return agglomeration_; }
       const AgglomerationType &agglomeration () const { return agglomeration_; }
       const GridPartType &gridPart () const { return agglomeration().gridPart(); }
 
@@ -182,7 +183,7 @@ namespace Dune
       const Agglomerate &agglomerate ( std::size_t agglomerateIndex ) const { return agglomerates_[ agglomerateIndex ]; }
       const Agglomerate &agglomerate ( const ElementType &element ) const { return agglomerate( index( element ) ); }
 
-      const AgglomerationType &agglomeration_;
+      AgglomerationType &agglomeration_;
       AllocatorType allocator_;
       std::vector< Agglomerate > agglomerates_;
       std::array< std::size_t, dimension+1 > size_;
@@ -276,7 +277,7 @@ namespace Dune
     // ---------------------------------------
 
     template< class GridPart, class Allocator >
-    inline AgglomerationIndexSet< GridPart, Allocator >::AgglomerationIndexSet ( const AgglomerationType &agglomeration, AllocatorType allocator )
+    inline AgglomerationIndexSet< GridPart, Allocator >::AgglomerationIndexSet ( AgglomerationType &agglomeration, AllocatorType allocator )
       : agglomeration_( agglomeration )
       , allocator_( std::move( allocator ) )
     {

@@ -40,7 +40,7 @@ namespace Dune
       typedef typename BaseType::AllocatorType AllocatorType;
 
       // !TS assume vector of vectors
-      explicit VemAgglomerationIndexSet ( const AgglomerationType &agglomeration,
+      explicit VemAgglomerationIndexSet ( AgglomerationType &agglomeration,
           const TestSpacesType &testSpaces,
           AllocatorType allocator = AllocatorType() )
       : BaseType( agglomeration, allocator )

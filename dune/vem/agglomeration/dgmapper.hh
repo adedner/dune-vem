@@ -2,6 +2,7 @@
 #define DUNE_VEM_AGGLOMERATION_DGMAPPER_HH
 
 #include <dune/fem/space/mapper/dofmapper.hh>
+#include <dune/vem/agglomeration/agglomeration.hh>
 
 namespace Dune
 {

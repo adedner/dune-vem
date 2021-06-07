@@ -13,8 +13,8 @@
 #include <dune/fem/space/basisfunctionset/functor.hh>
 #include <dune/fem/space/shapefunctionset/vectorial.hh>
 
-#include <dune/vem/agglomeration/agglomeration.hh>
 #include <dune/vem/agglomeration/functor.hh>
+#include <dune/vem/agglomeration/boundingbox.hh>
 // #include <dune/vem/misc/highorderquadratures.hh>
 
 namespace Dune
@@ -382,14 +382,18 @@ namespace Dune
       bool useOnb_ = false;
     };
 
-    template< class GridPart, class ShapeFunctionSet >
-    inline static void onbBasis( const Agglomeration< GridPart > &agglomeration,
-        const ShapeFunctionSet &shapeFunctionSet,
-        std::vector< BoundingBox< GridPart > > &boundingBoxes )
+    template< class Agglomeration >
+    inline static void onbBasis( const Agglomeration &agglomeration,
+        int maxPolOrder, std::vector< BoundingBox< typename Agglomeration::GridPartType > > &boundingBoxes )
     {
+      typedef typename Agglomeration::GridPartType GridPart;
       typedef typename GridPart::template Codim< 0 >::EntityType ElementType;
       typedef typename GridPart::template Codim< 0 >::EntitySeedType ElementSeedType;
-      typedef BoundingBoxBasisFunctionSet< GridPart, ShapeFunctionSet > BBBasisFunctionSetType;
+
+      typedef Dune::Fem::FunctionSpace< double, double, GridPart::dimension, 1 > ScalarFunctionSpaceType;
+      typedef Dune::Fem::OrthonormalShapeFunctionSet< ScalarFunctionSpaceType > ScalarShapeFunctionSetType;
+
+      typedef BoundingBoxBasisFunctionSet< GridPart, ScalarShapeFunctionSetType > BBBasisFunctionSetType;
       typedef typename BBBasisFunctionSetType::RangeType RangeType;
       typedef typename BBBasisFunctionSetType::DomainFieldType DomainFieldType;
 
@@ -399,6 +403,7 @@ namespace Dune
       typedef Dune::Fem::ElementQuadrature<GridPart,0,Dune::Fem::HighOrderQuadratureTraits> Quadrature0Type;
 #endif
 
+      ScalarShapeFunctionSetType shapeFunctionSet(Dune::GeometryType(Dune::GeometryType::cube, GridPart::dimension),maxPolOrder);
       const int polOrder = shapeFunctionSet.order();
       const auto &gridPart = agglomeration.gridPart();
 

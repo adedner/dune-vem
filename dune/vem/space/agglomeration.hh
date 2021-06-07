@@ -2,8 +2,8 @@
 #define DUNE_VEM_SPACE_AGGLOMERATION_HH
 
 #include <cassert>
-
 #include <utility>
+#include <thread>
 
 #include <dune/fem/common/hybrid.hh>
 
@@ -24,13 +24,11 @@
 #include <dune/vem/misc/pseudoinverse.hh>
 #include <dune/vem/misc/leastSquares.hh>
 #include <dune/vem/misc/matrixWrappers.hh>
-#include <dune/vem/agglomeration/dgspace.hh>
 #include <dune/vem/space/basisfunctionset.hh>
 #include <dune/vem/space/interpolation.hh>
 #include <dune/vem/space/interpolate.hh>
 
 #include <dune/vem/space/test.hh>
-// #include <dune/vem/misc/highorderquadratures.hh>
 
 namespace Dune {
 
@@ -188,8 +186,8 @@ namespace Dune {
                   typename Traits::ScalarBasisFunctionSetType::HessianProjection>()),
               stabilizations_(new Vector<Stabilization>())
             {
-              onbBasis(agIndexSet_.agglomeration(), scalarShapeFunctionSet_, agIndexSet_.boundingBoxes());
-              buildProjections();
+              agIndexSet_.agglomeration().onbBasis(order());
+              update();
             }
             std::unique_ptr<AgglomerationType> agglPtr_ = nullptr;
             AgglomerationVEMSpace(std::unique_ptr<AgglomerationType> agglPtr,
@@ -207,8 +205,46 @@ namespace Dune {
             void update()
             {
               agIndexSet_.update();
-              onbBasis(agIndexSet_.agglomeration(), scalarShapeFunctionSet_, agIndexSet_.boundingBoxes());
-              buildProjections();
+              if (agglPtr_)
+                agglPtr_->update();
+              agglomeration().onbBasis(order());
+
+              // these are the matrices we need to compute
+              valueProjections().resize(agglomeration().size());
+              jacobianProjections().resize(agglomeration().size());
+              hessianProjections().resize(agglomeration().size());
+              stabilizations().resize(agglomeration().size());
+
+              std::vector<std::vector<ElementSeedType> > entitySeeds(agglomeration().size());
+              for (const ElementType &element : elements(static_cast< typename GridPart::GridViewType >( gridPart()), Partitions::interiorBorder))
+                entitySeeds[agglomeration().index(element)].push_back(element.seed());
+
+              std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
+              int numThreads = std::max(1u, std::thread::hardware_concurrency());
+              if (false) // use single thread
+              {
+                numThreads = 1;
+                buildProjections(entitySeeds,0,agglomeration().size());
+              }
+              else
+              {
+                std::vector<std::thread> threads;
+                const double threadSize = agglomeration().size() / double(numThreads);
+                for (std::size_t t=0; t < numThreads; ++t)
+                {
+                  unsigned int start = int(t*threadSize);
+                  unsigned int end   = int((t+1)*threadSize);
+                  threads.push_back( std::thread(&AgglomerationVEMSpace::buildProjections,this,entitySeeds,start,end));
+                }
+                std::for_each(threads.begin(),threads.end(), std::mem_fn(&std::thread::join));
+              }
+              /*
+              auto end = std::chrono::system_clock::now();
+              auto diff = duration_cast < std::chrono::seconds > (end - start).count();
+              std::cout << "Total build time = " << diff << " seconds for "
+                        << agglomeration().size() << " projections on "
+                        << numThreads << " threads." << std::endl;
+              */
             }
 
             const BasisFunctionSetType basisFunctionSet(const EntityType &entity) const
@@ -264,7 +300,8 @@ namespace Dune {
 
             // implementation-defined methods
 
-            const AgglomerationType &agglomeration() const { return blockMapper_.agglomeration(); }
+            const AgglomerationType &agglomeration() const { return agIndexSet_.agglomeration(); }
+            AgglomerationType &agglomeration() { return agIndexSet_.agglomeration(); }
 
             const Stabilization &stabilization(const EntityType &entity) const
             {
@@ -302,7 +339,8 @@ namespace Dune {
             std::shared_ptr<Vector<typename Traits::ScalarBasisFunctionSetType::HessianProjection>> hessianProjections_;
             std::shared_ptr<Vector<Stabilization>> stabilizations_;
 
-            void buildProjections();
+            void buildProjections(const std::vector<std::vector<ElementSeedType> > &entitySeeds,
+                                  unsigned int start, unsigned int end);
 
             // issue with making these const: use of delete default constructor in some python bindings...
             bool edgeInterpolation_;
@@ -320,24 +358,20 @@ namespace Dune {
         // ---------------------------------------
 
         template<class FunctionSpace, class GridPart>
-        inline void AgglomerationVEMSpace<FunctionSpace, GridPart>::buildProjections()
+        inline void AgglomerationVEMSpace<FunctionSpace, GridPart>::buildProjections(
+              const std::vector<std::vector<ElementSeedType> > &entitySeeds,
+              unsigned int start, unsigned int end)
         {
-          const int polOrder = polOrder_;
-          // want to iterate over each polygon separately - so collect all
-          // triangles from a given polygon
-          std::vector<std::vector<ElementSeedType> > entitySeeds(agglomeration().size());
-          for (const ElementType &element : elements(static_cast< typename GridPart::GridViewType >( gridPart()), Partitions::interiorBorder))
-            entitySeeds[agglomeration().index(element)].push_back(element.seed());
-
+          int polOrder = order();
           std::vector<int> orders = agIndexSet_.orders();
           const std::size_t numShapeFunctions = scalarShapeFunctionSet_.size();
-          const std::size_t numHessShapeFunctions = // numShapeFunctions;
+          const std::size_t numHessShapeFunctions =
                 polOrder==1? 1:
                 std::min(numShapeFunctions,
                    Dune::Fem::OrthonormalShapeFunctions<DomainType::dimension>::
                    size(std::max(orders[2], polOrder - 2))
            );
-          std::size_t numGradShapeFunctions = // numShapeFunctions;
+          std::size_t numGradShapeFunctions =
                    std::min(numShapeFunctions,
                    Dune::Fem::OrthonormalShapeFunctions<DomainType::dimension>::
                    size(std::max(orders[1], polOrder - 1))
@@ -347,30 +381,9 @@ namespace Dune {
                   size(orders[0]);
 
           const std::size_t numGradConstraints = numGradShapeFunctions;
-               // std::min(numGradShapeFunctions,
-               // Dune::Fem::OrthonormalShapeFunctions<DomainType::dimension>::
-               // size(orders[1]) ); //!!!!!!!!!!!!!! for C^1-nc-mod
           const std::size_t edgeTangentialSize = Dune::Fem::OrthonormalShapeFunctions<1>::
                size( agIndexSet_.edgeOrders()[0] + 1);
           std::size_t edgeNormalSize = agIndexSet_.template order2size<1>(1);
-          //   (edgeTangentialSize*3+numGradConstraints >= 2*numGradShapeFunctions)?
-          //                             0 : agIndexSet_.template order2size<1>(1);
-#ifndef NDEBUG
-          std::cout << "size of spaces (SF,gSF,hSF): "
-                    << numShapeFunctions << ", "
-                    << numGradShapeFunctions << ", "
-                    << numHessShapeFunctions << ",   "
-                    << "value setup (constraints): "
-                    << numInnerShapeFunctions << ", "
-                    << "edge interpolation:"
-                    << (edgeInterpolation_? "interpolation, ": "projection, ")
-                    << "grad setup (constraints, normal-ls, tangential-ls): "
-                    << numGradConstraints << " " << edgeNormalSize << " " << edgeTangentialSize << ",   "
-                    << "order<1,2,3> and edgeDegrees<0,1>: "
-                    << orders[0] << " " << orders[1] << " " << orders[2] << ",  "
-                    << agIndexSet_.edgeDegrees()[0] << " " << agIndexSet_.edgeDegrees()[1]
-                    << std::endl;
-#endif
 
           // set up matrices used for constructing gradient, value, and edge projections
           // Note: the code is set up with the assumption that the dofs suffice to compute the edge projection
@@ -380,14 +393,9 @@ namespace Dune {
 
           LeftPseudoInverse <DomainFieldType> pseudoInverse(numShapeFunctions);
 
-          // these are the matrices we need to compute
-          valueProjections().resize(agglomeration().size());
-          jacobianProjections().resize(agglomeration().size());
-          hessianProjections().resize(agglomeration().size());
-          stabilizations().resize(agglomeration().size());
-
           // start iteration over all polygons
-          for (std::size_t agglomerate = 0; agglomerate < agglomeration().size(); ++agglomerate) {
+          for (std::size_t agglomerate = start; agglomerate < end; ++agglomerate)
+          {
             const auto &bbox = blockMapper_.indexSet().boundingBox(agglomerate);
             const std::size_t numDofs = blockMapper().numDofs(agglomerate);
 
@@ -406,7 +414,8 @@ namespace Dune {
             RHSleastSquaresGrad.resize( numDofs, leastSquaresGradProj.rows(), 0);
 
             // iterate over the triangles of this polygon
-            for (const ElementSeedType &entitySeed : entitySeeds[agglomerate]) {
+            for (const ElementSeedType &entitySeed : entitySeeds[agglomerate])
+            {
               const ElementType &element = gridPart().entity(entitySeed);
               const auto geometry = element.geometry();
               const auto &refElement = ReferenceElements<typename GridPart::ctype, GridPart::dimension>::general(
