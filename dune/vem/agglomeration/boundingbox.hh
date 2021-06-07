@@ -13,8 +13,6 @@
 
 #include <dune/common/fvector.hh>
 
-#include <dune/vem/agglomeration/agglomeration.hh>
-
 namespace Dune
 {
 
@@ -129,9 +127,11 @@ namespace Dune
     // agglomerateBoundingBoxes
     // ------------------------
 
-    template< class GridPart >
-    inline static std::vector< BoundingBox< GridPart > > boundingBoxes ( const Agglomeration< GridPart > &agglomeration )
+    template< class Agglomeration >
+    inline static std::vector< BoundingBox< typename Agglomeration::GridPartType > >
+    boundingBoxes ( const Agglomeration &agglomeration )
     {
+      typedef typename Agglomeration::GridPartType GridPart;
       typedef typename GridPart::template Codim< 0 >::GeometryType GeometryType;
 
       BoundingBox< GridPart > emptyBox;

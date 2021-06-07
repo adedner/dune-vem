@@ -39,7 +39,7 @@ namespace Dune {
         // Internal Forward Declarations
         // -----------------------------
 
-        template<class FunctionSpace, class GridPart, int polOrder>
+        template<class FunctionSpace, class GridPart>
         class AgglomerationVEMSpace;
 
 
@@ -52,8 +52,8 @@ namespace Dune {
                 : std::integral_constant<bool, false> {
         };
 
-        template<class FunctionSpace, class GridPart, int order>
-        struct IsAgglomerationVEMSpace<AgglomerationVEMSpace<FunctionSpace, GridPart, order> >
+        template<class FunctionSpace, class GridPart>
+        struct IsAgglomerationVEMSpace<AgglomerationVEMSpace<FunctionSpace, GridPart> >
                 : std::integral_constant<bool, true> {
         };
 
@@ -62,11 +62,11 @@ namespace Dune {
         // AgglomerationVEMSpaceTraits
         // ---------------------------
 
-        template<class FunctionSpace, class GridPart, int polOrder>
+        template<class FunctionSpace, class GridPart>
         struct AgglomerationVEMSpaceTraits {
-            friend class AgglomerationVEMSpace<FunctionSpace, GridPart, polOrder>;
+            friend class AgglomerationVEMSpace<FunctionSpace, GridPart>;
 
-            typedef AgglomerationVEMSpace<FunctionSpace, GridPart, polOrder> DiscreteFunctionSpaceType;
+            typedef AgglomerationVEMSpace<FunctionSpace, GridPart> DiscreteFunctionSpaceType;
 
             typedef FunctionSpace FunctionSpaceType;
             typedef GridPart GridPartType;
@@ -81,9 +81,9 @@ namespace Dune {
                     typename FunctionSpace::DomainFieldType, typename FunctionSpace::RangeFieldType,
                     GridPartType::dimension, 1
             > ScalarShapeFunctionSpaceType;
-            typedef AgglomerationDGSpaceTraits <ScalarShapeFunctionSpaceType, GridPart, polOrder> DGTraitsType;
-            typedef typename DGTraitsType::ScalarShapeFunctionSetType ScalarShapeFunctionSetType;
-            typedef typename DGTraitsType::BasisFunctionSetType ScalarBBBasisFunctionSetType;
+            typedef Dune::Fem::OrthonormalShapeFunctionSet< ScalarShapeFunctionSpaceType > ScalarShapeFunctionSetType;
+            typedef Fem::VectorialShapeFunctionSet< Fem::ShapeFunctionSetProxy< ScalarShapeFunctionSetType >, typename ScalarShapeFunctionSpaceType::RangeType> ShapeFunctionSetType;
+            typedef BoundingBoxBasisFunctionSet< GridPartType, ShapeFunctionSetType > ScalarBBBasisFunctionSetType;
             typedef VEMBasisFunctionSet <EntityType, ScalarBBBasisFunctionSetType> ScalarBasisFunctionSetType;
             typedef Fem::VectorialBasisFunctionSet<ScalarBasisFunctionSetType, typename FunctionSpaceType::RangeType> BasisFunctionSetType;
 
@@ -103,12 +103,12 @@ namespace Dune {
         // AgglomerationVEMSpace
         // ---------------------
 
-        template<class FunctionSpace, class GridPart, int polOrder>
+        template<class FunctionSpace, class GridPart>
         class AgglomerationVEMSpace
-        : public Fem::DiscreteFunctionSpaceDefault<AgglomerationVEMSpaceTraits<FunctionSpace, GridPart, polOrder> >
+        : public Fem::DiscreteFunctionSpaceDefault<AgglomerationVEMSpaceTraits<FunctionSpace, GridPart> >
         {
-            typedef AgglomerationVEMSpace<FunctionSpace, GridPart, polOrder> ThisType;
-            typedef Fem::DiscreteFunctionSpaceDefault <AgglomerationVEMSpaceTraits<FunctionSpace, GridPart, polOrder>> BaseType;
+            typedef AgglomerationVEMSpace<FunctionSpace, GridPart> ThisType;
+            typedef Fem::DiscreteFunctionSpaceDefault <AgglomerationVEMSpaceTraits<FunctionSpace, GridPart>> BaseType;
 
         public:
             typedef typename BaseType::Traits Traits;
@@ -128,7 +128,6 @@ namespace Dune {
             typedef typename BaseType::GridPartType GridPartType;
             typedef Dune::Fem::FunctionSpace<double, double, GridPartType::dimensionworld - 1, 1> EdgeFSType;
             typedef Dune::Fem::OrthonormalShapeFunctionSet<EdgeFSType> EdgeShapeFunctionSetType;
-            // typedef Dune::Fem::LegendreShapeFunctionSet<EdgeFSType,true> EdgeShapeFunctionSetType;
             typedef typename BasisFunctionSetType::DomainFieldType DomainFieldType;
             typedef typename BasisFunctionSetType::DomainType DomainType;
             typedef typename GridPart::template Codim<0>::EntityType ElementType;
@@ -148,7 +147,7 @@ namespace Dune {
             using BaseType::gridPart;
 
             enum { hasLocalInterpolate = false };
-            static const int polynomialOrder = polOrder;
+            // static const int polynomialOrder = polOrder_;
 
             // for interpolation
             struct InterpolationType {
@@ -167,6 +166,7 @@ namespace Dune {
             // 3: don't use onb at all
             //!TS: change to vector of vectors
             AgglomerationVEMSpace(AgglomerationType &agglomeration,
+                const unsigned int polOrder,
                 const typename AgglomerationIndexSetType::TestSpacesType &testSpaces,
                 int basisChoice,
                 bool edgeInterpolation)
@@ -175,21 +175,29 @@ namespace Dune {
               agIndexSet_(agglomeration, testSpaces),
               blockMapper_(agIndexSet_, agIndexSet_.dofsPerCodim()),
               interpolation_(blockMapper().indexSet(), polOrder, basisChoice != 3),
-              scalarShapeFunctionSet_(Dune::GeometryType(Dune::GeometryType::cube, GridPart::dimension)),
+              scalarShapeFunctionSet_(Dune::GeometryType(Dune::GeometryType::cube, GridPart::dimension),polOrder),
               edgeShapeFunctionSet_(Dune::GeometryType(Dune::GeometryType::cube, GridPart::dimension - 1),
                    agIndexSet_.maxEdgeDegree()),
               polOrder_(polOrder),
-              useOnb_(basisChoice == 2)
+              useOnb_(basisChoice == 2),
+              valueProjections_(new Vector<
+                  typename Traits::ScalarBasisFunctionSetType::ValueProjection>()),
+              jacobianProjections_(new Vector<
+                  typename Traits::ScalarBasisFunctionSetType::JacobianProjection>()),
+              hessianProjections_(new Vector<
+                  typename Traits::ScalarBasisFunctionSetType::HessianProjection>()),
+              stabilizations_(new Vector<Stabilization>())
             {
-              onbBasis(agIndexSet_.agglomeration(), scalarShapeFunctionSet_, agIndexSet_.boundingBox());
+              onbBasis(agIndexSet_.agglomeration(), scalarShapeFunctionSet_, agIndexSet_.boundingBoxes());
               buildProjections();
             }
             std::unique_ptr<AgglomerationType> agglPtr_ = nullptr;
             AgglomerationVEMSpace(std::unique_ptr<AgglomerationType> agglPtr,
+                const unsigned int polOrder,
                 const typename AgglomerationIndexSetType::TestSpacesType &testSpaces,
                 int basisChoice,
                 bool edgeInterpolation)
-            : AgglomerationVEMSpace(*agglPtr, testSpaces, basisChoice, edgeInterpolation)
+            : AgglomerationVEMSpace(*agglPtr, polOrder, testSpaces, basisChoice, edgeInterpolation)
             {
               agglPtr_ = std::move(agglPtr);
             }
@@ -199,22 +207,22 @@ namespace Dune {
             void update()
             {
               agIndexSet_.update();
-              onbBasis(agIndexSet_.agglomeration(), scalarShapeFunctionSet_, agIndexSet_.boundingBox());
+              onbBasis(agIndexSet_.agglomeration(), scalarShapeFunctionSet_, agIndexSet_.boundingBoxes());
               buildProjections();
             }
 
             const BasisFunctionSetType basisFunctionSet(const EntityType &entity) const
             {
               const std::size_t agglomerate = agglomeration().index(entity);
-              assert(agglomerate<valueProjections_.size());
-              assert(agglomerate<jacobianProjections_.size());
-              assert(agglomerate<hessianProjections_.size());
-              const auto &valueProjection = valueProjections_[agglomerate];
-              const auto &jacobianProjection = jacobianProjections_[agglomerate];
-              const auto &hessianProjection = hessianProjections_[agglomerate];
+              assert(agglomerate<valueProjections().size());
+              assert(agglomerate<jacobianProjections().size());
+              assert(agglomerate<hessianProjections().size());
+              const auto &valueProjection = valueProjections()[agglomerate];
+              const auto &jacobianProjection = jacobianProjections()[agglomerate];
+              const auto &hessianProjection = hessianProjections()[agglomerate];
               const auto &bbox = blockMapper_.indexSet().boundingBox(agglomerate);
               // scalar ONB Basis proxy
-              typename Traits::DGTraitsType::ShapeFunctionSetType scalarShapeFunctionSet(&scalarShapeFunctionSet_);
+              typename Traits::ShapeFunctionSetType scalarShapeFunctionSet(&scalarShapeFunctionSet_);
               // scalar BB Basis
               typename Traits::ScalarBBBasisFunctionSetType bbScalarBasisFunctionSet(entity, bbox,
                 useOnb_, std::move(scalarShapeFunctionSet));
@@ -225,15 +233,15 @@ namespace Dune {
             const typename Traits::ScalarBasisFunctionSetType scalarBasisFunctionSet(const EntityType &entity) const
             {
               const std::size_t agglomerate = agglomeration().index(entity);
-              assert(agglomerate<valueProjections_.size());
-              assert(agglomerate<jacobianProjections_.size());
-              assert(agglomerate<hessianProjections_.size());
-              const auto &valueProjection = valueProjections_[agglomerate];
-              const auto &jacobianProjection = jacobianProjections_[agglomerate];
-              const auto &hessianProjection = hessianProjections_[agglomerate];
+              assert(agglomerate<valueProjections().size());
+              assert(agglomerate<jacobianProjections().size());
+              assert(agglomerate<hessianProjections().size());
+              const auto &valueProjection = valueProjections()[agglomerate];
+              const auto &jacobianProjection = jacobianProjections()[agglomerate];
+              const auto &hessianProjection = hessianProjections()[agglomerate];
               const auto &bbox = blockMapper_.indexSet().boundingBox(agglomerate);
               // scalar ONB Basis proxy
-              typename Traits::DGTraitsType::ShapeFunctionSetType scalarShapeFunctionSet(&scalarShapeFunctionSet_);
+              typename Traits::ShapeFunctionSetType scalarShapeFunctionSet(&scalarShapeFunctionSet_);
               // scalar BB Basis
               typename Traits::ScalarBBBasisFunctionSetType bbScalarBasisFunctionSet(entity, bbox,
                 useOnb_, std::move(scalarShapeFunctionSet));
@@ -249,8 +257,8 @@ namespace Dune {
 
             static constexpr bool continuous(const typename BaseType::IntersectionType &) noexcept { return false; }
 
-            static constexpr int order(const EntityType &) noexcept { return polOrder; }
-            static constexpr int order() { return polOrder; }
+            int order(const EntityType &) const { return polOrder_; }
+            int order() const { return polOrder_; }
 
             static constexpr Fem::DFSpaceIdentifier type() noexcept { return Fem::GenericSpace_id; }
 
@@ -260,8 +268,8 @@ namespace Dune {
 
             const Stabilization &stabilization(const EntityType &entity) const
             {
-              assert( agglomeration().index(entity)<stabilizations_.size());
-              return stabilizations_[agglomeration().index(entity)];
+              assert( agglomeration().index(entity)<stabilizations().size());
+              return stabilizations()[agglomeration().index(entity)];
             }
 
             //////////////////////////////////////////////////////////
@@ -283,6 +291,17 @@ namespace Dune {
 
         private:
 
+            template <class T>
+            using Vector = std::vector<T>;
+            auto& valueProjections() const { return *valueProjections_; }
+            auto& jacobianProjections() const { return *jacobianProjections_; }
+            auto& hessianProjections() const { return *hessianProjections_; }
+            auto& stabilizations() const { return *stabilizations_; }
+            std::shared_ptr<Vector<typename Traits::ScalarBasisFunctionSetType::ValueProjection>> valueProjections_;
+            std::shared_ptr<Vector<typename Traits::ScalarBasisFunctionSetType::JacobianProjection>> jacobianProjections_;
+            std::shared_ptr<Vector<typename Traits::ScalarBasisFunctionSetType::HessianProjection>> hessianProjections_;
+            std::shared_ptr<Vector<Stabilization>> stabilizations_;
+
             void buildProjections();
 
             // issue with making these const: use of delete default constructor in some python bindings...
@@ -290,10 +309,6 @@ namespace Dune {
             AgglomerationIndexSetType agIndexSet_;
             mutable BlockMapperType blockMapper_;
             AgglomerationInterpolationType interpolation_;
-            std::vector<typename Traits::ScalarBasisFunctionSetType::ValueProjection> valueProjections_;
-            std::vector<typename Traits::ScalarBasisFunctionSetType::JacobianProjection> jacobianProjections_;
-            std::vector<typename Traits::ScalarBasisFunctionSetType::HessianProjection> hessianProjections_;
-            std::vector<Stabilization> stabilizations_;
             ScalarShapeFunctionSetType scalarShapeFunctionSet_;
             EdgeShapeFunctionSetType edgeShapeFunctionSet_;
             unsigned int polOrder_;
@@ -304,9 +319,10 @@ namespace Dune {
         // Implementation of AgglomerationVEMSpace
         // ---------------------------------------
 
-        template<class FunctionSpace, class GridPart, int polOrder>
-        inline void AgglomerationVEMSpace<FunctionSpace, GridPart, polOrder>::buildProjections()
+        template<class FunctionSpace, class GridPart>
+        inline void AgglomerationVEMSpace<FunctionSpace, GridPart>::buildProjections()
         {
+          const int polOrder = polOrder_;
           // want to iterate over each polygon separately - so collect all
           // triangles from a given polygon
           std::vector<std::vector<ElementSeedType> > entitySeeds(agglomeration().size());
@@ -314,7 +330,7 @@ namespace Dune {
             entitySeeds[agglomeration().index(element)].push_back(element.seed());
 
           std::vector<int> orders = agIndexSet_.orders();
-          const std::size_t numShapeFunctions = scalarShapeFunctionSet_.size(); // uses polOrder
+          const std::size_t numShapeFunctions = scalarShapeFunctionSet_.size();
           const std::size_t numHessShapeFunctions = // numShapeFunctions;
                 polOrder==1? 1:
                 std::min(numShapeFunctions,
@@ -365,10 +381,10 @@ namespace Dune {
           LeftPseudoInverse <DomainFieldType> pseudoInverse(numShapeFunctions);
 
           // these are the matrices we need to compute
-          valueProjections_.resize(agglomeration().size());
-          jacobianProjections_.resize(agglomeration().size());
-          hessianProjections_.resize(agglomeration().size());
-          stabilizations_.resize(agglomeration().size());
+          valueProjections().resize(agglomeration().size());
+          jacobianProjections().resize(agglomeration().size());
+          hessianProjections().resize(agglomeration().size());
+          stabilizations().resize(agglomeration().size());
 
           // start iteration over all polygons
           for (std::size_t agglomerate = 0; agglomerate < agglomeration().size(); ++agglomerate) {
@@ -432,9 +448,9 @@ namespace Dune {
             // volume of polygon
             DomainFieldType H0 = blockMapper_.indexSet().volume(agglomerate);
 
-            auto &valueProjection = valueProjections_[agglomerate];
-            auto &jacobianProjection = jacobianProjections_[agglomerate];
-            auto &hessianProjection = hessianProjections_[agglomerate];
+            auto &valueProjection = valueProjections()[agglomerate];
+            auto &jacobianProjection = jacobianProjections()[agglomerate];
+            auto &hessianProjection = hessianProjections()[agglomerate];
             valueProjection.resize(numShapeFunctions);
             jacobianProjection.resize(numShapeFunctions);
             hessianProjection.resize(numShapeFunctions);
@@ -962,7 +978,7 @@ namespace Dune {
                   //   << D[i][alpha] << " " << valueProjection[alpha][j]
                   //   << " -> " << S[i][j] << std::endl;
                 }
-            Stabilization &stabilization = stabilizations_[agglomerate];
+            Stabilization &stabilization = stabilizations()[agglomerate];
             stabilization.resize(numDofs, numDofs, 0);
             for (std::size_t i = 0; i < numDofs; ++i)
               for (std::size_t j = 0; j < numDofs; ++j) {
@@ -983,8 +999,8 @@ namespace Dune {
     namespace Fem {
 
         namespace Capabilities {
-            template<class FunctionSpace, class GridPart, int polOrder>
-            struct hasInterpolation<Vem::AgglomerationVEMSpace<FunctionSpace, GridPart, polOrder> > {
+            template<class FunctionSpace, class GridPart>
+            struct hasInterpolation<Vem::AgglomerationVEMSpace<FunctionSpace, GridPart> > {
                 static const bool v = false;
             };
         }

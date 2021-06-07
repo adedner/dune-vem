@@ -154,20 +154,22 @@ def vemSpace(view, order=1, testSpaces=None, scalar=False,
     gridPartName = "Dune::FemPy::GridPart< " + view._typeName + " >"
     typeName = "Dune::Vem::AgglomerationVEMSpace< " +\
       "Dune::Fem::FunctionSpace< double, " + field + ", " + str(dimw) + ", " + str(dimRange) + " >, " +\
-      gridPartName + ", " + str(order) + " >"
+      gridPartName + " >"
 
     constructor = Constructor(
                    ['pybind11::object gridView',
                     'const pybind11::function agglomerate',
+                    'unsigned int order',
                     'const std::array<std::vector<int>,'+str(view.dimension+1)+'> &testSpaces',
                     'int basisChoice','bool edgeInterpolation'],
                    ['auto agglo = std::make_unique<Dune::Vem::Agglomeration<' + gridPartName + '>>(',
                     '         Dune::FemPy::gridPart<' + viewType + '>(gridView),',
                     '    [agglomerate](const auto& idx)',
                     '    { return agglomerate(idx).template cast<unsigned int>(); } ); ',
-                    'auto obj = new DuneType( std::move(agglo), testSpaces, basisChoice, edgeInterpolation );',
+                    'auto obj = new DuneType( std::move(agglo), order, testSpaces, basisChoice, edgeInterpolation );',
                     'return obj;'],
-                   ['"gridView"_a', '"agglomerate"_a', '"testSpaces"_a',
+                   ['"gridView"_a', '"agglomerate"_a',
+                    '"order"_a', '"testSpaces"_a',
                     '"basisChoice"_a', '"edgeInterpolation"_a',
                     'pybind11::keep_alive< 1, 2 >()'] )
     updateMethod = Method('update',
@@ -177,7 +179,7 @@ def vemSpace(view, order=1, testSpaces=None, scalar=False,
 
     spc = module(field, includes, typeName, constructor, diameterMethod, updateMethod,
                 scalar=scalar, storage=storage,
-                ctorArgs=[view, agglomerate, testSpaces, basisChoice, edgeInterpolation])
+                ctorArgs=[view, agglomerate, order, testSpaces, basisChoice, edgeInterpolation])
     addStorage(spc, storage)
     return spc.as_ufl()
 

@@ -13,7 +13,7 @@
 #include <dune/fem/space/basisfunctionset/functor.hh>
 #include <dune/fem/space/shapefunctionset/vectorial.hh>
 
-#include <dune/vem/agglomeration/boundingbox.hh>
+#include <dune/vem/agglomeration/agglomeration.hh>
 #include <dune/vem/agglomeration/functor.hh>
 // #include <dune/vem/misc/highorderquadratures.hh>
 

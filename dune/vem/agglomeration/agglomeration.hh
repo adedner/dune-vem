@@ -9,6 +9,7 @@
 #include <vector>
 
 #include <dune/grid/common/mcmgmapper.hh>
+#include <dune/vem/agglomeration/boundingbox.hh>
 
 namespace Dune
 {
@@ -29,24 +30,6 @@ namespace Dune
 
       typedef typename GridPartType::template Codim< 0 >::EntityType ElementType;
 
-#if 0
-      Agglomeration ( GridPartType &gridPart, std::vector< std::size_t > indices )
-        : gridPart_( gridPart ),
-          mapper_( static_cast< typename GridPartType::GridViewType >( gridPart ), mcmgElementLayout() ),
-          indices_( std::move( indices ) ),
-          size_( 0 )
-      {
-        assert( indices_.size() == static_cast< std::size_t >( mapper_.size() ) );
-        if( !indices_.empty() )
-          size_ = *std::max_element( indices_.begin(), indices_.end() ) + 1u;
-      }
-
-      template< class T >
-      Agglomeration ( GridPartType &gridPart, const std::vector< T > &indices )
-        : Agglomeration( gridPart, convert( indices ) )
-      {}
-
-#endif
       template <class Callback>
       Agglomeration ( GridPartType &gridPart, const Callback callBack )
         : gridPart_( gridPart ),
@@ -64,10 +47,17 @@ namespace Dune
         assert( indices_.size() == static_cast< std::size_t >( mapper_.size() ) );
         if( !indices_.empty() )
           size_ = *std::max_element( indices_.begin(), indices_.end() ) + 1u;
+
+        update();
       }
       ~Agglomeration() {}
       Agglomeration(const Agglomeration&) = delete;
       Agglomeration &operator=( Agglomeration&) = delete;
+
+      void update()
+      {
+        boundingBoxes_ = Dune::Vem::boundingBoxes( *this );
+      }
 
       GridPart &gridPart () const { return gridPart_; }
 
@@ -75,14 +65,24 @@ namespace Dune
 
       std::size_t size () const { return size_; }
 
-/*
-      std::vector<std::size_t> polygonindices() const
+      const BoundingBox<GridPart>& boundingBox( std::size_t index ) const
       {
-        std::vector< std::size_t > w(size(),0);
-        return w;
+        assert(index<boundingBoxes_.size());
+        return boundingBoxes_[index];
       }
-      // std::vector< std::size_t > polygonindices () const { return indices_; }
-*/
+      const BoundingBox<GridPart>& boundingBox( const ElementType &element ) const
+      {
+        return boundingBox( index( element ) );
+      }
+      const std::vector< BoundingBox< GridPart > >& boundingBoxes() const
+      {
+        return boundingBoxes_;
+      }
+      std::vector< BoundingBox< GridPart > >& boundingBoxes()
+      {
+        return boundingBoxes_;
+      }
+
     private:
       template< class T >
       static std::vector< std::size_t > convert ( const std::vector< T > &v )
@@ -98,6 +98,7 @@ namespace Dune
       MultipleCodimMultipleGeomTypeMapper< typename GridPartType::GridViewType > mapper_;
       std::vector< std::size_t > indices_;
       std::size_t size_;
+      std::vector< BoundingBox< GridPart > > boundingBoxes_;
     };
 
 
