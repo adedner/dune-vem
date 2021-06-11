@@ -176,37 +176,43 @@ namespace Dune {
               scalarShapeFunctionSet_(Dune::GeometryType(Dune::GeometryType::cube, GridPart::dimension),polOrder),
               edgeShapeFunctionSet_(Dune::GeometryType(Dune::GeometryType::cube, GridPart::dimension - 1),
                    agIndexSet_.maxEdgeDegree()),
+              basisChoice_(basisChoice),
               polOrder_(polOrder),
-              useOnb_(basisChoice == 2),
               valueProjections_(new Vector<
                   typename Traits::ScalarBasisFunctionSetType::ValueProjection>()),
               jacobianProjections_(new Vector<
                   typename Traits::ScalarBasisFunctionSetType::JacobianProjection>()),
               hessianProjections_(new Vector<
                   typename Traits::ScalarBasisFunctionSetType::HessianProjection>()),
-              stabilizations_(new Vector<Stabilization>())
+              stabilizations_(new Vector<Stabilization>()),
+              useOnb_(basisChoice == 2),
+              counter_(0)
             {
-              agIndexSet_.agglomeration().onbBasis(order());
+              std::cout << "VemSpace::ctor " << this << " " << &agglomeration << "\n";
               update();
             }
-            std::unique_ptr<AgglomerationType> agglPtr_ = nullptr;
-            AgglomerationVEMSpace(std::unique_ptr<AgglomerationType> agglPtr,
+            std::shared_ptr<AgglomerationType> agglPtr_ = nullptr;
+            AgglomerationVEMSpace(std::shared_ptr<AgglomerationType> agglPtr,
                 const unsigned int polOrder,
                 const typename AgglomerationIndexSetType::TestSpacesType &testSpaces,
                 int basisChoice,
                 bool edgeInterpolation)
             : AgglomerationVEMSpace(*agglPtr, polOrder, testSpaces, basisChoice, edgeInterpolation)
             {
-              agglPtr_ = std::move(agglPtr);
+              agglPtr_ = agglPtr;
+              std::cout << "VemSpace::ctor: " << agglPtr_.get() << " " << this << "\n";
             }
             AgglomerationVEMSpace(const AgglomerationVEMSpace&) = delete;
             AgglomerationVEMSpace& operator=(const AgglomerationVEMSpace&) = delete;
-            ~AgglomerationVEMSpace() { }
+            ~AgglomerationVEMSpace() {
+              std::cout << "VemSpace::dtor: " << agglPtr_.get() << " " << this << "\n";
+            }
             void update()
             {
-              agIndexSet_.update();
-              if (agglPtr_)
-                agglPtr_->update();
+              std::cout << "Space::update\n";
+              ++counter_;
+              if (agglomeration().counter()<counter_)
+                agIndexSet_.update();
               agglomeration().onbBasis(order());
 
               // these are the matrices we need to compute
@@ -228,6 +234,8 @@ namespace Dune {
               }
               else
               {
+                // make sure all required quadratures are constructed before going multithreaded
+                AgglomerationVEMSpace::buildProjections(entitySeeds,0,1);
                 std::vector<std::thread> threads;
                 const double threadSize = agglomeration().size() / double(numThreads);
                 for (std::size_t t=0; t < numThreads; ++t)
@@ -238,13 +246,11 @@ namespace Dune {
                 }
                 std::for_each(threads.begin(),threads.end(), std::mem_fn(&std::thread::join));
               }
-              /*
               auto end = std::chrono::system_clock::now();
               auto diff = duration_cast < std::chrono::seconds > (end - start).count();
               std::cout << "Total build time = " << diff << " seconds for "
                         << agglomeration().size() << " projections on "
                         << numThreads << " threads." << std::endl;
-              */
             }
 
             const BasisFunctionSetType basisFunctionSet(const EntityType &entity) const
@@ -253,17 +259,16 @@ namespace Dune {
               assert(agglomerate<valueProjections().size());
               assert(agglomerate<jacobianProjections().size());
               assert(agglomerate<hessianProjections().size());
-              const auto &valueProjection = valueProjections()[agglomerate];
-              const auto &jacobianProjection = jacobianProjections()[agglomerate];
-              const auto &hessianProjection = hessianProjections()[agglomerate];
-              const auto &bbox = blockMapper_.indexSet().boundingBox(agglomerate);
               // scalar ONB Basis proxy
               typename Traits::ShapeFunctionSetType scalarShapeFunctionSet(&scalarShapeFunctionSet_);
               // scalar BB Basis
-              typename Traits::ScalarBBBasisFunctionSetType bbScalarBasisFunctionSet(entity, bbox,
+              typename Traits::ScalarBBBasisFunctionSetType bbScalarBasisFunctionSet(entity, agglomerate,
+                agglomeration().boundingBoxes(),
                 useOnb_, std::move(scalarShapeFunctionSet));
               // vectorial extended VEM Basis
-              typename Traits::ScalarBasisFunctionSetType scalarBFS(entity, bbox, valueProjection, jacobianProjection, hessianProjection, std::move(bbScalarBasisFunctionSet));
+              typename Traits::ScalarBasisFunctionSetType scalarBFS(entity, agglomerate,
+                             valueProjections_, jacobianProjections_, hessianProjections_,
+                             std::move(bbScalarBasisFunctionSet));
               return BasisFunctionSetType(std::move(scalarBFS));
             }
             const typename Traits::ScalarBasisFunctionSetType scalarBasisFunctionSet(const EntityType &entity) const
@@ -272,17 +277,16 @@ namespace Dune {
               assert(agglomerate<valueProjections().size());
               assert(agglomerate<jacobianProjections().size());
               assert(agglomerate<hessianProjections().size());
-              const auto &valueProjection = valueProjections()[agglomerate];
-              const auto &jacobianProjection = jacobianProjections()[agglomerate];
-              const auto &hessianProjection = hessianProjections()[agglomerate];
-              const auto &bbox = blockMapper_.indexSet().boundingBox(agglomerate);
               // scalar ONB Basis proxy
               typename Traits::ShapeFunctionSetType scalarShapeFunctionSet(&scalarShapeFunctionSet_);
               // scalar BB Basis
-              typename Traits::ScalarBBBasisFunctionSetType bbScalarBasisFunctionSet(entity, bbox,
+              typename Traits::ScalarBBBasisFunctionSetType bbScalarBasisFunctionSet(entity, agglomerate,
+                agglomeration().boundingBoxes(),
                 useOnb_, std::move(scalarShapeFunctionSet));
               // vectorial extended VEM Basis
-              return typename Traits::ScalarBasisFunctionSetType(entity, bbox, valueProjection, jacobianProjection, hessianProjection, std::move(bbScalarBasisFunctionSet));
+              return typename Traits::ScalarBasisFunctionSetType(entity, agglomerate,
+                              valueProjections_, jacobianProjections_, hessianProjections_,
+                              std::move(bbScalarBasisFunctionSet));
             }
 
             BlockMapperType &blockMapper() const { return blockMapper_; }
@@ -350,7 +354,9 @@ namespace Dune {
             ScalarShapeFunctionSetType scalarShapeFunctionSet_;
             EdgeShapeFunctionSetType edgeShapeFunctionSet_;
             unsigned int polOrder_;
+            int basisChoice_;
             const bool useOnb_;
+            std::size_t counter_;
         };
 
 
@@ -393,6 +399,8 @@ namespace Dune {
 
           LeftPseudoInverse <DomainFieldType> pseudoInverse(numShapeFunctions);
 
+          AgglomerationInterpolationType interpolation(blockMapper().indexSet(), polOrder, basisChoice_ != 3);
+
           // start iteration over all polygons
           for (std::size_t agglomerate = start; agglomerate < end; ++agglomerate)
           {
@@ -418,16 +426,15 @@ namespace Dune {
             {
               const ElementType &element = gridPart().entity(entitySeed);
               const auto geometry = element.geometry();
-              const auto &refElement = ReferenceElements<typename GridPart::ctype, GridPart::dimension>::general(
-                      element.type());
+              Quadrature0Type quadrature(element, 2 * polOrder);
 
               // get the bounding box monomials and apply all dofs to them
-              BoundingBoxBasisFunctionSet <GridPart, ScalarShapeFunctionSetType> shapeFunctionSet(element, bbox,
+              BoundingBoxBasisFunctionSet <GridPart, ScalarShapeFunctionSetType> shapeFunctionSet(element, agglomerate,
+                      agglomeration().boundingBoxes(),
                       useOnb_, scalarShapeFunctionSet_);
-              interpolation_(shapeFunctionSet, D);
+              interpolation(shapeFunctionSet, D);
 
               // compute mass matrices Hp, HpGrad, and the gradient matrices G^l
-              Quadrature0Type quadrature(element, 2 * polOrder);
               for (std::size_t qp = 0; qp < quadrature.nop(); ++qp) {
                 const DomainFieldType weight =
                         geometry.integrationElement(quadrature.point(qp)) * quadrature.weight(qp);
@@ -522,7 +529,9 @@ namespace Dune {
               std::vector<Dune::DynamicMatrix<double> > edgePhiVector(2);
               // get the bounding box monomials and apply all dofs to them
               BoundingBoxBasisFunctionSet <GridPart, ScalarShapeFunctionSetType>
-                  shapeFunctionSet(element, bbox, useOnb_, scalarShapeFunctionSet_);
+                  shapeFunctionSet(element, agglomerate,
+                  agglomeration().boundingBoxes(),
+                  useOnb_, scalarShapeFunctionSet_);
 
               auto vemBasisFunction = scalarBasisFunctionSet(element);
 
@@ -555,7 +564,7 @@ namespace Dune {
                   mask(2,std::vector<unsigned int>(0)); // contains indices with Phi_mask[i] is attached to given edge
                 edgePhiVector[0].resize(agIndexSet_.edgeSize(0), agIndexSet_.edgeSize(0), 0);
                 edgePhiVector[1].resize(agIndexSet_.edgeSize(1), agIndexSet_.edgeSize(1), 0);
-                interpolation_(intersection, edgeShapeFunctionSet_, edgePhiVector, mask);
+                interpolation(intersection, edgeShapeFunctionSet_, edgePhiVector, mask);
                 //!!! std::cout << "edgePhiVector[0].size:" << edgePhiVector[0].size() << std::endl;
                 if (edgePhiVector[0].size() > 0)
                 {
@@ -626,7 +635,7 @@ namespace Dune {
                   PhiEdge <GridPartType, Dune::DynamicMatrix<double>, EdgeShapeFunctionSetType>
                           phiEdge(gridPart(), intersection, edgePhiVector[0], edgeShapeFunctionSet_,
                                   0); // behaves like Phi_mask[i] restricted to edge
-                  interpolation_(element, phiEdge, lambda);
+                  interpolation(element, phiEdge, lambda);
                   // test with phi_mask[0] (vertex) has the correct interpolation result:
                   succ = std::abs(lambda[mask[0][0]] - 1) < 1e-10;
                   DomainType otherTau = element.geometry().corner(
@@ -654,7 +663,7 @@ namespace Dune {
                     }
                   }
                   std::fill(lambda.begin(), lambda.end(), 0);
-                  interpolation_(element, phiEdge, lambda);
+                  interpolation(element, phiEdge, lambda);
                   succ = std::abs(lambda[mask[0][0]] - 1) < 1e-10;
                   assert(succ);
                 }
@@ -675,24 +684,28 @@ namespace Dune {
                                 << std::endl;
                    */
                       if (alpha < numGradShapeFunctions)
+                      {
                         // evaluate each here for edge shape fns
                         // first check if we should be using interpolation (for the
                         // existing edge moments - or for H4 space)
                         if (alpha < Dune::Fem::OrthonormalShapeFunctions<DomainType::dimension>::
-                                    size( agIndexSet_.edgeOrders()[0] ) // have enough edge moments
+                                    size( agIndexSet_.edgeOrders()[0] ) // have enough edge momentsa
                             || edgePhiVector[0].size() == polOrder+1    // interpolation is exact
                             || edgeInterpolation_)                      // user want interpolation no matter what
+                        {
                           edgeShapeFunctionSet_.evaluateEach(x, [&](std::size_t beta, FieldVector<DomainFieldType, 1> psi) {
                             if (beta < edgePhiVector[0].size())
                               for (std::size_t s = 0; s < mask[0].size(); ++s)// note that edgePhi is the transposed of the basis transform matrix
                                 R[alpha][mask[0][s]].axpy(edgePhiVector[0][beta][s] * psi[0] * phi[0] * weight, normal);
                           });
+                        }
                         else // use value projection
                         {
                           auto factor = normal;
                           factor *= phi[0]*weight;
                           vemBasisFunction.axpy(y, factor, R[alpha]);
                         }
+                      }
                       if (alpha < numHessShapeFunctions && agIndexSet_.edgeSize(1) > 0)
                       {
 #if 1 // can be replaced by integration by parts version further down
@@ -909,7 +922,9 @@ namespace Dune {
                       element.type());
 
               // get the bounding box monomials and apply all dofs to them
-              BoundingBoxBasisFunctionSet <GridPart, ScalarShapeFunctionSetType> shapeFunctionSet(element, bbox,
+              BoundingBoxBasisFunctionSet <GridPart,
+              ScalarShapeFunctionSetType> shapeFunctionSet(element, agglomerate,
+                      agglomeration().boundingBoxes(),
                       useOnb_, scalarShapeFunctionSet_);
               auto vemBasisFunction = scalarBasisFunctionSet(element);
 

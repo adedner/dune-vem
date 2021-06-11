@@ -128,7 +128,7 @@ namespace Dune
     // ------------------------
 
     template< class Agglomeration >
-    inline static std::vector< BoundingBox< typename Agglomeration::GridPartType > >
+    std::shared_ptr< std::vector< BoundingBox< typename Agglomeration::GridPartType > > >
     boundingBoxes ( const Agglomeration &agglomeration )
     {
       typedef typename Agglomeration::GridPartType GridPart;
@@ -141,7 +141,10 @@ namespace Dune
         emptyBox.first[ k ] = std::numeric_limits< typename GridPart::ctype >::max();
         emptyBox.second[ k ] = std::numeric_limits< typename GridPart::ctype >::min();
       }
-      std::vector< BoundingBox< GridPart > > boundingBoxes( agglomeration.size(), emptyBox );
+
+      std::shared_ptr< std::vector< BoundingBox< GridPart > > > boundingBoxesPtr
+        = make_shared< std::vector< BoundingBox< GridPart > > >( agglomeration.size(), emptyBox );
+      auto &boundingBoxes = *boundingBoxesPtr;
 
       std::vector<std::vector<std::vector<double>>> polygonPoints( agglomeration.size() );
       for( const auto element : elements( static_cast< typename GridPart::GridViewType >( agglomeration.gridPart() ), Partitions::interiorBorder ) )
@@ -173,7 +176,7 @@ namespace Dune
         // std::cout << bbox.xAxis() << "   " << bbox.yAxis() << "     ";
         // std::cout << bbox.diameter() << std::endl;
       }
-      return boundingBoxes;
+      return boundingBoxesPtr;
     }
 
   } // namespace Vem

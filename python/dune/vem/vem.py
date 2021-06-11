@@ -155,18 +155,38 @@ def vemSpace(view, order=1, testSpaces=None, scalar=False,
     typeName = "Dune::Vem::AgglomerationVEMSpace< " +\
       "Dune::Fem::FunctionSpace< double, " + field + ", " + str(dimw) + ", " + str(dimRange) + " >, " +\
       gridPartName + " >"
-
     constructor = Constructor(
-                   ['pybind11::object gridView',
-                    'const pybind11::function agglomerate',
+                   ['pybind11::handle gridView',
+                    'const pybind11::object agglomerate',
                     'unsigned int order',
                     'const std::array<std::vector<int>,'+str(view.dimension+1)+'> &testSpaces',
                     'int basisChoice','bool edgeInterpolation'],
-                   ['auto agglo = std::make_unique<Dune::Vem::Agglomeration<' + gridPartName + '>>(',
-                    '         Dune::FemPy::gridPart<' + viewType + '>(gridView),',
-                    '    [agglomerate](const auto& idx)',
-                    '    { return agglomerate(idx).template cast<unsigned int>(); } ); ',
-                    'auto obj = new DuneType( std::move(agglo), order, testSpaces, basisChoice, edgeInterpolation );',
+                   ['typedef Dune::Vem::Agglomeration<' + gridPartName + '> AggloType;',
+                    'AggloType *agglo = nullptr;',
+                    '// check storage',
+                    'pybind11::function retrieve = pybind11::module::import("dune.vem.vem").attr("retrieveAgglo_");',
+                    'pybind11::function insert   = pybind11::module::import("dune.vem.vem").attr("insertAgglo_");',
+                    'pybind11::function remove   = pybind11::module::import("dune.vem.vem").attr("removeAgglo_");',
+                    'pybind11::handle aggloExists = retrieve(gridView);',
+                    'if (! pybind11::isinstance<pybind11::none>(aggloExists) ) {',
+                    '  agglo = static_cast<AggloType*>(aggloExists.cast<void*>());',
+                    '}',
+                    'else {',
+                    '  agglo = new AggloType(',
+                    '           Dune::FemPy::gridPart<' + viewType + '>(gridView),',
+                    '      [agglomerate](const auto& idx)',
+                    '      { return agglomerate(idx).template cast<unsigned int>(); } );',
+                    '  insert(gridView,(void*)agglo);',
+                    '  pybind11::cpp_function aggloCleanup(',
+                    '        [agglo,remove](pybind11::handle weakref) {',
+                    '        remove((void*)agglo);',
+                    '        delete agglo;',
+                    '        weakref.dec_ref();',
+                    '    });',
+                    '  (void) pybind11::weakref(gridView, aggloCleanup).release();',
+                    '}',
+                    '// auto obj = std::make_shared<DuneType>(*agglo, order, testSpaces, basisChoice, edgeInterpolation );',
+                    'auto obj = new DuneType(*agglo, order, testSpaces, basisChoice, edgeInterpolation );',
                     'return obj;'],
                    ['"gridView"_a', '"agglomerate"_a',
                     '"order"_a', '"testSpaces"_a',
@@ -492,6 +512,9 @@ class PolyAgglomerate:
         self.polys = numpy.zeros(grid.size(0),int)
         for e in grid.elements:
             self.polys[indexSet.index(e)] = index[PolyAgglomerate.roundBary(e.geometry.center)]
+        print("PolyAgglomerate::ctor",flush=True)
+    def __del__(self):
+        print("PolyAgglomerate::dtor",flush=True)
     def __call__(self,idx):
         return self.polys[idx]
     def roundBary(a):
@@ -543,10 +566,24 @@ def polyAgglomerate(constructor,cubes=False,convex=None):
     grid.hierarchicalGrid.agglomerate = agglomerate
     return grid
 
-
 def polyGrid(constructor,cubes=False, convex=None,**kwargs):
     if isinstance(constructor,dict) and constructor.get("polygons",None) is not None:
         grid = polyAgglomerate(constructor,cubes,convex)
     else:
         grid = trivialAgglomerate(constructor, cubes, **kwargs)
     return grid
+
+import weakref
+agglomerationStorage_ = weakref.WeakKeyDictionary()
+def removeAgglo_(agglo):
+    for key, value in agglomerationStorage_.items():
+        if value == agglo:
+            print("removing gv=",key,"value=",value,flush=True)
+            del agglomerationStorage_[key]
+            break
+def retrieveAgglo_(gv):
+    print("retrieve",gv,agglomerationStorage_.get(gv,None))
+    return agglomerationStorage_.get(gv,None)
+def insertAgglo_(gv, agglo):
+    print("insert",gv,agglo)
+    agglomerationStorage_[gv] = agglo

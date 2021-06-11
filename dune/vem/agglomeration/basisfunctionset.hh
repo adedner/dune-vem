@@ -53,8 +53,8 @@ namespace Dune
       struct Transformation
       {
         Transformation() {}
-        explicit Transformation ( const BoundingBoxType &bbox )
-        : bbox_(bbox)
+        explicit Transformation ( std::size_t agglomerate, std::shared_ptr<std::vector<BoundingBoxType>> bbox )
+        : agglomerate_(agglomerate), bbox_(std::move(bbox))
         {}
 
         JacobianRangeType operator() ( JacobianRangeType jacobian, bool transpose=false ) const
@@ -87,14 +87,17 @@ namespace Dune
 
         void applyScalar ( FieldVector< RangeFieldType, dimDomain > &jacobian, bool transpose=false ) const
         {
-          bbox_.gradientTransform(jacobian,transpose);
+          bbox().gradientTransform(jacobian,transpose);
         }
 
         void applyScalar ( FieldMatrix< RangeFieldType, dimDomain, dimDomain > &hessian, bool transpose=false ) const
         {
-          bbox_.hessianTransform(hessian,transpose);
+          bbox().hessianTransform(hessian,transpose);
         }
-        BoundingBoxType bbox_;
+
+        const BoundingBoxType& bbox() const { return (*bbox_)[agglomerate_]; }
+        std::size_t agglomerate_;
+        std::shared_ptr<std::vector<BoundingBoxType>> bbox_;
       };
 
     public:
@@ -102,17 +105,20 @@ namespace Dune
       : entity_(nullptr) , useOnb_(false)
       { }
 
-      BoundingBoxBasisFunctionSet ( const EntityType &entity, const BoundingBoxType &bbox,
+      BoundingBoxBasisFunctionSet ( const EntityType &entity, std::size_t agglomerate,
+                                    std::shared_ptr<std::vector<BoundingBoxType>> bbox,
                                     bool useOnb,
                                     ShapeFunctionSet shapeFunctionSet = ShapeFunctionSet() )
-        : entity_( &entity ), shapeFunctionSet_( std::move( shapeFunctionSet ) ), bbox_( std::move( bbox ) ),
-          transformation_(bbox_),
+        : entity_( &entity ), shapeFunctionSet_( std::move( shapeFunctionSet ) ),
+          transformation_(agglomerate, std::move(bbox)),
           vals_(shapeFunctionSet_.size()),
           jacs_(shapeFunctionSet_.size()),
           hess_(shapeFunctionSet_.size()),
           useOnb_(useOnb)
       {
       }
+
+      const BoundingBoxType& bbox() const { return transformation_.bbox(); }
 
       int order () const { return shapeFunctionSet_.order(); }
 
@@ -311,7 +317,7 @@ namespace Dune
       template< class Point >
       DomainType position ( const Point &x ) const
       {
-        return bbox_.transform( entity().geometry().global( Fem::coordinate( x ) ) );
+        return bbox().transform( entity().geometry().global( Fem::coordinate( x ) ) );
       }
       // make basis orthogonal
       // k = 0
@@ -329,8 +335,8 @@ namespace Dune
         for (std::size_t i=0;i<values.size();++i,++k)
         {
           for (std::size_t j=0;j<i;++j,++k)
-            values[i].axpy(-bbox_.r(k), values[j]);
-          values[i] /= bbox_.r(k);
+            values[i].axpy(-bbox().r(k), values[j]);
+          values[i] /= bbox().r(k);
         }
       }
       template< class Point>
@@ -367,14 +373,13 @@ namespace Dune
         {
           for (std::size_t j=0;j<i;++j,++k)
             for (std::size_t r=0;r<values[i].size();++r)
-              values[i][r].axpy(-bbox_.r(k), values[j][r]);
-          values[i] /= bbox_.r(k);
+              values[i][r].axpy(-bbox().r(k), values[j][r]);
+          values[i] /= bbox().r(k);
         }
       }
 
       const EntityType *entity_ = nullptr;
       ShapeFunctionSet shapeFunctionSet_;
-      BoundingBoxType bbox_;
       Transformation transformation_;
       mutable std::vector< RangeType > vals_;
       mutable std::vector< JacobianRangeType > jacs_;
@@ -384,7 +389,7 @@ namespace Dune
 
     template< class Agglomeration >
     inline static void onbBasis( const Agglomeration &agglomeration,
-        int maxPolOrder, std::vector< BoundingBox< typename Agglomeration::GridPartType > > &boundingBoxes )
+        int maxPolOrder, std::shared_ptr< std::vector< BoundingBox< typename Agglomeration::GridPartType > > > boundingBoxes )
     {
       typedef typename Agglomeration::GridPartType GridPart;
       typedef typename GridPart::template Codim< 0 >::EntityType ElementType;
@@ -408,9 +413,9 @@ namespace Dune
       const auto &gridPart = agglomeration.gridPart();
 
       // start off with R=I
-      for (std::size_t b=0;b<boundingBoxes.size();++b)
+      for (std::size_t b=0;b<boundingBoxes->size();++b)
       {
-        auto &bbox = boundingBoxes[b];
+        auto &bbox = (*boundingBoxes)[b];
         bbox.resizeR( shapeFunctionSet.size() );
         std::size_t k = 0;
         for (std::size_t i=0;i<shapeFunctionSet.size();++i,++k)
@@ -439,7 +444,7 @@ namespace Dune
       // start iteration over all polygons
       for( std::size_t agglomerate = 0; agglomerate < agglomeration.size(); ++agglomerate )
       {
-        auto &bbox = boundingBoxes[agglomerate];
+        auto &bbox = (*boundingBoxes)[agglomerate];
         const ElementType &element = gridPart.entity( entitySeeds[agglomerate][0] );
 
         // first collect all weights and basis function evaluation needed
@@ -454,7 +459,8 @@ namespace Dune
         {
           const ElementType &element = gridPart.entity( entitySeed );
           const auto geometry = element.geometry();
-          BBBasisFunctionSetType basisFunctionSet( element, bbox, false, shapeFunctionSet );
+          BBBasisFunctionSetType basisFunctionSet( element, agglomerate,
+            boundingBoxes, false, shapeFunctionSet );
           Quadrature0Type quadrature( element, 2*polOrder );
           for( std::size_t qp = 0; qp < nop; ++qp, ++e )
           {

@@ -36,8 +36,11 @@ namespace Dune
         : gridPart_( gridPart ),
           mapper_( static_cast< typename GridPartType::GridViewType >( gridPart ), mcmgElementLayout() ),
           indices_( mapper_.size() ),
-          size_( 0 )
+          size_( 0 ),
+          maxOrder_( 0 ),
+          counter_( 0 )
       {
+        std::cout << "Agglomeration::ctor: " << this << "\n";
         auto is = gridPart.indexSet();
         const auto &end = gridPart.template end<0>();
         for ( auto it = gridPart.template begin<0>(); it != end; ++it )
@@ -51,17 +54,33 @@ namespace Dune
 
         update();
       }
-      ~Agglomeration() {}
+      ~Agglomeration()
+      {
+        std::cout << "Agglomeration::dtor: " << this << "\n";
+      }
       Agglomeration(const Agglomeration&) = delete;
       Agglomeration &operator=( Agglomeration&) = delete;
 
+      std::size_t counter()
+      {
+        return counter_;
+      }
       void update()
       {
         boundingBoxes_ = Dune::Vem::boundingBoxes( *this );
+        assert(boundingBoxes()->size() == size());
+        std::cout << "Aggl::update "
+                  << counter_ << "," << size() << "," << this << "\n";
       }
       void onbBasis(int order)
       {
-        Dune::Vem::onbBasis(*this, order, boundingBoxes());
+        if (order > maxOrder_)
+        {
+          Dune::Vem::onbBasis(*this, order, boundingBoxes());
+          maxOrder_ = order;
+          std::cout << "Aggl::onbBasis p=" << order << ", "
+                    << counter_ << "," << size() << "," << this << "\n";
+        }
       }
 
       GridPart &gridPart () const { return gridPart_; }
@@ -72,38 +91,26 @@ namespace Dune
 
       const BoundingBox<GridPart>& boundingBox( std::size_t index ) const
       {
-        assert(index<boundingBoxes_.size());
-        return boundingBoxes_[index];
+        assert(index<boundingBoxes()->size());
+        return (*boundingBoxes())[index];
       }
       const BoundingBox<GridPart>& boundingBox( const ElementType &element ) const
       {
         return boundingBox( index( element ) );
       }
-      const std::vector< BoundingBox< GridPart > >& boundingBoxes() const
-      {
-        return boundingBoxes_;
-      }
-      std::vector< BoundingBox< GridPart > >& boundingBoxes()
+      std::shared_ptr< std::vector< BoundingBox< GridPart > > > boundingBoxes() const
       {
         return boundingBoxes_;
       }
 
     private:
-      template< class T >
-      static std::vector< std::size_t > convert ( const std::vector< T > &v )
-      {
-        std::vector< std::size_t > w;
-        w.reserve( v.size() );
-        for( const T &i : v )
-          w.emplace_back( i );
-        return w;
-      }
-
       GridPart &gridPart_;
       MultipleCodimMultipleGeomTypeMapper< typename GridPartType::GridViewType > mapper_;
       std::vector< std::size_t > indices_;
       std::size_t size_;
-      std::vector< BoundingBox< GridPart > > boundingBoxes_;
+      std::size_t maxOrder_;
+      std::size_t counter_;
+      std::shared_ptr< std::vector< BoundingBox< GridPart > > > boundingBoxes_;
     };
 
 

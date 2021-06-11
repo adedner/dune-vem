@@ -129,8 +129,10 @@ namespace Dune
         const auto &refElement = ReferenceElements< ctype, dimension >::general( element.type() );
 
         // use the bb set for this polygon for the inner testing space
-        const auto &bbox = indexSet_.boundingBox(element);
-        BoundingBoxBasisFunctionSet< GridPartType, InnerShapeFunctionSetType > innerShapeFunctionSet( element, bbox, useOnb_, innerBFS_ );
+        BoundingBoxBasisFunctionSet< GridPartType, InnerShapeFunctionSetType >
+          innerShapeFunctionSet( element, indexSet_.index(element),
+                                 indexSet_.agglomeration().boundingBoxes(),
+                                 useOnb_, innerBFS_ );
 
         // define the corresponding vertex,edge, and inner parts of the interpolation
         auto vertex = [&] (int poly,int i,int k,int numDofs)
@@ -151,7 +153,7 @@ namespace Dune
               }
             } );
         };
-        auto edge = [&] (int poly,auto intersection,int k,int numDofs)
+        auto edge = [&,this] (int poly,auto intersection,int k,int numDofs)
         { //!TS add nomral derivatives
           int kStart = k;
           // int edgeNumber = intersection.indexInInside();
@@ -258,7 +260,7 @@ namespace Dune
         auto vertex = [&] (int poly,int i,int k,int numDofs)
         { //!TS add derivatives at vertex (probably only normal component - is the mask then correct?)
           const auto &x = edgeGeo.local( refElement.position( i, dimension ) );
-          edgeShapeFunctionSet.evaluateEach( x, [ &localDofVectorMatrix, k, &entry ] ( std::size_t alpha, typename EdgeShapeFunctionSet::RangeType phi ) {
+          edgeShapeFunctionSet.evaluateEach( x, [ &localDofVectorMatrix, &entry ] ( std::size_t alpha, typename EdgeShapeFunctionSet::RangeType phi ) {
               assert( phi.dimension == 1 );
               assert( entry[0] < localDofVectorMatrix[0].size() );
               if (alpha < localDofVectorMatrix[0][ entry[0] ].size())
@@ -407,7 +409,10 @@ namespace Dune
 
         // use the bb set for this polygon for the inner testing space
         const auto &bbox = indexSet_.boundingBox(element);
-        BoundingBoxBasisFunctionSet< GridPartType, InnerShapeFunctionSetType > innerShapeFunctionSet( element, bbox, useOnb_, innerBFS_ );
+        BoundingBoxBasisFunctionSet< GridPartType, InnerShapeFunctionSetType >
+          innerShapeFunctionSet( element, indexSet_.index(element),
+                                 indexSet_.agglomeration().boundingBoxes(),
+                                 useOnb_, innerBFS_ );
 
         // define the vertex,edge, and inner parts of the interpolation
         auto vertex = [&] (int poly,auto i,int k,int numDofs)
