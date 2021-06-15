@@ -12,8 +12,7 @@
 // #include <pybind11/pybind11.h>
 
 #include <dune/common/fvector.hh>
-
-#include <dune/vem/agglomeration/agglomeration.hh>
+#include <dune/vem/misc/vector.hh>
 
 namespace Dune
 {
@@ -123,15 +122,17 @@ namespace Dune
       ReturnType rotation_;
       double volume_ = 0;
       Dune::FieldMatrix< typename GridPart::ctype, GridPart::dimensionworld, GridPart::dimensionworld > transform_;
-      std::vector<double> r_;
+      Std::vector<double> r_;
     };
 
     // agglomerateBoundingBoxes
     // ------------------------
 
-    template< class GridPart >
-    inline static std::vector< BoundingBox< GridPart > > boundingBoxes ( const Agglomeration< GridPart > &agglomeration )
+    template< class Agglomeration >
+    std::shared_ptr< Std::vector< BoundingBox< typename Agglomeration::GridPartType > > >
+    boundingBoxes ( const Agglomeration &agglomeration, bool rotate )
     {
+      typedef typename Agglomeration::GridPartType GridPart;
       typedef typename GridPart::template Codim< 0 >::GeometryType GeometryType;
 
       BoundingBox< GridPart > emptyBox;
@@ -141,7 +142,10 @@ namespace Dune
         emptyBox.first[ k ] = std::numeric_limits< typename GridPart::ctype >::max();
         emptyBox.second[ k ] = std::numeric_limits< typename GridPart::ctype >::min();
       }
-      std::vector< BoundingBox< GridPart > > boundingBoxes( agglomeration.size(), emptyBox );
+
+      std::shared_ptr< Std::vector< BoundingBox< GridPart > > > boundingBoxesPtr
+        = std::make_shared< Std::vector< BoundingBox< GridPart > > >( agglomeration.size(), emptyBox );
+      auto &boundingBoxes = *boundingBoxesPtr;
 
       std::vector<std::vector<std::vector<double>>> polygonPoints( agglomeration.size() );
       for( const auto element : elements( static_cast< typename GridPart::GridViewType >( agglomeration.gridPart() ), Partitions::interiorBorder ) )
@@ -167,13 +171,10 @@ namespace Dune
         BoundingBox< GridPart > &bbox = boundingBoxes[ i ];
         std::vector<std::vector<double>> &points = polygonPoints[ i ];
         auto pyBBox   = pybind11::module::import("dune.vem.bbox");
-        auto bboxobj  = pyBBox.attr("rotatedBBox")(points);
+        auto bboxobj  = pyBBox.attr("rotatedBBox")(points,rotate);
         bbox.set( bboxobj );
-        // std::cout << bbox.lower() << "   " << bbox.upper() << "     ";
-        // std::cout << bbox.xAxis() << "   " << bbox.yAxis() << "     ";
-        // std::cout << bbox.diameter() << std::endl;
       }
-      return boundingBoxes;
+      return boundingBoxesPtr;
     }
 
   } // namespace Vem

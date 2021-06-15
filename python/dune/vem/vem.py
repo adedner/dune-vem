@@ -9,7 +9,9 @@ from dune.generator import Constructor, Method
 import dune.common.checkconfiguration as checkconfiguration
 import dune
 
-def bbdgSpace(view, order=1, scalar=False, dimRange=None, field="double", storage="adaptive"):
+def bbdgSpace(view, order=1, scalar=False, dimRange=None, field="double",
+             rotatedBB=True,
+             storage="adaptive"):
     """create a discontinous galerkin space over an agglomerated grid
 
     Args:
@@ -57,26 +59,44 @@ def bbdgSpace(view, order=1, scalar=False, dimRange=None, field="double", storag
       gridPartName + ", " + str(order) + " >"
 
     constructor = Constructor(
-                   ['pybind11::object gridView',
-                    'const pybind11::function agglomerate'],
-                   ['auto agglo = new Dune::Vem::Agglomeration<' + gridPartName + '>',
-                    '         (Dune::FemPy::gridPart<' + viewType + '>(gridView), [agglomerate](const auto& e)',
-                    ' { return agglomerate(e).template cast<unsigned int>(); } );',
+                   ['pybind11::handle gridView',
+                    'const pybind11::object agglomerate',
+                    'bool rotatedBB'],
+                   ['typedef Dune::Vem::Agglomeration<' + gridPartName + '> AggloType;',
+                    'AggloType *agglo = nullptr;',
+                    '// check storage',
+                    'pybind11::function retrieve = pybind11::module::import("dune.vem.vem").attr("retrieveAgglo_");',
+                    'pybind11::function insert   = pybind11::module::import("dune.vem.vem").attr("insertAgglo_");',
+                    'pybind11::function remove   = pybind11::module::import("dune.vem.vem").attr("removeAgglo_");',
+                    'pybind11::handle aggloExists = retrieve(gridView);',
+                    'if (! pybind11::isinstance<pybind11::none>(aggloExists) ) {',
+                    '  agglo = static_cast<AggloType*>(aggloExists.cast<void*>());',
+                    '}',
+                    'else {',
+                    '  agglo = new AggloType(',
+                    '           Dune::FemPy::gridPart<' + viewType + '>(gridView),rotatedBB,',
+                    '      [agglomerate](const auto& idx)',
+                    '      { return agglomerate(idx).template cast<unsigned int>(); } );',
+                    '  insert(gridView,(void*)agglo);',
+                    '  pybind11::cpp_function aggloCleanup(',
+                    '        [agglo,remove](pybind11::handle weakref) {',
+                    '        remove((void*)agglo);',
+                    '        delete agglo;',
+                    '        weakref.dec_ref();',
+                    '    });',
+                    '  (void) pybind11::weakref(gridView, aggloCleanup).release();',
+                    '}',
                     'auto obj = new DuneType( *agglo );',
-                    'pybind11::cpp_function remove_agglo( [ agglo ] ( pybind11::handle weakref ) {',
-                    '  delete agglo;',
-                    '  weakref.dec_ref();',
-                    '} );',
-                    '// pybind11::handle nurse = pybind11::detail::get_object_handle( &obj, pybind11::detail::get_type_info( typeid( ' + typeName + ' ) ) );',
-                    '// assert(nurse);',
-                    'pybind11::weakref( agglomerate, remove_agglo ).release();',
                     'return obj;'],
-                   ['"gridView"_a', '"agglomerate"_a',
+                   ['"gridView"_a', '"agglomerate"_a', '"rotatedBB"_a',
                     'pybind11::keep_alive< 1, 2 >()'] )
+
+
     updateMethod = Method('update',
        '''[]( DuneType &self ) { self.update(); }''' )
 
-    spc = module(field, includes, typeName, constructor, updateMethod, scalar=scalar, storage=storage,ctorArgs=[view, agglomerate])
+    spc = module(field, includes, typeName, constructor, updateMethod, scalar=scalar, storage=storage,
+             ctorArgs=[view, agglomerate,rotatedBB])
     addStorage(spc, storage)
     return spc.as_ufl()
 
@@ -94,7 +114,8 @@ def bbdgScheme(model, space=None, penalty=1, solver=None, parameters={}):
 
 def vemSpace(view, order=1, testSpaces=None, scalar=False,
              dimRange=None, conforming=True, field="double",
-             storage="adaptive", basisChoice=2,
+             storage="adaptive",
+             basisChoice=2, rotatedBB=True,
              edgeInterpolation=False):
     """create a virtual element space over an agglomerated grid
 
@@ -154,30 +175,51 @@ def vemSpace(view, order=1, testSpaces=None, scalar=False,
     gridPartName = "Dune::FemPy::GridPart< " + view._typeName + " >"
     typeName = "Dune::Vem::AgglomerationVEMSpace< " +\
       "Dune::Fem::FunctionSpace< double, " + field + ", " + str(dimw) + ", " + str(dimRange) + " >, " +\
-      gridPartName + ", " + str(order) + " >"
-
+      gridPartName + " >"
     constructor = Constructor(
-                   ['pybind11::object gridView',
-                    'const pybind11::function agglomerate',
+                   ['pybind11::handle gridView',
+                    'const pybind11::object agglomerate',
+                    'unsigned int order',
                     'const std::array<std::vector<int>,'+str(view.dimension+1)+'> &testSpaces',
-                    'int basisChoice','bool edgeInterpolation'],
-                   ['auto agglo = std::make_unique<Dune::Vem::Agglomeration<' + gridPartName + '>>(',
-                    '         Dune::FemPy::gridPart<' + viewType + '>(gridView),',
-                    '    [agglomerate](const auto& idx)',
-                    '    { return agglomerate(idx).template cast<unsigned int>(); } ); ',
-                    'auto obj = new DuneType( std::move(agglo), testSpaces, basisChoice, edgeInterpolation );',
+                    'int basisChoice','bool edgeInterpolation','bool rotatedBB'],
+                   ['typedef Dune::Vem::Agglomeration<' + gridPartName + '> AggloType;',
+                    'AggloType *agglo = nullptr;',
+                    '// check storage',
+                    'pybind11::function retrieve = pybind11::module::import("dune.vem.vem").attr("retrieveAgglo_");',
+                    'pybind11::function insert   = pybind11::module::import("dune.vem.vem").attr("insertAgglo_");',
+                    'pybind11::function remove   = pybind11::module::import("dune.vem.vem").attr("removeAgglo_");',
+                    'pybind11::handle aggloExists = retrieve(gridView);',
+                    'if (! pybind11::isinstance<pybind11::none>(aggloExists) ) {',
+                    '  agglo = static_cast<AggloType*>(aggloExists.cast<void*>());',
+                    '}',
+                    'else {',
+                    '  agglo = new AggloType(',
+                    '           Dune::FemPy::gridPart<' + viewType + '>(gridView),rotatedBB,',
+                    '      [agglomerate](const auto& idx)',
+                    '      { return agglomerate(idx).template cast<unsigned int>(); } );',
+                    '  insert(gridView,(void*)agglo);',
+                    '  pybind11::cpp_function aggloCleanup(',
+                    '        [agglo,remove](pybind11::handle weakref) {',
+                    '        remove((void*)agglo);',
+                    '        delete agglo;',
+                    '        weakref.dec_ref();',
+                    '    });',
+                    '  (void) pybind11::weakref(gridView, aggloCleanup).release();',
+                    '}',
+                    'auto obj = new DuneType(*agglo, order, testSpaces, basisChoice, edgeInterpolation );',
                     'return obj;'],
-                   ['"gridView"_a', '"agglomerate"_a', '"testSpaces"_a',
-                    '"basisChoice"_a', '"edgeInterpolation"_a',
+                   ['"gridView"_a', '"agglomerate"_a',
+                    '"order"_a', '"testSpaces"_a',
+                    '"basisChoice"_a', '"edgeInterpolation"_a', '"rotatedBB"_a',
                     'pybind11::keep_alive< 1, 2 >()'] )
-    updateMethod = Method('update',
-       '''[]( DuneType &self ) { self.update(); }''' )
     diameterMethod = Method('diameters',
        '''[]( DuneType &self ) { return self.blockMapper().indexSet().diameters(); }''' )
+    updateMethod = Method('update',
+       '''[]( DuneType &self ) { self.update(); }''' )
 
     spc = module(field, includes, typeName, constructor, diameterMethod, updateMethod,
                 scalar=scalar, storage=storage,
-                ctorArgs=[view, agglomerate, testSpaces, basisChoice, edgeInterpolation])
+                ctorArgs=[view, agglomerate, order, testSpaces, basisChoice, edgeInterpolation, rotatedBB])
     addStorage(spc, storage)
     return spc.as_ufl()
 
@@ -541,10 +583,21 @@ def polyAgglomerate(constructor,cubes=False,convex=None):
     grid.hierarchicalGrid.agglomerate = agglomerate
     return grid
 
-
 def polyGrid(constructor,cubes=False, convex=None,**kwargs):
     if isinstance(constructor,dict) and constructor.get("polygons",None) is not None:
         grid = polyAgglomerate(constructor,cubes,convex)
     else:
         grid = trivialAgglomerate(constructor, cubes, **kwargs)
     return grid
+
+import weakref
+agglomerationStorage_ = weakref.WeakKeyDictionary()
+def removeAgglo_(agglo):
+    for key, value in agglomerationStorage_.items():
+        if value == agglo:
+            del agglomerationStorage_[key]
+            break
+def retrieveAgglo_(gv):
+    return agglomerationStorage_.get(gv,None)
+def insertAgglo_(gv, agglo):
+    agglomerationStorage_[gv] = agglo

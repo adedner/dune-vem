@@ -7,6 +7,7 @@
 #include <dune/vem/misc/pseudoinverse.hh>
 
 #include <assert.h>
+#include <dune/vem/misc/vector.hh>
 
 
 namespace Dune {
@@ -50,7 +51,7 @@ namespace Dune {
         };
 
         template<class FStruct>
-        struct VectorizedF<std::vector<FStruct>>
+        struct VectorizedF<Std::vector<FStruct>>
                 : public VectorizedF<FStruct> {
         };
 

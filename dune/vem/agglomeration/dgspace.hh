@@ -25,6 +25,7 @@
 #include <dune/vem/agglomeration/boundingbox.hh>
 #include <dune/vem/agglomeration/dgmapper.hh>
 #include <dune/vem/operator/mass.hh>
+#include <dune/vem/misc/vector.hh>
 
 namespace Dune
 {
@@ -149,31 +150,34 @@ namespace Dune
 
       enum { hasLocalInterpolate = false };
 
-      AgglomerationDGSpace ( const AgglomerationType &agglomeration )
+      AgglomerationDGSpace ( AgglomerationType &agglomeration )
         : BaseType( agglomeration.gridPart() ),
           blockMapper_( agglomeration ),
-          boundingBoxes_( boundingBoxes( agglomeration ) ),
-          // scalarShapeFunctionSet_( polOrder )
-          scalarShapeFunctionSet_( Dune::GeometryType(Dune::GeometryType::cube,GridPart::dimension), polOrder )
+          scalarShapeFunctionSet_( Dune::GeometryType(Dune::GeometryType::cube,GridPart::dimension), polOrder ),
+          counter_(0)
       {
-        onbBasis( agglomeration, scalarShapeFunctionSet_, boundingBoxes_ );
+        blockMapper().agglomeration().onbBasis(polOrder);
       }
       void update()
       {
-        boundingBoxes_ = boundingBoxes( agglomeration() );
-        onbBasis( agglomeration(), scalarShapeFunctionSet_, boundingBoxes_ );
+        ++counter_;
+        if (agglomeration().counter()<counter_)
+          blockMapper().agglomeration().update();
       }
 
+      const AgglomerationType &agglomeration() const { return blockMapper().agglomeration(); }
+      AgglomerationType &agglomeration() { return blockMapper().agglomeration(); }
       const BoundingBox< GridPart >& boundingBox( const EntityType &entity ) const
       {
-        return boundingBoxes_[ agglomeration().index( entity ) ];
+        return agglomeration().boundingBox(agglomeration().index(entity));
       }
 
       const BasisFunctionSetType basisFunctionSet ( const EntityType &entity ) const
       {
-        typename Traits::ShapeFunctionSetType shapeFunctionSet( &scalarShapeFunctionSet_ );
-        return BasisFunctionSetType( entity, boundingBoxes_[ agglomeration().index( entity ) ],
-                                     true, std::move( shapeFunctionSet ) );
+        const std::size_t agglomerate = agglomeration().index(entity);
+        typename Traits::ShapeFunctionSetType scalarShapeFunctionSet( &scalarShapeFunctionSet_ );
+        return BasisFunctionSetType(entity, agglomerate,
+                                    agglomeration().boundingBoxes(), true, std::move(scalarShapeFunctionSet));
       }
 
       BlockMapperType &blockMapper () const { return blockMapper_; }
@@ -189,14 +193,11 @@ namespace Dune
 
       static constexpr Fem::DFSpaceIdentifier type () noexcept { return Fem::GenericSpace_id; }
 
-      // implementation-defined methods
-
-      const AgglomerationType &agglomeration () const { return blockMapper_.agglomeration(); }
-
     private:
       mutable BlockMapperType blockMapper_;
-      std::vector< BoundingBox< GridPart > > boundingBoxes_;
+      Std::vector< BoundingBox< GridPart > > boundingBoxes_;
       typename Traits::ScalarShapeFunctionSetType scalarShapeFunctionSet_;
+      std::size_t counter_;
     };
 
     template <class DFSpace>

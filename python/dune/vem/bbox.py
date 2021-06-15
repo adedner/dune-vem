@@ -2,9 +2,9 @@ import numpy
 from dune.vem.qhull_2d import *
 from dune.vem.min_bounding_rect import *
 
-def rotatedBBox(points):
+def rotatedBBox(points,rotate):
     points = numpy.array(points)
-    if True: # rotated bbox
+    if rotate: # rotated bbox
         # Find convex hull
         hull_points = qhull2D(points)
         # Reverse order of points, to match output from other qhull implementations
