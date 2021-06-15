@@ -12,6 +12,7 @@
 #include <dune/grid/common/rangegenerators.hh>
 
 #include <dune/vem/agglomeration/agglomeration.hh>
+#include <dune/vem/misc/vector.hh>
 
 namespace Dune
 {
@@ -169,11 +170,11 @@ namespace Dune
       {
         return boundingBox( index( element ) );
       }
-      const std::vector< BoundingBox< GridPart > >& boundingBoxes() const
+      const Std::vector< BoundingBox< GridPart > >& boundingBoxes() const
       {
         return agglomeration().boundingBoxes();
       }
-      std::vector< BoundingBox< GridPart > >& boundingBoxes()
+      Std::vector< BoundingBox< GridPart > >& boundingBoxes()
       {
         return const_cast<AgglomerationType&>(agglomeration()).boundingBoxes();
       }
@@ -185,11 +186,11 @@ namespace Dune
 
       AgglomerationType &agglomeration_;
       AllocatorType allocator_;
-      std::vector< Agglomerate > agglomerates_;
+      Std::vector< Agglomerate > agglomerates_;
       std::array< std::size_t, dimension+1 > size_;
       std::array< std::size_t, dimension+1 > maxSubAgglomerates_;
       std::vector< std::vector< int > > globalIndex_;
-      std::vector< double > vertexDiameters_;
+      Std::vector< double > vertexDiameters_;
       double minDiameter_, maxDiameter_;
     };
 
@@ -419,6 +420,7 @@ namespace Dune
     template< class GridPart, class Allocator >
     inline void AgglomerationIndexSet< GridPart, Allocator >::update ()
     {
+      agglomeration().update();
       vertexDiameters_.resize( size(dimension), 0.);
       std::fill(vertexDiameters_.begin(), vertexDiameters_.end(), 0);
       std::vector<std::size_t> vertexCount( size(dimension), 0);

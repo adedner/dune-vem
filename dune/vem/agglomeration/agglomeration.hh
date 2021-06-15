@@ -11,6 +11,7 @@
 #include <dune/grid/common/mcmgmapper.hh>
 #include <dune/vem/agglomeration/boundingbox.hh>
 #include <dune/vem/agglomeration/basisfunctionset.hh>
+#include <dune/vem/misc/vector.hh>
 
 namespace Dune
 {
@@ -32,15 +33,15 @@ namespace Dune
       typedef typename GridPartType::template Codim< 0 >::EntityType ElementType;
 
       template <class Callback>
-      Agglomeration ( GridPartType &gridPart, const Callback callBack )
+      Agglomeration ( GridPartType &gridPart, bool rotate, const Callback callBack )
         : gridPart_( gridPart ),
+          rotate_(rotate),
           mapper_( static_cast< typename GridPartType::GridViewType >( gridPart ), mcmgElementLayout() ),
           indices_( mapper_.size() ),
           size_( 0 ),
           maxOrder_( 0 ),
           counter_( 0 )
       {
-        std::cout << "Agglomeration::ctor: " << this << "\n";
         auto is = gridPart.indexSet();
         const auto &end = gridPart.template end<0>();
         for ( auto it = gridPart.template begin<0>(); it != end; ++it )
@@ -56,7 +57,6 @@ namespace Dune
       }
       ~Agglomeration()
       {
-        std::cout << "Agglomeration::dtor: " << this << "\n";
       }
       Agglomeration(const Agglomeration&) = delete;
       Agglomeration &operator=( Agglomeration&) = delete;
@@ -67,10 +67,17 @@ namespace Dune
       }
       void update()
       {
-        boundingBoxes_ = Dune::Vem::boundingBoxes( *this );
+        // std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
+        boundingBoxes_ = Dune::Vem::boundingBoxes( *this, rotate_ );
+        if (maxOrder_>0)
+          Dune::Vem::onbBasis(*this, maxOrder_, boundingBoxes());
         assert(boundingBoxes()->size() == size());
-        std::cout << "Aggl::update "
-                  << counter_ << "," << size() << "," << this << "\n";
+        /*
+        auto end = std::chrono::system_clock::now();
+        auto diff = std::chrono::duration_cast < std::chrono::seconds > (end - start).count();
+        std::cout << "Total AgglUpdate = " << diff << " seconds for "
+                  << size() << " BBs " << std::endl;
+        */
       }
       void onbBasis(int order)
       {
@@ -78,8 +85,6 @@ namespace Dune
         {
           Dune::Vem::onbBasis(*this, order, boundingBoxes());
           maxOrder_ = order;
-          std::cout << "Aggl::onbBasis p=" << order << ", "
-                    << counter_ << "," << size() << "," << this << "\n";
         }
       }
 
@@ -98,19 +103,20 @@ namespace Dune
       {
         return boundingBox( index( element ) );
       }
-      std::shared_ptr< std::vector< BoundingBox< GridPart > > > boundingBoxes() const
+      std::shared_ptr< Std::vector< BoundingBox< GridPart > > > boundingBoxes() const
       {
         return boundingBoxes_;
       }
 
     private:
       GridPart &gridPart_;
+      bool rotate_;
       MultipleCodimMultipleGeomTypeMapper< typename GridPartType::GridViewType > mapper_;
-      std::vector< std::size_t > indices_;
+      Std::vector< std::size_t > indices_;
       std::size_t size_;
       std::size_t maxOrder_;
       std::size_t counter_;
-      std::shared_ptr< std::vector< BoundingBox< GridPart > > > boundingBoxes_;
+      std::shared_ptr< Std::vector< BoundingBox< GridPart > > > boundingBoxes_;
     };
 
 

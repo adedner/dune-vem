@@ -16,6 +16,7 @@
 #include <dune/vem/agglomeration/functor.hh>
 #include <dune/vem/agglomeration/boundingbox.hh>
 // #include <dune/vem/misc/highorderquadratures.hh>
+#include <dune/vem/misc/vector.hh>
 
 namespace Dune
 {
@@ -53,7 +54,7 @@ namespace Dune
       struct Transformation
       {
         Transformation() {}
-        explicit Transformation ( std::size_t agglomerate, std::shared_ptr<std::vector<BoundingBoxType>> bbox )
+        explicit Transformation ( std::size_t agglomerate, std::shared_ptr<Std::vector<BoundingBoxType>> bbox )
         : agglomerate_(agglomerate), bbox_(std::move(bbox))
         {}
 
@@ -97,7 +98,7 @@ namespace Dune
 
         const BoundingBoxType& bbox() const { return (*bbox_)[agglomerate_]; }
         std::size_t agglomerate_;
-        std::shared_ptr<std::vector<BoundingBoxType>> bbox_;
+        std::shared_ptr<Std::vector<BoundingBoxType>> bbox_;
       };
 
     public:
@@ -106,7 +107,7 @@ namespace Dune
       { }
 
       BoundingBoxBasisFunctionSet ( const EntityType &entity, std::size_t agglomerate,
-                                    std::shared_ptr<std::vector<BoundingBoxType>> bbox,
+                                    std::shared_ptr<Std::vector<BoundingBoxType>> bbox,
                                     bool useOnb,
                                     ShapeFunctionSet shapeFunctionSet = ShapeFunctionSet() )
         : entity_( &entity ), shapeFunctionSet_( std::move( shapeFunctionSet ) ),
@@ -340,7 +341,7 @@ namespace Dune
         }
       }
       template< class Point>
-      void sfEvaluateAll(const Point &x, std::vector<RangeType> &values) const
+      void sfEvaluateAll(const Point &x, Std::vector<RangeType> &values) const
       {
         assert(values.size()==size());
         Fem::AssignFunctor< decltype(values) > f( values );
@@ -350,7 +351,7 @@ namespace Dune
         onb( values );
       }
       template< class Point>
-      void sfEvaluateAll(const Point &x, std::vector<JacobianRangeType> &values) const
+      void sfEvaluateAll(const Point &x, Std::vector<JacobianRangeType> &values) const
       {
         assert(values.size()==size());
         Fem::AssignFunctor< decltype(values) > f( values );
@@ -360,7 +361,7 @@ namespace Dune
         onb( values );
       }
       template< class Point>
-      void sfEvaluateAll(const Point &x, std::vector<HessianRangeType> &values) const
+      void sfEvaluateAll(const Point &x, Std::vector<HessianRangeType> &values) const
       {
         assert(values.size()==size());
         Fem::AssignFunctor< decltype(values) > f( values );
@@ -381,15 +382,15 @@ namespace Dune
       const EntityType *entity_ = nullptr;
       ShapeFunctionSet shapeFunctionSet_;
       Transformation transformation_;
-      mutable std::vector< RangeType > vals_;
-      mutable std::vector< JacobianRangeType > jacs_;
-      mutable std::vector< HessianRangeType > hess_;
+      mutable Std::vector< RangeType > vals_;
+      mutable Std::vector< JacobianRangeType > jacs_;
+      mutable Std::vector< HessianRangeType > hess_;
       bool useOnb_ = false;
     };
 
     template< class Agglomeration >
     inline static void onbBasis( const Agglomeration &agglomeration,
-        int maxPolOrder, std::shared_ptr< std::vector< BoundingBox< typename Agglomeration::GridPartType > > > boundingBoxes )
+        int maxPolOrder, std::shared_ptr< Std::vector< BoundingBox< typename Agglomeration::GridPartType > > > boundingBoxes )
     {
       typedef typename Agglomeration::GridPartType GridPart;
       typedef typename GridPart::template Codim< 0 >::EntityType ElementType;
@@ -428,16 +429,16 @@ namespace Dune
 
       // return; // no ONB
 
-      std::vector<RangeType> val;
-      std::vector< std::vector<RangeType> > values;
-      std::vector<DomainFieldType> weights;
+      Std::vector<RangeType> val;
+      Std::vector< Std::vector<RangeType> > values;
+      Std::vector<DomainFieldType> weights;
       values.resize( shapeFunctionSet.size() );
       val.resize( shapeFunctionSet.size() );
 
       // compute onb factors
       // want to iterate over each polygon separately - so collect all
       // triangles from a given polygon
-      std::vector< std::vector< ElementSeedType > > entitySeeds( agglomeration.size() );
+      Std::vector< Std::vector< ElementSeedType > > entitySeeds( agglomeration.size() );
       for( const ElementType &element : elements( static_cast< typename GridPart::GridViewType >( gridPart ), Partitions::interiorBorder ) )
         entitySeeds[ agglomeration.index( element ) ].push_back( element.seed() );
 

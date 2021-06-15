@@ -9,6 +9,7 @@
 
 #include <dune/fem/function/common/discretefunction.hh>
 #include <dune/vem/space/interpolation.hh>
+#include <dune/vem/misc/vector.hh>
 
 namespace Dune
 {
@@ -46,7 +47,7 @@ namespace Dune
 
       typedef typename DiscreteFunction::GridPartType GridPartType;
       typedef typename GridPartType::template Codim< 0 >::EntitySeedType ElementSeedType;
-      std::vector< std::vector< ElementSeedType > > entitySeeds( agglomeration.size() );
+      Dune::Vem::Std::vector< Dune::Vem::Std::vector< ElementSeedType > > entitySeeds( agglomeration.size() );
       for( const auto &element : elements( static_cast< typename GridPartType::GridViewType >( v.gridPart() ), ps ) )
         entitySeeds[ agglomeration.index( element ) ].push_back( element.seed() );
 

@@ -1,5 +1,6 @@
 #include <dune/geometry/referenceelements.hh>
 #include <dune/fem/function/localfunction/bindable.hh>
+#include <dune/vem/misc/vector.hh>
 
 template <class GridPart, class Matrix, class SFS>
 struct Derivative : public Dune::Fem::BindableGridFunction< GridPart, Dune::Dim<2> >
@@ -56,7 +57,6 @@ struct PhiEdge : public Dune::Fem::BindableGridFunction< GridPart, Dune::Dim<1> 
   template <class Point>
   void evaluate(const Point &p, typename Base::RangeType &ret) const
   {
-    const int dimension = GridPart::dimension;
     const auto& entity = intersection_.inside();
     ret = typename Base::RangeType(0.);
     // test if evaluation point on edge

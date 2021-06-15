@@ -52,7 +52,7 @@ namespace Dune
 
       typedef SizeType GlobalKeyType;
 
-      explicit AgglomerationDGMapper ( const AgglomerationType &agglomeration )
+      explicit AgglomerationDGMapper ( AgglomerationType &agglomeration )
         : agglomeration_( agglomeration )
       {}
 
@@ -109,9 +109,10 @@ namespace Dune
       // implementation-defined methods
 
       const AgglomerationType &agglomeration () const { return agglomeration_; }
+      AgglomerationType &agglomeration () { return agglomeration_; }
 
     private:
-      const AgglomerationType &agglomeration_;
+      AgglomerationType &agglomeration_;
     };
 
   } // namespace Vem

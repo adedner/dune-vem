@@ -1,7 +1,7 @@
 import dune.vem
 
+import gc, sys, time
 from memory_profiler import profile
-import gc, sys
 from guppy import hpy
 
 from loadMatlabMeshes import loadMatlabMeshes
@@ -99,15 +99,18 @@ methods = lambda order:\
              dune.fem.space.dgonb, dune.fem.scheme.dg,  {}, {"penalty":diffCoeff}],
             ["vem-conforming",
              dune.vem.vemSpace,    dune.vem.vemScheme,
-                {"testSpaces":[0,order-2,order-2]},  # conforming vem space
+                {"testSpaces":[0,order-2,order-2],  # conforming vem space
+                 "basisChoice":3, "rotatedBB":False},
                 {"gradStabilization":diffCoeff, "massStabilization":massCoeff}],
             ["vem-nonconforming",
              dune.vem.vemSpace,    dune.vem.vemScheme,
-                 {"testSpaces":[-1,order-1,order-2]},  # non-conforming vem space
+                 {"testSpaces":[-1,order-1,order-2],  # non-conforming vem space
+                  "basisChoice":3, "rotatedBB":False},
                  {"gradStabilization":diffCoeff, "massStabilization":massCoeff}],
             ["bb-dg",
              dune.vem.bbdgSpace,   dune.vem.bbdgScheme, {}, {"penalty":diffCoeff}],
    ]
+
 
 # %% [markdown]
 # We now define a function to compute the solution and the $L^2,H^1$ error
@@ -118,7 +121,7 @@ parameters = {"newton.linear.tolerance": 1e-12,
               "newton.linear.preconditioning.method": "jacobi",
               "penalty": 10*4**2,  # for the dg schemes
               "newton.linear.verbose": False,
-              "newton.verbose": False
+              "newton.verbose": False,
               }
 # @profile(precision=8)
 def compute(grid, order, space, spaceArgs, schemeName,schemeArgs):
@@ -126,17 +129,14 @@ def compute(grid, order, space, spaceArgs, schemeName,schemeArgs):
     df = space.interpolate([0],name="solution")
     scheme = schemeName( [a==b, *dbc], space, solver="cg", **schemeArgs,
                          parameters=parameters )
-    print("Solving...",flush=True)
     info = scheme.solve(target=df)
-    print("...done",flush=True)
-    return 1,2,3
 
     # compute the error
     edf = exact-df
     err = [inner(edf,edf),
            inner(grad(edf),grad(edf))]
     errors = [ math.sqrt(e) for e in integrate(grid, err, order=8) ]
-
+    print("Solving:", info)
     return df, errors, info
 def eoc(oldE,E):
     return [math.log(olde/e)/math.log(2) for olde,e in zip(oldE,E)]
@@ -144,35 +144,63 @@ def eoc(oldE,E):
 # %% [markdown]
 # Finally we iterate over the requested methods and solve the problems
 
-@profile(precision=8)
+# @profile(precision=8)
 def linear():
-    mem = hpy()
+    # mem = hpy()
     # meshes = [2500,10000,40000]
-    meshes = [3] # [4,5,6]
-    orders = [1] # [4,3,2]
+    meshes = [3,4] # [1...6]
+    orders = [3,2]
     oldErr = []
     for nEl in meshes:
         print("==================================================",flush=True)
-        print(mem.heap(),flush=True)
+        # print(mem.heap(),flush=True)
         # polyGrid = dune.vem.polyGrid( dune.vem.voronoiCells([[-0.5,-0.5],[1,1]], nEl, lloyd=4) )
         polyGrid = dune.vem.polyGrid( loadMatlabMeshes("cvt",nEl), convex=True ) # importing my saved matlab meshes
-        polyGrid.plot()
         print("==================================================",flush=True)
         for j,order in enumerate(orders):
             if len(oldErr)>=j: oldErr += [len(methods(1))*[None]]
             for i,m in enumerate(methods(order)):
                 if not m[1] == dune.vem.vemSpace: continue
-                _,errors,info = compute(polyGrid,order, m[1],m[3], m[2],m[4])
-                gc.collect()
+                '''
+                space, spaceArgs, schemeName,schemeArgs = m[1],m[3],m[2],m[4]
+                print("--------------------------------------------------",flush=True)
+                space = space( polyGrid, order=order, dimRange=1, storage="istl", **spaceArgs)
+                print("--------------------------------------------------",flush=True)
+                solution = space.interpolate([0],name="solution")
+                scheme = schemeName( [a==b, *dbc], space, solver="cg", **schemeArgs,
+                                     parameters=parameters )
+                tic = time.perf_counter()
+                for n in range(5):
+                    space.update()
+                toc = time.perf_counter()
+                print(f"Update in {toc - tic:0.4f} seconds")
+                tic = time.perf_counter()
+                for n in range(5):
+                    solution.clear()
+                    info = scheme.solve(target=solution)
+                    print("Solver:",info,flush=True)
+                toc = time.perf_counter()
+                print(f"Solve in {toc - tic:0.4f} seconds")
+                tic = time.perf_counter()
+                for n in range(5):
+                    space.update()
+                    solution.clear()
+                    info = scheme.solve(target=solution)
+                    print("Solver:",info,flush=True)
+                toc = time.perf_counter()
+                print(f"Solve/Update in {toc - tic:0.4f} seconds")
                 continue
-                print(j,i,"Error method (",m[0],nEl,order,"):",
+                '''
+                _,errors,info = compute(polyGrid,order, m[1],m[3], m[2],m[4])
+                print(i,nEl,j,"Error method (",m[0],polyGrid.size,order,"):",
                       "L^2: ", errors[0], "H^1: ", errors[1],
                       info["linear_iterations"], flush=True)
                 if oldErr[j][i]:
                     print(j,i,"EOC method (",m[0],order,"):", eoc(oldErr[j][i],errors), flush=True)
                 oldErr[j][i] = errors
+                gc.collect()
     print("==================================================",flush=True)
-    print(mem.heap(),flush=True)
+    # print(mem.heap(),flush=True)
     print("==================================================",flush=True)
 
 # @profile(precision=8)
@@ -181,7 +209,8 @@ def nonlinear():
     oldErr = None
     for nEl in [50,200]:
         polyGrid = dune.vem.polyGrid( dune.vem.voronoiCells([[-0.5,-0.5],[1,1]], nEl, lloyd=200) )
-        space = dune.vem.vemSpace( polyGrid, order=order, dimRange=1, storage="istl", conforming=True )
+        space = dune.vem.vemSpace( polyGrid, order=order, dimRange=1, storage="istl", conforming=True,
+                                   basisChoice=3, rotatedBB=False )
         u = TrialFunction(space)
         v = TestFunction(space)
         x = SpatialCoordinate(space)
@@ -203,15 +232,28 @@ def nonlinear():
         oldErr = errors
 
 # @profile(precision=8)
+def bilapCompute(scheme,solution):
+    solution.clear()
+    # solution.interpolate(exact)
+    info = scheme.solve(target=solution)
+    # print("Solver:",info,flush=True)
+
+@profile(precision=8)
 def bilaplace():
-    order = 3
+    mem = hpy()
+    order = 2
     oldErr = None
     ncC1testSpaces = [ [0], [order-3,order-2], [order-4] ]
-    for nEl in [16000]:
+    for nEl in [6]:
+        #print("==================================================",flush=True)
+        #print(mem.heap(),flush=True)
+        #print("==================================================",flush=True)
         polyGrid = dune.vem.polyGrid( dune.vem.voronoiCells([[0,0],[1,1]], nEl, lloyd=2) )
-        print("setting up space",flush=True)
+        #print("setting up space",flush=True)
         space = dune.vem.vemSpace( polyGrid, order=order, dimRange=1, storage="istl",
-                                   testSpaces=ncC1testSpaces)
+                                   testSpaces=ncC1testSpaces,
+                                   # basisChoice=3, rotatedBB=False
+                                   )
 
         x = SpatialCoordinate(space)
         exact = as_vector( [sin(2*pi*x[0])**2*sin(2*pi*x[1])**2] )
@@ -226,30 +268,50 @@ def bilaplace():
         b = laplace(laplace(exact[0])) * v[0] * dx
         dbcs = [dune.ufl.DirichletBC(space, [0], i+1) for i in range(4)]
 
+        solution = discreteFunction(space, name="solution")
+
         scheme = dune.vem.vemScheme( [a==b, *dbcs], space, hessStabilization=1,
                                      solver="cg", parameters=parameters )
+        '''
+        tic = time.perf_counter()
+        for i in range(10):
+            space.update()
+        toc = time.perf_counter()
+        print(f"Space update in {toc - tic:0.4f} seconds",flush=True)
+        tic = time.perf_counter()
+        for i in range(10):
+            bilapCompute(scheme,solution)
+        toc = time.perf_counter()
+        print(f"Solve in {toc - tic:0.4f} seconds",flush=True)
+        '''
+        tic = time.perf_counter()
+        for i in range(10):
+            bilapCompute(scheme,solution)
+        toc = time.perf_counter()
+        #print(f"Computed in {toc - tic:0.4f} seconds",flush=True)
 
-        # solution = space.interpolate([0], name="solution") # issue here for C^1 spaces
-        solution = discreteFunction(space, name="solution")
-        info = scheme.solve(target=solution)
         edf = exact-solution
         errors = [ math.sqrt(e) for e in
                    integrate(polyGrid, [inner(edf,edf),
                                         inner(grad(edf),grad(edf)),
                                         inner(H(edf[0]),H(edf[0]))],
                                         order=8) ]
-        print("bi-laplace errors:", nEl, errors, flush=True)
-        if oldErr:
-            print("EOC bi-laplace:", eoc(oldErr,errors), flush=True)
+        #print("bi-laplace errors:", nEl, errors, flush=True)
+        #if oldErr:
+        #    print("EOC bi-laplace:", eoc(oldErr,errors), flush=True)
         oldErr = errors
+        gc.collect()
 
-for i in range(30):
+    print("==================================================",flush=True)
+    print(mem.heap(),flush=True)
+    print("==================================================",flush=True)
+
+for i in range(1):
     linear()
     gc.collect()
-sys.exit(0)
 for i in range(5):
     nonlinear()
     gc.collect()
-for i in range(5):
+for i in range(25):
     bilaplace()
     gc.collect()

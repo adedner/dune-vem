@@ -16,6 +16,7 @@
 #include <dune/fem/space/shapefunctionset/vectorial.hh>
 
 #include <dune/vem/agglomeration/functor.hh>
+#include <dune/vem/misc/vector.hh>
 
 namespace Dune
 {
@@ -55,11 +56,11 @@ namespace Dune
       const auto& valueProjection() const { return (*valueProjections_)[agglomerate_]; }
       const auto& jacobianProjection() const { return (*jacobianProjections_)[agglomerate_]; }
       const auto& hessianProjection() const { return (*hessianProjections_)[agglomerate_]; }
-      typedef std::vector< std::vector< DomainFieldType > > ValueProjection;
-      typedef std::vector< std::vector< DomainType > > JacobianProjection;
-      typedef std::vector< std::vector< HessianMatrixType > > HessianProjection;
+      typedef Std::vector< Std::vector< DomainFieldType > > ValueProjection;
+      typedef Std::vector< Std::vector< DomainType > > JacobianProjection;
+      typedef Std::vector< Std::vector< HessianMatrixType > > HessianProjection;
       template <class T>
-      using Vector = std::vector<T>;
+      using Vector = Std::vector<T>;
 
       VEMBasisFunctionSet () = default;
 
@@ -76,18 +77,7 @@ namespace Dune
           jacobianProjections_( jacobianProjections ),
           hessianProjections_( hessianProjections ),
           size_( valueProjection()[0].size() * dimRange)
-      {
-      /*
-        std::cout << "ValueProjection\n";
-        for (std::size_t i=0;i<valueProjection().size();++i)
-          for (std::size_t j=0;j<valueProjection()[i].size();++j)
-            std::cout << i << "," << j << "=" << valueProjection()[i][j] << "    ";
-        std::cout << "JacobianProjection\n";
-        for (std::size_t i=0;i<jacobianProjection().size();++i)
-          for (std::size_t j=0;j<jacobianProjection()[i].size();++j)
-            std::cout << i << "," << j << "=" << jacobianProjection()[i][j] << "    ";
-      */
-      }
+      {}
 
       int order () const { return shapeFunctionSet_.order(); }
 
@@ -112,10 +102,7 @@ namespace Dune
         value = RangeType( 0 );
         shapeFunctionSet_.evaluateEach( position( x ), [ this, &dofs, &value ] ( std::size_t alpha, RangeType phi_alpha ) {
             for( std::size_t j = 0; j < size(); ++j )
-            {
-              double v = valueProjection()[ alpha ][ j ];
               value.axpy( valueProjection()[ alpha ][ j ]*dofs[ j ], phi_alpha );
-            }
           } );
       }
 

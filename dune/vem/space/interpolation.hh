@@ -19,6 +19,7 @@
 #include <dune/vem/agglomeration/basisfunctionset.hh>
 // #include <dune/vem/agglomeration/shapefunctionset.hh>
 // #include <dune/vem/misc/highorderquadratures.hh>
+#include <dune/vem/misc/vector.hh>
 
 namespace Dune
 {
@@ -83,7 +84,7 @@ namespace Dune
       // 'active' on the given element, i.e., are attached to a given
       // subentity of this element. Needed for dirichlet boundary data for
       // example
-      void operator() ( const ElementType &element, std::vector<char> &mask) const
+      void operator() ( const ElementType &element, Std::vector<char> &mask) const
       {
         std::fill(mask.begin(),mask.end(),-1);
         auto vertex = [&] (int poly,auto i,int k,int numDofs)
@@ -97,7 +98,9 @@ namespace Dune
         };
         auto edge = [&] (int poly,auto i,int k,int numDofs)
         {
-          int kStart = k;
+#ifndef NDEBUG
+          auto kStart = k;
+#endif
           for (std::size_t alpha=0;alpha<edgeBFS_.size();++alpha)
           {
             if (alpha < indexSet_.template order2size<1>(0))
@@ -231,8 +234,8 @@ namespace Dune
       //!TS ii) add an int normDerivOrder parameter and fill the matrix only for that order?
       template< class EdgeShapeFunctionSet >
       void operator() (const IntersectionType &intersection,
-                       const EdgeShapeFunctionSet &edgeShapeFunctionSet, std::vector < Dune::DynamicMatrix<double> > &localDofVectorMatrix,
-                       std::vector<std::vector<unsigned int>> &mask) const
+                       const EdgeShapeFunctionSet &edgeShapeFunctionSet, Std::vector < Dune::DynamicMatrix<double> > &localDofVectorMatrix,
+                       Std::vector<Std::vector<unsigned int>> &mask) const
       {
         const int dimension = AgglomerationIndexSet::dimension;
         for (std::size_t i=0;i<mask.size();++i)
@@ -252,7 +255,7 @@ namespace Dune
           }
 
         /**/
-        std::vector<std::size_t> entry(localDofVectorMatrix.size(), 0);
+        Std::vector<std::size_t> entry(localDofVectorMatrix.size(), 0);
 
         // define the three relevant part of the interpolation, i.e.,
         // vertices,edges - no inner needed since only doing interpolation
@@ -431,7 +434,6 @@ namespace Dune
         auto edge = [&] (int poly,auto intersection,int k,int numDofs)
         { //!TS edge derivatives
           int kStart = k;
-          int edgeNumber = intersection.indexInInside();
           auto normal = intersection.centerUnitOuterNormal();
           if (intersection.neighbor()) // we need to check the orientation of the normal
             if (indexSet_.index(intersection.inside()) > indexSet_.index(intersection.outside()))
@@ -521,7 +523,7 @@ namespace Dune
       template< class Vertex, class Edge>
       void applyOnIntersection( const IntersectionType &intersection,
                                 const Vertex &vertex, const Edge &edge,
-                                std::vector<std::vector<unsigned int>> &mask) const
+                                Std::vector<Std::vector<unsigned int>> &mask) const
       {
         const int dimension = AgglomerationIndexSet::dimension;
         const ElementType &element = intersection.inside();

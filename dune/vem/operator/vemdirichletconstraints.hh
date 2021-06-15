@@ -4,6 +4,7 @@
 #include <dune/fem/function/common/scalarproducts.hh>
 #include <dune/fem/schemes/dirichletconstraints.hh>
 #include <dune/vem/space/interpolation.hh>
+#include <dune/vem/misc/vector.hh>
 
 namespace Dune {
 
@@ -125,7 +126,7 @@ namespace Dune {
       std::vector<std::size_t> globalBlockDofs(localBlocks);
       // obtain all DofBlocks for this element
       space_.blockMapper().map( entity, globalBlockDofs );
-      std::vector< char > mask( localBlocks );
+      Vem::Std::vector< char > mask( localBlocks );
       space_.interpolation()( entity, mask );
 
       // counter for all local dofs (i.e. localBlockDof * localBlockSize + ... )
@@ -164,7 +165,7 @@ namespace Dune {
       std::vector< std::size_t > globalBlockDofs( localBlocks );
       space_.blockMapper().map( entity, globalBlockDofs );
       std::vector< double > valuesModel( localBlocks*localBlockSize );
-      std::vector< char > mask( localBlocks );
+      Vem::Std::vector< char > mask( localBlocks );
       space_.interpolation()( entity, mask );
 
       int localDof = 0;
@@ -204,7 +205,7 @@ namespace Dune {
 
       std::vector<double> values( localBlocks*localBlockSize );
       std::vector<double> valuesModel( localBlocks*localBlockSize );
-      std::vector< char > mask( localBlocks );
+      Vem::Std::vector< char > mask( localBlocks );
       assert( uLocal.size() == values.size() );
       for (unsigned int i=0;i<uLocal.size();++i)
         values[i] = uLocal[i];

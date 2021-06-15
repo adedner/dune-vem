@@ -14,6 +14,7 @@
 #include <dune/vem/agglomeration/agglomeration.hh>
 #include <dune/vem/agglomeration/boundingbox.hh>
 #include <dune/vem/agglomeration/indexset.hh>
+#include <dune/vem/misc/vector.hh>
 
 namespace Dune
 {
@@ -69,28 +70,28 @@ namespace Dune
                  std::make_pair( dimension-2, iSize ) };
       }
 
-      std::vector<int> orders()
+      Std::vector<int> orders()
       {
-          std::vector<int> ret(3,0);
+          Std::vector<int> ret(3,0);
           ret[0] += testSpaces_[2][0];
           ret[1] += std::min( {testSpaces_[2][0] + 1, edgeDegrees()[0]} );
           ret[2] += std::min( {testSpaces_[2][0] + 2, edgeDegrees()[0]+1, edgeDegrees()[1]} );
           return ret;
       }
 
-      const std::vector<int> maxDegreePerCodim() const
+      const Std::vector<int> maxDegreePerCodim() const
       {
-          std::vector<int> ret(3);
+          Std::vector<int> ret(3);
             for ( int k = 0; k < ret.size(); k++){
               ret[k] = *std::max_element( testSpaces_[k].begin(), testSpaces_[k].end() );
             }
            return ret;
       }
 
-      std::vector<int> edgeDegrees() const
+      Std::vector<int> edgeDegrees() const
       {
         assert( testSpaces_[2].size()<2 );
-        std::vector<int> degrees(2, -1);
+        Std::vector<int> degrees(2, -1);
         for (std::size_t i=0;i<testSpaces_[0].size();++i)
           degrees[i] += 2*(testSpaces_[0][i]+1);
         if (testSpaces_[0].size()>1 && testSpaces_[0][1]>-1) // add tangential derivatives
