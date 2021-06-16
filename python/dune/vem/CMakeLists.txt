@@ -1,4 +1,4 @@
-add_python_targets(fem
+add_python_targets(vem
   __init__
   vem
   voronoi

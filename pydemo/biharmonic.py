@@ -14,8 +14,8 @@ from scipy.sparse.linalg import spsolve
 from ufl import *
 import dune.ufl
 
-maxLevel     = 5
-order        = 5
+maxLevel     = 4
+order        = 4
 epsilon      = 1
 laplaceCoeff = 1
 mu           = 0
@@ -123,16 +123,17 @@ def compute(grid, space, schemeName):
 # figPos = 100*len(methods)+10*maxLevel+1
 results = []
 for level in range(maxLevel):
-    constructor = cartesianDomain([0,0],[1,1],[4*2**level,4*2**level])
-    polyGrid = create.grid("agglomerate", constructor, cubes=False )
-    # constructor = cartesianDomain([0,0],[1,1],[4,4])
-    # polyGrid = create.grid("agglomerate", voronoiCells(constructor,16*2**level*2**level,"voronoiseeds",load=True,show=False,lloyd=5) )
+    # constructor = cartesianDomain([0,0],[1,1],[4*2**level,4*2**level])
+    # polyGrid = create.grid("agglomerate", constructor, cubes=False )
+    constructor = cartesianDomain([0,0],[1,1],[4,4])
+    polyGrid = create.grid("agglomerate", voronoiCells(constructor,16*2**level*2**level,"voronoiseeds",
+               load=True,show=False,lloyd=5), convex=True )
     res = []
     for i,m in enumerate(methods):
         space = create.space(m[0], polyGrid, dimRange=1, storage="fem", **m[2])
         dfs,errors,info = compute(polyGrid, space, m[1])
         print("[",level,"]","method:(",m[0],m[2],")",
-              "Size: ",space.size, polyGrid.size(0), "L^2: ", errors[0], "H^1: ", errors[1],
+              "Sizes (polys,simplex,dofs): ",polyGrid.hierarchicalGrid.agglomerate.size, polyGrid.size(0), space.size, "L^2: ", errors[0], "H^1: ", errors[1],
               "H^2: ", errors[2],
               info["linear_iterations"], flush=True)
         res += [ [polyGrid.hierarchicalGrid.agglomerate.size,space.size,errors[0],errors[1],errors[2]] ]

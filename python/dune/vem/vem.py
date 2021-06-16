@@ -502,11 +502,12 @@ def yaspGrid(constructor, dimgrid=None, coordinates="equidistant", ctype="double
 
 #################################################################
 class TrivialAgglomerate:
-    def __init__(self,constructor, cubes=False, **kwargs):
+    def __init__(self,grid,cubes):
         if cubes:
             self.minEdgeNumber = 4
         else:
             self.minEdgeNumber = 3
+        self.size = grid.size(0)
     def __call__(self, idx):
         return idx
 def trivialAgglomerate(constructor, cubes=False, **kwargs):
@@ -514,7 +515,7 @@ def trivialAgglomerate(constructor, cubes=False, **kwargs):
         grid = aluCubeGrid(constructor, **kwargs)
     else:
         grid = aluSimplexGrid(constructor, **kwargs)
-    agglomerate = TrivialAgglomerate(constructor, cubes, **kwargs)
+    agglomerate = TrivialAgglomerate(grid, cubes)
     grid.hierarchicalGrid.agglomerate = agglomerate
     return grid
 
@@ -530,8 +531,12 @@ class PolyAgglomerate:
     def __init__(self,grid,index):
         indexSet = grid.indexSet
         self.polys = numpy.zeros(grid.size(0),int)
+        self.size = 0
         for e in grid.elements:
-            self.polys[indexSet.index(e)] = index[PolyAgglomerate.roundBary(e.geometry.center)]
+            idx = index[PolyAgglomerate.roundBary(e.geometry.center)]
+            self.polys[indexSet.index(e)] = idx
+            self.size = max(self.size,idx+1)
+
     def __call__(self,idx):
         return self.polys[idx]
     def roundBary(a):
