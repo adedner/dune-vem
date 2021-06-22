@@ -9,6 +9,7 @@
 
 #include <dune/geometry/referenceelements.hh>
 
+#include <dune/fem/space/shapefunctionset/orthonormal.hh>
 #include <dune/fem/quadrature/quadrature.hh>
 #include <dune/fem/space/basisfunctionset/functor.hh>
 #include <dune/fem/space/shapefunctionset/vectorial.hh>

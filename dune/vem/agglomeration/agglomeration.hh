@@ -72,6 +72,7 @@ namespace Dune
         if (maxOrder_>0)
           Dune::Vem::onbBasis(*this, maxOrder_, boundingBoxes());
         assert(boundingBoxes()->size() == size());
+        ++counter_;
         /*
         auto end = std::chrono::system_clock::now();
         auto diff = std::chrono::duration_cast < std::chrono::seconds > (end - start).count();

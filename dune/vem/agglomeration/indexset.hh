@@ -192,6 +192,7 @@ namespace Dune
       std::vector< std::vector< int > > globalIndex_;
       Std::vector< double > vertexDiameters_;
       double minDiameter_, maxDiameter_;
+      std::size_t counter_;
     };
 
 
@@ -281,6 +282,7 @@ namespace Dune
     inline AgglomerationIndexSet< GridPart, Allocator >::AgglomerationIndexSet ( AgglomerationType &agglomeration, AllocatorType allocator )
       : agglomeration_( agglomeration )
       , allocator_( std::move( allocator ) )
+      , counter_(0)
     {
       const typename GridPartType::IndexSetType& indexSet = agglomeration_.gridPart().indexSet();
       std::vector< std::vector< typename GridPartType::IndexSetType::IndexType > > subAgglomerates( GlobalGeometryTypeIndex::size( dimension-1 ) );
@@ -420,7 +422,9 @@ namespace Dune
     template< class GridPart, class Allocator >
     inline void AgglomerationIndexSet< GridPart, Allocator >::update ()
     {
-      agglomeration().update();
+      ++counter_;
+      if (agglomeration_.counter() < counter_)
+        agglomeration_.update();
       vertexDiameters_.resize( size(dimension), 0.);
       std::fill(vertexDiameters_.begin(), vertexDiameters_.end(), 0);
       std::vector<std::size_t> vertexCount( size(dimension), 0);
