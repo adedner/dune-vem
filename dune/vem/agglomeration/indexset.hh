@@ -292,11 +292,11 @@ namespace Dune
       // insert the index of each subentity belonging to more than one agglomerate into the
       // subAgglomerates vector for the corresponding geometry type
 
-      for( const auto element : elements( static_cast< typename GridPart::GridViewType >( agglomeration_.gridPart() ), Partitions::interiorBorder ) )
+      for( const auto element : elements( agglomeration_.gridPart(), Partitions::interiorBorder ) )
       {
         const std::size_t agIndex = index( element );
         const auto &refElement = ReferenceElements< typename GridPart::ctype, dimension >::general( element.type() );
-        for( const auto intersection : intersections( static_cast< typename GridPart::GridViewType >( agglomeration_.gridPart() ), element ) )
+        for( const auto intersection : intersections( agglomeration_.gridPart(), element ) )
         {
           assert( intersection.conforming() );
           if( !intersection.neighbor() || ( index( intersection.outside() ) != agIndex ) )
@@ -348,12 +348,11 @@ namespace Dune
       size_[ dimension ] = agglomeration_.size();
       std::vector< std::array< std::vector< std::size_t >, dimension > > connectivity( size_[ dimension ] );
 
-      for( const auto element : elements( static_cast< typename GridPart::GridViewType >( agglomeration_.gridPart() ), Partitions::interiorBorder ) )
+      for( const auto element : elements( agglomeration_.gridPart(), Partitions::interiorBorder ) )
       {
         const std::size_t agIndex = agglomeration_.index( element );
         const auto &refElement = ReferenceElements< typename GridPart::ctype, dimension >::general( element.type() );
-        //for( const auto intersection : intersections( agglomeration_.gridPart(), element ) )
-        for( const auto intersection : intersections( static_cast< typename GridPart::GridViewType >( agglomeration_.gridPart() ), element ))
+        for( const auto intersection : intersections( agglomeration_.gridPart(), element ) )
         {
           assert( intersection.conforming() );
           if( !intersection.neighbor() || ( agglomeration_.index( intersection.outside() ) != agIndex ) )
@@ -399,7 +398,7 @@ namespace Dune
           globalIndex_[ GlobalGeometryTypeIndex::index( type ) ].resize( indexSet.size( type ), -1 );
       }
 
-      for( const auto element : elements( static_cast< typename GridPart::GridViewType >( agglomeration_.gridPart() ), Partitions::interiorBorder ) )
+      for( const auto element : elements( agglomeration_.gridPart(), Partitions::interiorBorder ) )
       {
         const auto &refElement = ReferenceElements< typename GridPart::ctype, dimension >::general( element.type() );
 
@@ -428,7 +427,7 @@ namespace Dune
       vertexDiameters_.resize( size(dimension), 0.);
       std::fill(vertexDiameters_.begin(), vertexDiameters_.end(), 0);
       std::vector<std::size_t> vertexCount( size(dimension), 0);
-      for( const auto element : elements( static_cast< typename GridPart::GridViewType >( agglomeration_.gridPart() ), Partitions::interiorBorder ) )
+      for( const auto element : elements( agglomeration_.gridPart(), Partitions::interiorBorder ) )
       {
         auto &localAgg = agglomerate( element );
         for( std::size_t k = 0; k < localAgg.size( 0 ); ++k )

@@ -36,7 +36,7 @@ namespace Dune
       Agglomeration ( GridPartType &gridPart, bool rotate, const Callback callBack )
         : gridPart_( gridPart ),
           rotate_(rotate),
-          mapper_( static_cast< typename GridPartType::GridViewType >( gridPart ), mcmgElementLayout() ),
+          mapper_( gridPart.gridView(), mcmgElementLayout() ),
           indices_( mapper_.size() ),
           size_( 0 ),
           maxOrder_( 0 ),

@@ -148,7 +148,7 @@ namespace Dune
       auto &boundingBoxes = *boundingBoxesPtr;
 
       std::vector<std::vector<std::vector<double>>> polygonPoints( agglomeration.size() );
-      for( const auto element : elements( static_cast< typename GridPart::GridViewType >( agglomeration.gridPart() ), Partitions::interiorBorder ) )
+      for( const auto element : elements( agglomeration.gridPart(), Partitions::interiorBorder ) )
       {
         BoundingBox< GridPart > &bbox = boundingBoxes[ agglomeration.index( element ) ];
         std::vector<std::vector<double>> &points = polygonPoints[ agglomeration.index( element) ];

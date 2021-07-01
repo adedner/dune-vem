@@ -48,7 +48,7 @@ namespace Dune
       typedef typename DiscreteFunction::GridPartType GridPartType;
       typedef typename GridPartType::template Codim< 0 >::EntitySeedType ElementSeedType;
       Dune::Vem::Std::vector< Dune::Vem::Std::vector< ElementSeedType > > entitySeeds( agglomeration.size() );
-      for( const auto &element : elements( static_cast< typename GridPartType::GridViewType >( v.gridPart() ), ps ) )
+      for( const auto &element : elements( v.gridPart(), ps ) )
         entitySeeds[ agglomeration.index( element ) ].push_back( element.seed() );
 
       const auto& interpolation = v.space().interpolation();

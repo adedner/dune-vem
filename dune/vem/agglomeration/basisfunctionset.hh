@@ -440,7 +440,7 @@ namespace Dune
       // want to iterate over each polygon separately - so collect all
       // triangles from a given polygon
       Std::vector< Std::vector< ElementSeedType > > entitySeeds( agglomeration.size() );
-      for( const ElementType &element : elements( static_cast< typename GridPart::GridViewType >( gridPart ), Partitions::interiorBorder ) )
+      for( const ElementType &element : elements( gridPart, Partitions::interiorBorder ) )
         entitySeeds[ agglomeration.index( element ) ].push_back( element.seed() );
 
       // start iteration over all polygons

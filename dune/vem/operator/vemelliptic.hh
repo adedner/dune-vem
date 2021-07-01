@@ -188,9 +188,7 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model>
 
   // iterate over grid
   const GridPartType &gridPart = w.gridPart();
-  for (const auto &entity : Dune::elements(
-        static_cast<typename GridPartType::GridViewType>(gridPart),
-        Dune::Partitions::interiorBorder))
+  for (const auto &entity : Dune::elements( gridPart, Dune::Partitions::interiorBorder ) )
   {
     model().init(entity);
     // get elements geometry
@@ -207,8 +205,7 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model>
     const std::size_t agglomerate = dfSpace.agglomeration().index( entity);
     const auto &bbox = agIndexSet.boundingBox( agglomerate );
 
-    for (const auto &intersection : Dune::intersections(
-         static_cast<typename GridPartType::GridViewType>(gridPart), entity))
+    for (const auto &intersection : Dune::intersections( gridPart, entity ))
     {
       if( !intersection.boundary() && (dfSpace.agglomeration().index( intersection.outside() ) == agglomerate) )
         continue;
@@ -241,9 +238,8 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model>
 
   // assemble the stablisation matrix
   std::vector<bool> stabilization(dfSpace.agglomeration().size(), false);
-  for (const auto &entity : Dune::elements(
-        static_cast<typename GridPartType::GridViewType>(gridPart),
-        Dune::Partitions::interiorBorder)) {
+  for (const auto &entity : Dune::elements( gridPart, Dune::Partitions::interiorBorder))
+  {
     RangeLocalFunctionType wLocal = w.localFunction(entity);
     const DomainLocalFunctionType uLocal = u.localFunction(entity);
     const std::size_t agglomerate = dfSpace.agglomeration().index( entity);
@@ -304,9 +300,8 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
 
   // std::cout << "   in assembly: start element loop time=  " << timer.elapsed() << std::endl;
 
-  for (const auto &entity : Dune::elements(
-        static_cast<typename GridPartType::GridViewType>(gridPart),
-        Dune::Partitions::interiorBorder)) {
+  for (const auto &entity : Dune::elements(gridPart, Dune::Partitions::interiorBorder))
+  {
     const GeometryType &geometry = entity.geometry();
     model().init(entity);
     const DomainLocalFunctionType uLocal = u.localFunction(entity);
@@ -320,8 +315,7 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
     // For Stabilisation..
     auto& refElement = Dune::ReferenceElements<double, 2>::general( entity.type());
 
-    for (const auto &intersection : Dune::intersections(
-          static_cast<typename GridPartType::GridViewType>(gridPart), entity))
+    for (const auto &intersection : Dune::intersections(gridPart, entity))
     {
       if( !intersection.boundary() && (agglomeration.index( intersection.outside() ) == agglomerate) )
         continue;

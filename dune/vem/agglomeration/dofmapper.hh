@@ -289,7 +289,7 @@ namespace Dune
         const auto &idSet = agglomeration().gridPart().grid().globalIdSet();
 
         edgeTwist_.resize( indexSet().size( dimension-1 ) );
-        for( const auto element : elements( static_cast< typename GridPart::GridViewType >( agglomeration().gridPart() ), Partitions::interiorBorder ) )
+        for( const auto element : elements( agglomeration().gridPart(), Partitions::interiorBorder ) )
         {
           const auto &refElement = ReferenceElements< typename GridPart::ctype, dimension >::general( element.type() );
 

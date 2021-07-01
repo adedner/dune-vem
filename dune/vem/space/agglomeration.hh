@@ -234,7 +234,7 @@ namespace Dune {
               stabilizations().resize(agglomeration().size());
 
               Std::vector<Std::vector<ElementSeedType> > entitySeeds(agglomeration().size());
-              for (const ElementType &element : elements(static_cast< typename GridPart::GridViewType >( gridPart()), Partitions::interiorBorder))
+              for (const ElementType &element : elements(gridPart(), Partitions::interiorBorder))
                 entitySeeds[agglomeration().index(element)].push_back(element.seed());
 
               if (first) // use single thread at start to guarantee quadratures build
@@ -579,7 +579,7 @@ namespace Dune {
               auto vemBasisFunction = scalarBasisFunctionSet(element);
 
               // compute the boundary terms for the gradient projection
-              for (const auto &intersection : intersections(static_cast< typename GridPart::GridViewType >( gridPart()), element))
+              for (const auto &intersection : intersections(gridPart(), element))
               {
                 // ignore edges inside the given polygon
                 if (!intersection.boundary() && (agglomeration().index(intersection.outside()) == agglomerate))
@@ -959,8 +959,7 @@ namespace Dune {
               // compute the boundary terms for the gradient projection
               if (agIndexSet_.edgeSize(1) == 0)
               {
-                for (const auto &intersection : intersections(
-                        static_cast< typename GridPart::GridViewType >( gridPart()), element))
+                for (const auto &intersection : intersections(gridPart(), element))
                 {
                   // ignore edges inside the given polygon
                   if (!intersection.boundary() && (agglomeration().index(intersection.outside()) == agglomerate))
