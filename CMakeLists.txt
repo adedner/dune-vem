@@ -17,7 +17,6 @@ include(DuneMacros)
 # start a dune project with information from dune.module
 dune_project()
 
-add_subdirectory("src")
 add_subdirectory("dune")
 add_subdirectory("cmake/modules")
 add_subdirectory("lib")
