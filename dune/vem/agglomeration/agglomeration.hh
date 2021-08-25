@@ -42,7 +42,7 @@ namespace Dune
           maxOrder_( 0 ),
           counter_( 0 )
       {
-        auto is = gridPart.indexSet();
+        const auto &is = gridPart.indexSet();
         const auto &end = gridPart.template end<0>();
         for ( auto it = gridPart.template begin<0>(); it != end; ++it )
         {

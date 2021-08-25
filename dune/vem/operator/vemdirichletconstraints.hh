@@ -72,6 +72,7 @@ namespace Dune {
       return false; // can't be reached
     }
 
+#if 0
     template < class DiscreteFunctionType >
     void operator ()( const DiscreteFunctionType& u, DiscreteFunctionType& w ) const
     {
@@ -81,6 +82,13 @@ namespace Dune {
     void operator ()( const typename DiscreteFunctionType::RangeType& value, DiscreteFunctionType& w ) const
     {
       BaseType::operator()(value,w);
+    }
+#endif
+
+    template < class DiscreteFunctionType >
+    void operator ()( const typename DiscreteFunctionType::RangeType& value, DiscreteFunctionType& w ) const
+    {
+      this->operator()(w);
     }
     template < class DiscreteFunctionType >
     void operator ()( DiscreteFunctionType& w ) const
@@ -94,8 +102,8 @@ namespace Dune {
     void operator ()( const DiscreteFunctionType &u,
                       DiscreteFunctionType& w, Operation op) const
     {
-      if (op == Operation::set)
-        this->operator()(u,w);
+      // if (op == Operation::set)
+      //   this->operator()(u,w);
 
       BaseType::updateDirichletDofs();
       if( BaseType::hasDirichletDofs_ )

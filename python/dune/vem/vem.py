@@ -279,7 +279,7 @@ def vemModel(view, equation, space,
 
 def vemScheme(model, space=None, solver=None, parameters={},
               hessStabilization=None, gradStabilization=None, massStabilization=None,
-              boundary="full"):
+              boundary="default"):
     """create a scheme for solving second order pdes with the virtual element method
 
     Args:
@@ -291,7 +291,7 @@ def vemScheme(model, space=None, solver=None, parameters={},
     from dune.fem.scheme import module
     from dune.fem.scheme import femschemeModule
 
-    assert boundary=="full" or boundary=="value" or boundary=="derivative" or boundary is None
+    assert boundary == "default" or boundary=="full" or boundary=="value" or boundary=="derivative" or boundary is None
 
     modelParam = None
     if isinstance(model, (list, tuple)):
@@ -323,6 +323,7 @@ def vemScheme(model, space=None, solver=None, parameters={},
                              ",".join([linOp,model]) + ">"
 
     if model.hasDirichletBoundary:
+        if boundary == "default": boundary = "full"
         assert boundary is not None
         includes += [ "dune/fem/schemes/dirichletwrapper.hh",
                       "dune/vem/operator/vemdirichletconstraints.hh"]
@@ -334,7 +335,7 @@ def vemScheme(model, space=None, solver=None, parameters={},
         operator = lambda linOp,model: "DirichletWrapperOperator< " +\
                 ",".join([op(linOp,model),constraints(model)]) + " >"
     else:
-        assert boundary is None
+        assert boundary is None or boundary == "default"
         operator = op
 
     spaceType = space._typeName
@@ -513,11 +514,13 @@ class TrivialAgglomerate:
         self.size = grid.size(0)
     def __call__(self, idx):
         return idx
-def trivialAgglomerate(constructor, cubes=False, **kwargs):
+def trivialAgglomerate(constructor, cubes=False, globalRefine=None, **kwargs):
     if cubes:
         grid = aluCubeGrid(constructor, **kwargs)
     else:
         grid = aluSimplexGrid(constructor, **kwargs)
+        if globalRefine is not None:
+            grid.hierarchicalGrid.globalRefine(globalRefine)
     agglomerate = TrivialAgglomerate(grid, cubes)
     grid.hierarchicalGrid.agglomerate = agglomerate
     return grid
