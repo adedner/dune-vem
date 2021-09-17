@@ -193,9 +193,6 @@ namespace Dune {
               counter_(0),
               useThreads_(Fem::ThreadManager::maxThreads())
             {
-              const char* nThreads = getenv("DUNE_NUM_THREADS");
-              if( nThreads )
-                useThreads_ =  std::max( int(1), atoi( nThreads ) );
 #ifdef USE_PTHREADS
               if( Fem::ThreadManager :: pthreads )
                 std::cout << "using pthreads with " << useThreads_ << " threads\n";
@@ -244,7 +241,7 @@ namespace Dune {
               else
               {
                 const double threadSize = agglomeration().size() / useThreads_;
-                Fem::ThreadManager :: initMultiThreadMode( useThreads_ );
+                Fem::ThreadManager :: initMultiThreadMode();
                 // make sure all required quadratures are constructed before going multithreaded
 #ifdef USE_PTHREADS
                 if( Fem::ThreadManager :: pthreads )

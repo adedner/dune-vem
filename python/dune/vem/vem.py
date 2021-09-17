@@ -334,6 +334,13 @@ def vemScheme(model, space=None, solver=None, parameters={},
                     ",".join([model,space._typeName,str(boundary)]) + " > "
         operator = lambda linOp,model: "DirichletWrapperOperator< " +\
                 ",".join([op(linOp,model),constraints(model)]) + " >"
+    elif boundary == 'derivative':
+        includes += [ "dune/fem/schemes/dirichletwrapper.hh",
+                      "dune/vem/operator/vemdirichletconstraints.hh"]
+        constraints = lambda model: "Dune::VemDirichletConstraints< " +\
+                    ",".join([model,space._typeName,str(2)]) + " > "
+        operator = lambda linOp,model: "DirichletWrapperOperator< " +\
+                ",".join([op(linOp,model),constraints(model)]) + " >"
     else:
         assert boundary is None or boundary == "default"
         operator = op
