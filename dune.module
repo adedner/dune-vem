@@ -1,5 +1,5 @@
 Module: dune-vem
-Version: 2.8.0
+Version: 2.8.0.0
 Author: Andreas Dedner
 Maintainer: a.s.dedner@warwick.ac.uk
 Description: Implementation of a number of virtual element spaces and bilinear forms
