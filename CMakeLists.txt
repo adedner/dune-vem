@@ -19,7 +19,7 @@ dune_project()
 
 add_subdirectory("dune")
 add_subdirectory("cmake/modules")
-add_subdirectory("lib")
+# add_subdirectory("lib")
 add_subdirectory(python)
 dune_python_install_package(PATH "python")
 

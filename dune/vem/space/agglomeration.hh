@@ -241,7 +241,7 @@ namespace Dune {
               else
               {
                 const double threadSize = agglomeration().size() / useThreads_;
-                Fem::ThreadManager :: initMultiThreadMode( useThreads_ );
+                Fem::ThreadManager :: initMultiThreadMode(useThreads_);
                 // make sure all required quadratures are constructed before going multithreaded
 #ifdef USE_PTHREADS
                 if( Fem::ThreadManager :: pthreads )
