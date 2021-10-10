@@ -11,7 +11,7 @@ import dune
 
 def bbdgSpace(view, order=1, scalar=False, dimRange=None, field="double",
              rotatedBB=True,
-             storage="adaptive"):
+             storage="numpy"):
     """create a discontinous galerkin space over an agglomerated grid
 
     Args:
@@ -114,7 +114,7 @@ def bbdgScheme(model, space=None, penalty=1, solver=None, parameters={}):
 
 def vemSpace(view, order=1, testSpaces=None, scalar=False,
              dimRange=None, conforming=True, field="double",
-             storage="adaptive",
+             storage="numpy",
              basisChoice=2, rotatedBB=True,
              edgeInterpolation=False):
     """create a virtual element space over an agglomerated grid
@@ -232,7 +232,7 @@ def space(view, order=1, dimRange=None,
           version=None,
           scalar=False,
           basisChoice=2,
-          field="double", storage="adaptive"):
+          field="double", storage="numpy"):
     '''
         version is tuple,list for a general vem space (=tests[aces)
         version == "dg" (bbdg)
@@ -313,9 +313,9 @@ def vemScheme(model, space=None, solver=None, parameters={},
             except AttributeError:
                 pass
         if modelParam:
-            model = vemModel(space.grid,model,space,hessStabilization,gradStabilization,massStabilization,*modelParam)
+            model = vemModel(space.gridView,model,space,hessStabilization,gradStabilization,massStabilization,*modelParam)
         else:
-            model = vemModel(space.grid,model,space,hessStabilization,gradStabilization,massStabilization)
+            model = vemModel(space.gridView,model,space,hessStabilization,gradStabilization,massStabilization)
 
     includes = [ "dune/vem/operator/vemelliptic.hh", "dune/vem/operator/diffusionmodel.hh" ]
 
@@ -386,9 +386,9 @@ def vemOperator(model, domainSpace=None, rangeSpace=None):
             except AttributeError:
                 raise ValueError("no domain space provided and could not deduce from form provided")
         if modelParam:
-            model = vemModel(domainSpace.grid,model,domainSpace,None,None,*modelParam)
+            model = vemModel(domainSpace.gridView,model,domainSpace,None,None,*modelParam)
         else:
-            model = vemModel(domainSpace.grid,model,domainSpace,None,None)
+            model = vemModel(domainSpace.gridView,model,domainSpace,None,None)
 
     if not hasattr(rangeSpace,"interpolate"):
         raise ValueError("wrong range space")
