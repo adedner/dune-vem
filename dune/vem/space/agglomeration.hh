@@ -3,7 +3,6 @@
 
 #include <cassert>
 #include <utility>
-#include <thread>
 
 #include <dune/fem/common/hybrid.hh>
 
@@ -17,7 +16,6 @@
 #include <dune/fem/space/shapefunctionset/proxy.hh>
 #include <dune/fem/space/shapefunctionset/vectorial.hh>
 #include <dune/fem/space/common/capabilities.hh>
-#include <dune/fem/misc/threads/threadmanager.hh>
 
 #include <dune/vem/space/indexset.hh>
 #include <dune/vem/agglomeration/dofmapper.hh>
@@ -191,21 +189,9 @@ namespace Dune {
               stabilizations_(new Vector<Stabilization>()),
               useOnb_(basisChoice == 2),
               counter_(0),
-              useThreads_(Fem::ThreadManager::maxThreads())
+              useThreads_(Fem::MPIManager::numThreads())
             {
-#ifdef USE_PTHREADS
-              if( Fem::ThreadManager :: pthreads )
-                std::cout << "using pthreads with " << useThreads_ << " threads\n";
-              else
-#endif
-#ifdef _OPENMP
-                std::cout << "using OMP with " << useThreads_ << " threads\n";
-#else
-                std::cout << "no parallelization used\n";
-#endif
-
-
-
+              std::cout << "using " << useThreads_ << " threads\n";
               if (basisChoice != 3)
                 this->agglomeration().onbBasis(order());
               update(true);
@@ -241,54 +227,17 @@ namespace Dune {
               else
               {
                 const double threadSize = agglomeration().size() / useThreads_;
-                Fem::ThreadManager :: initMultiThreadMode(useThreads_);
-                // make sure all required quadratures are constructed before going multithreaded
-#ifdef USE_PTHREADS
-                if( Fem::ThreadManager :: pthreads )
-                {
-                  // std::cout << "using pthreads\n";
-                  Std::vector<std::thread> threads;
-                  for (std::size_t t=1; t < useThreads_; ++t)
-                  {
-                    unsigned int start = int(t*threadSize);
-                    unsigned int end   = int((t+1)*threadSize);
-                    threads.push_back(
-                      std::thread([this,threadNumber=t,useThreads=useThreads_, start,end,entitySeeds]{
-                        Fem::ThreadManager :: initThread( useThreads, threadNumber );
-                        this->buildProjections(entitySeeds,start,end);
-                      }) );
-                      // &AgglomerationVEMSpace::buildProjectionsPThreads,
-                      //                  this,entitySeeds,start,end,t) );
-                  }
-                  buildProjectionsPThreads(entitySeeds,0,threadSize,0);
-                  std::for_each(threads.begin(),threads.end(), std::mem_fn(&std::thread::join));
-                }
-                else
-#endif
-                {
-                  const std::size_t numPolys = agglomeration().size();
-#ifdef _OPENMP
-#pragma omp parallel
-                  {
-                    // std::cout << "using omb\n";
-                    std::size_t t = Fem::ThreadManager :: thread();
-                    unsigned int start = int(t*threadSize);
-                    unsigned int end   = int((t+1)*threadSize);
-                    buildProjections(entitySeeds,start,end);
-                  }
-#else
-                  buildProjections(entitySeeds,0,agglomeration().size());
-#endif
-                }
-                Fem::ThreadManager :: initSingleThreadMode( );
+                std::vector<unsigned int> threads(useThreads_+1,0);
+                threads[0] = 0;
+                for (std::size_t t=1; t < useThreads_; ++t)
+                  threads[t] = int(t*threadSize);
+                threads[useThreads_] = agglomeration().size();
+                Fem::MPIManager :: run( [this, &entitySeeds, &threads]() {
+                      unsigned int start = threads[Fem::MPIManager::thread()];
+                      unsigned int end   = threads[Fem::MPIManager::thread()+1];
+                      buildProjections(entitySeeds,start,end);
+                    });
               }
-              /*
-              auto end = std::chrono::system_clock::now();
-              auto diff = std::chrono::duration_cast < std::chrono::seconds > (end - start).count();
-              std::cout << "Total build time = " << diff << " seconds for "
-                        << agglomeration().size() << " projections on "
-                        << useThreads_ << " threads." << std::endl;
-              */
             }
 
             const BasisFunctionSetType basisFunctionSet(const EntityType &entity) const
@@ -381,12 +330,6 @@ namespace Dune {
             std::shared_ptr<Vector<typename Traits::ScalarBasisFunctionSetType::HessianProjection>> hessianProjections_;
             std::shared_ptr<Vector<Stabilization>> stabilizations_;
 
-            void buildProjectionsPThreads(const Std::vector<Std::vector<ElementSeedType> > &entitySeeds,
-                                          unsigned int start, unsigned int end, int threadNumber)
-            {
-              Fem::ThreadManager :: initThread( useThreads_, threadNumber );
-              buildProjections(entitySeeds,start,end);
-            }
             void buildProjections(const Std::vector<Std::vector<ElementSeedType> > &entitySeeds,
                                   unsigned int start, unsigned int end);
 
@@ -413,7 +356,6 @@ namespace Dune {
               const Std::vector<Std::vector<ElementSeedType> > &entitySeeds,
               unsigned int start, unsigned int end )
         {
-          // std::cout << "buildProjection on thread " << Fem::ThreadManager :: thread() << ": " << start << "-" << end << std::endl;
           int polOrder = order();
           Std::vector<int> orders = agIndexSet_.orders();
           const std::size_t numShapeFunctions = scalarShapeFunctionSet_.size();
