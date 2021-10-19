@@ -49,11 +49,11 @@ def bbdgSpace(view, order=1, scalar=False, dimRange=None, field="double",
 
     agglomerate = view.hierarchicalGrid.agglomerate
 
-    includes = [ "dune/vem/agglomeration/dgspace.hh" ] + view._includes
+    includes = [ "dune/vem/agglomeration/dgspace.hh" ] + view.cppIncludes
     dimw = view.dimWorld
-    viewType = view._typeName
+    viewType = view.cppTypeName
 
-    gridPartName = "Dune::FemPy::GridPart< " + view._typeName + " >"
+    gridPartName = "Dune::FemPy::GridPart< " + view.cppTypeName + " >"
     typeName = "Dune::Vem::AgglomerationDGSpace< " +\
       "Dune::Fem::FunctionSpace< double, " + field + ", " + str(dimw) + ", " + str(dimRange) + " >, " +\
       gridPartName + ", " + str(order) + " >"
@@ -107,7 +107,7 @@ def bbdgScheme(model, space=None, penalty=1, solver=None, parameters={}):
             space = model.lhs.arguments()[0].ufl_function_space()
         except AttributeError:
             raise ValueError("no space provided and could not deduce from form provided")
-    spaceType = space._typeName
+    spaceType = space.cppTypeName
     penaltyClass = "Dune::Vem::BBDGPenalty<"+spaceType+">"
     return dg(model,space,penalty,solver,parameters,penaltyClass)
     # return galerkin(model,space,solver,parameters)
@@ -168,11 +168,11 @@ def vemSpace(view, order=1, testSpaces=None, scalar=False,
 
     agglomerate = view.hierarchicalGrid.agglomerate
 
-    includes = [ "dune/fem/gridpart/common/gridpart.hh", "dune/vem/space/agglomeration.hh" ] + view._includes
+    includes = [ "dune/fem/gridpart/common/gridpart.hh", "dune/vem/space/agglomeration.hh" ] + view.cppIncludes
     dimw = view.dimWorld
-    viewType = view._typeName
+    viewType = view.cppTypeName
 
-    gridPartName = "Dune::FemPy::GridPart< " + view._typeName + " >"
+    gridPartName = "Dune::FemPy::GridPart< " + view.cppTypeName + " >"
     typeName = "Dune::Vem::AgglomerationVEMSpace< " +\
       "Dune::Fem::FunctionSpace< double, " + field + ", " + str(dimw) + ", " + str(dimRange) + " >, " +\
       gridPartName + " >"
@@ -331,21 +331,21 @@ def vemScheme(model, space=None, solver=None, parameters={},
         elif boundary == "value":      boundary = 1
         elif boundary == "derivative": boundary = 2
         constraints = lambda model: "Dune::VemDirichletConstraints< " +\
-                    ",".join([model,space._typeName,str(boundary)]) + " > "
+                    ",".join([model,space.cppTypeName,str(boundary)]) + " > "
         operator = lambda linOp,model: "DirichletWrapperOperator< " +\
                 ",".join([op(linOp,model),constraints(model)]) + " >"
     elif boundary == 'derivative':
         includes += [ "dune/fem/schemes/dirichletwrapper.hh",
                       "dune/vem/operator/vemdirichletconstraints.hh"]
         constraints = lambda model: "Dune::VemDirichletConstraints< " +\
-                    ",".join([model,space._typeName,str(2)]) + " > "
+                    ",".join([model,space.cppTypeName,str(2)]) + " > "
         operator = lambda linOp,model: "DirichletWrapperOperator< " +\
                 ",".join([op(linOp,model),constraints(model)]) + " >"
     else:
         assert boundary is None or boundary == "default"
         operator = op
 
-    spaceType = space._typeName
+    spaceType = space.cppTypeName
     # modelType = "VEMDiffusionModel< " +\
     #       "typename " + spaceType + "::GridPartType, " +\
     #       spaceType + "::dimRange, " +\
@@ -395,8 +395,8 @@ def vemOperator(model, domainSpace=None, rangeSpace=None):
     if not hasattr(domainSpace,"interpolate"):
         raise ValueError("wrong domain space")
 
-    domainSpaceType = domainSpace._typeName
-    rangeSpaceType = rangeSpace._typeName
+    domainSpaceType = domainSpace.cppTypeName
+    rangeSpaceType = rangeSpace.cppTypeName
 
     storage,  domainFunctionIncludes, domainFunctionType, _, _, dbackend = domainSpace.storage
     rstorage, rangeFunctionIncludes,  rangeFunctionType,  _, _, rbackend = rangeSpace.storage
@@ -407,8 +407,8 @@ def vemOperator(model, domainSpace=None, rangeSpace=None):
                 "dune/fempy/py/grid/gridpart.hh",
                 "dune/fem/schemes/dirichletwrapper.hh",
                 "dune/vem/operator/vemdirichletconstraints.hh"]
-    includes += domainSpace._includes + domainFunctionIncludes
-    includes += rangeSpace._includes + rangeFunctionIncludes
+    includes += domainSpace.cppIncludes + domainFunctionIncludes
+    includes += rangeSpace.cppIncludes + rangeFunctionIncludes
     includes += ["dune/vem/operator/diffusionmodel.hh", "dune/fempy/parameter.hh"]
 
     import dune.create as create
@@ -422,7 +422,7 @@ def vemOperator(model, domainSpace=None, rangeSpace=None):
     typeName = "DifferentiableVEMEllipticOperator< " + linearOperator + ", " + modelType + ">"
     if model.hasDirichletBoundary:
         constraints = "Dune::VemDirichletConstraints< " +\
-                ",".join([modelType,domainSpace._typeName]) + " > "
+                ",".join([modelType,domainSpace.cppTypeName]) + " > "
         typeName = "DirichletWrapperOperator< " +\
                 ",".join([typeName,constraints(model)]) + " >"
 
