@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.1)
+cmake_minimum_required(VERSION 3.13)
 
 project(dune-vem CXX C)
 
@@ -16,6 +16,9 @@ include(DuneMacros)
 
 # start a dune project with information from dune.module
 dune_project()
+dune_enable_all_packages()
+
+include(AddMPIFlags)
 
 add_subdirectory("dune")
 add_subdirectory("cmake/modules")
