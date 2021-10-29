@@ -49,7 +49,8 @@ namespace Dune
       static constexpr int dimDomain = DomainType::dimension;
       static constexpr int dimRange  = RangeType::dimension;
 
-      typedef ReferenceElement< typename DomainType::field_type, dimDomain > ReferenceElementType;
+      // typedef ReferenceElement< typename DomainType::field_type, dimDomain > ReferenceElementType;
+      typedef ReferenceElements< typename DomainType::field_type, dimDomain > ReferenceElementType;
 
       typedef FieldMatrix < DomainFieldType, dimDomain, dimDomain > HessianMatrixType;
 
@@ -182,38 +183,66 @@ namespace Dune
 
       const EntityType &entity () const { assert( entity_ ); return *entity_; }
 
+#if 0
       template< class Point, class Factor >
       void axpy ( const Point &x, const Factor &factor, DynamicVector<DomainType> &dofs ) const
       {
         shapeFunctionSet_.evaluateEach( position( x ), [ this, &factor, &dofs ] ( std::size_t alpha, RangeType phi_alpha ) {
             for( std::size_t j = 0; j < size(); ++j )
-              dofs[ j ].axpy( phi_alpha[0]*valueProjection()[ alpha ][ j ], factor );
+              dofs[ j ].axpy( valueProjection()[ alpha ][ j ], factor*phi_alpha );
           } );
       }
-      template< class Point, class Factor >
-      void axpy ( const Point &x, const Factor &factor, DynamicVector<HessianMatrixType> &dofs ) const
+#endif
+      template< class Point >
+      void axpy ( const Point &x, const JacobianRangeType &factor, DynamicVector<DomainType> &dofs ) const
+      {
+        shapeFunctionSet_.evaluateEach( position( x ), [ this, &factor, &dofs ] ( std::size_t alpha, RangeType phi_alpha ) {
+            for( std::size_t j = 0; j < size(); ++j )
+            {
+              DomainType f;
+              factor.mtv(phi_alpha,f);
+              dofs[ j ].axpy( valueProjection()[ alpha ][ j ], f );
+            }
+          } );
+      }
+      template< class Point >
+      void axpy ( const Point &x, const RangeType &f1, const DomainType &f2, DynamicVector<DomainType> &dofs ) const
+      {
+        shapeFunctionSet_.evaluateEach( position( x ), [ this, &f1, &f2, &dofs ] ( std::size_t alpha, RangeType phi_alpha ) {
+            for( std::size_t j = 0; j < size(); ++j )
+              dofs[ j ].axpy( valueProjection()[ alpha ][ j ], f2*(phi_alpha*f1) );
+          } );
+      }
+
+      template< class Point >
+      void axpy ( const Point &x, const JacobianRangeType &factor, DynamicVector<HessianMatrixType> &dofs ) const
       {
         shapeFunctionSet_.evaluateEach( position( x ), [ this, &factor, &dofs ] ( std::size_t alpha, RangeType phi_alpha ) {
             for( std::size_t j = 0; j < size(); ++j )
               for ( std::size_t l = 0; l < dimDomain; ++l )
                 for ( std::size_t k = 0; k < dimDomain; ++k )
-                  dofs[ j ][l][k] += phi_alpha[0] *
-                      0.5*( jacobianProjection()[ alpha ][ j ][ k ]*factor[l] +
-                            jacobianProjection()[ alpha ][ j ][ l ]*factor[k] );
+                {
+                  DomainType f;
+                  factor.mtv(phi_alpha,f);
+                  dofs[ j ][l][k] +=
+                      0.5*( jacobianProjection()[ alpha ][ j ][ k ]*f[l] +
+                            jacobianProjection()[ alpha ][ j ][ l ]*f[k] );
+                }
           } );
       }
-      template< class Point, class Factor >
-      void axpy ( const Point &x, const DomainType &normal, const Factor &factor, DynamicVector<HessianMatrixType> &dofs ) const
+      template< class Point >
+      void axpy ( const Point &x, const RangeType &factor, const DomainType &normal, DynamicVector<HessianMatrixType> &dofs ) const
       {
         shapeFunctionSet_.evaluateEach( position( x ), [ this, &factor, &dofs, &normal ] ( std::size_t alpha, RangeType phi_alpha ) {
             for( std::size_t j = 0; j < size(); ++j )
             {
               DomainFieldType Gn = 0;
               for ( std::size_t n = 0; n < dimDomain; ++n )
-                Gn += phi_alpha[0] * jacobianProjection()[ alpha ][ j ][ n ]*normal[n];
+                Gn += jacobianProjection()[ alpha ][ j ][ n ]*normal[n];
+              Gn *= phi_alpha*factor;
               for ( std::size_t l = 0; l < dimDomain; ++l )
                 for ( std::size_t k = 0; k < dimDomain; ++k )
-                    dofs[ j ][l][k] += Gn * 0.5*(normal[k]*factor[l] + normal[l]*factor[k] );
+                    dofs[ j ][l][k] += Gn * 0.5*(normal[k]*normal[l] + normal[l]*normal[k] );
             }
           } );
       }

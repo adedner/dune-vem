@@ -91,7 +91,7 @@ struct PhiEdge : public Dune::Fem::BindableGridFunction< GridPart, Dune::Dim<1> 
         if ( beta < matrix_.size() )
         {
           assert( i_ < matrix_[beta].size() );
-          ret[0].axpy(matrix_[beta][i_] * dphi[0][0], tau);
+          // ??????? NEEDS FIXING ret[0].axpy(matrix_[beta][i_] * dphi[0][0], tau);
         }
     } );
   }
