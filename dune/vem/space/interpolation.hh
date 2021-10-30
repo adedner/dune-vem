@@ -126,7 +126,7 @@ namespace Dune
           for (int r=0;r<baseRangeDimension;++r)
             mask[k+r] = 1;
           k += baseRangeDimension;
-          if (indexSet_.template order2size<0>(1)>0)
+          if (order2size<0>(1)>0)
           {
             for (int r=0;r<baseRangeDimension;++r)
             {
@@ -142,12 +142,12 @@ namespace Dune
 #endif
           for (std::size_t alpha=0;alpha<testBasisSets_.edgeSize();++alpha)
           {
-            if (alpha < indexSet_.template order2size<1>(0))
+            if (alpha < order2size<1>(0))
             {
               mask[k] = 1;
               ++k;
             }
-            if (alpha < indexSet_.template order2size<1>(1))
+            if (alpha < order2size<1>(1))
             {
               mask[k] = 2;
               ++k;
@@ -183,7 +183,7 @@ namespace Dune
                   localDofMatrix[ k+r ][ alpha ] = phi[ r ];
             } );
           k += baseRangeDimension;
-          if (indexSet_.template order2size<0>(1)>0)
+          if (order2size<0>(1)>0)
             basisFunctionSet.jacobianEach( x, [ & ] ( std::size_t alpha, typename BasisFunctionSet::JacobianRangeType dphi ) {
               assert( dphi[0].dimension == 2 );
               if (alpha < localDofMatrix[k+1].size())
@@ -213,7 +213,7 @@ namespace Dune
             double weight = edgeQuad.weight(qp) * intersection.geometry().integrationElement(x);
             edgeBFS.evaluateEach(x,
                 [&](std::size_t alpha, typename BasisFunctionSet::RangeType phi ) {
-                if (alpha < indexSet_.template order2size<1>(0))
+                if (alpha < order2size<1>(0))
                 {
                   basisFunctionSet.evaluateEach( y,
                     [ & ] ( std::size_t beta, typename BasisFunctionSet::RangeType value )
@@ -225,7 +225,7 @@ namespace Dune
                   );
                   ++k;
                 }
-                if (alpha < indexSet_.template order2size<1>(1))
+                if (alpha < order2size<1>(1))
                 {
                   basisFunctionSet.jacobianEach( y,
                     [ & ] ( std::size_t beta, typename BasisFunctionSet::JacobianRangeType dvalue )
@@ -315,7 +315,7 @@ namespace Dune
                   localDofVectorMatrix[0][ entry[0]+r ][ alpha ] = phi[ r ];
             } );
           entry[0] += baseRangeDimension;
-          if (indexSet_.template order2size<0>(1)>0)
+          if (order2size<0>(1)>0)
           {
             edgeShapeFunctionSet.jacobianEach( x, [ & ] ( std::size_t alpha, typename EdgeShapeFunctionSet::JacobianRangeType dphi ) {
               assert( entry[0] < localDofVectorMatrix[0].size() );
@@ -350,16 +350,14 @@ namespace Dune
                 edgeBFS.evaluateEach( xx,
                   [&](std::size_t alpha, typename EdgeShapeFunctionSet::RangeType phi ) {
                     //!TS add alpha<...
-                    if (alpha < indexSet_.template order2size<1>(0) &&
-                        beta < indexSet_.edgeSize(0))
+                    if (alpha < order2size<1>(0) && beta < edgeSize(0))
                     {
                       assert( entry[0]+alpha < localDofVectorMatrix[0].size() );
                       localDofVectorMatrix[0][ entry[0]+alpha ][ beta ] += value*phi * weight
                                                                            / intersection.geometry().volume();
                     }
                     // FIX ME
-                    if (alpha < indexSet_.template order2size<1>(1) &&
-                        beta < indexSet_.edgeSize(1))
+                    if (alpha < order2size<1>(1) && beta < edgeSize(1))
                     {
                       assert( entry[1]+alpha < localDofVectorMatrix[1].size() );
                       localDofVectorMatrix[1][ entry[1]+alpha ][ beta ] += value*phi * weight * flipNormal;
@@ -369,13 +367,24 @@ namespace Dune
               }
             );
           }
-          entry[0] += indexSet_.template order2size<1>(0)*baseRangeDimension;
-          entry[1] += indexSet_.template order2size<1>(1)*baseRangeDimension;
+          entry[0] += order2size<1>(0);
+          entry[1] += order2size<1>(1);
         };
         applyOnIntersection(intersection,vertex,edge,mask);
         assert( entry[0] == localDofVectorMatrix[0].size() );
         assert( entry[1] == localDofVectorMatrix[1].size() );
       }
+
+      std::size_t edgeSize(int deriv) const
+      {
+        return indexSet_.edgeSize(deriv) * baseRangeDimension;
+      }
+      template <int dim>
+      std::size_t order2size(unsigned int deriv) const
+      {
+        return indexSet_.template order2size<dim>(deriv) * baseRangeDimension;
+      }
+
 
     private:
       void getSizesAndOffsets(int poly,
@@ -385,11 +394,11 @@ namespace Dune
       {
         auto dofs   = indexSet_.dofsPerCodim();  // assume always three entries in dim order (i.e. 2d)
         assert(dofs.size()==3);
-        vertexSize  = dofs[0].second;
+        vertexSize  = dofs[0].second*baseRangeDimension;
         edgeOffset  = indexSet_.subAgglomerates(poly,dimension)*vertexSize;
-        edgeSize    = dofs[1].second;
+        edgeSize    = dofs[1].second*baseRangeDimension;
         innerOffset = edgeOffset + indexSet_.subAgglomerates(poly,dimension-1)*edgeSize;
-        innerSize   = dofs[2].second;
+        innerSize   = dofs[2].second*baseRangeDimension;
       }
 
       // carry out actual interpolation giving the three components, i.e.,
@@ -417,8 +426,8 @@ namespace Dune
           }
         }
         //!TS needs changing
-        if (indexSet_.template order2size<1>(0)>0 ||
-            indexSet_.template order2size<1>(1)>0)
+        if (order2size<1>(0)>0 ||
+            order2size<1>(1)>0)
         {
           // to avoid any issue with twists we use an intersection iterator
           // here instead of going over the edges
@@ -466,7 +475,7 @@ namespace Dune
           for (int r=0;r<value.dimension;++r)
             localDofVector[ k+r ] = value[ r ];
           k += value.dimension;
-          if (indexSet_.template order2size<0>(1)>0)
+          if (order2size<0>(1)>0)
           {
             localFunction.jacobian( x, dvalue );
             for (int r=0;r<value.dimension;++r)
@@ -492,7 +501,7 @@ namespace Dune
             auto y = intersection.geometryInInside().global(x);
             localFunction.evaluate( y, value );
             double weight = edgeQuad.weight(qp) * intersection.geometry().integrationElement(x);
-            if (indexSet_.template order2size<1>(1)>0)
+            if (order2size<1>(1)>0)
               localFunction.jacobian( y, dvalue);
             typename LocalFunction::RangeType dnvalue;
             dvalue.mv(normal,dnvalue);
@@ -500,14 +509,14 @@ namespace Dune
             edgeBFS.evaluateEach(x,
               [&](std::size_t alpha, typename LocalFunction::RangeType phi ) {
                 //! SubDofWrapper has no size assert( kk < localDofVector.size() );
-                if (alpha < indexSet_.template order2size<1>(0))
+                if (alpha < order2size<1>(0))
                 {
                   //! see above assert(k < localDofVector.size() );
                   localDofVector[ k ] += value*phi * weight
                                          / intersection.geometry().volume();
                   ++k;
                 }
-                if (alpha < indexSet_.template order2size<1>(1))
+                if (alpha < order2size<1>(1))
                 {
                   //! see above assert(k < localDofVector.size() );
                   localDofVector[ k ] += dnvalue*phi * weight;
@@ -601,7 +610,7 @@ namespace Dune
               assert(vtxk>=0); // intersection is 'outside' so vertices should be as well
               vertex(poly,vertexNumber,i*vertexSize,1);
               mask[0].push_back(vtxk*vertexSize);
-              if (indexSet_.template order2size<0>(1)>0)
+              if (order2size<0>(1)>0)
               {
                 assert(vertexSize==3);
                 mask[0].push_back(vtxk*vertexSize+1);
@@ -610,17 +619,17 @@ namespace Dune
                 mask[1].push_back(vtxk*vertexSize+2);
               }
               else
-                assert(vertexSize==1);
+                assert(vertexSize==baseRangeDimension);
             }
           }
-          if (indexSet_.template order2size<1>(0)>0 ||
-              indexSet_.template order2size<1>(1)>0)
+          if (order2size<1>(0)>0 ||
+              order2size<1>(1)>0)
           {
             edge(poly,intersection,i,edgeSize);
             int count = 0;
             for (std::size_t alpha=0;alpha<testBasisSets_.edgeSize();++alpha)
               for (int deriv=0;deriv<2;++deriv)
-                if (alpha < indexSet_.template order2size<1>(deriv))
+                if (alpha < order2size<1>(deriv))
                 {
                   mask[deriv].push_back(k*edgeSize+edgeOffset+count);
                   ++count;

@@ -77,7 +77,7 @@ namespace Dune
           valueProjections_( valueProjections),
           jacobianProjections_( jacobianProjections ),
           hessianProjections_( hessianProjections ),
-          size_( valueProjection()[0].size() * dimRange)
+          size_( valueProjection()[0].size() )
       {}
 
       int order () const { return shapeFunctionSet_.order(); }
@@ -248,10 +248,10 @@ namespace Dune
         std::size_t size = size_;
         assert( size == dofs.size() );
         std::vector< HessianRangeType > hessians( size );
-        jacobianAll(x, hessians);
+        hessianAll(x, hessians);
         for (std::size_t i=0; i<size; ++i)
           for (std::size_t r=0; r<RangeType::dimension; ++r)
-            for (std::size_t d=0; d<DomainType::dimension; ++r)
+            for (std::size_t d=0; d<DomainType::dimension; ++d)
               dofs[i] += hessians[i][r][d]*hessianFactor[r][d];
       }
 
