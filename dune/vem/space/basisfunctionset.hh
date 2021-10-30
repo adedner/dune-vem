@@ -193,6 +193,70 @@ namespace Dune
           } );
       }
 #endif
+
+      /********************************************/
+
+      template< class Quadrature, class Vector, class DofVector >
+      void_t<typename Quadrature::QuadratureKeyType> axpy ( const Quadrature &quad, const Vector &values, DofVector &dofs ) const
+      {
+        const unsigned int nop = quad.nop();
+        for( unsigned int qp = 0; qp < nop; ++qp )
+          axpy( quad[ qp ], values[ qp ], dofs );
+      }
+      template< class Quadrature, class VectorA, class VectorB, class DofVector >
+      void_t<typename Quadrature::QuadratureKeyType> axpy ( const Quadrature &quad, const VectorA &valuesA, const VectorB &valuesB, DofVector &dofs ) const
+      {
+        const unsigned int nop = quad.nop();
+        for( unsigned int qp = 0; qp < nop; ++qp )
+        {
+          axpy( quad[ qp ], valuesA[ qp ], dofs );
+          axpy( quad[ qp ], valuesB[ qp ], dofs );
+        }
+      }
+      template< class Point, class DofVector >
+      void axpy ( const Point &x, const RangeType &valueFactor,
+                  const JacobianRangeType &jacobianFactor,
+                  DofVector &dofs ) const
+      {
+        axpy( x, valueFactor, dofs );
+        axpy( x, jacobianFactor, dofs );
+      }
+      template< class Point, class DofVector >
+      void axpy ( const Point &x, const RangeType &valueFactor, DofVector &dofs ) const
+      {
+        std::size_t size = size_;
+        assert( size == dofs.size() );
+        std::vector< RangeType > values( size );
+        evaluateAll(x,values);
+        for (std::size_t i=0; i<size; ++i)
+          dofs[i] += values[i]*valueFactor;
+      }
+      template< class Point, class DofVector >
+      void axpy ( const Point &x, const JacobianRangeType &jacobianFactor, DofVector &dofs ) const
+      {
+        std::size_t size = size_;
+        assert( size == dofs.size() );
+        std::vector< JacobianRangeType > jacobians( size );
+        jacobianAll(x, jacobians);
+        for (std::size_t i=0; i<size; ++i)
+          for (std::size_t r=0; r<RangeType::dimension; ++r)
+            dofs[i] += jacobians[i][r]*jacobianFactor[r];
+      }
+      template< class Point, class DofVector >
+      void axpy ( const Point &x, const HessianRangeType &hessianFactor, DofVector &dofs ) const
+      {
+        std::size_t size = size_;
+        assert( size == dofs.size() );
+        std::vector< HessianRangeType > hessians( size );
+        jacobianAll(x, hessians);
+        for (std::size_t i=0; i<size; ++i)
+          for (std::size_t r=0; r<RangeType::dimension; ++r)
+            for (std::size_t d=0; d<DomainType::dimension; ++r)
+              dofs[i] += hessians[i][r][d]*hessianFactor[r][d];
+      }
+
+      /********************************************/
+
       template< class Point >
       void axpy ( const Point &x, const JacobianRangeType &factor, DynamicVector<DomainType> &dofs ) const
       {
