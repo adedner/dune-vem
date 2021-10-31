@@ -118,45 +118,49 @@ namespace Dune
       // 'active' on the given element, i.e., are attached to a given
       // subentity of this element. Needed for dirichlet boundary data for
       // example
+      // Note: this returns the same mask independent of the baseRangeDimension,
+      //       i.e., vector extension has to be done on the calling side
       void operator() ( const ElementType &element, Std::vector<char> &mask) const
       {
         std::fill(mask.begin(),mask.end(),-1);
         auto vertex = [&] (int poly,auto i,int k,int numDofs)
         {
-          for (int r=0;r<baseRangeDimension;++r)
-            mask[k+r] = 1;
-          k += baseRangeDimension;
+          k /= baseRangeDimension;
+          mask[k] = 1;
+          ++k;
           if (order2size<0>(1)>0)
           {
-            for (int r=0;r<baseRangeDimension;++r)
-            {
-              mask[k+2*r]   = 2;
-              mask[k+2*r+1] = 2;
-            }
+              mask[k]   = 2;
+              mask[k+1] = 2;
           }
         };
         auto edge = [&] (int poly,auto i,int k,int numDofs)
         {
+          k /= baseRangeDimension;
 #ifndef NDEBUG
           auto kStart = k;
 #endif
-          for (std::size_t alpha=0;alpha<testBasisSets_.edgeSize();++alpha)
+          for (std::size_t alpha=0;alpha<testBasisSets_.edgeSize()/baseRangeDimension;++alpha)
           {
-            if (alpha < order2size<1>(0))
+            if (alpha < indexSet_.template order2size<1>(0))
             {
               mask[k] = 1;
               ++k;
             }
-            if (alpha < order2size<1>(1))
+            if (alpha < indexSet_.template order2size<1>(1))
             {
               mask[k] = 2;
               ++k;
             }
           }
-          assert(k-kStart == numDofs);
+          // assert(k-kStart == numDofs/baseRangeDimension);
         };
         auto inner = [&mask] (int poly,auto i,int k,int numDofs)
-        { std::fill(mask.begin()+k,mask.begin()+k+numDofs,1); };
+        {
+          // assert( innerShapeFunctionSet.size() == numDofs );
+          k /= baseRangeDimension;
+          std::fill(mask.begin()+k,mask.begin()+k+numDofs/baseRangeDimension,1);
+        };
         apply(element,vertex,edge,inner);
         // assert( std::none_of(mask.begin(),mask.end(), [](char m){return // m==-1;}) ); // ???? needs investigation - issue with DirichletBCs
       }
@@ -276,6 +280,7 @@ namespace Dune
       //!TS what do we want to return here?
       //!TS  i) std::vector<DynMatrix> containing the matrix for each normal derivative?
       //!TS ii) add an int normDerivOrder parameter and fill the matrix only for that order?
+      // Note: for a vector valued space this fills in the full 'baseRangeDimension' mask and localDofs
       template< class EdgeShapeFunctionSet >
       void operator() (const IntersectionType &intersection,
                        const EdgeShapeFunctionSet &edgeShapeFunctionSet, Std::vector < Dune::DynamicMatrix<double> > &localDofVectorMatrix,
@@ -609,14 +614,19 @@ namespace Dune
               const int vtxk = indexSet_.localIndex( element, vertexNumber, dimension );
               assert(vtxk>=0); // intersection is 'outside' so vertices should be as well
               vertex(poly,vertexNumber,i*vertexSize,1);
-              mask[0].push_back(vtxk*vertexSize);
+              for (int r=0;r<baseRangeDimension;++r)
+                mask[0].push_back(vtxk*vertexSize+r);
               if (order2size<0>(1)>0)
               {
-                assert(vertexSize==3);
-                mask[0].push_back(vtxk*vertexSize+1);
-                mask[0].push_back(vtxk*vertexSize+2);
-                mask[1].push_back(vtxk*vertexSize+1);
-                mask[1].push_back(vtxk*vertexSize+2);
+                assert(vertexSize==3*baseRangeDimension);
+                for (int r=0;r<baseRangeDimension;++r)
+                  mask[0].push_back(vtxk*vertexSize+baseRangeDimension+r);
+                for (int r=0;r<baseRangeDimension;++r)
+                  mask[0].push_back(vtxk*vertexSize+2*baseRangeDimension+r);
+                for (int r=0;r<baseRangeDimension;++r)
+                  mask[1].push_back(vtxk*vertexSize+baseRangeDimension+r);
+                for (int r=0;r<baseRangeDimension;++r)
+                  mask[1].push_back(vtxk*vertexSize+2*baseRangeDimension+r);
               }
               else
                 assert(vertexSize==baseRangeDimension);

@@ -38,10 +38,8 @@ namespace Dune {
         // Internal Forward Declarations
         // -----------------------------
 
-        template<class FunctionSpace, class GridPart, bool vectorSpace = true>
+        template<class FunctionSpace, class GridPart, bool vectorSpace = false>
         class AgglomerationVEMSpace;
-
-
 
         // IsAgglomerationVEMSpace
         // -----------------------
@@ -656,7 +654,10 @@ namespace Dune {
                         std::swap(mask[1][1], mask[1][3]); // the HACK
                       }
                       else
-                        std::swap(mask[0][0], mask[0][1]); // the HACK
+                      {
+                        for (int r=0;r<rangeFactor;++r)
+                          std::swap(mask[0][r], mask[0][rangeFactor+r]); // the HACK
+                      }
                     }
                   }
                   std::fill(lambda.begin(), lambda.end(), 0);
@@ -866,7 +867,6 @@ namespace Dune {
               auto leastSquaresMinimizerGradient = leastSquares(leastSquaresGradProj, constraintBlockMatrix);
               // auto leastSquaresMinimizerGradient = leastSquares(leastSquaresGradProj);
 
-              // std::cout << "ls grad proj:" << leastSquaresGradProj.rows() << "," << leastSquaresGradProj.cols() << " constraint:" << constraintBlockMatrix.rows() << "," << constraintBlockMatrix.cols() << std::endl;
               for (std::size_t beta = 0; beta < numDofs; ++beta)
               {
                 VectorizeMatrixCol d = vectorizeMatrixCol(R, beta);
