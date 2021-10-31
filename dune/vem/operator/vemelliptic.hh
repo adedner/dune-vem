@@ -255,7 +255,8 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model>
       for (std::size_t r = 0; r < stabMatrix.rows(); ++r)
         for (std::size_t c = 0; c < stabMatrix.cols(); ++c)
           for (std::size_t b = 0; b < bs; ++b)
-            wLocal[r*bs+b] += VectorOfAveragedDiffusionCoefficients[agglomerate][0]
+            wLocal[r*bs+b] +=
+            VectorOfAveragedDiffusionCoefficients[agglomerate][0] // FIX ME: how to make the coeff. depend on the range dimension
                 * stabMatrix[r][c] * uLocal[c*bs+b];
       stabilization[dfSpace.agglomeration().index(entity)] = true;
     }
@@ -379,8 +380,9 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
           for (std::size_t ccc = 0; ccc < stabMatrix.cols(); ++ccc)
             for (std::size_t b = 0; b < bs; ++b)
               add += stabMatrix[r][ccc] * uLocal[ccc*bs+b]; //???  / (nE));
-          jLocal.add(r*bs+b, c*bs+b, VectorOfAveragedDiffusionCoefficients[agglomerate][0]
-                     * (stabMatrix[r][c]+add) );
+          jLocal.add(r*bs+b, c*bs+b,
+                     VectorOfAveragedDiffusionCoefficients[agglomerate][0] * stabMatrix[r][c] +
+                     VectorOfAveragedLinearlisedDiffusionCoefficients[agglomerate][0] * add ); // FIX ME: make coeff depend on range * dimension
         }
 #if 0
     for (std::size_t r = 0; r < stabMatrix.rows(); ++r)

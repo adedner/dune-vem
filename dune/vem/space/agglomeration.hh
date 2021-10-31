@@ -325,6 +325,10 @@ namespace Dune {
             }
 
         private:
+            std::size_t sizeONB(order)
+            {
+              return Dune::Fem::OrthonormalShapeFunctions<DomainType::dimension>:: size(order)*rangeFactor;
+            }
 
             template <class T>
             using Vector = Std::vector<T>;
@@ -375,19 +379,19 @@ namespace Dune {
           Std::vector<int> orders = agIndexSet_.orders();
           const std::size_t numShapeFunctions = testBasisSets_.size();
           const std::size_t numHessShapeFunctions =
-                polOrder==1? 1:
+                polOrder==1? rangeFactor :
                 std::min(numShapeFunctions,
                    Dune::Fem::OrthonormalShapeFunctions<DomainType::dimension>::
-                   size(std::max(orders[2], polOrder - 2))*rangeFactor
+                         size(std::max(orders[2], polOrder - 2))*rangeFactor
            );
           std::size_t numGradShapeFunctions =
                    std::min(numShapeFunctions,
                    Dune::Fem::OrthonormalShapeFunctions<DomainType::dimension>::
-                   size(std::max(orders[1], polOrder - 1))*rangeFactor
+                         size(std::max(orders[1], polOrder - 1))*rangeFactor
            );
           const std::size_t numInnerShapeFunctions = orders[0] < 0 ? 0 :
                   Dune::Fem::OrthonormalShapeFunctions<DomainType::dimension>::
-                  size(orders[0])*rangeFactor;
+                        size(orders[0])*rangeFactor;
 
           const std::size_t numGradConstraints = numGradShapeFunctions;
           const std::size_t edgeTangentialSize = Dune::Fem::OrthonormalShapeFunctions<1>::
@@ -443,13 +447,9 @@ namespace Dune {
                   shapeFunctionSet.evaluateEach(quadrature[qp], [&](std::size_t beta, typename InnerTestSpace::RangeType psi) {
                     Hp[alpha][beta] += phi * psi * weight;
                     if (alpha < numGradShapeFunctions && beta < numGradShapeFunctions) // basis set is hierarchic so we can compute HpGrad using the order p shapeFunctionSet
-                    {
                       HpGrad[alpha][beta] += phi * psi * weight;
-                    }
                     if (alpha < numGradConstraints && beta < numGradShapeFunctions )
-                    {
                       constraintGradProj[alpha][beta] += phi * psi * weight;
-                    }
                     if (alpha < numHessShapeFunctions && beta < numHessShapeFunctions)
                       HpHess[alpha][beta] += phi * psi * weight;
                     if (alpha < numInnerShapeFunctions)
@@ -657,6 +657,9 @@ namespace Dune {
                       {
                         for (int r=0;r<rangeFactor;++r)
                           std::swap(mask[0][r], mask[0][rangeFactor+r]); // the HACK
+                        std::cout << "mask [" << agglomerate << "]: ";
+                        for (auto &m : mask[0]) std::cout << m << ", ";
+                        std::cout << std::endl;
                       }
                     }
                   }
@@ -680,9 +683,9 @@ namespace Dune {
                         // first check if we should be using interpolation (for the
                         // existing edge moments - or for H4 space)
                         if (alpha < Dune::Fem::OrthonormalShapeFunctions<DomainType::dimension>::
-                                    size( agIndexSet_.edgeOrders()[0] ) // have enough edge momentsa
-                            || edgePhiVector[0].size() == polOrder+1    // interpolation is exact
-                            || edgeInterpolation_)                      // user want interpolation no matter what
+                                    size( agIndexSet_.edgeOrders()[0])*rangeFactor // have enough edge momentsa
+                            || edgePhiVector[0].size() == polOrder+1               // interpolation is exact
+                            || edgeInterpolation_)                                 // user want interpolation no matter what
                         {
                           // ??? Fix
                           edgeShapeFunctionSet.evaluateEach(x, [&](std::size_t beta,
@@ -891,6 +894,13 @@ namespace Dune {
 #endif
                 colGradProjection = leastSquaresMinimizerGradient.solve( RHSleastSquaresGrad[ beta ] , d );
               }
+            }
+            std::cout << "jacobian [" << agglomerate << "]:\n";
+            for (std::size_t alpha = 0; alpha < numGradShapeFunctions; ++alpha)
+            {
+              for (std::size_t i = 0; i < numDofs; ++i)
+                std::cout << "   " << jacobianProjection[alpha][i] << ", ";
+              std::cout << std::endl;
             }
 
             /////////////////////////////////////////////////////////////////////
