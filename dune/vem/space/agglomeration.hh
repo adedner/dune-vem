@@ -325,9 +325,11 @@ namespace Dune {
             }
 
         private:
-            std::size_t sizeONB(order)
+            template <int codim>
+            std::size_t sizeONB(std::size_t order)
             {
-              return Dune::Fem::OrthonormalShapeFunctions<DomainType::dimension>:: size(order)*rangeFactor;
+              return Dune::Fem::OrthonormalShapeFunctions<DomainType::dimension - codim>:: size(order) *
+                     Traits :: baseRangeDimension;
             }
 
             template <class T>
@@ -380,22 +382,13 @@ namespace Dune {
           const std::size_t numShapeFunctions = testBasisSets_.size();
           const std::size_t numHessShapeFunctions =
                 polOrder==1? rangeFactor :
-                std::min(numShapeFunctions,
-                   Dune::Fem::OrthonormalShapeFunctions<DomainType::dimension>::
-                         size(std::max(orders[2], polOrder - 2))*rangeFactor
-           );
+                std::min( numShapeFunctions, sizeONB<0>(std::max(orders[2], polOrder - 2)) );
           std::size_t numGradShapeFunctions =
-                   std::min(numShapeFunctions,
-                   Dune::Fem::OrthonormalShapeFunctions<DomainType::dimension>::
-                         size(std::max(orders[1], polOrder - 1))*rangeFactor
-           );
-          const std::size_t numInnerShapeFunctions = orders[0] < 0 ? 0 :
-                  Dune::Fem::OrthonormalShapeFunctions<DomainType::dimension>::
-                        size(orders[0])*rangeFactor;
+                   std::min( numShapeFunctions, sizeONB<0>(std::max(orders[1], polOrder - 1)) );
+          const std::size_t numInnerShapeFunctions = orders[0] < 0 ? 0 : sizeONB<0>(orders[0]);
 
           const std::size_t numGradConstraints = numGradShapeFunctions;
-          const std::size_t edgeTangentialSize = Dune::Fem::OrthonormalShapeFunctions<1>::
-               size( agIndexSet_.edgeOrders()[0] + 1)*rangeFactor;
+          const std::size_t edgeTangentialSize = sizeONB<1>(agIndexSet_.edgeOrders()[0] + 1);
           std::size_t edgeNormalSize = interpolation.template order2size<1>(1);
 
           // set up matrices used for constructing gradient, value, and edge projections
@@ -657,9 +650,9 @@ namespace Dune {
                       {
                         for (int r=0;r<rangeFactor;++r)
                           std::swap(mask[0][r], mask[0][rangeFactor+r]); // the HACK
-                        std::cout << "mask [" << agglomerate << "]: ";
-                        for (auto &m : mask[0]) std::cout << m << ", ";
-                        std::cout << std::endl;
+                        // std::cout << "mask [" << agglomerate << "]: ";
+                        // for (auto &m : mask[0]) std::cout << m << ", ";
+                        // std::cout << std::endl;
                       }
                     }
                   }
@@ -682,8 +675,7 @@ namespace Dune {
                         // evaluate each here for edge shape fns
                         // first check if we should be using interpolation (for the
                         // existing edge moments - or for H4 space)
-                        if (alpha < Dune::Fem::OrthonormalShapeFunctions<DomainType::dimension>::
-                                    size( agIndexSet_.edgeOrders()[0])*rangeFactor // have enough edge momentsa
+                        if (alpha < sizeONB<0>( agIndexSet_.edgeOrders()[0])       // have enough edge momentsa
                             || edgePhiVector[0].size() == polOrder+1               // interpolation is exact
                             || edgeInterpolation_)                                 // user want interpolation no matter what
                         {
@@ -713,18 +705,14 @@ namespace Dune {
                               // note: the edgeShapeFunctionSet is defined over
                               // the reference element of the edge so the jit has
                               // to be applied here
-                              Dune::FieldVector<double, 2> gradPsi;
-                              for (std::size_t r=0;r<EdgeTestSpace::RangeType::dimension;++r)
-                              {
-                                jit.mv(dpsi[r], gradPsi);
-                                double gradPsiDottau = gradPsi * tau;
-                                assert(std::abs(gradPsiDottau - dpsi[r][0] / h) < 1e-8);
-                                for (std::size_t s = 0; s < mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
-                                {
-                                  P[alpha][mask[0][s]].axpy(edgePhiVector[0][beta][s] * gradPsiDottau * phi[r] * weight,
-                                                            factorTN);
-                                }
-                              }
+                              Dune::FieldVector<double,1> gradHatPsiPhi;
+                              dpsi.mtv(phi, gradHatPsiPhi);
+                              DomainType gradPsiPhi;
+                              jit.mv(gradHatPsiPhi, gradPsiPhi);
+                              double gradPsiPhiDottau = gradPsiPhi * tau;
+                              // assert(std::abs(gradPsiDottau - dpsi[r][0] / h) < 1e-8);
+                              for (std::size_t s = 0; s < mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
+                                P[alpha][mask[0][s]].axpy(edgePhiVector[0][beta][s] * gradPsiPhiDottau * weight, factorTN);
                             }
                         });
 #endif
@@ -733,9 +721,8 @@ namespace Dune {
                       if (alpha < numHessShapeFunctions && interpolation.edgeSize(1) > 0) {
                         edgeShapeFunctionSet.evaluateEach(x, [&](std::size_t beta, typename EdgeTestSpace::RangeType psi) {
                           if (beta < edgePhiVector[1].size())
-                            for (std::size_t r=0;r<EdgeTestSpace::RangeType::dimension;++r)
-                              for (std::size_t s = 0; s < mask[1].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
-                                P[alpha][mask[1][s]].axpy(edgePhiVector[1][beta][s] * psi*phi * weight, factorNN);
+                            for (std::size_t s = 0; s < mask[1].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
+                              P[alpha][mask[1][s]].axpy(edgePhiVector[1][beta][s] * psi*phi * weight, factorNN);
                         });
                       } // alpha < numHessSF and can compute normal derivative
                   });
@@ -894,13 +881,6 @@ namespace Dune {
 #endif
                 colGradProjection = leastSquaresMinimizerGradient.solve( RHSleastSquaresGrad[ beta ] , d );
               }
-            }
-            std::cout << "jacobian [" << agglomerate << "]:\n";
-            for (std::size_t alpha = 0; alpha < numGradShapeFunctions; ++alpha)
-            {
-              for (std::size_t i = 0; i < numDofs; ++i)
-                std::cout << "   " << jacobianProjection[alpha][i] << ", ";
-              std::cout << std::endl;
             }
 
             /////////////////////////////////////////////////////////////////////
