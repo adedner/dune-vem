@@ -9,16 +9,12 @@
 #include <dune/common/dynmatrix.hh>
 #include <dune/geometry/referenceelements.hh>
 
-// #include <dune/fem/space/localfiniteelement/interpolation.hh>
 #include <dune/fem/function/localfunction/converter.hh>
 #include <dune/fem/space/combinedspace/interpolation.hh>
 
 #include <dune/fem/quadrature/elementquadrature.hh>
 #include <dune/fem/space/shapefunctionset/orthonormal.hh>
-// #include <dune/fem/space/shapefunctionset/legendre.hh>
 #include <dune/vem/agglomeration/basisfunctionset.hh>
-// #include <dune/vem/agglomeration/shapefunctionset.hh>
-// #include <dune/vem/misc/highorderquadratures.hh>
 #include <dune/vem/misc/vector.hh>
 
 namespace Dune
@@ -30,7 +26,7 @@ namespace Dune
     struct AgglomerationVEMTestBasisSets
     {
       AgglomerationVEMTestBasisSets( const unsigned int order0, const unsigned int order1, bool useOnb)
-      : scalarSFS_(Dune::GeometryType(Dune::GeometryType::cube, Traits::dimension),order0)
+      : scalarSFS_(Dune::GeometryType(Dune::GeometryType::cube, Traits::dimension), order0)
       , edgeSFS_( Dune::GeometryType(Dune::GeometryType::cube,Traits::dimension-1), order1 )
       , useOnb_(useOnb)
       {}
@@ -78,6 +74,7 @@ namespace Dune
       typedef typename AgglomerationIndexSetType::ElementType ElementType;
       typedef typename AgglomerationIndexSetType::GridPartType GridPartType;
       typedef typename GridPartType::IntersectionType IntersectionType;
+      typedef AgglomerationVEMTestBasisSets<Traits> TestBasisSetsType;
 
       static const int dimension = AgglomerationIndexSetType::dimension;
       static const int baseRangeDimension = Traits::baseRangeDimension;
@@ -112,6 +109,31 @@ namespace Dune
         // calling the interpolate_ method for each component - the actual
         // work is done in the interpolate_ method
         interpolate__(element,localFunction,localDofVector, Dune::PriorityTag<LocalFunction::RangeType::dimension>() );
+      }
+
+      // setup right hand side constraints vector for valueProjection CLS
+      // beta: current basis function phi_beta for which to setup CLS
+      // volune: volume of current polygon
+      // D:    Lambda(B) matrix (numDofs x numShapeFunctions)
+      // d:    right hand side vector (numInnerShapeFunctions)
+      template <class DomainFieldType>
+      void valueL2constraints(unsigned int beta, double volume,
+                              Dune::DynamicMatrix<DomainFieldType> &D,
+                              Dune::DynamicVector<DomainFieldType> &d)
+      {
+        unsigned int numInnerShapeFunctions = d.size();
+        if (numInnerShapeFunctions == 0) return;
+        unsigned int numDofs = D.rows();
+        assert( numInnerShapeFunctions == testBasisSets_.size() );
+        for (int alpha=0; alpha<numInnerShapeFunctions; ++alpha)
+        {
+          // d[alpha] = e_gamma * D_beta
+          // with gamma = beta + numInnerShapeFunctions - numDofs
+          if( beta - numDofs + numInnerShapeFunctions == alpha )
+            d[ alpha ] = D[beta][alpha] * volume;
+          else
+            d[ alpha ] = 0;
+        }
       }
 
       // fill a mask vector providing the information which dofs are
@@ -378,6 +400,100 @@ namespace Dune
         applyOnIntersection(intersection,vertex,edge,mask);
         assert( entry[0] == localDofVectorMatrix[0].size() );
         assert( entry[1] == localDofVectorMatrix[1].size() );
+
+        //////////////////////////////////////////////////////////////////////////////////
+        auto tau = intersection.geometry().corner(1);
+        tau -= intersection.geometry().corner(0);
+        if (localDofVectorMatrix[0].size() > 0)
+        {
+          localDofVectorMatrix[0].invert();
+
+          if (mask[1].size() > edgeSize(1))
+          { // need to take tangential derivatives at vertices into account
+            assert(mask[0].size() == edgeSize(0)+2);
+            auto A = localDofVectorMatrix[0];
+            localDofVectorMatrix[0].resize(edgeSize(0), mask[0].size(), 0);
+            // vertex basis functions (values)
+            for (std::size_t j=0;j<edgeSize(0);++j)
+            {
+              localDofVectorMatrix[0][j][0] = A[j][0];
+              localDofVectorMatrix[0][j][3] = A[j][2];
+            }
+            // vertex basis functions (tangential derivatives)
+            // TODO: add baseRangeDimension
+            for (std::size_t j=0;j<edgeSize(0);++j)
+            {
+              localDofVectorMatrix[0][j][1] = A[j][1]*tau[0];
+              localDofVectorMatrix[0][j][2] = A[j][1]*tau[1];
+              localDofVectorMatrix[0][j][4] = A[j][3]*tau[0];
+              localDofVectorMatrix[0][j][5] = A[j][3]*tau[1];
+            }
+            for (std::size_t i=6;i<mask[0].size();++i)
+              for (std::size_t j=0;j<edgeSize(0);++j)
+              {
+                assert( i-2 < A[j].size() );
+                localDofVectorMatrix[0][j][i] = A[j][i-2];
+              }
+          }
+        }
+        if (localDofVectorMatrix[1].size() > 0)
+        {
+          localDofVectorMatrix[1].invert();
+          if (mask[1].size() > edgeSize(1))
+          {
+            assert(mask[1].size() == edgeSize(1)+2);
+            auto A = localDofVectorMatrix[1];
+            localDofVectorMatrix[1].resize(edgeSize(1), mask[1].size(), 0);
+            std::size_t i=0;
+            // vertex basis functions
+            for (;i<4;i+=2)
+            {
+              for (std::size_t j=0;j<edgeSize(1);++j)
+              {
+                localDofVectorMatrix[1][j][i]   = A[j][i/2]*normal[0];
+                localDofVectorMatrix[1][j][i+1] = A[j][i/2]*normal[1];
+              }
+            }
+            for (;i<mask[1].size();++i)
+              for (std::size_t j=0;j<edgeSize(1);++j)
+                localDofVectorMatrix[1][j][i] = A[j][i-2];
+          }
+        }
+        /* ////////////////////////////////////////////////////////////////////// */
+        // It might be necessary to flip the vertex entries in the masks around
+        // due to a twist in the intersection.
+        // At the moment this is done by checking that the
+        /* ////////////////////////////////////////////////////////////////////// */
+        {
+          auto otherTau = element.geometry().corner(
+                       refElement.subEntity(intersection.indexInInside(),1,1,2)
+                     );
+          otherTau -= element.geometry().corner(
+                        refElement.subEntity(intersection.indexInInside(),1,0,2)
+                      );
+          otherTau /= otherTau.two_norm();
+          if (indexSet_.vertexOrders()[0]>=0) // vertices might have to be flipped
+          {
+            if (otherTau*tau<0)
+            {
+              if (mask[1].size() > edgeSize(1))
+              {
+                // swap vertex values and tangential derivatives
+                for (int r=0;r<3*baseRangeDimension;++r)
+                  std::swap(mask[0][r], mask[0][3*baseRangeDimension+r]);
+                // swap normal derivatives at vertices
+                for (int r=0;r<2*baseRangeDimension;++r)
+                  std::swap(mask[1][r], mask[1][2*baseRangeDimension+r]);
+              }
+              else
+              {
+                // swap vertex values
+                for (int r=0;r<baseRangeDimension;++r)
+                  std::swap(mask[0][r], mask[0][baseRangeDimension+r]);
+              }
+            }
+          }
+        }
       }
 
       std::size_t edgeSize(int deriv) const
@@ -649,7 +765,7 @@ namespace Dune
       }
 
       const AgglomerationIndexSetType &indexSet_;
-      AgglomerationVEMTestBasisSets<Traits> testBasisSets_;
+      TestBasisSetsType testBasisSets_;
       const unsigned int polOrder_;
       const bool useOnb_;
     };
