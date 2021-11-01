@@ -116,7 +116,7 @@ def vemSpace(view, order=1, testSpaces=None, scalar=False,
              dimRange=None, conforming=True, field="double",
              storage="numpy",
              basisChoice=2, rotatedBB=True,
-             edgeInterpolation=False):
+             edgeInterpolation=False, vectorSpace=False):
     """create a virtual element space over an agglomerated grid
 
     Args:
@@ -175,7 +175,7 @@ def vemSpace(view, order=1, testSpaces=None, scalar=False,
     gridPartName = "Dune::FemPy::GridPart< " + view.cppTypeName + " >"
     typeName = "Dune::Vem::AgglomerationVEMSpace< " +\
       "Dune::Fem::FunctionSpace< double, " + field + ", " + str(dimw) + ", " + str(dimRange) + " >, " +\
-      gridPartName + " >"
+      gridPartName + (", true " if vectorSpace else ", false ") + " >"
     constructor = Constructor(
                    ['pybind11::handle gridView',
                     'const pybind11::object agglomerate',

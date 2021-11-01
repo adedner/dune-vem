@@ -37,10 +37,10 @@ struct Derivative : public Dune::Fem::BindableGridFunction< GridPart, Dune::Dim<
   const SFS &sfs_;
 };
 template <class GridPart, class Matrix, class SFS>
-struct PhiEdge : public Dune::Fem::BindableGridFunction< GridPart, Dune::Dim<1> >
+struct PhiEdge : public Dune::Fem::BindableGridFunction< GridPart, typename SFS::RangeType >
 {
-  static const int dimRange = 1;
-  typedef Dune::Fem::BindableGridFunction<GridPart, Dune::Dim<1> > Base;
+  static const int dimRange = SFS::RangeType::dimension;
+  typedef Dune::Fem::BindableGridFunction<GridPart, typename SFS::RangeType > Base;
   using Base::Base;
   typedef typename GridPart::IntersectionType IntersectionType;
 
@@ -69,7 +69,8 @@ struct PhiEdge : public Dune::Fem::BindableGridFunction< GridPart, Dune::Dim<1> 
         if ( beta < matrix_.size() )
         {
           assert( i_ < matrix_[beta].size() );
-          ret[0] += matrix_[beta][i_] * phi[0];
+          for (int r=0;r<dimRange;++r)
+            ret[r] += matrix_[beta][i_] * phi[r];
         }
     } );
   }
@@ -91,7 +92,7 @@ struct PhiEdge : public Dune::Fem::BindableGridFunction< GridPart, Dune::Dim<1> 
         if ( beta < matrix_.size() )
         {
           assert( i_ < matrix_[beta].size() );
-          ret[0].axpy(matrix_[beta][i_] * dphi[0][0], tau);
+          // ??????? NEEDS FIXING ret[0].axpy(matrix_[beta][i_] * dphi[0][0], tau);
         }
     } );
   }

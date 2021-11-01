@@ -246,14 +246,18 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model>
     if (!stabilization[dfSpace.agglomeration().index(entity)])
     {
       const auto &stabMatrix = dfSpace.stabilization(entity);
-      assert( stabMatrix.cols()*blockSize == uLocal.size() );
-      assert( stabMatrix.rows()*blockSize == wLocal.size() );
+      std::size_t bs = 1;
+      if ( stabMatrix.cols()*blockSize == uLocal.size() )
+        bs = blockSize;
+      assert( stabMatrix.cols()*bs == uLocal.size() );
+      assert( stabMatrix.rows()*bs == wLocal.size() );
+      // assert( bs == 1 );
       for (std::size_t r = 0; r < stabMatrix.rows(); ++r)
         for (std::size_t c = 0; c < stabMatrix.cols(); ++c)
-          for (std::size_t b = 0; b < blockSize; ++b)
-            wLocal[r*blockSize+b] +=
-              VectorOfAveragedDiffusionCoefficients[agglomerate][0]
-                * stabMatrix[r][c] * uLocal[c*blockSize+b];
+          for (std::size_t b = 0; b < bs; ++b)
+            wLocal[r*bs+b] +=
+            VectorOfAveragedDiffusionCoefficients[agglomerate][0] // FIX ME: how to make the coeff. depend on the range dimension
+                * stabMatrix[r][c] * uLocal[c*bs+b];
       stabilization[dfSpace.agglomeration().index(entity)] = true;
     }
   }
@@ -350,6 +354,7 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
 
   // std::cout << "   in assembly: finished element loop time=  " << timer.elapsed() << std::endl;
 
+
   for (const auto &seed : stabilization)
   {
     const auto entity = gridPart.entity( seed );
@@ -357,18 +362,27 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
 
     const auto &stabMatrix = rangeSpace.stabilization(entity);
     LocalMatrixType jLocal = jOp.localMatrix(entity, entity);
-    assert( jLocal.rows()    == stabMatrix.rows()*domainBlockSize );
-    assert( jLocal.columns() == stabMatrix.cols()*domainBlockSize );
     //??? const int nE = agIndexSet.numPolyVertices(entity, GridPartType::dimension);
     const DomainLocalFunctionType uLocal = u.localFunction(entity);
+    std::size_t bs = 1;
+    if ( stabMatrix.cols()*domainBlockSize == uLocal.size() )
+      bs = domainBlockSize;
+    // assert( bs == 1);
+    assert( jLocal.rows()    == stabMatrix.rows()*bs );
+    assert( jLocal.columns() == stabMatrix.cols()*bs );
+    assert( stabMatrix.cols()*bs == uLocal.size() );
 
     for (std::size_t r = 0; r < stabMatrix.rows(); ++r)
       for (std::size_t c = 0; c < stabMatrix.cols(); ++c)
-        for (std::size_t b = 0; b < domainBlockSize; ++b)
+        for (std::size_t b = 0; b < bs; ++b)
         {
-          jLocal.add(r*domainBlockSize+b, c*domainBlockSize+b, VectorOfAveragedDiffusionCoefficients[agglomerate][0]  * stabMatrix[r][c]);
+          double add = 0;
           for (std::size_t ccc = 0; ccc < stabMatrix.cols(); ++ccc)
-            jLocal.add(r*domainBlockSize+b, c*domainBlockSize+b, VectorOfAveragedLinearlisedDiffusionCoefficients[agglomerate][0]  * stabMatrix[r][ccc] * uLocal[ccc]); //???  / (nE));
+            for (std::size_t b = 0; b < bs; ++b)
+              add += stabMatrix[r][ccc] * uLocal[ccc*bs+b]; //???  / (nE));
+          jLocal.add(r*bs+b, c*bs+b,
+                     VectorOfAveragedDiffusionCoefficients[agglomerate][0] * stabMatrix[r][c] +
+                     VectorOfAveragedLinearlisedDiffusionCoefficients[agglomerate][0] * add ); // FIX ME: make coeff depend on range * dimension
         }
 #if 0
     for (std::size_t r = 0; r < stabMatrix.rows(); ++r)
