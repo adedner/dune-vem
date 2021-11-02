@@ -168,7 +168,7 @@ def vemSpace(view, order=1, testSpaces=None, scalar=False,
 
     agglomerate = view.hierarchicalGrid.agglomerate
 
-    includes = [ "dune/fem/gridpart/common/gridpart.hh", "dune/vem/space/agglomeration.hh" ] + view.cppIncludes
+    includes = [ "dune/fem/gridpart/common/gridpart.hh", "dune/vem/space/hk.hh" ] + view.cppIncludes
     dimw = view.dimWorld
     viewType = view.cppTypeName
 

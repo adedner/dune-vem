@@ -3,7 +3,7 @@
 
 #include <dune/fem/function/common/scalarproducts.hh>
 #include <dune/fem/schemes/dirichletconstraints.hh>
-#include <dune/vem/space/interpolation.hh>
+// #include <dune/vem/space/interpolation.hh>
 #include <dune/vem/misc/vector.hh>
 
 namespace Dune {
