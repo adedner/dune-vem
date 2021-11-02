@@ -8,7 +8,6 @@
 #include <dune/grid/common/rangegenerators.hh>
 
 #include <dune/fem/function/common/discretefunction.hh>
-#include <dune/vem/space/interpolation.hh>
 #include <dune/vem/misc/vector.hh>
 
 namespace Dune

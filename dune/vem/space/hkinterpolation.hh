@@ -1,5 +1,5 @@
-#ifndef DUNE_VEM_SPACE_INTERPOLATION_HH
-#define DUNE_VEM_SPACE_INTERPOLATION_HH
+#ifndef DUNE_VEM_SPACE_HKINTERPOLATION_HH
+#define DUNE_VEM_SPACE_HKINTERPOLATION_HH
 
 #include <cstddef>
 
@@ -70,13 +70,13 @@ namespace Dune
       typedef AgglomerationVEMInterpolation< Traits > ThisType;
 
     public:
-      typedef typename Traits::AgglomerationIndexSetType AgglomerationIndexSetType;
-      typedef typename AgglomerationIndexSetType::ElementType ElementType;
-      typedef typename AgglomerationIndexSetType::GridPartType GridPartType;
+      typedef typename Traits::IndexSetType IndexSetType;
+      typedef typename IndexSetType::ElementType ElementType;
+      typedef typename IndexSetType::GridPartType GridPartType;
       typedef typename GridPartType::IntersectionType IntersectionType;
       typedef AgglomerationVEMTestBasisSets<Traits> TestBasisSetsType;
 
-      static const int dimension = AgglomerationIndexSetType::dimension;
+      static const int dimension = IndexSetType::dimension;
       static const int baseRangeDimension = Traits::baseRangeDimension;
     private:
 #if 1 // FemQuads
@@ -90,7 +90,7 @@ namespace Dune
       typedef typename Traits::BBBasisFunctionSetType InnerShapeFunctionSet;
 
     public:
-      explicit AgglomerationVEMInterpolation ( const AgglomerationIndexSetType &indexSet, unsigned int polOrder, bool useOnb ) noexcept
+      explicit AgglomerationVEMInterpolation ( const IndexSetType &indexSet, unsigned int polOrder, bool useOnb ) noexcept
         : indexSet_( indexSet )
         , testBasisSets_( std::max(indexSet_.maxDegreePerCodim()[2],0),
                           std::max(indexSet_.maxDegreePerCodim()[1],0),
@@ -764,7 +764,7 @@ namespace Dune
         }
       }
 
-      const AgglomerationIndexSetType &indexSet_;
+      const IndexSetType &indexSet_;
       TestBasisSetsType testBasisSets_;
       const unsigned int polOrder_;
       const bool useOnb_;
@@ -773,4 +773,4 @@ namespace Dune
 
 } // namespace Dune
 
-#endif // #ifndef DUNE_VEM_SPACE_INTERPOLATION_HH
+#endif // #ifndef DUNE_VEM_SPACE_HKINTERPOLATION_HH

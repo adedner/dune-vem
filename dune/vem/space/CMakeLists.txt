@@ -1,9 +1,10 @@
 set(HEADERS
-  agglomeration.hh
+  default.hh
   basisfunctionset.hh
   indexset.hh
   interpolate.hh
-  interpolation.hh
+  hkinterpolation.hh
+  hk.hh
   test.hh
 )
 
