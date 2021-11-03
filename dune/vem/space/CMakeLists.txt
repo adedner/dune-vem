@@ -3,7 +3,6 @@ set(HEADERS
   basisfunctionset.hh
   indexset.hh
   interpolate.hh
-  hkinterpolation.hh
   hk.hh
   test.hh
 )
