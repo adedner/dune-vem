@@ -10,7 +10,6 @@
 #include <dune/fem/space/common/capabilities.hh>
 #include <dune/vem/misc/compatibility.hh>
 
-#include <dune/vem/space/interpolate.hh>
 #include <dune/vem/space/default.hh>
 
 #include <dune/vem/space/hkinterpolation.hh>

@@ -45,10 +45,12 @@ namespace Dune
       }
       std::size_t size() const
       {
-        return scalarSFS_.size()*Traits::baseRangeDimension;
+        // note: scalarSFS has dimension=1 in all cases since the vector space is defined over the element
+        return scalarSFS_.size()*baseRangeDimension;
       }
       std::size_t edgeSize() const
       {
+        // the edge sfs already has baseRangeDimension since it can be defined over the reference edge
         return edgeSFS_.size();
       }
       private:
@@ -61,7 +63,34 @@ namespace Dune
 
     // AgglomerationVEMInterpolation
     // -----------------------------
+    /* Methods:
+      // interpolation of a local function
+      template< class LocalFunction, class LocalDofVector >
+      void operator() ( const ElementType &element, const LocalFunction &localFunction,
+                        LocalDofVector &localDofVector ) const
+      // set mask for active (and type of) dofs - needed for DirichletConstraints
+      // Note: this is based on the block dof mapper approach, i.e., one
+      //       entry in the mask per block
+      void operator() ( const ElementType &element, Std::vector<char> &mask) const
 
+      // apply all dofs to a basis function set (A=L(B))
+      template< class BasisFunctionSet, class LocalDofMatrix >
+      void interpolateBasis ( const ElementType &element,
+                   const BasisFunctionSet &basisFunctionSet, LocalDofMatrix &localDofMatrix ) const
+      // setup constraints rhs for value projection CLS problem
+      template <class DomainFieldType>
+      void valueL2constraints(unsigned int beta, double volume,
+                              Dune::DynamicMatrix<DomainFieldType> &D,
+                              Dune::DynamicVector<DomainFieldType> &d)
+      // interpolate given shape function set on intersection (needed for gradient projection)
+      // Note: this fills in the full mask and localDofs, i.e., not only for each block
+      template< class EdgeShapeFunctionSet >
+      void operator() (const IntersectionType &intersection,
+                       const EdgeShapeFunctionSet &edgeShapeFunctionSet, Std::vector < Dune::DynamicMatrix<double> > &localDofVectorMatrix,
+                       Std::vector<Std::vector<unsigned int>> &mask) const
+      // size of the edgePhiVector
+      std::size_t edgeSize(int deriv) const
+    */
 
 
     template< class Traits >
@@ -299,9 +328,6 @@ namespace Dune
 
       // interpolate the full shape function set on intersection needed for
       // the gradient projection matrix
-      //!TS what do we want to return here?
-      //!TS  i) std::vector<DynMatrix> containing the matrix for each normal derivative?
-      //!TS ii) add an int normDerivOrder parameter and fill the matrix only for that order?
       // Note: for a vector valued space this fills in the full 'baseRangeDimension' mask and localDofs
       template< class EdgeShapeFunctionSet >
       void operator() (const IntersectionType &intersection,
@@ -500,14 +526,14 @@ namespace Dune
       {
         return indexSet_.edgeSize(deriv) * baseRangeDimension;
       }
+
+    private:
       template <int dim>
       std::size_t order2size(unsigned int deriv) const
       {
         return indexSet_.template order2size<dim>(deriv) * baseRangeDimension;
       }
 
-
-    private:
       void getSizesAndOffsets(int poly,
                   int &vertexSize,
                   int &edgeOffset, int &edgeSize,
