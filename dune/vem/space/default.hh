@@ -362,6 +362,8 @@ namespace Dune
           interpolation.interpolateBasis(element, shapeFunctionSet, D);
 
           // compute mass matrices Hp, HpGrad, and the gradient matrices G^l
+          // CHANGE: need to change this to different 'evaluateEach' calls'
+          // CHANGE: constraintValueProjection?
           for (std::size_t qp = 0; qp < quadrature.nop(); ++qp) {
             const DomainFieldType weight =
                     geometry.integrationElement(quadrature.point(qp)) * quadrature.weight(qp);
@@ -402,7 +404,9 @@ namespace Dune
           // set up vector d (rhs for constraints)
           interpolation.valueL2constraints(beta, H0, D, d);
           if( beta >= numDofs - numInnerShapeFunctions )
-            assert( std::abs( d[ beta - numDofs + numInnerShapeFunctions ] - H0 ) < 1e-13);
+          {
+            assert( std::abs( d[ beta - numDofs + numInnerShapeFunctions ] - H0 ) < 1e-13 );
+          }
 
           // compite CLS solution and store in right column of 'valueProjection'
           auto colValueProjection = vectorizeMatrixCol( valueProjection, beta );
@@ -441,6 +445,7 @@ namespace Dune
               mask(2,Std::vector<unsigned int>(0)); // contains indices with Phi_mask[i] is attached to given edge
             edgePhiVector[0] = 0;
             edgePhiVector[1] = 0;
+            // CHANGE: will this still work?
             interpolation(intersection, edgeShapeFunctionSet, edgePhiVector, mask);
 
             auto normal = intersection.centerUnitOuterNormal();
@@ -463,6 +468,8 @@ namespace Dune
               auto x = quadrature.localPoint(qp);
               auto y = intersection.geometryInInside().global(x);
               const DomainFieldType weight = intersection.geometry().integrationElement(x) * quadrature.weight(qp);
+              // CHANGE: which 'sfs' should this be - what is the // // 'RangeType'?
+              // CHANGE: 'evaluateAll' for hessian must be done seperately
               shapeFunctionSet.evaluateEach(y, [&](std::size_t alpha, typename Traits::BBBasisFunctionSetType::RangeType phi) {
                   if (alpha < numGradShapeFunctions)
                   {
@@ -514,6 +521,7 @@ namespace Dune
 
                   // compute the phi.n boundary terms for the hessian projection in
                   // the case that there are dofs for the normal gradient on the edge
+                  // CHANGE: same if as above so can be combined?
                   if (alpha < numHessShapeFunctions && interpolation.edgeSize(1) > 0) {
                     edgeShapeFunctionSet.evaluateEach(x, [&](std::size_t beta, typename EdgeTestSpace::RangeType psi) {
                       if (beta < edgePhiVector[1].size())
@@ -534,6 +542,7 @@ namespace Dune
           {
             const DomainFieldType weight =
                     geometry.integrationElement(quadrature.point(qp)) * quadrature.weight(qp);
+            // CHANGE: use correct shapefunction set - so need 'jacobinEach' as well on the gradient sfs
             shapeFunctionSet.jacobianEach(quadrature[qp], [&](std::size_t alpha, auto gradPhi) {
                 // Note: the shapeFunctionSet is defined in physical space so
                 // the jit is not needed here
@@ -593,6 +602,7 @@ namespace Dune
                 auto x = quadrature.localPoint(qp);
                 auto y = intersection.geometryInInside().global(x);
                 const DomainFieldType weight = intersection.geometry().integrationElement(x) * quadrature.weight(qp);
+                // CHANGE: need hessian sfs here - what is phi?
                 shapeFunctionSet.evaluateEach(y, [&](std::size_t alpha, auto phi) {
                     if (alpha < numHessShapeFunctions)
                     {
@@ -611,6 +621,7 @@ namespace Dune
           for (std::size_t qp = 0; qp < quadrature.nop(); ++qp)
           {
             const DomainFieldType weight = geometry.integrationElement(quadrature.point(qp)) * quadrature.weight(qp);
+            // CHANGE: need jacobianEach on hessian sfs
             shapeFunctionSet.jacobianEach(quadrature[qp],
                           [&](std::size_t alpha, auto gradPhi) {
                 // Note: the shapeFunctionSet is defined in physical space so
