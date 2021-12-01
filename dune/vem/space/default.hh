@@ -368,12 +368,20 @@ namespace Dune
             shapeFunctionSet.evaluateEach(quadrature[qp], [&](std::size_t alpha, typename InnerTestSpace::RangeType phi) {
               shapeFunctionSet.evaluateEach(quadrature[qp], [&](std::size_t beta, typename InnerTestSpace::RangeType psi) {
                 Hp[alpha][beta] += phi * psi * weight;
-                if (alpha < numGradShapeFunctions && beta < numGradShapeFunctions) // basis set is hierarchic so we can compute HpGrad using the order p shapeFunctionSet
-                  HpGrad[alpha][beta] += phi * psi * weight;
-                if (alpha < numHessShapeFunctions && beta < numHessShapeFunctions)
-                  HpHess[alpha][beta] += phi * psi * weight;
                 if (alpha < numInnerShapeFunctions)
                   constraintValueProj[alpha][beta] += phi * psi * weight;
+              });
+            });
+            shapeFunctionSet.evaluateEach(quadrature[qp], [&](std::size_t alpha, typename InnerTestSpace::RangeType phi) {
+              shapeFunctionSet.evaluateEach(quadrature[qp], [&](std::size_t beta, typename InnerTestSpace::RangeType psi) {
+                if (alpha < numGradShapeFunctions && beta < numGradShapeFunctions)
+                  HpGrad[alpha][beta] += phi * psi * weight;
+              });
+            });
+            shapeFunctionSet.evaluateEach(quadrature[qp], [&](std::size_t alpha, typename InnerTestSpace::RangeType phi) {
+              shapeFunctionSet.evaluateEach(quadrature[qp], [&](std::size_t beta, typename InnerTestSpace::RangeType psi) {
+                if (alpha < numHessShapeFunctions && beta < numHessShapeFunctions)
+                  HpHess[alpha][beta] += phi * psi * weight;
               });
             });
           } // quadrature loop
@@ -412,7 +420,7 @@ namespace Dune
         }
 
         //////////////////////////////////////////////////////////////////////////
-        /// GradientProjecjtion //////////////////////////////////////////////////
+        /// GradientProjection //////////////////////////////////////////////////
         //////////////////////////////////////////////////////////////////////////
 
         for (const ElementSeedType &entitySeed : entitySeeds[agglomerate])
@@ -487,7 +495,8 @@ namespace Dune
                       vemBasisFunction.axpy(y, phi, factor, R[alpha]);
                     }
                   }
-
+              });
+              shapeFunctionSet.evaluateEach(y, [&](std::size_t alpha, typename Traits::BBBasisFunctionSetType::RangeType phi) {
                   // compute the phi.tau boundary terms for the hessian projection using d/ds Pi^e
                   if (alpha < numHessShapeFunctions && interpolation.edgeSize(1) > 0)
                   {
