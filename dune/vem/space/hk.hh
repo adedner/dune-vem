@@ -128,9 +128,11 @@ namespace Dune
     template <class Traits>
     struct AgglomerationVEMTestBasisSets
     {
-      AgglomerationVEMTestBasisSets( const unsigned int order0, const unsigned int order1, bool useOnb)
+      AgglomerationVEMTestBasisSets( const unsigned int order0, const unsigned int order1, const unsigned int order2, const unsigned int order3, bool useOnb)
       : scalarSFS_(Dune::GeometryType(Dune::GeometryType::cube, Traits::dimension), order0)
-      , edgeSFS_( Dune::GeometryType(Dune::GeometryType::cube,Traits::dimension-1), order1 )
+      , gradientSFS_(Dune::GeometryType(Dune::GeometryType::cube, Traits::dimension), order1)
+      , hessianSFS_(Dune::GeometryType(Dune::GeometryType::cube, Traits::dimension), order2)
+      , edgeSFS_( Dune::GeometryType(Dune::GeometryType::cube,Traits::dimension-1), order3 )
       , useOnb_(useOnb)
       {}
       template <class Agglomeration>
@@ -150,6 +152,14 @@ namespace Dune
       {
         // note: scalarSFS has dimension=1 in all cases since the vector space is defined over the element
         return scalarSFS_.size()*Traits::baseRangeDimension;
+      }
+       std::size_t size() const
+      {
+        return gradientSFS_.size()*Traits::baseRangeDimension;
+      }
+       std::size_t size() const
+      {
+        return hessianSFS_.size()*Traits::baseRangeDimension;
       }
       std::size_t edgeSize() const
       {
