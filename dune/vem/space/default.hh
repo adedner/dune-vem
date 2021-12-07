@@ -48,7 +48,7 @@ namespace Dune
 
       typedef typename Traits::IndexSetType IndexSetType;
       typedef typename Traits::template InterpolationType<Traits> AgglomerationInterpolationType;
-      typedef typename AgglomerationInterpolationType::TestBasisSetsType TestBasisSetsType;
+      typedef typename AgglomerationInterpolationType::BasisSetsType BasisSetsType;
 
     public:
       typedef typename BaseType::BasisFunctionSetType BasisFunctionSetType;
@@ -106,7 +106,7 @@ namespace Dune
         agIndexSet_(agglomeration, testSpaces),
         blockMapper_(agIndexSet_, agIndexSet_.dofsPerCodim()),
         interpolation_(blockMapper().indexSet(), polOrder, basisChoice != 3),
-        testBasisSets_(polOrder_, agIndexSet_.maxEdgeDegree(), useOnb_),
+        basisSets_(polOrder_, agIndexSet_.maxEdgeDegree(), useOnb_),
         counter_(0),
         useThreads_(Fem::MPIManager::numThreads()),
         valueProjections_(new Vector<
@@ -170,7 +170,7 @@ namespace Dune
         assert(agglomerate<hessianProjections().size());
         return typename Traits::ScalarBasisFunctionSetType(entity, agglomerate,
                        valueProjections_, jacobianProjections_, hessianProjections_,
-                       testBasisSets_.bbBasisFunctionSet(agglomeration(), entity)
+                       basisSets_.bbBasisFunctionSet(agglomeration(), entity)
                );
       }
       const BasisFunctionSetType basisFunctionSet(const EntityType &entity) const
@@ -244,7 +244,7 @@ namespace Dune
       mutable BlockMapperType blockMapper_;
       AgglomerationInterpolationType interpolation_;
       // ScalarShapeFunctionSetType scalarShapeFunctionSet_;
-      TestBasisSetsType testBasisSets_;
+      BasisSetsType basisSets_;
       std::size_t counter_;
       int useThreads_;
       std::shared_ptr<Vector<typename Traits::ScalarBasisFunctionSetType::ValueProjection>> valueProjections_;
@@ -271,7 +271,7 @@ namespace Dune
       assert( EdgeTestSpace::RangeType::dimension == Traits::baseRangeDimension );
 
       Std::vector<int> orders = agIndexSet_.orders();
-      const std::size_t numShapeFunctions = testBasisSets_.size();
+      const std::size_t numShapeFunctions = basisSets_.size();
       const std::size_t numHessShapeFunctions =
             polOrder==1? baseRangeDimension :
             std::min( numShapeFunctions, sizeONB<0>(std::max(orders[2], polOrder - 2)) );
@@ -357,7 +357,7 @@ namespace Dune
           // get the bounding box monomials and apply all dofs to them
           // GENERAL: these are the same as used as test function in 'interpolation'
           const typename Traits::BBBasisFunctionSetType &shapeFunctionSet
-                  = testBasisSets_.bbBasisFunctionSet(agglomeration(), element);
+                  = basisSets_.bbBasisFunctionSet(agglomeration(), element);
 
           interpolation.interpolateBasis(element, shapeFunctionSet, D);
 
@@ -431,9 +431,9 @@ namespace Dune
 
           // get the bounding box monomials and apply all dofs to them
           const typename Traits::BBBasisFunctionSetType &shapeFunctionSet
-                  = testBasisSets_.bbBasisFunctionSet(agglomeration(), element);
+                  = basisSets_.bbBasisFunctionSet(agglomeration(), element);
           const typename Traits::EdgeShapeFunctionSetType &edgeShapeFunctionSet
-                  = testBasisSets_.edgeBasisFunctionSet(agglomeration(), element);
+                  = basisSets_.edgeBasisFunctionSet(agglomeration(), element);
 
           auto vemBasisFunction = scalarBasisFunctionSet(element);
 
@@ -576,7 +576,7 @@ namespace Dune
 
           // get the bounding box monomials and apply all dofs to them
           typename Traits::BBBasisFunctionSetType shapeFunctionSet
-                  = testBasisSets_.bbBasisFunctionSet(agglomeration(), element);
+                  = basisSets_.bbBasisFunctionSet(agglomeration(), element);
           auto vemBasisFunction = scalarBasisFunctionSet(element);
 
           // compute the phi.n boundary terms for the hessian projection in

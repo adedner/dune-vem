@@ -126,9 +126,9 @@ namespace Dune
     //////////////////////////////////////////////////////////////////////////////
 
     template <class Traits>
-    struct AgglomerationVEMTestBasisSets
+    struct AgglomerationVEMBasisSets
     {
-      AgglomerationVEMTestBasisSets( const unsigned int order, const unsigned int edgeOrder, bool useOnb)
+      AgglomerationVEMBasisSets( const unsigned int order, const unsigned int edgeOrder, bool useOnb)
       : valueSFS_(Dune::GeometryType(Dune::GeometryType::cube, Traits::dimension), order)
       , gradientSFS_(Dune::GeometryType(Dune::GeometryType::cube, Traits::dimension), order-1)
       , hessianSFS_(Dune::GeometryType(Dune::GeometryType::cube, Traits::dimension), order-2)
@@ -218,7 +218,7 @@ namespace Dune
       typedef typename IndexSetType::ElementType ElementType;
       typedef typename IndexSetType::GridPartType GridPartType;
       typedef typename GridPartType::IntersectionType IntersectionType;
-      typedef AgglomerationVEMTestBasisSets<Traits> TestBasisSetsType;
+      typedef AgglomerationVEMBasisSets<Traits> BasisSetsType;
 
       static const int dimension = IndexSetType::dimension;
       static const int baseRangeDimension = Traits::baseRangeDimension;
@@ -232,7 +232,7 @@ namespace Dune
     public:
       explicit AgglomerationVEMInterpolation ( const IndexSetType &indexSet, unsigned int polOrder, bool useOnb ) noexcept
         : indexSet_( indexSet )
-        , testBasisSets_( std::max(indexSet_.maxDegreePerCodim()[2],0),
+        , basisSets_( std::max(indexSet_.maxDegreePerCodim()[2],0),
                           std::max(indexSet_.maxDegreePerCodim()[1],0),
                           useOnb )
         , polOrder_( polOrder )
@@ -264,7 +264,7 @@ namespace Dune
         unsigned int numInnerShapeFunctions = d.size();
         if (numInnerShapeFunctions == 0) return;
         unsigned int numDofs = D.rows();
-        assert( numInnerShapeFunctions == testBasisSets_.size() );
+        assert( numInnerShapeFunctions == basisSets_.size() );
         for (int alpha=0; alpha<numInnerShapeFunctions; ++alpha)
         {
           // d[alpha] = e_gamma * D_beta
@@ -302,7 +302,7 @@ namespace Dune
 #ifndef NDEBUG
           auto kStart = k;
 #endif
-          for (std::size_t alpha=0;alpha<testBasisSets_.edgeSize()/baseRangeDimension;++alpha)
+          for (std::size_t alpha=0;alpha<basisSets_.edgeSize()/baseRangeDimension;++alpha)
           {
             if (alpha < indexSet_.template order2size<1>(0))
             {
@@ -335,8 +335,8 @@ namespace Dune
         const auto &refElement = ReferenceElements< ctype, dimension >::general( element.type() );
 
         // use the bb set for this polygon for the inner testing space
-        const auto &innerShapeFunctionSet = testBasisSets_.bbBasisFunctionSet( indexSet_.agglomeration(), element );
-        const auto &edgeBFS = testBasisSets_.edgeBasisFunctionSet( indexSet_.agglomeration(), element );
+        const auto &innerShapeFunctionSet = basisSets_.bbBasisFunctionSet( indexSet_.agglomeration(), element );
+        const auto &edgeBFS = basisSets_.edgeBasisFunctionSet( indexSet_.agglomeration(), element );
 
         // define the corresponding vertex,edge, and inner parts of the interpolation
         auto vertex = [&] (int poly,int i,int k,int numDofs)
@@ -448,7 +448,7 @@ namespace Dune
         for (std::size_t i=0;i<mask.size();++i)
           mask[i].clear();
         const ElementType &element = intersection.inside();
-        const auto &edgeBFS = testBasisSets_.edgeBasisFunctionSet( indexSet_.agglomeration(), element );
+        const auto &edgeBFS = basisSets_.edgeBasisFunctionSet( indexSet_.agglomeration(), element );
         const auto &refElement = ReferenceElements< ctype, dimension >::general( element.type() );
         int edgeNumber = intersection.indexInInside();
         const auto &edgeGeo = refElement.template geometry<1>(edgeNumber);
@@ -721,8 +721,8 @@ namespace Dune
         const auto &refElement = ReferenceElements< ctype, dimension >::general( element.type() );
 
         // use the bb set for this polygon for the inner testing space
-        const auto &innerShapeFunctionSet = testBasisSets_.bbBasisFunctionSet( indexSet_.agglomeration(), element );
-        const auto &edgeBFS = testBasisSets_.edgeBasisFunctionSet( indexSet_.agglomeration(), element );
+        const auto &innerShapeFunctionSet = basisSets_.bbBasisFunctionSet( indexSet_.agglomeration(), element );
+        const auto &edgeBFS = basisSets_.edgeBasisFunctionSet( indexSet_.agglomeration(), element );
 
         // define the vertex,edge, and inner parts of the interpolation
         auto vertex = [&] (int poly,auto i,int k,int numDofs)
@@ -890,7 +890,7 @@ namespace Dune
           {
             edge(poly,intersection,i,edgeSize);
             int count = 0;
-            for (std::size_t alpha=0;alpha<testBasisSets_.edgeSize();++alpha)
+            for (std::size_t alpha=0;alpha<basisSets_.edgeSize();++alpha)
               for (int deriv=0;deriv<2;++deriv)
                 if (alpha < order2size<1>(deriv))
                 {
@@ -902,7 +902,7 @@ namespace Dune
       }
 
       const IndexSetType &indexSet_;
-      TestBasisSetsType testBasisSets_;
+      BasisSetsType basisSets_;
       const unsigned int polOrder_;
       const bool useOnb_;
     };
