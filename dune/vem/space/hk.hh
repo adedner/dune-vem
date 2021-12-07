@@ -128,11 +128,11 @@ namespace Dune
     template <class Traits>
     struct AgglomerationVEMTestBasisSets
     {
-      AgglomerationVEMTestBasisSets( const unsigned int order0, const unsigned int order1, const unsigned int order2, const unsigned int order3, bool useOnb)
-      : scalarSFS_(Dune::GeometryType(Dune::GeometryType::cube, Traits::dimension), order0)
-      , gradientSFS_(Dune::GeometryType(Dune::GeometryType::cube, Traits::dimension), order1)
-      , hessianSFS_(Dune::GeometryType(Dune::GeometryType::cube, Traits::dimension), order2)
-      , edgeSFS_( Dune::GeometryType(Dune::GeometryType::cube,Traits::dimension-1), order3 )
+      AgglomerationVEMTestBasisSets( const unsigned int order, const unsigned int edgeOrder, bool useOnb)
+      : valueSFS_(Dune::GeometryType(Dune::GeometryType::cube, Traits::dimension), order)
+      , gradientSFS_(Dune::GeometryType(Dune::GeometryType::cube, Traits::dimension), order-1)
+      , hessianSFS_(Dune::GeometryType(Dune::GeometryType::cube, Traits::dimension), order-2)
+      , edgeSFS_( Dune::GeometryType(Dune::GeometryType::cube,Traits::dimension-1), edgeOrder )
       , useOnb_(useOnb)
       {}
       template <class Agglomeration>
@@ -140,7 +140,7 @@ namespace Dune
              const Agglomeration &agglomeration, const typename Traits::EntityType &entity) const
       {
         const std::size_t agglomerate = agglomeration.index(entity);
-        return typename Traits::BBBasisFunctionSetType( entity, agglomerate, agglomeration.boundingBoxes(), useOnb_, scalarSFS_);
+        return typename Traits::BBBasisFunctionSetType( orderSFS, entity, agglomerate, agglomeration.boundingBoxes(), useOnb_, valueSFS_);
       }
       template <class Agglomeration>
       const typename Traits::EdgeShapeFunctionSetType &edgeBasisFunctionSet(
@@ -148,18 +148,21 @@ namespace Dune
       {
         return edgeSFS_;
       }
-      std::size_t size() const
+      std::size_t size( orderSFS ) const
       {
         // note: scalarSFS has dimension=1 in all cases since the vector space is defined over the element
-        return scalarSFS_.size()*Traits::baseRangeDimension;
-      }
-       std::size_t size() const
-      {
-        return gradientSFS_.size()*Traits::baseRangeDimension;
-      }
-       std::size_t size() const
-      {
-        return hessianSFS_.size()*Traits::baseRangeDimension;
+        if (orderSFS == 0)
+        {
+          return valueSFS_.size()*Traits::baseRangeDimension;
+        }
+        if (orderSFS == 1)
+        {
+          return gradientSFS_.size()*Traits::baseRangeDimension;
+        }
+        if (orderSFS == 2)
+        {
+          return hessianSFS_.size()*Traits::baseRangeDimension;
+        }
       }
       std::size_t edgeSize() const
       {
@@ -169,7 +172,7 @@ namespace Dune
       private:
       // note: the actual shape function set depends on the entity so
       // we can only construct the underlying monomial basis in the ctor
-      typename Traits::ScalarShapeFunctionSetType scalarSFS_;
+      typename Traits::ScalarShapeFunctionSetType valueSFS_;
       typename Traits::EdgeShapeFunctionSetType edgeSFS_;
       bool useOnb_;
     };
