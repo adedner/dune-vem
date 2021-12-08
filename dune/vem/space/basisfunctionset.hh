@@ -70,16 +70,12 @@ namespace Dune
                             std::shared_ptr<Vector<ValueProjection>> valueProjections,
                             std::shared_ptr<Vector<JacobianProjection>> jacobianProjections,
                             std::shared_ptr<Vector<HessianProjection>> hessianProjections,
-                            ShapeFunctionSet shapeFunctionSet = ShapeFunctionSet(),
-                            ShapeFunctionSet gradShapeFunctionSet = gradShapeFunctionSet(),
-                            ShapeFunctionSet hessShapeFunctionSet = hessShapeFunctionSet()
+                            ShapeFunctionSet shapeFunctionSet
                           )
         : entity_( &entity ), //polygon
           agglomerate_(agglomerate),
           shapeFunctionSet_( std::move( shapeFunctionSet ) ),
-          gradShapeFunctionSet_( std::move( gradShapeFunctionSet ) ),
-          hessShapeFunctionSet_( std::move( hessShapeFunctionSet ) ),
-          valueProjections_( valueProjections),
+          valueProjections_( valueProjections ),
           jacobianProjections_( jacobianProjections ),
           hessianProjections_( hessianProjections ),
           size_( valueProjection()[0].size() )
@@ -123,14 +119,6 @@ namespace Dune
           } );
       }
 
-      // TODO: use lower order shape function set for Jacobian?
-      static void axpyJac(const DomainFieldType lam, const DomainType &dom, const RangeType &ran,
-                          JacobianRangeType &ret)
-      {
-        for (int r=0;r<RangeType::dimension;++r)
-          for (int d=0;d<DomainType::dimension;++d)
-            ret[r][d] += lam*dom[d]*ran[r];
-      }
       template< class Quadrature, class DofVector, class Jacobians >
       void jacobianAll ( const Quadrature &quadrature, const DofVector &dofs, Jacobians &jacobians ) const
       {
@@ -142,10 +130,9 @@ namespace Dune
       void jacobianAll ( const Point &x, const DofVector &dofs, JacobianRangeType &jacobian ) const
       {
         jacobian = JacobianRangeType( 0 );
-        gradShapeFunctionSet_.evaluateEach( position( x ), [ this, &dofs, &jacobian ] ( std::size_t alpha, JacobianRangeType phi_alpha ) {
-            const auto &jacobianProjectionAlpha = jacobianProjection()[alpha];
+        shapeFunctionSet_.jacobianEach( position( x ), [ this, &dofs, &jacobian ] ( std::size_t alpha, JacobianRangeType dphi_alpha ) {
             for( std::size_t j = 0; j < size(); ++j )
-              axpyJac( dofs[j], phi_alpha[j], jacobianProjectionAlpha, jacobian );
+              jacobian.axpy( jacobianProjection()[ alpha ][ j ]*dofs[ j ], dphi_alpha );
           } );
       }
       template< class Point, class Jacobians > const
@@ -153,21 +140,13 @@ namespace Dune
       {
         assert( jacobians.size() >= size() );
         std::fill( jacobians.begin(), jacobians.end(), JacobianRangeType( 0 ) );
-        gradShapeFunctionSet_.evaluateEach( position(x), [ this, &jacobians ] ( std::size_t alpha, JacobianRangeType phi_alpha ) {
-            const auto &jacobianProjectionAlpha = jacobianProjection()[alpha];
+        shapeFunctionSet_.jacobianEach( position(x), [ this, &jacobians ] ( std::size_t alpha, JacobianRangeType dphi_alpha ) {
             for( std::size_t j = 0; j < size(); ++j )
-              axpyJac( 1, phi_alpha[j], jacobianProjectionAlpha, jacobians[j] );
-        } );
+              jacobians[ j ].axpy( jacobianProjection()[ alpha ][ j ], dphi_alpha );
+          } );
       }
 
-      static void axpyHes(const DomainFieldType lam, const HessianMatrixType &dom, const RangeType &ran,
-                          HessianRangeType &ret)
-      {
-        for (int r=0;r<RangeType::dimension;++r)
-          for (int dx=0;dx<DomainType::dimension;++dx)
-            for (int dy=0;dy<DomainType::dimension;++dy)
-              ret[r][dx][dy] += lam*dom[dx][dy]*ran[r];
-      }
+#if 0 // !!!!!
       template< class Quadrature, class DofVector, class Hessians >
       void hessianAll ( const Quadrature &quadrature, const DofVector &dofs, Hessians &hessians ) const
       {
@@ -198,19 +177,9 @@ namespace Dune
               axpyHes( 1, phi_alpha[j], hessianProjectionAlpha, hessians[j] );
         } );
       }
+#endif
 
       const EntityType &entity () const { assert( entity_ ); return *entity_; }
-
-#if 0
-      template< class Point, class Factor >
-      void axpy ( const Point &x, const Factor &factor, DynamicVector<DomainType> &dofs ) const
-      {
-        shapeFunctionSet_.evaluateEach( position( x ), [ this, &factor, &dofs ] ( std::size_t alpha, RangeType phi_alpha ) {
-            for( std::size_t j = 0; j < size(); ++j )
-              dofs[ j ].axpy( valueProjection()[ alpha ][ j ], factor*phi_alpha );
-          } );
-      }
-#endif
 
       /********************************************/
 
@@ -275,6 +244,7 @@ namespace Dune
 
       /********************************************/
 
+#if 0
       template< class Point >
       void axpy ( const Point &x, const JacobianRangeType &factor, DynamicVector<DomainType> &dofs ) const
       {
@@ -328,7 +298,7 @@ namespace Dune
             }
           } );
       }
-
+#endif
 
     private:
       template< class Point >
@@ -340,8 +310,6 @@ namespace Dune
       const EntityType *entity_ = nullptr;
       std::size_t agglomerate_;
       ShapeFunctionSet shapeFunctionSet_;
-      ShapeFunctionSet gradShapeFunctionSet_;
-      ShapeFunctionSet hessShapeFunctionSet_;
       std::shared_ptr<Vector<ValueProjection>> valueProjections_;
       std::shared_ptr<Vector<JacobianProjection>> jacobianProjections_;
       std::shared_ptr<Vector<HessianProjection>> hessianProjections_;

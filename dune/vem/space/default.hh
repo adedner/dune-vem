@@ -169,10 +169,8 @@ namespace Dune
         assert(agglomerate<jacobianProjections().size());
         assert(agglomerate<hessianProjections().size());
         return typename Traits::ScalarBasisFunctionSetType(entity, agglomerate,
-                       valueProjections_, jacobianProjections_, hessianProjections_,
-                       basisSets_.bbBasisFunctionSet(0, agglomeration(), entity),
-                       basisSets_.bbBasisFunctionSet(1, agglomeration(), entity),
-                       basisSets_.bbBasisFunctionSet(2, agglomeration(), entity)
+                        valueProjections_, jacobianProjections_, hessianProjections_,
+                        basisSets_.basisFunctionSet(agglomeration(), entity)
                );
       }
       const BasisFunctionSetType basisFunctionSet(const EntityType &entity) const
@@ -224,7 +222,6 @@ namespace Dune
       {
         return Dune::Fem::OrthonormalShapeFunctions<DomainType::dimension - codim>:: size(order) *
                Traits::ScalarBasisFunctionSetType::RangeType::dimension;
-               // Traits::baseRangeDimension;
       }
 
       template <class T>
@@ -245,7 +242,6 @@ namespace Dune
       IndexSetType agIndexSet_;
       mutable BlockMapperType blockMapper_;
       AgglomerationInterpolationType interpolation_;
-      // ScalarShapeFunctionSetType scalarShapeFunctionSet_;
       BasisSetsType basisSets_;
       std::size_t counter_;
       int useThreads_;
@@ -264,7 +260,7 @@ namespace Dune
           unsigned int start, unsigned int end )
     {
       int polOrder = order();
-      typedef typename Traits::BBBasisFunctionSetType InnerTestSpace;
+      // ??? get RangeType etc some other way ... InnerTestSpace;
       typedef typename Traits::EdgeShapeFunctionSetType EdgeTestSpace;
       AgglomerationInterpolationType interpolation(blockMapper().indexSet(), polOrder, basisChoice_ != 3);
 
@@ -303,13 +299,16 @@ namespace Dune
       edgePhiVector[1].resize(interpolation.edgeSize(1), interpolation.edgeSize(1), 0);
 
       // matrix for rhs of gradient and hessian projections
-      DynamicMatrix<DomainType> R;
-      DynamicMatrix<Dune::FieldMatrix<DomainFieldType,dimDomain,dimDomain>> P;
+      DynamicMatrix<DomainFieldType> R;
+      DynamicMatrix<DomainFieldType> P;
+      std::vector<RangeType> phi0Values;
 
       // start iteration over all polygons
       for (std::size_t agglomerate = start; agglomerate < end; ++agglomerate)
       {
         const std::size_t numDofs = blockMapper().numDofs(agglomerate) * baseRangeDimension;
+
+        phi0Values.resize(numDofs);
 
         const int numEdges = agIndexSet_.subAgglomerates(agglomerate, IndexSetType::dimension - 1);
 
@@ -325,9 +324,9 @@ namespace Dune
         hessianProjection.resize(numShapeFunctions);
         for (std::size_t alpha = 0; alpha < numShapeFunctions; ++alpha)
         {
-          valueProjection[alpha].resize(numDofs, 0);
-          jacobianProjection[alpha].resize(numDofs, DomainType(0));
-          hessianProjection[alpha].resize(numDofs, HessianMatrixType(0));
+          valueProjection[alpha].resize(numDofs, DomainFieldType(0));
+          jacobianProjection[alpha].resize(numDofs, DomainFieldType(0));
+          hessianProjection[alpha].resize(numDofs, DomainFieldType(0));
         }
 
         // value projection CLS
@@ -337,7 +336,7 @@ namespace Dune
         std::fill(d.begin(),d.end(),0);
 
         // rhs structures for gradient/hessian projection
-        R.resize(numGradShapeFunctions, numDofs, DomainType(0));
+        R.resize(numGradShapeFunctions, numDofs, 0);
         P.resize(numHessShapeFunctions, numDofs, 0);
 
         //////////////////////////////////////////////////////////////////////////
@@ -355,8 +354,7 @@ namespace Dune
 
           // get the bounding box monomials and apply all dofs to them
           // GENERAL: these are the same as used as test function in 'interpolation'
-          const typename Traits::BBBasisFunctionSetType &shapeFunctionSet
-                  = basisSets_.bbBasisFunctionSet(agglomeration(), element);
+          const auto &shapeFunctionSet = basisSets_.basisFunctionSet(agglomeration(), element);
 
           interpolation.interpolateBasis(element, shapeFunctionSet, D);
 
@@ -372,16 +370,14 @@ namespace Dune
                   constraintValueProj[alpha][beta] += phi * psi * weight;
               });
             });
-            gradShapeFunctionSet.evaluateEach(quadrature[qp], [&](std::size_t alpha, typename InnerTestSpace::JacobianRangeType phi) {
-              gradShapeFunctionSet.evaluateEach(quadrature[qp], [&](std::size_t beta, typename InnerTestSpace::JacobianRangeType psi) {
-                // if (alpha < numGradShapeFunctions && beta < numGradShapeFunctions)
-                  HpGrad[alpha][beta] += phi * psi * weight;
+            shapeFunctionSet.jacobianEach(quadrature[qp], [&](std::size_t alpha, typename InnerTestSpace::JacobianRangeType phi) {
+              shapeFunctionSet.jacobianEach(quadrature[qp], [&](std::size_t beta, typename InnerTestSpace::JacobianRangeType psi) {
+                  HpGrad[alpha][beta] += phi * psi * weight; // ????
               });
             });
-            hessShapeFunctionSet.evaluateEach(quadrature[qp], [&](std::size_t alpha, typename InnerTestSpace::HessianRangeType phi) {
-              hessShapeFunctionSet.evaluateEach(quadrature[qp], [&](std::size_t beta, typename InnerTestSpace::HessianRangeType psi) {
-                // if (alpha < numHessShapeFunctions && beta < numHessShapeFunctions)
-                  HpHess[alpha][beta] += phi * psi * weight;
+            shapeFunctionSet.hessianEach(quadrature[qp], [&](std::size_t alpha, typename InnerTestSpace::HessianRangeType phi) {
+              shapeFunctionSet.hessianEach(quadrature[qp], [&](std::size_t beta, typename InnerTestSpace::HessianRangeType psi) {
+                  HpHess[alpha][beta] += phi * psi * weight; // ????
               });
             });
           } // quadrature loop
@@ -430,8 +426,7 @@ namespace Dune
           const auto &refElement = ReferenceElements<typename GridPartType::ctype, GridPartType::dimension>::general( element.type());
 
           // get the bounding box monomials and apply all dofs to them
-          const typename Traits::BBBasisFunctionSetType &shapeFunctionSet
-                  = basisSets_.bbBasisFunctionSet(agglomeration(), element);
+          const auto &shapeFunctionSet = basisSets_.basisFunctionSet(agglomeration(), element);
           const typename Traits::EdgeShapeFunctionSetType &edgeShapeFunctionSet
                   = basisSets_.edgeBasisFunctionSet(agglomeration(), element);
 
@@ -471,7 +466,7 @@ namespace Dune
               auto x = quadrature.localPoint(qp);
               auto y = intersection.geometryInInside().global(x);
               const DomainFieldType weight = intersection.geometry().integrationElement(x) * quadrature.weight(qp);
-              gradShapeFunctionSet.evaluateEach(y, [&](std::size_t alpha, typename Traits::BBBasisFunctionSetType::JacobianRangeType phi) {
+              shapeFunctionSet.jacobianEach(y, [&](std::size_t alpha, auto phi) {
                   // evaluate each here for edge shape fns
                   // first check if we should be using interpolation (for the
                   // existing edge moments - or for H4 space)
@@ -484,7 +479,7 @@ namespace Dune
                             // TO DO remove axpy here as R is now scalar
                       if (beta < edgePhiVector[0].size())
                         for (std::size_t s = 0; s < mask[0].size(); ++s)// note that edgePhi is the transposed of the basis transform matrix
-                          R[alpha][mask[0][s]] += weight * (edgePhiVector[0][beta][s] * psi) * (phi * normal);
+                          R[alpha][mask[0][s]] += weight * (edgePhiVector[0][beta][s] * psi) * (phi * normal); // ????
                           // R[alpha][mask[0][s]].axpy(edgePhiVector[0][beta][s] * psi*phi * weight, normal);
                     });
                   }
@@ -495,10 +490,11 @@ namespace Dune
                     auto factor = normal;
                     factor *= weight;
                     // R[alpha] += phi*factor
-                    vemBasisFunction.axpy(y, phi, factor, R[alpha]);
+                    vemBasisFunction.axpy(y, phi, factor, R[alpha]); // ????
                   }
               });
-              hessShapeFunctionSet.evaluateEach(y, [&](std::size_t alpha, typename Traits::BBBasisFunctionSetType::HessianRangeType phi) {
+#if 0
+              hessShapeFunctionSet.evaluateEach(y, [&](std::size_t alpha, HessianRangeType phi) {
                   // compute the phi.tau boundary terms for the hessian projection using d/ds Pi^e
                   if ( interpolation.edgeSize(1) > 0 )
                   {
@@ -535,6 +531,7 @@ namespace Dune
                     });
                   } // alpha < numHessSF and can compute normal derivative
               });
+#endif
             } // quadrature loop
             // store the masks for each edge
           } // loop over intersections
@@ -545,15 +542,14 @@ namespace Dune
           {
             const DomainFieldType weight =
                     geometry.integrationElement(quadrature.point(qp)) * quadrature.weight(qp);
-            shapeFunctionSet.jacobianEach(quadrature[qp], [&](std::size_t alpha, auto gradPhi) {
+            vemBasisFunction.evaluateAll(quadrature[qp], phi0Values);
+            shapeFunctionSet.divJacobianEach(quadrature[qp], [&](std::size_t alpha, auto divGradPhi) {
+                // divGradPhi = RangeType = tr( D GradSF )
                 // Note: the shapeFunctionSet is defined in physical space so
                 // the jit is not needed here
                 // R[alpha][j]  -=  Pi phi_j  grad(m_alpha) * weight
-                // TO DO remove axpy here and use shapeFunctionSet.gradientJacobianEach e.g. to use div(m_{alpha})
-                if (alpha < numGradShapeFunctions) {
-                  gradPhi *= -weight;
-                  vemBasisFunction.axpy(quadrature[qp], gradPhi, R[alpha]);
-                }
+                for (std::size_t j=0; j<numDofs; ++j)
+                  R[alpha][j] += phi0Values[j] * divGradPhi * weight;
             });
           } // quadrature loop
         } // loop over triangles in agglomerate
@@ -570,7 +566,7 @@ namespace Dune
         /////////////////////////////////////////////////////////////////////
         // HessianProjection ////////////////////////////////////////////////
         /////////////////////////////////////////////////////////////////////
-
+#if 0 // ???
         // iterate over the triangles of this polygon (for Hessian projection)
         for (const ElementSeedType &entitySeed : entitySeeds[agglomerate])
         {
@@ -578,12 +574,7 @@ namespace Dune
           const auto geometry = element.geometry();
 
           // get the bounding box monomials and apply all dofs to them
-          typename Traits::BBBasisFunctionSetType shapeFunctionSet
-                  = basisSets_.bbBasisFunctionSet(0, agglomeration(), element);
-          typename Traits::BBBasisFunctionSetType gradShapeFunctionSet
-                  = basisSets_.bbBasisFunctionSet(1, agglomeration(), element);
-          typename Traits::BBBasisFunctionSetType hessShapeFunctionSet
-                  = basisSets_.bbBasisFunctionSet(2, agglomeration(), element);
+          auto shapeFunctionSet = basisSets_.basisFunctionSet(agglomeration(), element);
           auto vemBasisFunction = scalarBasisFunctionSet(element);
 
           // compute the phi.n boundary terms for the hessian projection in
@@ -645,7 +636,7 @@ namespace Dune
             for (std::size_t beta = 0; beta < numHessShapeFunctions; ++beta)
               hessianProjection[alpha][i].axpy(HpHessInv[alpha][beta], P[beta][i]);
           }
-
+#endif
         /////////////////////////////////////////////////////////////////////
         // stabilization matrix /////////////////////////////////////////////
         /////////////////////////////////////////////////////////////////////
