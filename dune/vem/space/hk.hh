@@ -157,10 +157,13 @@ namespace Dune
         }
         if (orderSFS == 1)
         {
+          //  std::min( numShapeFunctions, sizeONB<0>(std::max(orders[1], polOrder - 1)) );
           return gradientSFS_.size()*Traits::baseRangeDimension;
         }
         if (orderSFS == 2)
         {
+          // polOrder==1? baseRangeDimension :
+          //   std::min( numShapeFunctions, sizeONB<0>(std::max(orders[2], polOrder - 2)) );
           return hessianSFS_.size()*Traits::baseRangeDimension;
         }
       }

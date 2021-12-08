@@ -74,6 +74,8 @@ namespace Dune
         : entity_( &entity ), //polygon
           agglomerate_(agglomerate),
           shapeFunctionSet_( std::move( shapeFunctionSet ) ),
+          // gradShapeFunctionSet_
+          // hessShapeFunctionSet_
           valueProjections_( valueProjections),
           jacobianProjections_( jacobianProjections ),
           hessianProjections_( hessianProjections ),

@@ -273,12 +273,9 @@ namespace Dune
       assert( EdgeTestSpace::RangeType::dimension == Traits::baseRangeDimension );
 
       Std::vector<int> orders = agIndexSet_.orders();
-      const std::size_t numShapeFunctions = basisSets_.size();
-      const std::size_t numHessShapeFunctions =
-            polOrder==1? baseRangeDimension :
-            std::min( numShapeFunctions, sizeONB<0>(std::max(orders[2], polOrder - 2)) );
-      std::size_t numGradShapeFunctions =
-               std::min( numShapeFunctions, sizeONB<0>(std::max(orders[1], polOrder - 1)) );
+      const std::size_t numShapeFunctions = basisSets_.size(0);
+      const std::size_t numGradShapeFunctions = basisSets_.size(1);
+      const std::size_t numHessShapeFunctions = basisSets_.size(2);
       const std::size_t numInnerShapeFunctions = orders[0] < 0 ? 0 : sizeONB<0>(orders[0]);
 
       // set up matrices used for constructing gradient, value, and edge projections
