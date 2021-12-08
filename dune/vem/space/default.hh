@@ -356,15 +356,12 @@ namespace Dune
           // get the bounding box monomials and apply all dofs to them
           // GENERAL: these are the same as used as test function in 'interpolation'
           const typename Traits::BBBasisFunctionSetType &shapeFunctionSet
-                  = basisSets_.bbBasisFunctionSet(0, agglomeration(), element);
-          const typename Traits::BBBasisFunctionSetType &gradShapeFunctionSet
-                  = basisSets_.bbBasisFunctionSet(1, agglomeration(), element);
-          const typename Traits::BBBasisFunctionSetType &hessShapeFunctionSet
-                  = basisSets_.bbBasisFunctionSet(2, agglomeration(), element);
+                  = basisSets_.bbBasisFunctionSet(agglomeration(), element);
 
           interpolation.interpolateBasis(element, shapeFunctionSet, D);
 
           // compute mass matrices Hp, HpGrad, and the gradient matrices G^l
+          // TO DO change here to call shapeFunctionSet.jacobianEach and hessianEach from methods in hk
           for (std::size_t qp = 0; qp < quadrature.nop(); ++qp) {
             const DomainFieldType weight =
                     geometry.integrationElement(quadrature.point(qp)) * quadrature.weight(qp);
@@ -400,7 +397,7 @@ namespace Dune
         HpHessInv.invert();
 
         //////////////////////////////////////////////////////////////////////////
-        /// ValueProjecjtion /////////////////////////////////////////////////////
+        /// ValueProjection /////////////////////////////////////////////////////
         //////////////////////////////////////////////////////////////////////////
 
         DomainFieldType H0 = blockMapper_.indexSet().volume(agglomerate);
@@ -434,11 +431,7 @@ namespace Dune
 
           // get the bounding box monomials and apply all dofs to them
           const typename Traits::BBBasisFunctionSetType &shapeFunctionSet
-                  = basisSets_.bbBasisFunctionSet(0, agglomeration(), element);
-          const typename Traits::BBBasisFunctionSetType &gradShapeFunctionSet
-                  = basisSets_.bbBasisFunctionSet(1, agglomeration(), element);
-          const typename Traits::BBBasisFunctionSetType &hessShapeFunctionSet
-                  = basisSets_.bbBasisFunctionSet(2, agglomeration(), element);
+                  = basisSets_.bbBasisFunctionSet(agglomeration(), element);
           const typename Traits::EdgeShapeFunctionSetType &edgeShapeFunctionSet
                   = basisSets_.edgeBasisFunctionSet(agglomeration(), element);
 
@@ -488,15 +481,20 @@ namespace Dune
                   {
                     edgeShapeFunctionSet.evaluateEach(x, [&](std::size_t beta,
                           typename Traits::EdgeShapeFunctionSetType::RangeType psi) {
+                            // TO DO remove axpy here as R is now scalar
                       if (beta < edgePhiVector[0].size())
                         for (std::size_t s = 0; s < mask[0].size(); ++s)// note that edgePhi is the transposed of the basis transform matrix
-                          R[alpha][mask[0][s]].axpy(edgePhiVector[0][beta][s] * psi*phi * weight, normal);
+                          R[alpha][mask[0][s]] += weight * (edgePhiVector[0][beta][s] * psi) * (phi * normal);
+                          // R[alpha][mask[0][s]].axpy(edgePhiVector[0][beta][s] * psi*phi * weight, normal);
                     });
                   }
                   else // use value projection
                   {
+                    // TO DO this needs changing as R is now dynamic matrix of type DFT
+                    // need to call evaluate all on VEM basis and store in vector
                     auto factor = normal;
                     factor *= weight;
+                    // R[alpha] += phi*factor
                     vemBasisFunction.axpy(y, phi, factor, R[alpha]);
                   }
               });
@@ -551,6 +549,7 @@ namespace Dune
                 // Note: the shapeFunctionSet is defined in physical space so
                 // the jit is not needed here
                 // R[alpha][j]  -=  Pi phi_j  grad(m_alpha) * weight
+                // TO DO remove axpy here and use shapeFunctionSet.gradientJacobianEach e.g. to use div(m_{alpha})
                 if (alpha < numGradShapeFunctions) {
                   gradPhi *= -weight;
                   vemBasisFunction.axpy(quadrature[qp], gradPhi, R[alpha]);
