@@ -130,17 +130,28 @@ namespace Dune
     {
       AgglomerationVEMBasisSets( const unsigned int order, const unsigned int edgeOrder, bool useOnb)
       : valueSFS_(Dune::GeometryType(Dune::GeometryType::cube, Traits::dimension), order)
-      , gradientSFS_(Dune::GeometryType(Dune::GeometryType::cube, Traits::dimension), order-1)
-      , hessianSFS_(Dune::GeometryType(Dune::GeometryType::cube, Traits::dimension), order-2)
+      , gradientSFS_(Dune::GeometryType(Dune::GeometryType::cube, Traits::dimension), max(0,order-1))
+      , hessianSFS_(Dune::GeometryType(Dune::GeometryType::cube, Traits::dimension), max(0,order-2))
       , edgeSFS_( Dune::GeometryType(Dune::GeometryType::cube,Traits::dimension-1), edgeOrder )
       , useOnb_(useOnb)
       {}
       template <class Agglomeration>
-      const typename Traits::BBBasisFunctionSetType bbBasisFunctionSet(
+      const typename Traits::BBBasisFunctionSetType bbBasisFunctionSet( orderSFS,
              const Agglomeration &agglomeration, const typename Traits::EntityType &entity) const
       {
         const std::size_t agglomerate = agglomeration.index(entity);
-        return typename Traits::BBBasisFunctionSetType( orderSFS, entity, agglomerate, agglomeration.boundingBoxes(), useOnb_, valueSFS_);
+        if ( orderSFS == 0)
+        {
+          return typename Traits::BBBasisFunctionSetType( orderSFS, entity, agglomerate, agglomeration.boundingBoxes(), useOnb_, valueSFS_);
+        }
+        if ( orderSFS == 1)
+        {
+          return typename Traits::BBBasisFunctionSetType( orderSFS, entity, agglomerate, agglomeration.boundingBoxes(), useOnb_, gradientSFS_);
+        }
+        if ( orderSFS == 2)
+        {
+          return typename Traits::BBBasisFunctionSetType( orderSFS, entity, agglomerate, agglomeration.boundingBoxes(), useOnb_, hessianSFS_);
+        }
       }
       template <class Agglomeration>
       const typename Traits::EdgeShapeFunctionSetType &edgeBasisFunctionSet(
@@ -176,6 +187,8 @@ namespace Dune
       // note: the actual shape function set depends on the entity so
       // we can only construct the underlying monomial basis in the ctor
       typename Traits::ScalarShapeFunctionSetType valueSFS_;
+      typename Traits::ScalarShapeFunctionSetType gradientSFS_;
+      typename Traits::ScalarShapeFunctionSetType hessianSFS_;
       typename Traits::EdgeShapeFunctionSetType edgeSFS_;
       bool useOnb_;
     };

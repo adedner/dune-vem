@@ -70,12 +70,15 @@ namespace Dune
                             std::shared_ptr<Vector<ValueProjection>> valueProjections,
                             std::shared_ptr<Vector<JacobianProjection>> jacobianProjections,
                             std::shared_ptr<Vector<HessianProjection>> hessianProjections,
-                            ShapeFunctionSet shapeFunctionSet = ShapeFunctionSet() )
+                            ShapeFunctionSet shapeFunctionSet = ShapeFunctionSet(),
+                            ShapeFunctionSet gradShapeFunctionSet = gradShapeFunctionSet(),
+                            ShapeFunctionSet hessShapeFunctionSet = hessShapeFunctionSet()
+                          )
         : entity_( &entity ), //polygon
           agglomerate_(agglomerate),
           shapeFunctionSet_( std::move( shapeFunctionSet ) ),
-          // gradShapeFunctionSet_
-          // hessShapeFunctionSet_
+          gradShapeFunctionSet_( std::move( gradShapeFunctionSet ) ),
+          hessShapeFunctionSet_( std::move( hessShapeFunctionSet ) ),
           valueProjections_( valueProjections),
           jacobianProjections_( jacobianProjections ),
           hessianProjections_( hessianProjections ),
@@ -337,6 +340,8 @@ namespace Dune
       const EntityType *entity_ = nullptr;
       std::size_t agglomerate_;
       ShapeFunctionSet shapeFunctionSet_;
+      ShapeFunctionSet gradShapeFunctionSet_;
+      ShapeFunctionSet hessShapeFunctionSet_;
       std::shared_ptr<Vector<ValueProjection>> valueProjections_;
       std::shared_ptr<Vector<JacobianProjection>> jacobianProjections_;
       std::shared_ptr<Vector<HessianProjection>> hessianProjections_;
