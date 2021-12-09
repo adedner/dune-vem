@@ -159,6 +159,21 @@ namespace Dune
           }
           );
         }
+        template< class Point, class Functor >
+        void divJacobianEach( const Point &x, Functor functor ) const
+        {
+          RangeType divGradret(0);
+          sfs_.jacobianEach(x, [&](std::size_t alpha, typename FunctionSpace::JacobianRangeType dphi){
+            for (size_t r=0;r<dphi.size();++r)
+            {
+              for (size_t d=0;d<dimDomain;++d)
+              {
+                divGradret[r] += dphi[r][d];
+                functor(dimDomain*alpha+d, divGradret);
+              }
+            }
+          );
+        }
 
         private:
         BBBasisFunctionSetType sfs_;

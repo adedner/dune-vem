@@ -554,7 +554,6 @@ namespace Dune
             const DomainFieldType weight =
                     geometry.integrationElement(quadrature.point(qp)) * quadrature.weight(qp);
             vemBasisFunction.evaluateAll(quadrature[qp], phi0Values);
-            /* ????
             shapeFunctionSet.divJacobianEach(quadrature[qp], [&](std::size_t alpha, auto divGradPhi) {
                 // divGradPhi = RangeType = tr( D GradSF )
                 // Note: the shapeFunctionSet is defined in physical space so
@@ -563,7 +562,6 @@ namespace Dune
                 for (std::size_t j=0; j<numDofs; ++j)
                   R[alpha][j] += phi0Values[j] * divGradPhi * weight;
             });
-            */
           } // quadrature loop
         } // loop over triangles in agglomerate
 
