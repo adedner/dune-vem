@@ -399,7 +399,7 @@ namespace Dune
                           std::max(indexSet_.maxDegreePerCodim()[1],0),
                           useOnb )
         */
-        , basisSets_(polOrder, indexSet_.maxEdgeDegree(), useOnb_)
+        , basisSets_(polOrder, std::max(indexSet_.maxDegreePerCodim()[1],0), useOnb)
         , polOrder_( polOrder )
         , useOnb_(useOnb)
       {}
@@ -429,7 +429,7 @@ namespace Dune
         unsigned int numInnerShapeFunctions = d.size();
         if (numInnerShapeFunctions == 0) return;
         unsigned int numDofs = D.rows();
-        // ??? assert( numInnerShapeFunctions == basisSets_.innerSize() );
+        assert( numInnerShapeFunctions == basisSets_.innerTestSize() );
         for (int alpha=0; alpha<numInnerShapeFunctions; ++alpha)
         {
           // d[alpha] = e_gamma * D_beta
