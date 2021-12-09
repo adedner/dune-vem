@@ -366,7 +366,8 @@ namespace Dune
 
           // compute mass matrices Hp, HpGrad, and the gradient matrices G^l
           // TO DO change here to call shapeFunctionSet.jacobianEach and hessianEach from methods in hk
-          for (std::size_t qp = 0; qp < quadrature.nop(); ++qp) {
+          for (std::size_t qp = 0; qp < quadrature.nop(); ++qp)
+          {
             const DomainFieldType weight =
                     geometry.integrationElement(quadrature.point(qp)) * quadrature.weight(qp);
             shapeFunctionSet.evaluateEach(quadrature[qp], [&](std::size_t alpha, RangeType phi) {
@@ -477,19 +478,20 @@ namespace Dune
               auto x = quadrature.localPoint(qp);
               auto y = intersection.geometryInInside().global(x);
               const DomainFieldType weight = intersection.geometry().integrationElement(x) * quadrature.weight(qp);
-              shapeFunctionSet.jacobianEach(y, [&](std::size_t alpha, auto phi) {
+              shapeFunctionSet.jacobianEach(y, [&](std::size_t alpha, JacobianRangeType phi) {
                   // evaluate each here for edge shape fns
                   // first check if we should be using interpolation (for the
                   // existing edge moments - or for H4 space)
-                  if (alpha < sizeONB<0>( agIndexSet_.edgeOrders()[0])       // have enough edge momentsa
+                  // !!!!!
+                  if (alpha < dimDomain*sizeONB<0>(agIndexSet_.edgeOrders()[0])       // have enough edge momentsa
                       || edgePhiVector[0].size() == polOrder+1               // interpolation is exact
                       || edgeInterpolation_)                                 // user want interpolation no matter what
                   {
                     edgeShapeFunctionSet.evaluateEach(x, [&](std::size_t beta,
-                          typename BasisSetsType::EdgeShapeFunctionSetType::RangeType psi) {
-                            // TO DO remove axpy here as R is now scalar
+                          typename BasisSetsType::EdgeShapeFunctionSetType::RangeType psi)
+                    {
                       if (beta < edgePhiVector[0].size())
-                        for (std::size_t s = 0; s < mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
+                        for (std::size_t s=0; s<mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
                           for (std::size_t i=0;i<dimRange;++i)
                             for (std::size_t j=0;j<dimDomain;++j)
                               R[alpha][mask[0][s]] += weight *
@@ -498,10 +500,12 @@ namespace Dune
                   }
                   else // use value projection
                   {
+                    assert(0);
                     vemBasisFunction.evaluateAll(y, phi0Values);
-                    for (std::size_t i=0;i<dimRange;++i)
-                      for (std::size_t j=0;j<dimDomain;++j)
-                        R[alpha] += weight * phi0Values[i] * phi[i][j] * normal[j];
+                    for (std::size_t s=0;s<numDofs;++s)
+                      for (std::size_t i=0;i<dimRange;++i)
+                        for (std::size_t j=0;j<dimDomain;++j)
+                          R[alpha][s] += weight * phi0Values[s][i] * phi[i][j] * normal[j];
                   }
               });
 #if 0
@@ -554,13 +558,10 @@ namespace Dune
             const DomainFieldType weight =
                     geometry.integrationElement(quadrature.point(qp)) * quadrature.weight(qp);
             vemBasisFunction.evaluateAll(quadrature[qp], phi0Values);
-            shapeFunctionSet.divJacobianEach(quadrature[qp], [&](std::size_t alpha, auto divGradPhi) {
+            shapeFunctionSet.divJacobianEach(quadrature[qp], [&](std::size_t alpha, RangeType divGradPhi) {
                 // divGradPhi = RangeType = tr( D GradSF )
-                // Note: the shapeFunctionSet is defined in physical space so
-                // the jit is not needed here
-                // R[alpha][j]  -=  Pi phi_j  grad(m_alpha) * weight
-                for (std::size_t j=0; j<numDofs; ++j)
-                  R[alpha][j] += phi0Values[j] * divGradPhi * weight;
+                for (std::size_t s=0; s<numDofs; ++s)
+                  R[alpha][s] -= weight * phi0Values[s] * divGradPhi;
             });
           } // quadrature loop
         } // loop over triangles in agglomerate

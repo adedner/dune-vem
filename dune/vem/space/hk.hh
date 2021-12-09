@@ -113,43 +113,41 @@ namespace Dune
         {
           JacobianRangeType jac(0);
           sfs_.evaluateEach(x, [&](std::size_t alpha, typename FunctionSpace::RangeType phi)
+          {
+            if (alpha<numGradShapeFunctions_)
             {
-              if (alpha<numGradShapeFunctions_)
+              for (size_t d=0;d<dimDomain;++d)
               {
-                for (size_t d=0;d<dimDomain;++d)
-                {
-                  for (size_t r=0;r<phi.size();++r)
-                    jac[r][d] = phi[r];
-                  functor(dimDomain*alpha+d,jac);
-                  for (size_t r=0;r<phi.size();++r)
-                    jac[r][d] = 0;
-                }
+                for (size_t r=0;r<phi.size();++r)
+                  jac[r][d] = phi[r];
+                functor(dimDomain*alpha+d,jac);
+                for (size_t r=0;r<phi.size();++r)
+                  jac[r][d] = 0;
               }
             }
-          );
+          });
         }
         template< class Point, class Functor >
         void hessianEach ( const Point &x, Functor functor ) const
         {
           HessianRangeType hess(0);
           sfs_.evaluateEach(x, [&](std::size_t alpha, typename FunctionSpace::RangeType phi)
+          {
+            if (alpha<numHessShapeFunctions_)
             {
-              if (alpha<numHessShapeFunctions_)
+              for (size_t d1=0;d1<dimDomain;++d1)
               {
-                for (size_t d1=0;d1<dimDomain;++d1)
+                for (size_t d2=0;d2<dimDomain;++d2)
                 {
-                  for (size_t d2=0;d2<dimDomain;++d2)
-                  {
-                    for (size_t r=0;r<phi.size();++r)
-                      hess[r][d1][d2] = phi[r];
-                    functor(dimDomain*dimDomain*alpha+dimDomain*d1+d2,hess);
-                    for (size_t r=0;r<phi.size();++r)
-                      hess[r][d1][d2] = 0;
-                  }
+                  for (size_t r=0;r<phi.size();++r)
+                    hess[r][d1][d2] = phi[r];
+                  functor(dimDomain*dimDomain*alpha+dimDomain*d1+d2,hess);
+                  for (size_t r=0;r<phi.size();++r)
+                    hess[r][d1][d2] = 0;
                 }
               }
             }
-          );
+          });
         }
         template< class Point, class Functor >
         void evaluateTestEach ( const Point &x, Functor functor ) const
@@ -162,28 +160,28 @@ namespace Dune
         }
         // functor(alpha, psi) with psi in R^r
         //
-        // for each g = g_{alpha*dimDomain+s} = m_alpha e_s and 1<=alpha<=numGradSF and 1<=s<=dimDomain
+        // for each g = g_{alpha*dimDomain+s} = m_alpha e_s    (1<=alpha<=numGradSF and 1<=s<=dimDomain)
         // sum_{ij} int_E d_j v_i g_ij = - sum_{ij} int_E v_i d_j g_ij + ...
-        //     = int_E sum_i ( v_i sum_j d_j g_ij )
-        //     = int_E v . psi
+        //     = - int_E sum_i ( v_i sum_j d_j g_ij )
+        //     = - int_E v . psi
         // with psi_i = sum_j d_j g_ij
         //
-        // g_{ij} = m_i delta_{js}   (s=1,..,dimDomain)
-        // sum_j d_j g_ij = sum_j d_j m_i delta_{js} = d_s m_i
+        // g_{ij} = m_i delta_{js}   (m=m_alpha and fixed s=1,..,dimDomain)
+        // psi_i = sum_j d_j g_ij = sum_j d_j m_i delta_{js} = d_s m_i
         template< class Point, class Functor >
         void divJacobianEach( const Point &x, Functor functor ) const
         {
-          RangeType divGradret(0);
+          RangeType divGrad(0);
           sfs_.jacobianEach(x, [&](std::size_t alpha, typename FunctionSpace::JacobianRangeType dphi)
           {
             if (alpha<numGradShapeFunctions_)
               for (size_t s=0;s<dimDomain;++s)
               {
-                for (size_t i=0;i<dphi.size();++i)
-                  divGradret[i] = dphi[i][s];
-                functor(dimDomain*alpha+s, divGradret);
+                for (size_t i=0;i<divGrad.size();++i)
+                  divGrad[i] = dphi[i][s];
+                functor(dimDomain*alpha+s, divGrad);
               }
-          } );
+          });
         }
 
         private:

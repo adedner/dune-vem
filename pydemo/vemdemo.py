@@ -99,7 +99,6 @@ def polygons(en,x):
 order = 3
 space = dune.vem.vemSpace( polyGrid, order=order, dimRange=1, storage="numpy",
                            testSpaces=[-1,order-1,order-2])
-# space = dune.vem.vemSpace( polyGrid, order=order, dimRange=1)
 
 # %% [markdown]
 # Now we define the model starting with the exact solution:
@@ -111,8 +110,8 @@ v = TestFunction(space)
 
 exact = as_vector( [x[0]*x[1] * cos(pi*x[0]*x[1])] )
 
-massCoeff = 1+sin(dot(x,x))       # factor for mass term
-diffCoeff = 1-0.9*cos(dot(x,x))   # factor for diffusion term
+massCoeff = 1 # +sin(dot(x,x))       # factor for mass term
+diffCoeff = 1 # 1-0.9*cos(dot(x,x))   # factor for diffusion term
 
 a = (diffCoeff*inner(grad(u),grad(v)) + massCoeff*dot(u,v) ) * dx
 
@@ -136,11 +135,11 @@ scheme = dune.vem.vemScheme( [a==b, *dbc], space, solver="cg",
                              gradStabilization=diffCoeff,
                              massStabilization=massCoeff,
                              parameters=parameters )
-# info = scheme.solve(target=df)
-df.interpolate(exact)
+info = scheme.solve(target=df)
+# df.interpolate(exact)
 print("size of space:",space.size,flush=True)
 df.plot(level=3)
-plot(df-exact, grid=polyGrid, gridLines=None)
+plot(df-exact, grid=polyGrid, gridLines=None, level=3)
 
 # %% [markdown]
 # Repeating the same test with a H^1-conforming space
@@ -154,9 +153,10 @@ scheme = dune.vem.vemScheme( [a==b, *dbc], space, solver="cg",
                              massStabilization=massCoeff,
                              parameters=parameters )
 info = scheme.solve(target=df)
+# df.interpolate(exact)
 print("size of space:",space.size,flush=True)
-df.plot()
-plot(df-exact, grid=polyGrid, gridLines=None)
+df.plot(level=3)
+plot(df-exact, grid=polyGrid, gridLines=None, level=3)
 
 # %% [markdown]
 # we can compare different method, e.g., a lagrange/dg scheme (on the the subtriangulation),
