@@ -146,7 +146,6 @@ namespace Dune
           } );
       }
 
-#if 0 // !!!!!
       template< class Quadrature, class DofVector, class Hessians >
       void hessianAll ( const Quadrature &quadrature, const DofVector &dofs, Hessians &hessians ) const
       {
@@ -159,11 +158,13 @@ namespace Dune
       void hessianAll ( const Point &x, const DofVector &dofs, HessianRangeType &hessian ) const
       {
         hessian = HessianRangeType( 0 );
+#if 0
         hessShapeFunctionSet_.evaluateEach( position(x), [this, &dofs, &hessian ] ( std::size_t alpha, HessianRangeType phi_alpha ) {
             const auto &hessianProjectionAlpha = hessianProjection()[alpha];
             for( std::size_t j = 0; j < size(); ++j )
               axpyHes( dofs[j], phi_alpha[j], hessianProjectionAlpha, hessian );
         } );
+#endif
       }
 
       template< class Point, class Hessians > const
@@ -171,13 +172,14 @@ namespace Dune
       {
         assert( hessians.size() >= size() );
         std::fill( hessians.begin(), hessians.end(), HessianRangeType( 0 ) );
+#if 0
         hessShapeFunctionSet_.evaluateEach( position(x), [ this, &hessians ] ( std::size_t alpha, HessianRangeType phi_alpha ) {
             const auto &hessianProjectionAlpha = hessianProjection()[alpha];
             for( std::size_t j = 0; j < size(); ++j )
               axpyHes( 1, phi_alpha[j], hessianProjectionAlpha, hessians[j] );
         } );
-      }
 #endif
+      }
 
       const EntityType &entity () const { assert( entity_ ); return *entity_; }
 

@@ -48,14 +48,14 @@ namespace Dune
 
       typedef typename Traits::IndexSetType IndexSetType;
       typedef typename Traits::template InterpolationType<Traits> AgglomerationInterpolationType;
-      typedef typename AgglomerationInterpolationType::BasisSetsType BasisSetsType;
+      typedef typename Traits::BasisSetsType BasisSetsType;
 
     public:
       typedef typename BaseType::BasisFunctionSetType BasisFunctionSetType;
       typedef typename BaseType::BlockMapperType BlockMapperType;
 
       typedef typename BaseType::EntityType EntityType;
-      typedef typename Traits::EdgeShapeFunctionSetType EdgeShapeFunctionSetType;
+      typedef typename BasisSetsType::EdgeShapeFunctionSetType EdgeShapeFunctionSetType;
       typedef typename BasisFunctionSetType::DomainFieldType DomainFieldType;
       typedef typename BasisFunctionSetType::DomainType DomainType;
 
@@ -218,7 +218,7 @@ namespace Dune
 
     private:
       template <int codim>
-      std::size_t sizeONB(std::size_t order)
+      static std::size_t sizeONB(std::size_t order)
       {
         return Dune::Fem::OrthonormalShapeFunctions<DomainType::dimension - codim>:: size(order) *
                Traits::ScalarBasisFunctionSetType::RangeType::dimension;
@@ -260,19 +260,22 @@ namespace Dune
           unsigned int start, unsigned int end )
     {
       int polOrder = order();
-      // ??? get RangeType etc some other way ... InnerTestSpace;
-      typedef typename Traits::EdgeShapeFunctionSetType EdgeTestSpace;
+      // ???????????????????? Scalar?
+      typedef typename BasisSetsType::EdgeShapeFunctionSetType EdgeTestSpace;
+      typedef typename Traits::FunctionSpaceType FunctionSpaceType;
+      typedef typename FunctionSpaceType::RangeType RangeType;
+      typedef typename FunctionSpaceType::JacobianRangeType JacobianRangeType;
+      typedef typename FunctionSpaceType::HessianRangeType HessianRangeType;
       AgglomerationInterpolationType interpolation(blockMapper().indexSet(), polOrder, basisChoice_ != 3);
 
-      const std::size_t baseRangeDimension = InnerTestSpace::RangeType::dimension;
-      assert( InnerTestSpace::RangeType::dimension == Traits::baseRangeDimension );
-      assert( EdgeTestSpace::RangeType::dimension == Traits::baseRangeDimension );
+      const std::size_t baseRangeDimension = RangeType::dimension;
+      assert( RangeType::dimension == Traits::baseRangeDimension );
 
       Std::vector<int> orders = agIndexSet_.orders();
       const std::size_t numShapeFunctions = basisSets_.size(0);
       const std::size_t numGradShapeFunctions = basisSets_.size(1);
       const std::size_t numHessShapeFunctions = basisSets_.size(2);
-      const std::size_t numInnerShapeFunctions = orders[0] < 0 ? 0 : sizeONB<0>(orders[0]);
+      const std::size_t numInnerShapeFunctions = basisSets_.innerTestSize();
 
       // set up matrices used for constructing gradient, value, and edge projections
       // Note: the code is set up with the assumption that the dofs suffice to compute the edge projection
@@ -363,21 +366,21 @@ namespace Dune
           for (std::size_t qp = 0; qp < quadrature.nop(); ++qp) {
             const DomainFieldType weight =
                     geometry.integrationElement(quadrature.point(qp)) * quadrature.weight(qp);
-            shapeFunctionSet.evaluateEach(quadrature[qp], [&](std::size_t alpha, typename InnerTestSpace::RangeType phi) {
-              shapeFunctionSet.evaluateEach(quadrature[qp], [&](std::size_t beta, typename InnerTestSpace::RangeType psi) {
+            shapeFunctionSet.evaluateEach(quadrature[qp], [&](std::size_t alpha, RangeType phi) {
+              shapeFunctionSet.evaluateEach(quadrature[qp], [&](std::size_t beta, RangeType psi) {
                 Hp[alpha][beta] += phi * psi * weight;
                 if (alpha < numInnerShapeFunctions)
                   constraintValueProj[alpha][beta] += phi * psi * weight;
               });
             });
-            shapeFunctionSet.jacobianEach(quadrature[qp], [&](std::size_t alpha, typename InnerTestSpace::JacobianRangeType phi) {
-              shapeFunctionSet.jacobianEach(quadrature[qp], [&](std::size_t beta, typename InnerTestSpace::JacobianRangeType psi) {
-                  HpGrad[alpha][beta] += phi * psi * weight; // ????
+            shapeFunctionSet.jacobianEach(quadrature[qp], [&](std::size_t alpha, JacobianRangeType phi) {
+              shapeFunctionSet.jacobianEach(quadrature[qp], [&](std::size_t beta, JacobianRangeType psi) {
+                  // HpGrad[alpha][beta] += phi * psi * weight; // ????
               });
             });
-            shapeFunctionSet.hessianEach(quadrature[qp], [&](std::size_t alpha, typename InnerTestSpace::HessianRangeType phi) {
-              shapeFunctionSet.hessianEach(quadrature[qp], [&](std::size_t beta, typename InnerTestSpace::HessianRangeType psi) {
-                  HpHess[alpha][beta] += phi * psi * weight; // ????
+            shapeFunctionSet.hessianEach(quadrature[qp], [&](std::size_t alpha, HessianRangeType phi) {
+              shapeFunctionSet.hessianEach(quadrature[qp], [&](std::size_t beta, HessianRangeType psi) {
+                  // HpHess[alpha][beta] += phi * psi * weight; // ????
               });
             });
           } // quadrature loop
@@ -427,7 +430,7 @@ namespace Dune
 
           // get the bounding box monomials and apply all dofs to them
           const auto &shapeFunctionSet = basisSets_.basisFunctionSet(agglomeration(), element);
-          const typename Traits::EdgeShapeFunctionSetType &edgeShapeFunctionSet
+          const typename BasisSetsType::EdgeShapeFunctionSetType &edgeShapeFunctionSet
                   = basisSets_.edgeBasisFunctionSet(agglomeration(), element);
 
           auto vemBasisFunction = scalarBasisFunctionSet(element);
@@ -475,11 +478,12 @@ namespace Dune
                       || edgeInterpolation_)                                 // user want interpolation no matter what
                   {
                     edgeShapeFunctionSet.evaluateEach(x, [&](std::size_t beta,
-                          typename Traits::EdgeShapeFunctionSetType::RangeType psi) {
+                          typename BasisSetsType::EdgeShapeFunctionSetType::RangeType psi) {
                             // TO DO remove axpy here as R is now scalar
                       if (beta < edgePhiVector[0].size())
-                        for (std::size_t s = 0; s < mask[0].size(); ++s)// note that edgePhi is the transposed of the basis transform matrix
-                          R[alpha][mask[0][s]] += weight * (edgePhiVector[0][beta][s] * psi) * (phi * normal); // ????
+                        for (std::size_t s = 0; s < mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
+                          ;
+                          // R[alpha][mask[0][s]] += weight * (edgePhiVector[0][beta][s] * psi) * (phi * normal); // ????
                           // R[alpha][mask[0][s]].axpy(edgePhiVector[0][beta][s] * psi*phi * weight, normal);
                     });
                   }
@@ -490,7 +494,7 @@ namespace Dune
                     auto factor = normal;
                     factor *= weight;
                     // R[alpha] += phi*factor
-                    vemBasisFunction.axpy(y, phi, factor, R[alpha]); // ????
+                    // vemBasisFunction.axpy(y, phi, factor, R[alpha]); // ????
                   }
               });
 #if 0
@@ -543,6 +547,7 @@ namespace Dune
             const DomainFieldType weight =
                     geometry.integrationElement(quadrature.point(qp)) * quadrature.weight(qp);
             vemBasisFunction.evaluateAll(quadrature[qp], phi0Values);
+            /* ????
             shapeFunctionSet.divJacobianEach(quadrature[qp], [&](std::size_t alpha, auto divGradPhi) {
                 // divGradPhi = RangeType = tr( D GradSF )
                 // Note: the shapeFunctionSet is defined in physical space so
@@ -551,6 +556,7 @@ namespace Dune
                 for (std::size_t j=0; j<numDofs; ++j)
                   R[alpha][j] += phi0Values[j] * divGradPhi * weight;
             });
+            */
           } // quadrature loop
         } // loop over triangles in agglomerate
 
@@ -560,7 +566,7 @@ namespace Dune
           {
             jacobianProjection[alpha][i] = 0;
             for (std::size_t beta = 0; beta < numGradShapeFunctions; ++beta)
-              jacobianProjection[alpha][i].axpy(HpGradInv[alpha][beta], R[beta][i]);
+              jacobianProjection[alpha][i] += HpGradInv[alpha][beta] * R[beta][i];
           }
 
         /////////////////////////////////////////////////////////////////////
