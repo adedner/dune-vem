@@ -48,15 +48,21 @@ namespace Dune
     // AgglomerationVEMSpaceTraits
     // ---------------------------
 
-    template<class FunctionSpace, class GridPart, bool vectorspace>
+    template<class FunctionSpace, class GridPart, bool vectorspace, class Traits>
     class AgglomerationVEMBasisSets
     {
+      typedef GridPart GridPartType;
+      static const bool vectorSpace = vectorspace;
+      static const int dimension = GridPartType::dimension;
+      static const int codimension = 0;
       typedef typename GridPart::template Codim<codimension>::EntityType EntityType;
+
       static const int dimDomain = FunctionSpace::DomainType::dimension;
       static const int dimRange = FunctionSpace::RangeType::dimension;
       typedef typename FunctionSpace::RangeType RangeType;
       typedef typename FunctionSpace::JacobianRangeType JacobianRangeType;
       typedef typename FunctionSpace::HessianRangeType HessianRangeType;
+
 
       // a scalar function space
       typedef Dune::Fem::FunctionSpace<
@@ -87,13 +93,13 @@ namespace Dune
         template< class Point, class Functor >
         void evaluateEach ( const Point &x, Functor functor ) const
         {
-          return sfs_.evaluateEach(x, functor);
+          sfs_.evaluateEach(x, functor);
         }
         template< class Point, class Functor >
         void jacobianEach ( const Point &x, Functor functor ) const
         {
           JacobianRangeType jac(0);
-          return sfs_.evaluateEach(x, [&](std::size_t alpha, typename RangeType phi)
+          sfs_.evaluateEach(x, [&](std::size_t alpha, typename FunctionSpace::RangeType phi)
             {
               if (alpha<numGradShapeFunctions_)
               {
@@ -108,11 +114,12 @@ namespace Dune
               }
             }
           );
+        }
         template< class Point, class Functor >
         void hessianEach ( const Point &x, Functor functor ) const
         {
           HessianRangeType hess(0);
-          return sfs_.evaluateEach(x, [&](std::size_t alpha, typename RangeType phi)
+          return sfs_.evaluateEach(x, [&](std::size_t alpha, typename FunctionSpace::RangeType phi)
             {
               if (alpha<numHessShapeFunctions_)
               {
@@ -141,20 +148,21 @@ namespace Dune
       public:
       typedef ShapeFunctionSet ShapeFunctionSetType;
 
-      AgglomerationVEMBasisSets( const unsigned int order, const unsigned int edgeOrder, bool useOnb)
+      AgglomerationVEMBasisSets( const unsigned int order, const unsigned int edgeOrder, bool useOnb, const int numValueSFS,
+                                 const int numGradSFS, const int numHessSFS)
       : scalarSFS_(Dune::GeometryType(Dune::GeometryType::cube, Traits::dimension), order)
       , edgeSFS_( Dune::GeometryType(Dune::GeometryType::cube,Traits::dimension-1), edgeOrder )
       , useOnb_(useOnb)
-      , numValueShapeFunctions_(...)
-      , numGradShapeFunctions_(...)
-      , numHessShapeFunctions_(...)
+      , numValueShapeFunctions_(numValueSFS)
+      , numGradShapeFunctions_(numGradSFS)
+      , numHessShapeFunctions_(numHessSFS)
       {}
 
       template <class Agglomeration>
       ShapeFunctionSetType basisFunctionSet(
              const Agglomeration &agglomeration, const typename Traits::EntityType &entity) const
       {
-        return ShapeFunctionSet(useOnb_, scalarSFS_, numValueShapeFunctions_, numGradShapeFunctions_, numHessShapeFunctions,
+        return ShapeFunctionSet(useOnb_, scalarSFS_, numValueShapeFunctions_, numGradShapeFunctions_, numHessShapeFunctions_,
                                 agglomeration,entity);
       }
       template <class Agglomeration>
@@ -163,28 +171,28 @@ namespace Dune
       {
         return edgeSFS_;
       }
-      std::size_t size( orderSFS ) const
-      {
-        // note: scalarSFS has dimension=1 in all cases since the vector space is defined over the element
-        if (orderSFS == 0)
-        {
-          return numValueShapeFunctions_;
-          return scalarSFS_.size()*Traits::baseRangeDimension; // ????
-        }
-        if (orderSFS == 1)
-        {
-          return numGradShapeFunctions_;
-          //  std::min( numShapeFunctions, sizeONB<0>(std::max(orders[1], polOrder - 1)) );
-          return gradientSFS_.size()*Traits::baseRangeDimension; // ???
-        }
-        if (orderSFS == 2)
-        {
-          return hessGradShapeFunctions_;
-          // polOrder==1? baseRangeDimension :
-          //   std::min( numShapeFunctions, sizeONB<0>(std::max(orders[2], polOrder - 2)) );
-          return hessianSFS_.size()*Traits::baseRangeDimension; // ???
-        }
-      }
+      // std::size_t size( orderSFS ) const
+      // {
+      //   // note: scalarSFS has dimension=1 in all cases since the vector space is defined over the element
+      //   if (orderSFS == 0)
+      //   {
+      //     return numValueShapeFunctions_;
+      //     return scalarSFS_.size()*Traits::baseRangeDimension; // ????
+      //   }
+      //   if (orderSFS == 1)
+      //   {
+      //     return numGradShapeFunctions_;
+      //     //  std::min( numShapeFunctions, sizeONB<0>(std::max(orders[1], polOrder - 1)) );
+      //     return gradientSFS_.size()*Traits::baseRangeDimension; // ???
+      //   }
+      //   if (orderSFS == 2)
+      //   {
+      //     return hessGradShapeFunctions_;
+      //     // polOrder==1? baseRangeDimension :
+      //     //   std::min( numShapeFunctions, sizeONB<0>(std::max(orders[2], polOrder - 2)) );
+      //     return hessianSFS_.size()*Traits::baseRangeDimension; // ???
+      //   }
+      // }
       std::size_t edgeSize() const
       {
         // the edge sfs already has baseRangeDimension since it can be defined over the reference edge
