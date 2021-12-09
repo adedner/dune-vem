@@ -48,6 +48,7 @@ namespace Dune
       typedef typename FunctionSpaceType::HessianRangeType HessianRangeType;
 
       static constexpr int dimDomain = DomainType::dimension;
+      static_assert(RangeType::dimension==1);
 
       typedef typename ReferenceElements< typename DomainType::field_type, dimDomain >::ReferenceElement ReferenceElementType;
 

@@ -261,7 +261,7 @@ namespace Dune
     {
       int polOrder = order();
       typedef typename BasisSetsType::EdgeShapeFunctionSetType EdgeTestSpace;
-      typedef typename BasisSetsType::FunctionSpaceType FunctionSpaceType;
+      typedef typename BasisSetsType::ShapeFunctionSetType::FunctionSpaceType FunctionSpaceType;
       typedef typename FunctionSpaceType::DomainType DomainType;
       typedef typename FunctionSpaceType::RangeType RangeType;
       typedef typename FunctionSpaceType::JacobianRangeType JacobianRangeType;
@@ -484,7 +484,7 @@ namespace Dune
                   // existing edge moments - or for H4 space)
                   // !!!!!
                   if (alpha < dimDomain*sizeONB<0>(agIndexSet_.edgeOrders()[0])       // have enough edge momentsa
-                      || edgePhiVector[0].size() == polOrder+1               // interpolation is exact
+                      || edgePhiVector[0].size() == dimRange*(polOrder+1)               // interpolation is exact
                       || edgeInterpolation_)                                 // user want interpolation no matter what
                   {
                     edgeShapeFunctionSet.evaluateEach(x, [&](std::size_t beta,
