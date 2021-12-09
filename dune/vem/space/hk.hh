@@ -342,8 +342,8 @@ namespace Dune
       typedef AgglomerationVEMInterpolation< Traits > ThisType;
 
     public:
-      // ???????????????????? Scalar?
-      typedef typename Traits::FunctionSpaceType FunctionSpaceType;
+      typedef typename Traits::BasisSetsType BasisSetsType;
+      typedef typename BasisSetsType::FunctionSpaceType FunctionSpaceType;
       typedef typename FunctionSpaceType::RangeType RangeType;
       typedef typename FunctionSpaceType::JacobianRangeType JacobianRangeType;
       typedef typename FunctionSpaceType::HessianRangeType HessianRangeType;
@@ -351,7 +351,6 @@ namespace Dune
       typedef typename IndexSetType::ElementType ElementType;
       typedef typename IndexSetType::GridPartType GridPartType;
       typedef typename GridPartType::IntersectionType IntersectionType;
-      typedef typename Traits::BasisSetsType BasisSetsType;
 
       static const int dimension = IndexSetType::dimension;
       static const int baseRangeDimension = Traits::baseRangeDimension;
@@ -364,6 +363,7 @@ namespace Dune
     public:
       explicit AgglomerationVEMInterpolation ( const IndexSetType &indexSet, unsigned int polOrder, bool useOnb ) noexcept
         : indexSet_( indexSet )
+        // ?????
         , basisSets_( std::max(indexSet_.maxDegreePerCodim()[2],0),
                           std::max(indexSet_.maxDegreePerCodim()[1],0),
                           useOnb )
@@ -396,7 +396,7 @@ namespace Dune
         unsigned int numInnerShapeFunctions = d.size();
         if (numInnerShapeFunctions == 0) return;
         unsigned int numDofs = D.rows();
-        assert( numInnerShapeFunctions == basisSets_.innerSize() );
+        // ??? assert( numInnerShapeFunctions == basisSets_.innerSize() );
         for (int alpha=0; alpha<numInnerShapeFunctions; ++alpha)
         {
           // d[alpha] = e_gamma * D_beta
@@ -451,7 +451,7 @@ namespace Dune
         };
         auto inner = [&mask] (int poly,auto i,int k,int numDofs)
         {
-          assert( innerShapeFunctionSet.size() == numDofs );
+          // ???? assert( basisSets_.innerTestSize() == numDofs );
           k /= baseRangeDimension;
           std::fill(mask.begin()+k,mask.begin()+k+numDofs/baseRangeDimension,1);
         };
@@ -546,7 +546,7 @@ namespace Dune
         };
         auto inner = [&] (int poly,int i,int k,int numDofs)
         {
-          assert(numDofs == basisSets_.innerSize());
+          // ???? assert(numDofs == basisSets_.innerSize());
           InnerQuadratureType innerQuad( element, 2*polOrder_ );
           for (int qp=0;qp<innerQuad.nop();++qp)
           {
@@ -918,7 +918,7 @@ namespace Dune
         };
         auto inner = [&] (int poly,int i,int k,int numDofs)
         {
-          assert(numDofs == innerShapeFunctionSet.size());
+          // ??? assert(numDofs == innerShapeFunctionSet.size());
           //! SubVector has no size: assert(k+numDofs == localDofVector.size());
           InnerQuadratureType innerQuad( element, 2*polOrder_ );
           for (unsigned int qp=0;qp<innerQuad.nop();++qp)

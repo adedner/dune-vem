@@ -260,12 +260,15 @@ namespace Dune
           unsigned int start, unsigned int end )
     {
       int polOrder = order();
-      // ???????????????????? Scalar?
       typedef typename BasisSetsType::EdgeShapeFunctionSetType EdgeTestSpace;
-      typedef typename Traits::FunctionSpaceType FunctionSpaceType;
+      typedef typename BasisSetsType::FunctionSpaceType FunctionSpaceType;
+      typedef typename FunctionSpaceType::DomainType DomainType;
       typedef typename FunctionSpaceType::RangeType RangeType;
       typedef typename FunctionSpaceType::JacobianRangeType JacobianRangeType;
       typedef typename FunctionSpaceType::HessianRangeType HessianRangeType;
+      const std::size_t dimDomain = DomainType::dimension;
+      const std::size_t dimRange = RangeType::dimension;
+
       AgglomerationInterpolationType interpolation(blockMapper().indexSet(), polOrder, basisChoice_ != 3);
 
       const std::size_t baseRangeDimension = RangeType::dimension;
@@ -375,12 +378,17 @@ namespace Dune
             });
             shapeFunctionSet.jacobianEach(quadrature[qp], [&](std::size_t alpha, JacobianRangeType phi) {
               shapeFunctionSet.jacobianEach(quadrature[qp], [&](std::size_t beta, JacobianRangeType psi) {
-                  // HpGrad[alpha][beta] += phi * psi * weight; // ????
+                  for (std::size_t i=0;i<dimRange;++i)
+                    for (std::size_t j=0;j<dimDomain;++j)
+                      HpGrad[alpha][beta] += phi[i][j] * psi[i][j] * weight;
               });
             });
             shapeFunctionSet.hessianEach(quadrature[qp], [&](std::size_t alpha, HessianRangeType phi) {
               shapeFunctionSet.hessianEach(quadrature[qp], [&](std::size_t beta, HessianRangeType psi) {
-                  // HpHess[alpha][beta] += phi * psi * weight; // ????
+                  for (std::size_t i=0;i<dimRange;++i)
+                    for (std::size_t j=0;j<dimDomain;++j)
+                      for (std::size_t k=0;k<dimDomain;++k)
+                        HpHess[alpha][beta] += phi[i][j][k] * psi[i][j][k] * weight;
               });
             });
           } // quadrature loop
@@ -482,19 +490,18 @@ namespace Dune
                             // TO DO remove axpy here as R is now scalar
                       if (beta < edgePhiVector[0].size())
                         for (std::size_t s = 0; s < mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
-                          ;
-                          // R[alpha][mask[0][s]] += weight * (edgePhiVector[0][beta][s] * psi) * (phi * normal); // ????
-                          // R[alpha][mask[0][s]].axpy(edgePhiVector[0][beta][s] * psi*phi * weight, normal);
+                          for (std::size_t i=0;i<dimRange;++i)
+                            for (std::size_t j=0;j<dimDomain;++j)
+                              R[alpha][mask[0][s]] += weight *
+                                edgePhiVector[0][beta][s] * psi[i] * phi[i][j] * normal[j];
                     });
                   }
                   else // use value projection
                   {
-                    // TO DO this needs changing as R is now dynamic matrix of type DFT
-                    // need to call evaluate all on VEM basis and store in vector
-                    auto factor = normal;
-                    factor *= weight;
-                    // R[alpha] += phi*factor
-                    // vemBasisFunction.axpy(y, phi, factor, R[alpha]); // ????
+                    vemBasisFunction.evaluateAll(y, phi0Values);
+                    for (std::size_t i=0;i<dimRange;++i)
+                      for (std::size_t j=0;j<dimDomain;++j)
+                        R[alpha] += weight * phi0Values[i] * phi[i][j] * normal[j];
                   }
               });
 #if 0
