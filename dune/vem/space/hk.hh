@@ -98,7 +98,12 @@ namespace Dune
         , numGradShapeFunctions_(numGradSFS)
         , numHessShapeFunctions_(numHessSFS)
         , numInnerShapeFunctions_(innerNumSFS)
-        {}
+        {
+          std::cout << "[" << numValueShapeFunctions_ << ","
+                    << numGradShapeFunctions_ << ","
+                    << numHessShapeFunctions_ << ","
+                    << numInnerShapeFunctions_ << std::endl;
+        }
 
         int order () const { return sfs_.order();  }
 
@@ -155,8 +160,8 @@ namespace Dune
         {
           sfs_.evaluateEach(x, [&](std::size_t alpha, typename FunctionSpace::RangeType phi)
           {
-              if (alpha < numInnerShapeFunctions_)
-                functor(alpha,phi);
+            if (alpha < numInnerShapeFunctions_)
+              functor(alpha,phi);
           });
         }
         // functor(alpha, psi) with psi in R^r
@@ -389,9 +394,12 @@ namespace Dune
       explicit AgglomerationVEMInterpolation ( const IndexSetType &indexSet, unsigned int polOrder, bool useOnb ) noexcept
         : indexSet_( indexSet )
         // ?????
+        /*
         , basisSets_( std::max(indexSet_.maxDegreePerCodim()[2],0),
                           std::max(indexSet_.maxDegreePerCodim()[1],0),
                           useOnb )
+        */
+        , basisSets_(polOrder, indexSet_.maxEdgeDegree(), useOnb_)
         , polOrder_( polOrder )
         , useOnb_(useOnb)
       {}
@@ -580,7 +588,7 @@ namespace Dune
             basisFunctionSet.evaluateEach( innerQuad[qp],
               [ & ] ( std::size_t beta, RangeType value )
               {
-                innerShapeFunctionSet.evaluateEach( innerQuad[qp],
+                innerShapeFunctionSet.evaluateTestEach( innerQuad[qp],
                   [&](std::size_t alpha, RangeType phi ) {
                     int kk = alpha+k;
                     assert(kk<localDofMatrix.size());
