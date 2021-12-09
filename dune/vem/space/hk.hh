@@ -121,7 +121,7 @@ namespace Dune
         void hessianEach ( const Point &x, Functor functor ) const
         {
           HessianRangeType hess(0);
-          return sfs_.evaluateEach(x, [&](std::size_t alpha, typename FunctionSpace::RangeType phi)
+          sfs_.evaluateEach(x, [&](std::size_t alpha, typename FunctionSpace::RangeType phi)
             {
               if (alpha<numHessShapeFunctions_)
               {
@@ -143,9 +143,10 @@ namespace Dune
         template< class Point, class Functor >
         void evaluateTestEach ( const Point &x, Functor functor ) const
         {
-          return sfs_.evaluateEach(x, [&](std::size_t alpha, typename RangeType phi)
+          sfs_.evaluateEach(x, [&](std::size_t alpha, typename FunctionSpace::RangeType phi){
               if (alpha<numInnerShapeFunctions_)
                 functor(alpha,phi);
+          }
         }
 
         private:
@@ -173,7 +174,7 @@ namespace Dune
       ShapeFunctionSetType basisFunctionSet(
              const Agglomeration &agglomeration, const typename Traits::EntityType &entity) const
       {
-        return ShapeFunctionSet(useOnb_, scalarSFS_, numValueShapeFunctions_, numGradShapeFunctions_, numHessShapeFunctions,
+        return ShapeFunctionSet(useOnb_, scalarSFS_, numValueShapeFunctions_, numGradShapeFunctions_, numHessShapeFunctions_,
                                 numInnerShapeFunctions_,
                                 agglomeration,entity);
       }
@@ -189,20 +190,20 @@ namespace Dune
         if (orderSFS == 0)
         {
           return numValueShapeFunctions_;
-          return scalarSFS_.size()*Traits::baseRangeDimension; // ????
+          // return scalarSFS_.size()*Traits::baseRangeDimension; // ????
         }
         if (orderSFS == 1)
         {
           return numGradShapeFunctions_;
           //  std::min( numShapeFunctions, sizeONB<0>(std::max(orders[1], polOrder - 1)) );
-          return gradientSFS_.size()*Traits::baseRangeDimension; // ???
+          // return gradientSFS_.size()*Traits::baseRangeDimension; // ???
         }
         if (orderSFS == 2)
         {
           return hessGradShapeFunctions_;
           // polOrder==1? baseRangeDimension :
           //   std::min( numShapeFunctions, sizeONB<0>(std::max(orders[2], polOrder - 2)) );
-          return hessianSFS_.size()*Traits::baseRangeDimension; // ???
+          // return hessianSFS_.size()*Traits::baseRangeDimension; // ???
         }
       }
       std::size_t innerTestSize() const
