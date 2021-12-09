@@ -136,9 +136,11 @@ scheme = dune.vem.vemScheme( [a==b, *dbc], space, solver="cg",
                              gradStabilization=diffCoeff,
                              massStabilization=massCoeff,
                              parameters=parameters )
-info = scheme.solve(target=df)
+# info = scheme.solve(target=df)
+df.interpolate(exact)
 print("size of space:",space.size,flush=True)
-df.plot()
+df.plot(level=3)
+plot(df-exact, grid=polyGrid, gridLines=None)
 
 # %% [markdown]
 # Repeating the same test with a H^1-conforming space
@@ -154,6 +156,7 @@ scheme = dune.vem.vemScheme( [a==b, *dbc], space, solver="cg",
 info = scheme.solve(target=df)
 print("size of space:",space.size,flush=True)
 df.plot()
+plot(df-exact, grid=polyGrid, gridLines=None)
 
 # %% [markdown]
 # we can compare different method, e.g., a lagrange/dg scheme (on the the subtriangulation),

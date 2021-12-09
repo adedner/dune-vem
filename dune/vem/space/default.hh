@@ -326,14 +326,14 @@ namespace Dune
         auto &jacobianProjection = jacobianProjections()[agglomerate];
         auto &hessianProjection = hessianProjections()[agglomerate];
         valueProjection.resize(numShapeFunctions);
-        jacobianProjection.resize(numShapeFunctions);
-        hessianProjection.resize(numShapeFunctions);
+        jacobianProjection.resize(numGradShapeFunctions);
+        hessianProjection.resize(numHessShapeFunctions);
         for (std::size_t alpha = 0; alpha < numShapeFunctions; ++alpha)
-        {
           valueProjection[alpha].resize(numDofs, DomainFieldType(0));
+        for (std::size_t alpha = 0; alpha < numGradShapeFunctions; ++alpha)
           jacobianProjection[alpha].resize(numDofs, DomainFieldType(0));
+        for (std::size_t alpha = 0; alpha < numHessShapeFunctions; ++alpha)
           hessianProjection[alpha].resize(numDofs, DomainFieldType(0));
-        }
 
         // value projection CLS
         constraintValueProj = 0;
@@ -372,7 +372,7 @@ namespace Dune
             shapeFunctionSet.evaluateEach(quadrature[qp], [&](std::size_t alpha, RangeType phi) {
               shapeFunctionSet.evaluateEach(quadrature[qp], [&](std::size_t beta, RangeType psi) {
                 Hp[alpha][beta] += phi * psi * weight;
-                if (alpha < numInnerShapeFunctions)
+                if (alpha < numInnerShapeFunctions) // ??? numInnerShapeShapeFunctions from space implementation
                   constraintValueProj[alpha][beta] += phi * psi * weight;
               });
             });

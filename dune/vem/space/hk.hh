@@ -153,26 +153,36 @@ namespace Dune
         template< class Point, class Functor >
         void evaluateTestEach ( const Point &x, Functor functor ) const
         {
-          sfs_.evaluateEach(x, [&](std::size_t alpha, typename FunctionSpace::RangeType phi){
-              if (alpha<numInnerShapeFunctions_)
+          sfs_.evaluateEach(x, [&](std::size_t alpha, typename FunctionSpace::RangeType phi)
+          {
+              if (alpha < numInnerShapeFunctions_)
                 functor(alpha,phi);
-          }
-          );
+          });
         }
+        // functor(alpha, psi) with psi in R^r
+        //
+        // for each g = g_{alpha*dimDomain+s} = m_alpha e_s and 1<=alpha<=numGradSF and 1<=s<=dimDomain
+        // sum_{ij} int_E d_j v_i g_ij = - sum_{ij} int_E v_i d_j g_ij + ...
+        //     = int_E sum_i ( v_i sum_j d_j g_ij )
+        //     = int_E v . psi
+        // with psi_i = sum_j d_j g_ij
+        //
+        // g_{ij} = m_i delta_{js}   (s=1,..,dimDomain)
+        // sum_j d_j g_ij = sum_j d_j m_i delta_{js} = d_s m_i
         template< class Point, class Functor >
         void divJacobianEach( const Point &x, Functor functor ) const
         {
           RangeType divGradret(0);
-          sfs_.jacobianEach(x, [&](std::size_t alpha, typename FunctionSpace::JacobianRangeType dphi){
-            for (size_t r=0;r<dphi.size();++r)
-            {
-              for (size_t d=0;d<dimDomain;++d)
+          sfs_.jacobianEach(x, [&](std::size_t alpha, typename FunctionSpace::JacobianRangeType dphi)
+          {
+            if (alpha<numGradShapeFunctions_)
+              for (size_t s=0;s<dimDomain;++s)
               {
-                divGradret[r] += dphi[r][d];
-                functor(dimDomain*alpha+d, divGradret);
+                for (size_t i=0;i<dphi.size();++i)
+                  divGradret[i] = dphi[i][s];
+                functor(dimDomain*alpha+s, divGradret);
               }
-            }
-          );
+          } );
         }
 
         private:
@@ -195,7 +205,7 @@ namespace Dune
       , numGradShapeFunctions_ ( std::min( scalarSFS_.size(), sizeONB<0>(std::max(0, order - 1)) ) )
       , numHessShapeFunctions_ ( std::min( scalarSFS_.size(), sizeONB<0>(std::max(0, order - 2)) ) )
       // ????
-      , numInnerShapeFunctions_( std::min( scalarSFS_.size(), sizeONB<0>(std::max(0, order - 2)) ) )
+      , numInnerShapeFunctions_( order-2<0 ? 0 : sizeONB<0>(order - 2) )
       {}
 
       template <class Agglomeration>
@@ -222,19 +232,19 @@ namespace Dune
         }
         else if (orderSFS == 1)
         {
-          return numGradShapeFunctions_;
+          return dimDomain*numGradShapeFunctions_;
           //  std::min( numShapeFunctions, sizeONB<0>(std::max(orders[1], polOrder - 1)) );
           // return gradientSFS_.size()*Traits::baseRangeDimension; // ???
         }
         else if (orderSFS == 2)
         {
-          return numHessShapeFunctions_;
+          return dimDomain*dimDomain*numHessShapeFunctions_;
           // polOrder==1? baseRangeDimension :
           //   std::min( numShapeFunctions, sizeONB<0>(std::max(orders[2], polOrder - 2)) );
           // return hessianSFS_.size()*Traits::baseRangeDimension; // ???
         }
       }
-      std::size_t innerTestSize() const
+      int innerTestSize() const
       {
         return numInnerShapeFunctions_;
       }
