@@ -82,12 +82,14 @@ namespace Dune
         template <class Agglomeration>
         ShapeFunctionSet(bool useOnb, ScalarShapeFunctionSetType scalarSFS,
                          std::size_t numValueSFS, std::size_t numGradSFS, std::size_t numHessSFS,
+                         std::size_t innerNumSFS,
                          const Agglomeration &agglomeration, const EntityType &entity)
         : sfs_(entity, agglomeration.index(entity),
                agglomeration.boundingBoxes(), useOnb, scalarSFS)
         , numValueShapeFunctions_(numValueSFS)
         , numGradShapeFunctions_(numGradSFS)
         , numHessShapeFunctions_(numHessSFS)
+        , numInnerShapeFunctions_(innerNumSFS)
         {}
 
         template< class Point, class Functor >
@@ -138,12 +140,21 @@ namespace Dune
             }
           );
         }
+        template< class Point, class Functor >
+        void evaluateTestEach ( const Point &x, Functor functor ) const
+        {
+          return sfs_.evaluateEach(x, [&](std::size_t alpha, typename RangeType phi)
+              if (alpha<numInnerShapeFunctions_)
+                functor(alpha,phi);
+        }
 
         private:
         BBBasisFunctionSetType sfs_;
         std::size_t numValueShapeFunctions_;
         std::size_t numGradShapeFunctions_;
         std::size_t numHessShapeFunctions_;
+        std::size_t innerShapeFunctions_;
+        std::size_t numInnerShapeFunctions_;
       };
       public:
       typedef ShapeFunctionSet ShapeFunctionSetType;
@@ -162,7 +173,8 @@ namespace Dune
       ShapeFunctionSetType basisFunctionSet(
              const Agglomeration &agglomeration, const typename Traits::EntityType &entity) const
       {
-        return ShapeFunctionSet(useOnb_, scalarSFS_, numValueShapeFunctions_, numGradShapeFunctions_, numHessShapeFunctions_,
+        return ShapeFunctionSet(useOnb_, scalarSFS_, numValueShapeFunctions_, numGradShapeFunctions_, numHessShapeFunctions,
+                                numInnerShapeFunctions_,
                                 agglomeration,entity);
       }
       template <class Agglomeration>
@@ -171,28 +183,32 @@ namespace Dune
       {
         return edgeSFS_;
       }
-      // std::size_t size( orderSFS ) const
-      // {
-      //   // note: scalarSFS has dimension=1 in all cases since the vector space is defined over the element
-      //   if (orderSFS == 0)
-      //   {
-      //     return numValueShapeFunctions_;
-      //     return scalarSFS_.size()*Traits::baseRangeDimension; // ????
-      //   }
-      //   if (orderSFS == 1)
-      //   {
-      //     return numGradShapeFunctions_;
-      //     //  std::min( numShapeFunctions, sizeONB<0>(std::max(orders[1], polOrder - 1)) );
-      //     return gradientSFS_.size()*Traits::baseRangeDimension; // ???
-      //   }
-      //   if (orderSFS == 2)
-      //   {
-      //     return hessGradShapeFunctions_;
-      //     // polOrder==1? baseRangeDimension :
-      //     //   std::min( numShapeFunctions, sizeONB<0>(std::max(orders[2], polOrder - 2)) );
-      //     return hessianSFS_.size()*Traits::baseRangeDimension; // ???
-      //   }
-      // }
+      std::size_t size( orderSFS ) const
+      {
+        // note: scalarSFS has dimension=1 in all cases since the vector space is defined over the element
+        if (orderSFS == 0)
+        {
+          return numValueShapeFunctions_;
+          return scalarSFS_.size()*Traits::baseRangeDimension; // ????
+        }
+        if (orderSFS == 1)
+        {
+          return numGradShapeFunctions_;
+          //  std::min( numShapeFunctions, sizeONB<0>(std::max(orders[1], polOrder - 1)) );
+          return gradientSFS_.size()*Traits::baseRangeDimension; // ???
+        }
+        if (orderSFS == 2)
+        {
+          return hessGradShapeFunctions_;
+          // polOrder==1? baseRangeDimension :
+          //   std::min( numShapeFunctions, sizeONB<0>(std::max(orders[2], polOrder - 2)) );
+          return hessianSFS_.size()*Traits::baseRangeDimension; // ???
+        }
+      }
+      std::size_t innerTestSize() const
+      {
+        return numInnerShapeFunctions_;
+      }
       std::size_t edgeSize() const
       {
         // the edge sfs already has baseRangeDimension since it can be defined over the reference edge
@@ -206,6 +222,7 @@ namespace Dune
       std::size_t numValueShapeFunctions_;
       std::size_t numGradShapeFunctions_;
       std::size_t numHessShapeFunctions_;
+      std::size_t numInnerShapeFunctions_;
       bool useOnb_;
     };
 
@@ -362,7 +379,7 @@ namespace Dune
         unsigned int numInnerShapeFunctions = d.size();
         if (numInnerShapeFunctions == 0) return;
         unsigned int numDofs = D.rows();
-        assert( numInnerShapeFunctions == basisSets_.size() );
+        assert( numInnerShapeFunctions == basisSets_.innerSize() );
         for (int alpha=0; alpha<numInnerShapeFunctions; ++alpha)
         {
           // d[alpha] = e_gamma * D_beta
@@ -417,7 +434,7 @@ namespace Dune
         };
         auto inner = [&mask] (int poly,auto i,int k,int numDofs)
         {
-          // assert( innerShapeFunctionSet.size() == numDofs );
+          assert( innerShapeFunctionSet.size() == numDofs );
           k /= baseRangeDimension;
           std::fill(mask.begin()+k,mask.begin()+k+numDofs/baseRangeDimension,1);
         };
@@ -433,7 +450,7 @@ namespace Dune
         const auto &refElement = ReferenceElements< ctype, dimension >::general( element.type() );
 
         // use the bb set for this polygon for the inner testing space
-        const auto &innerShapeFunctionSet = basisSets_.bbBasisFunctionSet( indexSet_.agglomeration(), element );
+        const auto &innerShapeFunctionSet = basisSets_.basisFunctionSet( indexSet_.agglomeration(), element );
         const auto &edgeBFS = basisSets_.edgeBasisFunctionSet( indexSet_.agglomeration(), element );
 
         // define the corresponding vertex,edge, and inner parts of the interpolation
@@ -512,7 +529,7 @@ namespace Dune
         };
         auto inner = [&] (int poly,int i,int k,int numDofs)
         {
-          assert(numDofs == innerShapeFunctionSet.size());
+          assert(numDofs == basisSets_.innerSize());
           InnerQuadratureType innerQuad( element, 2*polOrder_ );
           for (int qp=0;qp<innerQuad.nop();++qp)
           {
@@ -819,7 +836,7 @@ namespace Dune
         const auto &refElement = ReferenceElements< ctype, dimension >::general( element.type() );
 
         // use the bb set for this polygon for the inner testing space
-        const auto &innerShapeFunctionSet = basisSets_.bbBasisFunctionSet( indexSet_.agglomeration(), element );
+        const auto &innerShapeFunctionSet = basisSets_.basisFunctionSet( indexSet_.agglomeration(), element );
         const auto &edgeBFS = basisSets_.edgeBasisFunctionSet( indexSet_.agglomeration(), element );
 
         // define the vertex,edge, and inner parts of the interpolation
@@ -892,7 +909,7 @@ namespace Dune
             auto y = innerQuad.point(qp);
             localFunction.evaluate( innerQuad[qp], value );
             double weight = innerQuad.weight(qp) * element.geometry().integrationElement(y) / indexSet_.volume(poly);
-            innerShapeFunctionSet.evaluateEach(innerQuad[qp],
+            innerShapeFunctionSet.evaluateTestEach(innerQuad[qp],
               [&](std::size_t alpha, typename LocalFunction::RangeType phi ) {
                 int kk = alpha+k;
                 //! SubVector has no size assert( kk < localDofVector.size() );
