@@ -99,10 +99,6 @@ namespace Dune
         , numHessShapeFunctions_(numHessSFS)
         , numInnerShapeFunctions_(innerNumSFS)
         {
-          std::cout << "[" << numValueShapeFunctions_ << ","
-                    << numGradShapeFunctions_ << ","
-                    << numHessShapeFunctions_ << ","
-                    << numInnerShapeFunctions_ << std::endl;
         }
 
         int order () const { return sfs_.order();  }
@@ -211,7 +207,13 @@ namespace Dune
       , numHessShapeFunctions_ ( std::min( scalarSFS_.size(), sizeONB<0>(std::max(0, order - 2)) ) )
       // ????
       , numInnerShapeFunctions_( order-2<0 ? 0 : sizeONB<0>(order - 2) )
-      {}
+      {
+        std::cout << "[" << numValueShapeFunctions_ << ","
+                  << numGradShapeFunctions_ << ","
+                  << numHessShapeFunctions_ << ","
+                  << numInnerShapeFunctions_ << "]"
+                  << "   edge: " << edgeSFS_.size() << std::endl;
+      }
 
       template <class Agglomeration>
       ShapeFunctionSetType basisFunctionSet(
