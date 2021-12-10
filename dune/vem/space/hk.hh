@@ -48,7 +48,7 @@ namespace Dune
     // AgglomerationVEMSpaceTraits
     // ---------------------------
 
-    template<class FunctionSpace, class GridPart, bool vectorspace>
+    template<class FunctionSpace, class GridPart, bool vectorspace, bool reduced=false>
     struct AgglomerationVEMBasisSets
     {
       typedef GridPart GridPartType;
@@ -112,43 +112,63 @@ namespace Dune
         template< class Point, class Functor >
         void jacobianEach ( const Point &x, Functor functor ) const
         {
-          JacobianRangeType jac(0);
-          sfs_.evaluateEach(x, [&](std::size_t alpha, RangeType phi)
+          if constexpr (!reduced)
           {
-            if (alpha<numGradShapeFunctions_)
+            JacobianRangeType jac(0);
+            sfs_.evaluateEach(x, [&](std::size_t alpha, RangeType phi)
             {
-              for (size_t d=0;d<dimDomain;++d)
+              if (alpha<numGradShapeFunctions_)
               {
-                for (size_t r=0;r<phi.size();++r)
-                  jac[r][d] = phi[r];
-                functor(dimDomain*alpha+d,jac);
-                for (size_t r=0;r<phi.size();++r)
-                  jac[r][d] = 0;
+                for (size_t d=0;d<dimDomain;++d)
+                {
+                  for (size_t r=0;r<phi.size();++r)
+                    jac[r][d] = phi[r];
+                  functor(dimDomain*alpha+d,jac);
+                  for (size_t r=0;r<phi.size();++r)
+                    jac[r][d] = 0;
+                }
               }
-            }
-          });
+            });
+          }
+          else
+          {
+            sfs_.jacobianEach(x, [&](std::size_t alpha, JacobianRangeType dphi)
+            {
+              if (alpha>=dimRange) functor(alpha-dimRange,dphi);
+            });
+          }
         }
         template< class Point, class Functor >
         void hessianEach ( const Point &x, Functor functor ) const
         {
-          HessianRangeType hess(0);
-          sfs_.evaluateEach(x, [&](std::size_t alpha, RangeType phi)
+          if constexpr (!reduced)
           {
-            if (alpha<numHessShapeFunctions_)
+            HessianRangeType hess(0);
+            sfs_.evaluateEach(x, [&](std::size_t alpha, RangeType phi)
             {
-              for (size_t d1=0;d1<dimDomain;++d1)
+              if (alpha<numHessShapeFunctions_)
               {
-                for (size_t d2=0;d2<dimDomain;++d2)
+                for (size_t d1=0;d1<dimDomain;++d1)
                 {
-                  for (size_t r=0;r<phi.size();++r)
-                    hess[r][d1][d2] = phi[r];
-                  functor(dimDomain*dimDomain*alpha+dimDomain*d1+d2,hess);
-                  for (size_t r=0;r<phi.size();++r)
-                    hess[r][d1][d2] = 0;
+                  for (size_t d2=0;d2<dimDomain;++d2)
+                  {
+                    for (size_t r=0;r<phi.size();++r)
+                      hess[r][d1][d2] = phi[r];
+                    functor(dimDomain*dimDomain*alpha+dimDomain*d1+d2,hess);
+                    for (size_t r=0;r<phi.size();++r)
+                      hess[r][d1][d2] = 0;
+                  }
                 }
               }
-            }
-          });
+            });
+          }
+          else
+          {
+            sfs_.hessianEach(x, [&](std::size_t alpha, HessianRangeType d2phi)
+            {
+              if (alpha>=3*dimRange) functor(alpha-3*dimRange,d2phi);
+            });
+          }
         }
         template< class Point, class Functor >
         void evaluateTestEach ( const Point &x, Functor functor ) const
@@ -173,16 +193,35 @@ namespace Dune
         void divJacobianEach( const Point &x, Functor functor ) const
         {
           RangeType divGrad(0);
-          sfs_.jacobianEach(x, [&](std::size_t alpha, JacobianRangeType dphi)
+          if constexpr (!reduced)
           {
-            if (alpha<numGradShapeFunctions_)
-              for (size_t s=0;s<dimDomain;++s)
+            sfs_.jacobianEach(x, [&](std::size_t alpha, JacobianRangeType dphi)
+            {
+              if (alpha<numGradShapeFunctions_)
+                for (size_t s=0;s<dimDomain;++s)
+                {
+                  for (size_t i=0;i<divGrad.size();++i)
+                    divGrad[i] = dphi[i][s];
+                  functor(dimDomain*alpha+s, divGrad);
+                }
+            });
+          }
+          else
+          {
+            sfs_.hessianEach(x, [&](std::size_t alpha, HessianRangeType d2phi)
+            {
+              if (alpha>=dimRange)
               {
                 for (size_t i=0;i<divGrad.size();++i)
-                  divGrad[i] = dphi[i][s];
-                functor(dimDomain*alpha+s, divGrad);
+                {
+                  divGrad[i] = 0;
+                  for (size_t s=0;s<dimDomain;++s)
+                    divGrad[i] += d2phi[i][s][s];
+                }
+                functor(alpha-dimRange, divGrad);
               }
-          });
+            });
+          }
         }
 
         private:
@@ -202,8 +241,14 @@ namespace Dune
       , edgeSFS_( Dune::GeometryType(Dune::GeometryType::cube,dimDomain-1), edgeOrder )
       , useOnb_(useOnb)
       , numValueShapeFunctions_( onbSFS_.size()*BBBasisFunctionSetType::RangeType::dimension)
-      , numGradShapeFunctions_ ( std::min( numValueShapeFunctions_, sizeONB<0>(std::max(0, order - 1)) ) )
-      , numHessShapeFunctions_ ( std::min( numValueShapeFunctions_, sizeONB<0>(std::max(0, order - 2)) ) )
+      , numGradShapeFunctions_ (
+          !reduced? std::min( numValueShapeFunctions_, sizeONB<0>(std::max(0, order - 1)) )
+          : numValueShapeFunctions_-1*BBBasisFunctionSetType::RangeType::dimension
+        )
+      , numHessShapeFunctions_ (
+          !reduced? std::min( numValueShapeFunctions_, sizeONB<0>(std::max(0, order - 2)) )
+          : numValueShapeFunctions_-3*BBBasisFunctionSetType::RangeType::dimension
+        )
       // ????
       , numInnerShapeFunctions_( order-2<0 ? 0 : sizeONB<0>(order - 2) )
       {
@@ -230,24 +275,23 @@ namespace Dune
       }
       std::size_t size( std::size_t orderSFS ) const
       {
-        // note: scalarSFS has dimension=1 in all cases since the vector space is defined over the element
-        if (orderSFS == 0)
+        if constexpr (!reduced)
         {
-          return numValueShapeFunctions_;
-          // return scalarSFS_.size()*Traits::baseRangeDimension; // ????
+          if (orderSFS == 0)
+            return numValueShapeFunctions_;
+          else if (orderSFS == 1)
+            return dimDomain*numGradShapeFunctions_;
+          else if (orderSFS == 2)
+            return dimDomain*dimDomain*numHessShapeFunctions_;
         }
-        else if (orderSFS == 1)
+        else
         {
-          return dimDomain*numGradShapeFunctions_;
-          //  std::min( numShapeFunctions, sizeONB<0>(std::max(orders[1], polOrder - 1)) );
-          // return gradientSFS_.size()*Traits::baseRangeDimension; // ???
-        }
-        else if (orderSFS == 2)
-        {
-          return dimDomain*dimDomain*numHessShapeFunctions_;
-          // polOrder==1? baseRangeDimension :
-          //   std::min( numShapeFunctions, sizeONB<0>(std::max(orders[2], polOrder - 2)) );
-          // return hessianSFS_.size()*Traits::baseRangeDimension; // ???
+          if (orderSFS == 0)
+            return numValueShapeFunctions_;
+          else if (orderSFS == 1)
+            return numGradShapeFunctions_;
+          else if (orderSFS == 2)
+            return numHessShapeFunctions_;
         }
         assert(0);
         return 0;

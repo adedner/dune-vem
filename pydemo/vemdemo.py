@@ -110,8 +110,8 @@ v = TestFunction(space)
 
 exact = as_vector( [x[0]*x[1] * cos(pi*x[0]*x[1])] )
 
-massCoeff = 1 # +sin(dot(x,x))       # factor for mass term
-diffCoeff = 1 # 1-0.9*cos(dot(x,x))   # factor for diffusion term
+massCoeff = 1+sin(dot(x,x))       # factor for mass term
+diffCoeff = 11-0.9*cos(dot(x,x))   # factor for diffusion term
 
 a = (diffCoeff*inner(grad(u),grad(v)) + massCoeff*dot(u,v) ) * dx
 
@@ -140,6 +140,11 @@ info = scheme.solve(target=df)
 print("size of space:",space.size,flush=True)
 df.plot(level=3)
 plot(df-exact, grid=polyGrid, gridLines=None, level=3)
+edf = exact-df
+err = [inner(edf,edf),
+       inner(grad(edf),grad(edf))]
+errors = [ numpy.sqrt(e) for e in integrate(polyGrid, err, order=8) ]
+print(errors)
 
 # %% [markdown]
 # Repeating the same test with a H^1-conforming space
@@ -157,6 +162,11 @@ info = scheme.solve(target=df)
 print("size of space:",space.size,flush=True)
 df.plot(level=3)
 plot(df-exact, grid=polyGrid, gridLines=None, level=3)
+edf = exact-df
+err = [inner(edf,edf),
+       inner(grad(edf),grad(edf))]
+errors = [ numpy.sqrt(e) for e in integrate(polyGrid, err, order=8) ]
+print(errors)
 
 # %% [markdown]
 # we can compare different method, e.g., a lagrange/dg scheme (on the the subtriangulation),

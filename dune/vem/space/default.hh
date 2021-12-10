@@ -401,8 +401,11 @@ namespace Dune
         HpInv.invert();
         HpGradInv = HpGrad;
         HpGradInv.invert();
-        HpHessInv = HpHess;
-        HpHessInv.invert();
+        if (numHessShapeFunctions>0)
+        {
+          HpHessInv = HpHess;
+          HpHessInv.invert();
+        }
 
         //////////////////////////////////////////////////////////////////////////
         /// ValueProjection /////////////////////////////////////////////////////
