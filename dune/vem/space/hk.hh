@@ -48,7 +48,8 @@ namespace Dune
     // AgglomerationVEMSpaceTraits
     // ---------------------------
 
-    template<class FunctionSpace, class GridPart, bool vectorspace, bool reduced=false>
+    template<class FunctionSpace, class GridPart, bool vectorspace,
+              bool reduced=false>
     struct AgglomerationVEMBasisSets
     {
       typedef GridPart GridPartType;
@@ -166,7 +167,8 @@ namespace Dune
           {
             sfs_.hessianEach(x, [&](std::size_t alpha, HessianRangeType d2phi)
             {
-              if (alpha>=3*dimRange) functor(alpha-3*dimRange,d2phi);
+              if (alpha>=(dimDomain+1)*dimRange)
+                functor(alpha-(dimDomain+1)*dimRange,d2phi);
             });
           }
         }

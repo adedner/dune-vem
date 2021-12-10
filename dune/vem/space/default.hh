@@ -485,7 +485,7 @@ namespace Dune
                   // evaluate each here for edge shape fns
                   // first check if we should be using interpolation (for the
                   // existing edge moments - or for H4 space)
-                  // !!!!!
+                  // !!!!! sfs.degree(alpha) <= agIndexSet_.edgeOrders()[0]
                   if (alpha < dimDomain*sizeONB<0>(agIndexSet_.edgeOrders()[0])       // have enough edge momentsa
                       || edgePhiVector[0].size() == dimRange*(polOrder+1)               // interpolation is exact
                       || edgeInterpolation_)                                 // user want interpolation no matter what
