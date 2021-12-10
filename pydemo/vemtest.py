@@ -68,7 +68,15 @@ for i in range(1,6):
                                testSpaces=testSpaces,
                                vectorSpace=True)
     a,b,dbc,exact = model(space)
-    df = space.interpolate(exact,name="solution")
+    if False:
+        df = space.interpolate(exact,name="solution")
+    else:
+        df = space.interpolate(dimR*[0],name="solution")
+        scheme = dune.vem.vemScheme(
+                  [a==b, *dbc], space, solver="cg",
+                  gradStabilization=diffCoeff,
+                  massStabilization=massCoeff)
+        info = scheme.solve(target=df)
     edf = exact-df
     err = [inner(edf,edf),
            inner(grad(edf),grad(edf))]
