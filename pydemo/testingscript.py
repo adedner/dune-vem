@@ -6,6 +6,7 @@ from dune.fem.plotting import plotPointData as plot
 from dune.fem.function import integrate, discreteFunction
 from dune.fem import parameter
 from dune.vem import voronoiCells, vemScheme, vemSpace, polyGrid
+import numpy
 
 import ufl.algorithms
 from ufl import *
@@ -15,7 +16,7 @@ dune.fem.parameter.append({"fem.verboserank": -1})
 
 parameters = {"newton.linear.tolerance": 1e-12,
               "newton.linear.preconditioning.method": "jacobi",
-              "penalty": 10*order*order,  # for the dg schemes
+              "penalty": 40,  # for the dg schemes
               "newton.linear.verbose": False,
               "newton.verbose": False
               }
@@ -25,16 +26,20 @@ def test(exact, spaceConstructor, get_df):
     N_values = [2**i*Nval for i in range(4)]
     results = []
     for N in N_values:
+        print('grid size N:', N)
         # set up grid for testing
         constructor = cartesianDomain([0,0],[1,1],[N,N])
-        cells = voronoiCells(constructor,50,"voronoiseeds",load=True,show=False,lloyd=10)
+        cells = voronoiCells(constructor,N*N,"voronoiseeds",load=True,show=False,lloyd=10)
         grid = create.grid("agglomerate", cells, convex=True)
+
+        # grid = dune.vem.polyGrid( dune.vem.voronoiCells([[-0.5,-0.5],[1,1]], 50, lloyd=100) )
 
         # get dimension of range
         dimRange = exact.ufl_shape[0]
+        print('dim Range:', dimRange)
 
         # construct space to use
-        space = spaceConstructor(grid,r)
+        space = spaceConstructor(grid,dimRange)
 
         # get sizes for eoc calculation
         sizes = [grid.hierarchicalGrid.agglomerate.size, space.size, *space.diameters()]
@@ -42,15 +47,15 @@ def test(exact, spaceConstructor, get_df):
         # solve
         df = get_df(space)
         df.plot(level=3)
-        plot(df-exact, grid=polyGrid, gridLines=None, level=3)
+        plot(df-exact, grid=grid, gridLines=None, level=3)
 
         # calculate errors
         edf = exact-df
         err = [inner(edf,edf), inner(grad(edf),grad(edf))]
         errors = [ numpy.sqrt(e) for e in integrate(grid, err, order=8) ]
-        print(errors)
+        # print(errors)
 
-        results += [ [sizes] + errors ]
+        results += [[sizes] + [errors]]
 
     # calculate eocs
     h = lambda sizes: sizes[3]
@@ -64,14 +69,14 @@ def test(exact, spaceConstructor, get_df):
 
 def runTest(exact, spaceConstructor):
     # interpolation test
-    test( exact, spaceConstructor, lambda space: space.interpolate([0],name="solution") )
+    # test( exact, spaceConstructor, lambda space: space.interpolate([0],name="solution") )
 
     # elliptic test
     def testElliptic(space):
         # set up scheme, df, and solve
-
         u = TrialFunction(space)
         v = TestFunction(space)
+        x = SpatialCoordinate(space)
 
         massCoeff = 1+sin(dot(x,x))       # factor for mass term
         diffCoeff = 11-0.9*cos(dot(x,x))
@@ -83,7 +88,7 @@ def runTest(exact, spaceConstructor):
         dbc = [dune.ufl.DirichletBC(space, exact, i+1) for i in range(4)]
 
         df = space.interpolate([0],name="solution")
-        scheme = vemScheme( [a==b, *dbc], space, solver="cg",
+        scheme = dune.vem.vemScheme( [a==b, *dbc], space, solver="cg",
                              gradStabilization=diffCoeff,
                              massStabilization=massCoeff,
                              parameters=parameters )
@@ -96,11 +101,12 @@ def runTest(exact, spaceConstructor):
 
 def main():
     # test with conforming second order VEM space
-    conformingSpaceConstructor = lambda grid, r: vemSpace(grid, order=3, dimRange=r, testSpaces = [-1,order-1,order-2])
+    order=3
+    conformingSpaceConstructor = lambda grid, r: dune.vem.vemSpace(grid, order=order, dimRange=r, testSpaces = [-1,order-1,order-2])
     # define exact solution
-    x = ufl.Coordinate(ufl.triangle)
+    x = ufl.SpatialCoordinate(ufl.triangle)
     exact = as_vector( [x[0]*x[1] * cos(pi*x[0]*x[1])] )
 
     runTest(exact, conformingSpaceConstructor)
 
-main():
+main()
