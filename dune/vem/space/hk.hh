@@ -184,13 +184,13 @@ namespace Dune
         // functor(alpha, psi) with psi in R^r
         //
         // for each g = g_{alpha*dimDomain+s} = m_alpha e_s    (1<=alpha<=numGradSF and 1<=s<=dimDomain)
-        // sum_{ij} int_E d_j v_i g_ij = - sum_{ij} int_E v_i d_j g_ij + ...
-        //     = - int_E sum_i ( v_i sum_j d_j g_ij )
+        // sum_{rj} int_E d_j v_r g_rj = - sum_{rj} int_E v_r d_j g_rj + ...
+        //     = - int_E sum_r ( v_r sum_j d_j g_rj )
         //     = - int_E v . psi
-        // with psi_i = sum_j d_j g_ij
+        // with psi_r = sum_j d_j g_rj
         //
-        // g_{ij} = m_i delta_{js}   (m=m_alpha and fixed s=1,..,dimDomain)
-        // psi_i = sum_j d_j g_ij = sum_j d_j m_i delta_{js} = d_s m_i
+        // g_{rj} = m_r delta_{js}   (m=m_alpha and fixed s=1,..,dimDomain)
+        // psi_r = sum_j d_j g_rj = sum_j d_j m_r delta_{js} = d_s m_r
         template< class Point, class Functor >
         void divJacobianEach( const Point &x, Functor functor ) const
         {
@@ -227,40 +227,43 @@ namespace Dune
         }
         // functor(alpha, psi) with psi in R^{r,d}
         //
-        // for each h = m_{alpha,r} I_{ij}    (1<=alpha<=numHessSF and 1<=ij<=dimDomain)
-        // sum_{rij} int_E d_ij v_r h_rij = - sum_{rij} int_E d_i v_i d_j h_rij + ...
-        //     = - int_E sum_ri (d_i v_i sum_j d_j h_rij )
-        //     = - int_E v * psi
+        // h_{alpha*D^2+d1*D+d2}
+        // for each h_r = m_{alpha,r} I_{d1,d2}    (1<=alpha<=numHessSF and 1<=ij<=dimDomain)
+        // sum_{rij} int_E d_ij v_r h_rij = - sum_{rij} int_E d_i v_r d_j h_rij + ...
+        //     = - int_E sum_ri (d_i v_r sum_j d_j h_rij )
+        //     = - int_E sum_ri d_i v_r psi_ri
         // with psi_ri = sum_j d_j h_rij
         //
-        // h_{rij} = m_{alpha,r} I_{ij}   (m=m_alpha and fixed ij=1,..,dimDomain)
-        // psi_ri = sum_j d_j h_rij = sum_j d_j m_alpha,r I_ij = d_i m_alpha,r e_i
+        // h_{rij} = m_{alpha,r} delta_{i,d1}delta_{j,d2}   (m=m_alpha and fixed ij=1,..,dimDomain)
+        // psi_ri = sum_j d_j h_rij = sum_j d_j m_{alpha,r} // delta_{i,d1}delta_{j,d2}
+        //        = d_d2 m_{alpha,r} delta_{i,d1}
         template< class Point, class Functor >
         void divHessianEach( const Point &x, Functor functor ) const
         {
           JacobianRangeType divHess(0);
-          DomainType e_i(0);
           if constexpr (!reduced)
           {
             sfs_.jacobianEach(x, [&](std::size_t alpha, JacobianRangeType dphi)
             {
-              if (alpha < numHessShapeFunctions_)
-                for (size_t i=0;i<dimDomain;++i)
+              if (alpha<numHessShapeFunctions_)
+              {
+                for (size_t d1=0;d1<dimDomain;++d1)
+                {
+                  for (size_t d2=0;d2<dimDomain;++d2)
                   {
-                    e_i[i] = 1;
+                    divHess = 0;
                     for (size_t r=0;r<dimRange;++r)
-                    {
-                      // want to multiply dphi by unit vector for each d in dimDomain
-                      divHess = dphi[r][i] * e_i;
-                    }
-                    functor(dimDomain*alpha+s, divHess); // ???
-                    e_i[i] = 0;
+                      divHess[r][d1] = dphi[r][d2];
+                    functor(dimDomain*dimDomain*alpha+dimDomain*d1+d2, divHess);
                   }
-            }
+                }
+              }
+            });
           }
           else
           {
-            // ???
+            if (sfs_.order()>2)
+              DUNE_THROW( NotImplemented, "hessianEach not implemented for reduced space - needs third order derivative" );
           }
         }
 
