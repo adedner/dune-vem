@@ -581,7 +581,7 @@ namespace Dune
         /////////////////////////////////////////////////////////////////////
         // HessianProjection ////////////////////////////////////////////////
         /////////////////////////////////////////////////////////////////////
-#if 0 // ???
+
         // iterate over the triangles of this polygon (for Hessian projection)
         for (const ElementSeedType &entitySeed : entitySeeds[agglomerate])
         {
@@ -591,7 +591,7 @@ namespace Dune
           // get the bounding box monomials and apply all dofs to them
           auto shapeFunctionSet = basisSets_.basisFunctionSet(agglomeration(), element);
           auto vemBasisFunction = scalarBasisFunctionSet(element);
-
+#if 0 // ???
           // compute the phi.n boundary terms for the hessian projection in
           // the case that there are no dofs for the normal gradient on the edge
           if (interpolation.edgeSize(1) == 0)
@@ -622,6 +622,7 @@ namespace Dune
               } // quadrature loop
             } // loop over intersections
           }
+#endif
 
           // Compute element part for the hessian projection
           // GENERAL: could use the value projection here by using additional integration by parts
@@ -630,14 +631,19 @@ namespace Dune
           for (std::size_t qp = 0; qp < quadrature.nop(); ++qp)
           {
             const DomainFieldType weight = geometry.integrationElement(quadrature.point(qp)) * quadrature.weight(qp);
-            hessShapeFunctionSet.jacobianEach(quadrature[qp],
-                          [&](std::size_t alpha, auto gradPhi) {
+            vemBasisFunction.jacobianAll(quadrature[qp], phi1Values);
+            shapeFunctionSet.divHessianEach(quadrature[qp],
+                          [&](std::size_t alpha, JacobianRangeType gradPhi) {
                 // Note: the shapeFunctionSet is defined in physical space so
                 // the jit is not needed here
                 // P[alpha][j] -= Pi grad phi_j grad(m_alpha) * weight
                 // P[alpha] vector of hessians i.e. use axpy with type DynamicVector <HessianMatrixType>
-                gradPhi *= -weight;
-                vemBasisFunction.axpy(quadrature[qp], gradPhi, P[alpha]);
+                for (std::size_t s = 0; s < numDofs; ++s)
+                  for (std::size_t d = 0; d < dimDomain; ++d)
+                    for (std::size_t r = 0; r < dimRange; ++r)
+                    {
+                      P[alpha][s] -= weight * phi1Values[s][r][d] * gradPhi[r][d];
+                    }
             });
 
           } // quadrature loop
@@ -649,9 +655,8 @@ namespace Dune
           {
             hessianProjection[alpha][i] = 0;
             for (std::size_t beta = 0; beta < numHessShapeFunctions; ++beta)
-              hessianProjection[alpha][i].axpy(HpHessInv[alpha][beta], P[beta][i]);
+              hessianProjection[alpha][i] += HpHessInv[alpha][beta] * P[beta][i];
           }
-#endif
         /////////////////////////////////////////////////////////////////////
         // stabilization matrix /////////////////////////////////////////////
         /////////////////////////////////////////////////////////////////////

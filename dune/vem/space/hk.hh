@@ -225,6 +225,44 @@ namespace Dune
             });
           }
         }
+        // functor(alpha, psi) with psi in R^{r,d}
+        //
+        // for each h = m_{alpha,r} I_{ij}    (1<=alpha<=numHessSF and 1<=ij<=dimDomain)
+        // sum_{rij} int_E d_ij v_r h_rij = - sum_{rij} int_E d_i v_i d_j h_rij + ...
+        //     = - int_E sum_ri (d_i v_i sum_j d_j h_rij )
+        //     = - int_E v * psi
+        // with psi_ri = sum_j d_j h_rij
+        //
+        // h_{rij} = m_{alpha,r} I_{ij}   (m=m_alpha and fixed ij=1,..,dimDomain)
+        // psi_ri = sum_j d_j h_rij = sum_j d_j m_alpha,r I_ij = d_i m_alpha,r e_i
+        template< class Point, class Functor >
+        void divHessianEach( const Point &x, Functor functor ) const
+        {
+          JacobianRangeType divHess(0);
+          DomainType e_i(0);
+          if constexpr (!reduced)
+          {
+            sfs_.jacobianEach(x, [&](std::size_t alpha, JacobianRangeType dphi)
+            {
+              if (alpha < numHessShapeFunctions_)
+                for (size_t i=0;i<dimDomain;++i)
+                  {
+                    e_i[i] = 1;
+                    for (size_t r=0;r<dimRange;++r)
+                    {
+                      // want to multiply dphi by unit vector for each d in dimDomain
+                      divHess = dphi[r][i] * e_i;
+                    }
+                    functor(dimDomain*alpha+s, divHess); // ???
+                    e_i[i] = 0;
+                  }
+            }
+          }
+          else
+          {
+            // ???
+          }
+        }
 
         private:
         BBBasisFunctionSetType sfs_;
