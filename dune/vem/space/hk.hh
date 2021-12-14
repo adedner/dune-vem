@@ -80,6 +80,10 @@ namespace Dune
               ScalarEdgeShapeFunctionSetType > EdgeShapeFunctionSetType;
 
     private:
+      // implement three shape functions sets for
+      // value: as full basis function set
+      // jacobian: with evaluateEach and divergenceEach
+      // hessian: with evaluateEach and divergenceEach
       struct ShapeFunctionSet
       {
         typedef typename BBBasisFunctionSetType::FunctionSpaceType FunctionSpaceType;
@@ -104,6 +108,11 @@ namespace Dune
         {}
 
         int order () const { return sfs_.order();  }
+
+        const BBBasisFunctionSetType &valueBasisSet() const
+        {
+          return sfs_;
+        }
 
         template< class Point, class Functor >
         void evaluateEach ( const Point &x, Functor functor ) const
@@ -228,14 +237,14 @@ namespace Dune
         // functor(alpha, psi) with psi in R^{r,d}
         //
         // h_{alpha*D^2+d1*D+d2}
-        // for each h_r = m_{alpha,r} I_{d1,d2}    (1<=alpha<=numHessSF and 1<=ij<=dimDomain)
+        // for each h_r = m_{alpha,r} I_{d1,d2}    (fixed 1<=alpha<=numHessSF and 1<=d1,d2<=dimDomain)
         // sum_{rij} int_E d_ij v_r h_rij = - sum_{rij} int_E d_i v_r d_j h_rij + ...
         //     = - int_E sum_ri (d_i v_r sum_j d_j h_rij )
         //     = - int_E sum_ri d_i v_r psi_ri
         // with psi_ri = sum_j d_j h_rij
         //
         // h_{rij} = m_{alpha,r} delta_{i,d1}delta_{j,d2}   (m=m_alpha and fixed ij=1,..,dimDomain)
-        // psi_ri = sum_j d_j h_rij = sum_j d_j m_{alpha,r} // delta_{i,d1}delta_{j,d2}
+        // psi_ri = sum_j d_j h_rij = sum_j d_j m_{alpha,r} delta_{i,d1}delta_{j,d2}
         //        = d_d2 m_{alpha,r} delta_{i,d1}
         template< class Point, class Functor >
         void divHessianEach( const Point &x, Functor functor ) const

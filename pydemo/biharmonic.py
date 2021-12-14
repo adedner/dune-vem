@@ -15,7 +15,7 @@ from ufl import *
 import dune.ufl
 
 maxLevel     = 4
-order        = 4
+order        = 3
 epsilon      = 1
 laplaceCoeff = 1
 mu           = 0
@@ -51,7 +51,8 @@ parameters = {"newton.linear.tolerance": 1e-12,
 # <codecell>
 uflSpace = dune.ufl.Space(2, dimRange=1)
 x = SpatialCoordinate(uflSpace)
-exact = as_vector( [sin(2*pi*x[0])**2*sin(2*pi*x[1])**2] )
+# exact = as_vector( [sin(2*pi*x[0])**2*sin(2*pi*x[1])**2] )
+exact = as_vector( [x[0]**2] )
 
 # next the bilinear form
 # Note: for function which continuous derivatives we have
@@ -101,13 +102,15 @@ def compute(grid, space, schemeName):
                         gradStabilization=diffCoeff,
                         massStabilization=massCoeff,
                         parameters=parameters)
-    # df.interpolate(exact)
+    df.interpolate(exact)
+    """
     # info = scheme.solve(target=df)
     jacobian = linearOperator(scheme)
     rhs = discreteFunction(space,name="rhs")
     scheme(df,rhs)
     rhs.as_numpy[:] *= -1
     df.as_numpy[:] = spsolve(jacobian.as_numpy, rhs.as_numpy[:])
+    """
     edf = exact-df
     err = [inner(edf,edf),
            inner(grad(edf),grad(edf)),
@@ -123,11 +126,11 @@ def compute(grid, space, schemeName):
 # figPos = 100*len(methods)+10*maxLevel+1
 results = []
 for level in range(maxLevel):
-    # constructor = cartesianDomain([0,0],[1,1],[4*2**level,4*2**level])
-    # polyGrid = create.grid("agglomerate", constructor, cubes=False )
-    constructor = cartesianDomain([0,0],[1,1],[4,4])
-    polyGrid = create.grid("agglomerate", voronoiCells(constructor,16*2**level*2**level,"voronoiseeds",
-               load=True,show=False,lloyd=5), convex=True )
+    constructor = cartesianDomain([0,0],[1,1],[4*2**level,4*2**level])
+    polyGrid = create.grid("agglomerate", constructor, cubes=False )
+    # constructor = cartesianDomain([0,0],[1,1],[4,4])
+    # polyGrid = create.grid("agglomerate", voronoiCells(constructor,16*2**level*2**level,"voronoiseeds",
+    #            load=True,show=False,lloyd=5), convex=True )
     res = []
     for i,m in enumerate(methods):
         space = create.space(m[0], polyGrid, dimRange=1, storage="numpy", **m[2])

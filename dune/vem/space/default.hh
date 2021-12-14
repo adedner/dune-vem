@@ -316,6 +316,7 @@ namespace Dune
         const std::size_t numDofs = blockMapper().numDofs(agglomerate) * baseRangeDimension;
 
         phi0Values.resize(numDofs);
+        psi1Values.resize(numDofs);
 
         const int numEdges = agIndexSet_.subAgglomerates(agglomerate, IndexSetType::dimension - 1);
 
@@ -363,7 +364,7 @@ namespace Dune
           // GENERAL: these are the same as used as test function in 'interpolation'
           const auto &shapeFunctionSet = basisSets_.basisFunctionSet(agglomeration(), element);
 
-          interpolation.interpolateBasis(element, shapeFunctionSet, D);
+          interpolation.interpolateBasis(element, shapeFunctionSet.valueBasisSet(), D);
 
           // compute mass matrices Hp, HpGrad, and the gradient matrices G^l
           // TO DO change here to call shapeFunctionSet.jacobianEach and hessianEach from methods in hk
@@ -504,7 +505,6 @@ namespace Dune
                   }
                   else // use value projection
                   {
-                    assert(0);
                     vemBasisFunction.evaluateAll(y, phi0Values);
                     for (std::size_t s=0;s<numDofs;++s)
                       for (std::size_t i=0;i<dimRange;++i)
@@ -520,25 +520,26 @@ namespace Dune
                     // jacobian each here for edge shape fns
                     edgeShapeFunctionSet.jacobianEach(x, [&](std::size_t beta,
                                                               typename EdgeTestSpace::JacobianRangeType dpsi) {
-                        if (beta < edgePhiVector[0].size()) {
+                        if (beta < edgePhiVector[0].size())
+                        {
                           // note: the edgeShapeFunctionSet is defined over
                           // the reference element of the edge so the jit has
                           // to be applied here
 
                           JacobianRangeType gradPsi;
-                          jit.mv(dpsi,gradPsi);
-                          RangeType gradPsiDottau;
+                          double gradPsiDottau;
 
-                          // assert(std::abs(gradPsiDottau - dpsi[r][0] / h) < 1e-8);
                           // GENERAL: this assumed that the Pi_0 part of Pi^e is not needed?
                           for (std::size_t r = 0; r < dimRange; ++r)
                           {
-                            gradPsiDottau[r] = gradPsi[r] * tau;
+                            jit.mv(dpsi[r],gradPsi[r]);
+                            gradPsiDottau = gradPsi[r] * tau;
+                            assert(std::abs(gradPsiDottau - dpsi[r][0] / h) < 1e-8);
                             for (std::size_t s = 0; s < mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
                               for (std::size_t i = 0; i < dimDomain; ++i)
                                 for (std::size_t j = 0; j < dimDomain; ++j)
                                   // P[alpha][mask[0][s]].axpy(edgePhiVector[0][beta][s] * gradPsiPhiDottau * weight, factorTN);
-                                  P[alpha][mask[0][s]] += weight * edgePhiVector[0][beta][s] * gradPsiDottau[r] * phi[r][i][j] * factorTN[i][j];
+                                  P[alpha][mask[0][s]] += weight * edgePhiVector[0][beta][s] * gradPsiDottau * phi[r][i][j] * factorTN[i][j];
                           }
                         }
                     });
@@ -546,6 +547,7 @@ namespace Dune
 
                   // compute the phi.n boundary terms for the hessian projection in
                   // the case that there are dofs for the normal gradient on the edge
+                  // int_e Pi^1_e u m  n x n
                   if ( interpolation.edgeSize(1) > 0 ) {
                     edgeShapeFunctionSet.evaluateEach(x, [&](std::size_t beta, typename EdgeTestSpace::RangeType psi) {
                       if (beta < edgePhiVector[1].size())
@@ -655,18 +657,20 @@ namespace Dune
                       P[alpha][s] -= weight * psi1Values[s][r][d] * gradPhi[r][d];
                     }
             });
-
           } // quadrature loop
         } // loop over triangles in agglomerate
 
         // now compute hessian projection by multiplying with inverse mass matrix
         for (std::size_t alpha = 0; alpha < numHessShapeFunctions; ++alpha)
+        {
           for (std::size_t i = 0; i < numDofs; ++i)
           {
             hessianProjection[alpha][i] = 0;
             for (std::size_t beta = 0; beta < numHessShapeFunctions; ++beta)
               hessianProjection[alpha][i] += HpHessInv[alpha][beta] * P[beta][i];
           }
+        }
+
         /////////////////////////////////////////////////////////////////////
         // stabilization matrix /////////////////////////////////////////////
         /////////////////////////////////////////////////////////////////////
