@@ -322,8 +322,8 @@ namespace Dune
       // start iteration over all polygons
       for (std::size_t agglomerate = start; agglomerate < end; ++agglomerate)
       {
-        const std::size_t numDofs = blockMapper().numDofs(agglomerate) * dimRange;
-        // std::cout << "numDofs: " << numDofs << std::endl;
+        const std::size_t numDofs = blockMapper().numDofs(agglomerate); // * dimRange;
+        std::cout << "numDofs: " << numDofs << std::endl;
 
         phi0Values.resize(numDofs);
 
@@ -420,16 +420,19 @@ namespace Dune
         } // loop over triangles in agglomerate
 
         // compute inverse mass matrix
-        HpGradInv = HpGrad;
-        try
+        if (numGradShapeFunctions>0)
         {
-          HpGradInv.invert();
-        }
-        catch (const FMatrixError&)
-        {
-          std::cout << "HpGradInv.invert() failed!\n";
-          assert(0);
-          throw FMatrixError();
+          HpGradInv = HpGrad;
+          try
+          {
+            HpGradInv.invert();
+          }
+          catch (const FMatrixError&)
+          {
+            std::cout << "HpGradInv.invert() failed!\n";
+            assert(0);
+            throw FMatrixError();
+          }
         }
 
         if (numHessShapeFunctions>0)
@@ -458,6 +461,14 @@ namespace Dune
             for (int q=0;q<d.size();++q)
               std::cout << d[q] << " ";
             std::cout << std::endl;
+            std::cout << "    " << D.rows() << "," << D.cols() << ": " << std::endl;
+            for (int r=0;r<D.rows();++r)
+            {
+              std::cout << "     ";
+              for (int c=0;c<D.cols();++c)
+                std::cout << D[r][c] << " ";
+              std::cout << std::endl;
+            }
             */
             // if( beta >= numDofs - numConstraintShapeFunctions )
               // assert( std::abs( d[ beta - numDofs + numConstraintShapeFunctions ] - H0 ) < 1e-13);
@@ -490,15 +501,25 @@ namespace Dune
           for (std::size_t beta = 0; beta < numDofs; ++beta )
           {
             interpolation_.valueL2constraints(beta, H0, D, d);
-            for (std::size_t alpha = 0; alpha < numConstraintShapeFunctions; ++alpha)
+            for (std::size_t alpha = 0; alpha < numShapeFunctions; ++alpha)
             {
               valueProjection[alpha][beta] = 0;
-              for (std::size_t i = 0; i < numConstraintShapeFunctions; ++i)
-                valueProjection[alpha][i] += constraintValueProj[alpha][i] * d[i];
+              for (std::size_t i = 0; i < constraintValueProj.cols(); ++i)
+                valueProjection[alpha][beta] += constraintValueProj[alpha][i] * d[i];
             }
           }
         }
+        std::cout << "************************\n";
+        for (std::size_t beta = 0; beta < numDofs; ++beta )
+        {
+          std::cout << "phi_" << beta << " = ";
+          for (std::size_t alpha = 0; alpha < numShapeFunctions; ++alpha)
+            std::cout << valueProjection[alpha][beta] << " ";
+          std::cout << std::endl;
+        }
+        std::cout << "************************\n";
 
+        continue;
         //////////////////////////////////////////////////////////////////////////
         /// GradientProjection //////////////////////////////////////////////////
         //////////////////////////////////////////////////////////////////////////
