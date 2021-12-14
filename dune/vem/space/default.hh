@@ -100,11 +100,10 @@ namespace Dune
         polOrder_(polOrder),
         basisSets_(basisSets),
         basisChoice_(basisChoice),
-        useOnb_(basisChoice == 2),
         edgeInterpolation_(edgeInterpolation),
         agIndexSet_(agglomeration),
         blockMapper_(agIndexSet_, basisSets_.dofsPerCodim()),
-        interpolation_(blockMapper().indexSet(), polOrder, basisChoice != 3),
+        interpolation_(blockMapper().indexSet(), basisSets_, polOrder, basisChoice != 3),
         counter_(0),
         useThreads_(Fem::MPIManager::numThreads()),
         valueProjections_(new Vector<
@@ -237,7 +236,6 @@ namespace Dune
       unsigned int polOrder_;
       BasisSetsType basisSets_;
       int basisChoice_;
-      const bool useOnb_;
       bool edgeInterpolation_;
       IndexSetType agIndexSet_;
       mutable BlockMapperType blockMapper_;
@@ -278,8 +276,6 @@ namespace Dune
       const std::size_t dimDomain = DomainType::dimension;
       const std::size_t dimRange = RangeType::dimension;
 
-      AgglomerationInterpolationType interpolation(blockMapper().indexSet(), polOrder, basisChoice_ != 3);
-
       const std::size_t numShapeFunctions = basisSets_.size(0);
       const std::size_t numGradShapeFunctions = basisSets_.size(1);
       const std::size_t numHessShapeFunctions = basisSets_.size(2);
@@ -312,8 +308,11 @@ namespace Dune
 
       // matrices for edge projections
       Std::vector<Dune::DynamicMatrix<double> > edgePhiVector(2);
-      edgePhiVector[0].resize(interpolation.edgeSize(0), interpolation.edgeSize(0), 0);
-      edgePhiVector[1].resize(interpolation.edgeSize(1), interpolation.edgeSize(1), 0);
+      edgePhiVector[0].resize(basisSets_.edgeSize(0), basisSets_.edgeSize(0), 0);
+      edgePhiVector[1].resize(basisSets_.edgeSize(1), basisSets_.edgeSize(1), 0);
+
+      std::cout << "edgePhiVector:" << basisSets_.edgeSize(0) << "," <<  basisSets_.edgeSize(1)
+                << std::endl;
 
       // matrix for rhs of gradient and hessian projections
       DynamicMatrix<DomainFieldType> R;
@@ -323,8 +322,8 @@ namespace Dune
       // start iteration over all polygons
       for (std::size_t agglomerate = start; agglomerate < end; ++agglomerate)
       {
-        const std::size_t numDofs = blockMapper().numDofs(agglomerate); // * dimRange;
-        std::cout << "numDofs: " << numDofs << std::endl;
+        const std::size_t numDofs = blockMapper().numDofs(agglomerate) * dimRange;
+        // std::cout << "numDofs: " << numDofs << std::endl;
 
         phi0Values.resize(numDofs);
 
@@ -373,7 +372,7 @@ namespace Dune
           // GENERAL: these are the same as used as test function in 'interpolation'
           const auto &shapeFunctionSet = basisSets_.basisFunctionSet(agglomeration(), element);
 
-          interpolation.interpolateBasis(element, shapeFunctionSet, D);
+          interpolation_.interpolateBasis(element, shapeFunctionSet, D);
 
           // compute mass matrices
           for (std::size_t qp = 0; qp < quadrature.nop(); ++qp)
@@ -453,12 +452,13 @@ namespace Dune
             b[ beta ] = 1;
 
             // set up vector d (rhs for constraints)
-            interpolation.valueL2constraints(beta, H0, D, d);
+            interpolation_.valueL2constraints(beta, H0, D, d);
+            /*
             std::cout << beta << ", " << d.size() << ": ";
             for (int q=0;q<d.size();++q)
               std::cout << d[q] << " ";
             std::cout << std::endl;
-            assert(d.size() == 1);
+            */
             // if( beta >= numDofs - numConstraintShapeFunctions )
               // assert( std::abs( d[ beta - numDofs + numConstraintShapeFunctions ] - H0 ) < 1e-13);
 
@@ -489,7 +489,7 @@ namespace Dune
           }
           for (std::size_t beta = 0; beta < numDofs; ++beta )
           {
-            interpolation.valueL2constraints(beta, H0, D, d);
+            interpolation_.valueL2constraints(beta, H0, D, d);
             for (std::size_t alpha = 0; alpha < numConstraintShapeFunctions; ++alpha)
             {
               valueProjection[alpha][beta] = 0;
@@ -530,7 +530,7 @@ namespace Dune
             edgePhiVector[0] = 0;
             edgePhiVector[1] = 0;
 
-            interpolation(intersection, edgeShapeFunctionSet, edgePhiVector, mask);
+            interpolation_(intersection, edgeShapeFunctionSet, edgePhiVector, mask);
 
             auto normal = intersection.centerUnitOuterNormal();
             typename Dune::FieldMatrix<DomainFieldType,dimDomain,dimDomain> factorTN, factorNN;
@@ -556,8 +556,8 @@ namespace Dune
                   // evaluate each here for edge shape fns
                   // first check if we should be using interpolation (for the
                   // existing edge moments - or for H4 space)
-                  // !!!!! sfs.degree(alpha) <= agIndexSet_.edgeOrders()[0]
-                  if (alpha < dimDomain*sizeONB<0>(agIndexSet_.edgeOrders()[0])       // have enough edge momentsa
+                  // !!!!! sfs.degree(alpha) <= basisSets_.edgeOrders()[0]
+                  if (alpha < dimDomain*sizeONB<0>(basisSets_.edgeValueMoments())       // have enough edge momentsa
                       || edgePhiVector[0].size() == dimRange*(polOrder+1)               // interpolation is exact
                       || edgeInterpolation_)                                 // user want interpolation no matter what
                   {

@@ -26,8 +26,8 @@ namespace Dune
     // ---------------------
 
     template< class GridPart, class Allocator = std::allocator< std::size_t > >
-    class VemAgglomerationIndexSet
-    : public AgglomerationIndexSet< GridPart, Allocator >
+    using VemAgglomerationIndexSet = AgglomerationIndexSet< GridPart, Allocator >;
+#if 0
     {
       typedef VemAgglomerationIndexSet< GridPart, Allocator > ThisType;
       typedef AgglomerationIndexSet< GridPart, Allocator > BaseType;
@@ -133,7 +133,7 @@ namespace Dune
         // return std::accumulate(testSpaces_[codim].begin(),testSpaces_[codim].end(),0);
       }
     };
-
+#endif
 
   } // namespace Vem
 

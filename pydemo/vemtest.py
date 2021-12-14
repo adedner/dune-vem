@@ -20,8 +20,8 @@ dune.fem.parameter.append({"fem.verboserank": 0})
 order = 3
 dimR = 3
 # testSpaces = [ [0], [order-3,order-2], [order-4] ]
-testSpaces = [-1,order-1,order-2]
-# testSpaces = [0,order-2,order-2]
+# testSpaces = [-1,order-1,order-2]
+testSpaces = [0,order-2,order-2]
 
 x = SpatialCoordinate(triangle)
 massCoeff = 1 # +sin(dot(x,x))       # factor for mass term
