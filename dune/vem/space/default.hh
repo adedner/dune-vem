@@ -523,23 +523,22 @@ namespace Dune
                           // note: the edgeShapeFunctionSet is defined over
                           // the reference element of the edge so the jit has
                           // to be applied here
-                          // Dune::FieldVector<double,1> gradHatPsiPhi;
-                          // dpsi.mtv(phi, gradHatPsiPhi);
-                          // DomainType gradPsiPhi;
-                          // jit.mv(gradHatPsiPhi, gradPsiPhi);
-                          // double gradPsiPhiDottau = gradPsiPhi * tau;
 
                           JacobianRangeType gradPsi;
                           jit.mv(dpsi,gradPsi);
-                          RangeType gradPsiDottau = gradPsi * tau;
+                          RangeType gradPsiDottau;
 
                           // assert(std::abs(gradPsiDottau - dpsi[r][0] / h) < 1e-8);
                           // GENERAL: this assumed that the Pi_0 part of Pi^e is not needed?
-                          for (std::size_t s = 0; s < mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
-                            for (std::size_t i = 0; i < dimDomain; ++i)
-                              for (std::size_t j = 0; j < dimDomain; ++j)
-                                // P[alpha][mask[0][s]].axpy(edgePhiVector[0][beta][s] * gradPsiPhiDottau * weight, factorTN);
-                                P[alpha][mask[0][s]] += weight * edgePhiVector[0][beta][s] * gradPsiDottau * phi[r][i][j] * factorTN[i][j];
+                          for (std::size_t r = 0; r < dimRange; ++r)
+                          {
+                            gradPsiDottau[r] = gradPsi[r] * tau;
+                            for (std::size_t s = 0; s < mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
+                              for (std::size_t i = 0; i < dimDomain; ++i)
+                                for (std::size_t j = 0; j < dimDomain; ++j)
+                                  // P[alpha][mask[0][s]].axpy(edgePhiVector[0][beta][s] * gradPsiPhiDottau * weight, factorTN);
+                                  P[alpha][mask[0][s]] += weight * edgePhiVector[0][beta][s] * gradPsiDottau[r] * phi[r][i][j] * factorTN[i][j];
+                          }
                         }
                     });
                   } // alpha < numHessSF
@@ -552,9 +551,9 @@ namespace Dune
                         // GENERAL: could use Pi_0 here as suggested in varying coeff paper
                         //         avoid having to use the gradient projection later for the hessian projection
                         for (std::size_t s = 0; s < mask[1].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
-                          for (std::size_t r=0; r < dimRange; ++r )
-                            for (std::size_t i=0; i < dimDomain; ++i )
-                              for (std::size_t j=0; j < dimDomain; ++j )
+                          for (std::size_t r=0; r < dimRange; ++r)
+                            for (std::size_t i=0; i < dimDomain; ++i)
+                              for (std::size_t j=0; j < dimDomain; ++j)
                                 P[alpha][mask[1][s]] += weight * edgePhiVector[1][beta][s] * psi[r] * phi[r][i][j] * factorNN[i][j];
                                 // axpy(edgePhiVector[1][beta][s] * psi*phi * weight, factorNN);
                     });
@@ -641,7 +640,7 @@ namespace Dune
           for (std::size_t qp = 0; qp < quadrature.nop(); ++qp)
           {
             const DomainFieldType weight = geometry.integrationElement(quadrature.point(qp)) * quadrature.weight(qp);
-            vemBasisFunction.jacobianAll(quadrature[qp], phi1Values);
+            vemBasisFunction.jacobianAll(quadrature[qp], psi1Values);
             shapeFunctionSet.divHessianEach(quadrature[qp],
                           [&](std::size_t alpha, JacobianRangeType gradPhi) {
                 // Note: the shapeFunctionSet is defined in physical space so
@@ -652,7 +651,7 @@ namespace Dune
                   for (std::size_t d = 0; d < dimDomain; ++d)
                     for (std::size_t r = 0; r < dimRange; ++r)
                     {
-                      P[alpha][s] -= weight * phi1Values[s][r][d] * gradPhi[r][d];
+                      P[alpha][s] -= weight * psi1Values[s][r][d] * gradPhi[r][d];
                     }
             });
 
