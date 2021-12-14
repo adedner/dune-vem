@@ -308,6 +308,7 @@ namespace Dune
       DynamicMatrix<DomainFieldType> R;
       DynamicMatrix<DomainFieldType> P;
       std::vector<RangeType> phi0Values;
+      std::vector<JacobianRangeType> psi1Values;
 
       // start iteration over all polygons
       for (std::size_t agglomerate = start; agglomerate < end; ++agglomerate)
@@ -686,7 +687,7 @@ namespace Dune
               stabilization[i][j] += S[k][i] * S[k][j];
           }
 
-      } // end iteration over polygonsa
+      } // end iteration over polygons
 
     } // end build projections
 

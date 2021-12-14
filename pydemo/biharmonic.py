@@ -29,9 +29,9 @@ dune.fem.parameter.append({"fem.verboserank": 0})
 # <codecell>
 # Note: suboptimal laplace error for bubble (space is reduced to polorder=3 but could be 4 = ts+2
 methods = [ ### "[space,scheme,spaceKwrags]"
-        # ["vem","vem",{"order":order, "testSpaces":[ [0],  [order-3,order-2], [order-4] ] }, "C1-non-conforming"],
+        ["vem","vem",{"order":order, "testSpaces":[ [0],  [order-3,order-2], [order-4] ] }, "C1-non-conforming"],
         # ["vem","vem",{"order":order, "testSpaces":[ [0],  [order-2,order-2], [order-2] ] }, "C1C0-conforming"],
-        ["vem","vem",{"order":order, "testSpaces":[ [0],  [order-3,order-2], [order-3] ] }, "C1mod-conforming"],
+        # ["vem","vem",{"order":order, "testSpaces":[ [0],  [order-3,order-2], [order-3] ] }, "C1mod-conforming"],
           ]
 if epsilon == 0:
     methods += [
@@ -130,7 +130,7 @@ for level in range(maxLevel):
                load=True,show=False,lloyd=5), convex=True )
     res = []
     for i,m in enumerate(methods):
-        space = create.space(m[0], polyGrid, dimRange=1, storage="fem", **m[2])
+        space = create.space(m[0], polyGrid, dimRange=1, storage="numpy", **m[2])
         dfs,errors,info = compute(polyGrid, space, m[1])
         print("[",level,"]","method:(",m[0],m[2],")",
               "Sizes (polys,simplex,dofs): ",polyGrid.hierarchicalGrid.agglomerate.size, polyGrid.size(0), space.size, "L^2: ", errors[0], "H^1: ", errors[1],

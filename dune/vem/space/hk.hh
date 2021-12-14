@@ -293,7 +293,7 @@ namespace Dune
           : numValueShapeFunctions_-3*BBBasisFunctionSetType::RangeType::dimension
         )
       // ????
-      , numInnerShapeFunctions_( order-2<0 ? 0 : sizeONB<0>(order - 2) )
+      , numInnerShapeFunctions_( order-4<0 ? 0 : sizeONB<0>(order - 4) )
       {
         std::cout << "[" << numValueShapeFunctions_ << ","
                   << numGradShapeFunctions_ << ","
