@@ -154,19 +154,27 @@ namespace Dune
           if constexpr (!reduced)
           {
             HessianRangeType hess(0);
+            std::size_t beta = 0;
             sfs_.evaluateEach(x, [&](std::size_t alpha, RangeType phi)
             {
               if (alpha<numHessShapeFunctions_)
               {
                 for (size_t d1=0;d1<dimDomain;++d1)
                 {
-                  for (size_t d2=0;d2<dimDomain;++d2)
+                  for (size_t d2=0;d2<=d1;++d2)
                   {
                     for (size_t r=0;r<phi.size();++r)
+                    {
                       hess[r][d1][d2] = phi[r];
-                    functor(dimDomain*dimDomain*alpha+dimDomain*d1+d2,hess);
+                      hess[r][d2][d1] = phi[r];
+                    }
+                    functor(beta,hess);
+                    ++beta;
                     for (size_t r=0;r<phi.size();++r)
+                    {
                       hess[r][d1][d2] = 0;
+                      hess[r][d2][d1] = 0;
+                    }
                   }
                 }
               }
@@ -237,19 +245,22 @@ namespace Dune
         // functor(alpha, psi) with psi in R^{r,d}
         //
         // h_{alpha*D^2+d1*D+d2}
-        // for each h_r = m_{alpha,r} I_{d1,d2}    (fixed 1<=alpha<=numHessSF and 1<=d1,d2<=dimDomain)
+        // for each h_r = m_{alpha,r} S_{d1,d2}    (fixed 1<=alpha<=numHessSF and 1<=d1,d2<=dimDomain)
         // sum_{rij} int_E d_ij v_r h_rij = - sum_{rij} int_E d_i v_r d_j h_rij + ...
         //     = - int_E sum_ri (d_i v_r sum_j d_j h_rij )
         //     = - int_E sum_ri d_i v_r psi_ri
         // with psi_ri = sum_j d_j h_rij
         //
-        // h_{rij} = m_{alpha,r} delta_{i,d1}delta_{j,d2}   (m=m_alpha and fixed ij=1,..,dimDomain)
-        // psi_ri = sum_j d_j h_rij = sum_j d_j m_{alpha,r} delta_{i,d1}delta_{j,d2}
-        //        = d_d2 m_{alpha,r} delta_{i,d1}
+        // h_{rij} = m_{alpha,r} (delta_{i,d1}delta_{j,d2}+delta_{j,d1}delta_{i,d2})
+        //           (m=m_alpha and fixed ij=1,..,dimDomain)
+        // psi_ri = sum_j d_j h_rij
+        //        = sum_j d_j m_{alpha,r} (delta_{i,d1}delta_{j,d2}+delta_{j,d1}delta_{i,d2})
+        //        = (d_d2 m_{alpha,r} delta_{i,d1} + d_d1 m_{alpha,r} delta_{i,d2}
         template< class Point, class Functor >
         void divHessianEach( const Point &x, Functor functor ) const
         {
           JacobianRangeType divHess(0);
+          std::size_t beta=0;
           if constexpr (!reduced)
           {
             sfs_.jacobianEach(x, [&](std::size_t alpha, JacobianRangeType dphi)
@@ -258,12 +269,16 @@ namespace Dune
               {
                 for (size_t d1=0;d1<dimDomain;++d1)
                 {
-                  for (size_t d2=0;d2<dimDomain;++d2)
+                  for (size_t d2=0;d2<=d1;++d2)
                   {
                     divHess = 0;
                     for (size_t r=0;r<dimRange;++r)
+                    {
                       divHess[r][d1] = dphi[r][d2];
-                    functor(dimDomain*dimDomain*alpha+dimDomain*d1+d2, divHess);
+                      divHess[r][d2] = dphi[r][d1];
+                    }
+                    functor(beta, divHess);
+                    ++beta;
                   }
                 }
               }
@@ -334,7 +349,7 @@ namespace Dune
           else if (orderSFS == 1)
             return dimDomain*numGradShapeFunctions_;
           else if (orderSFS == 2)
-            return dimDomain*dimDomain*numHessShapeFunctions_;
+            return dimDomain*(dimDomain+1)/2*numHessShapeFunctions_;
         }
         else
         {

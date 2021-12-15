@@ -512,7 +512,8 @@ namespace Dune
                           R[alpha][s] += weight * phi0Values[s][i] * phi[i][j] * normal[j];
                   }
               });
-              shapeFunctionSet.hessianEach(y, [&](std::size_t alpha, HessianRangeType phi) {
+              shapeFunctionSet.hessianEach(y, [&](std::size_t alpha, HessianRangeType phi)
+              {
                   // compute the phi.tau boundary terms for the hessian projection using d/ds Pi^e
                   if ( interpolation.edgeSize(1) > 0 )
                   {
