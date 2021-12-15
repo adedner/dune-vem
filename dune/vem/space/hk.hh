@@ -78,6 +78,8 @@ namespace Dune
       // value: as full basis function set
       // jacobian: with evaluateEach and divergenceEach
       // hessian: with evaluateEach and divergenceEach
+      // test: for the inner moments
+      // implement edge shape function sets for the testing (value, normal derivative etc)
       struct ShapeFunctionSet
       {
         typedef typename BBBasisFunctionSetType::FunctionSpaceType FunctionSpaceType;
