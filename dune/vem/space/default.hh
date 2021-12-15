@@ -70,8 +70,6 @@ namespace Dune
       typedef Dune::Fem::ElementQuadrature<GridPartType, 0> Quadrature0Type;
       typedef Dune::Fem::ElementQuadrature<GridPartType, 1> Quadrature1Type;
 
-      typedef typename Traits::ScalarBasisFunctionSetType::HessianMatrixType HessianMatrixType;
-
       typedef DynamicMatrix<typename BasisFunctionSetType::DomainFieldType> Stabilization;
 
       using BaseType::gridPart;
@@ -95,18 +93,17 @@ namespace Dune
       // 3: don't use onb at all
       DefaultAgglomerationVEMSpace(AgglomerationType &agglomeration,
           const unsigned int polOrder,
-          const typename IndexSetType::TestSpacesType &testSpaces,
+          const typename Traits::BasisSetsType &basisSets,
           int basisChoice,
           bool edgeInterpolation)
       : BaseType(agglomeration.gridPart()),
         polOrder_(polOrder),
+        basisSets_(basisSets),
         basisChoice_(basisChoice),
-        useOnb_(basisChoice == 2),
         edgeInterpolation_(edgeInterpolation),
-        agIndexSet_(agglomeration, testSpaces),
-        blockMapper_(agIndexSet_, agIndexSet_.dofsPerCodim()),
-        interpolation_(blockMapper().indexSet(), polOrder, basisChoice != 3),
-        basisSets_(polOrder_, agIndexSet_.maxEdgeDegree(), useOnb_),
+        agIndexSet_(agglomeration),
+        blockMapper_(agIndexSet_, basisSets_.dofsPerCodim()),
+        interpolation_(blockMapper().indexSet(), basisSets_, polOrder, basisChoice != 3),
         counter_(0),
         useThreads_(Fem::MPIManager::numThreads()),
         valueProjections_(new Vector<
@@ -119,7 +116,7 @@ namespace Dune
       {
         std::cout << "using " << useThreads_ << " threads\n";
         if (basisChoice != 3)
-          this->agglomeration().onbBasis(order());
+          this->agglomeration().onbBasis(order()+1);
         update(true);
       }
       DefaultAgglomerationVEMSpace(const DefaultAgglomerationVEMSpace&) = delete;
@@ -175,7 +172,6 @@ namespace Dune
       }
       const BasisFunctionSetType basisFunctionSet(const EntityType &entity) const
       {
-        // if constexpr (vectorSpace) return scalarBasisFunctionSet(entity); else
         return BasisFunctionSetType( std::move(scalarBasisFunctionSet(entity)) );
       }
 
@@ -208,7 +204,7 @@ namespace Dune
        */
       InterpolationType interpolation(const EntityType &entity) const
       {
-        return InterpolationType(blockMapper().indexSet(), entity);
+        return InterpolationType(blockMapper().indexSet(), basisSets_, entity);
       }
 
       AgglomerationInterpolationType interpolation() const
@@ -231,18 +227,19 @@ namespace Dune
       auto& hessianProjections() const { return *hessianProjections_; }
       auto& stabilizations() const { return *stabilizations_; }
 
+      virtual void buildValueProjection(const Std::vector<Std::vector<ElementSeedType> > &entitySeeds,
+                                        unsigned int start, unsigned int end);
       void buildProjections(const Std::vector<Std::vector<ElementSeedType> > &entitySeeds,
                             unsigned int start, unsigned int end);
 
       // issue with making these const: use of delete default constructor in some python bindings...
       unsigned int polOrder_;
+      BasisSetsType basisSets_;
       int basisChoice_;
-      const bool useOnb_;
       bool edgeInterpolation_;
       IndexSetType agIndexSet_;
       mutable BlockMapperType blockMapper_;
       AgglomerationInterpolationType interpolation_;
-      BasisSetsType basisSets_;
       std::size_t counter_;
       int useThreads_;
       std::shared_ptr<Vector<typename Traits::ScalarBasisFunctionSetType::ValueProjection>> valueProjections_;
@@ -250,6 +247,16 @@ namespace Dune
       std::shared_ptr<Vector<typename Traits::ScalarBasisFunctionSetType::HessianProjection>> hessianProjections_;
       std::shared_ptr<Vector<Stabilization>> stabilizations_;
     };
+
+    // Computation of value projection for DefaultAgglomerationVEMSpace
+    // ------------------------------------------------------------
+
+    template<class Traits>
+    inline void DefaultAgglomerationVEMSpace<Traits> :: buildValueProjection(
+          const Std::vector<Std::vector<ElementSeedType> > &entitySeeds,
+          unsigned int start, unsigned int end )
+    {
+    }
 
     // Computation of  projections for DefaultAgglomerationVEMSpace
     // ------------------------------------------------------------
@@ -269,24 +276,24 @@ namespace Dune
       const std::size_t dimDomain = DomainType::dimension;
       const std::size_t dimRange = RangeType::dimension;
 
-      AgglomerationInterpolationType interpolation(blockMapper().indexSet(), polOrder, basisChoice_ != 3);
-
-      const std::size_t baseRangeDimension = RangeType::dimension;
-      assert( RangeType::dimension == Traits::baseRangeDimension );
-
-      Std::vector<int> orders = agIndexSet_.orders();
       const std::size_t numShapeFunctions = basisSets_.size(0);
       const std::size_t numGradShapeFunctions = basisSets_.size(1);
       const std::size_t numHessShapeFunctions = basisSets_.size(2);
-      const std::size_t numInnerShapeFunctions = basisSets_.innerTestSize();
+      const std::size_t numConstraintShapeFunctions = basisSets_.constraintSize();
+
+      std::cout << "num val / grad / hess / constr shapefunctions: "
+                << numShapeFunctions << " / "
+                << numGradShapeFunctions << " / "
+                << numHessShapeFunctions << " / "
+                << numConstraintShapeFunctions << std::endl;
 
       // set up matrices used for constructing gradient, value, and edge projections
       // Note: the code is set up with the assumption that the dofs suffice to compute the edge projection
       //       Is this still the case?
 
-      // Mass matrices and their inverse: Hp, HpGrad, HpHess, HpInv, HpGradInv, HpHessInv
-      DynamicMatrix<DomainFieldType> Hp, HpGrad, HpHess, HpInv, HpGradInv, HpHessInv;
-      Hp.resize(numShapeFunctions, numShapeFunctions, 0);
+      // Mass matrices and their inverse: HpGrad, HpHess, HpGradInv, HpHessInv
+      // !!! HpGrad/HpHess are not needed after inversion so use HpGradInv/HpHessInv from the start
+      DynamicMatrix<DomainFieldType> HpGrad, HpHess, HpGradInv, HpHessInv;
       HpGrad.resize(numGradShapeFunctions, numGradShapeFunctions, 0);
       HpHess.resize(numHessShapeFunctions, numHessShapeFunctions, 0);
 
@@ -294,15 +301,18 @@ namespace Dune
       DynamicMatrix<DomainFieldType> D;
       // constraint matrix for value projection
       DynamicMatrix<DomainFieldType> constraintValueProj;
-      constraintValueProj.resize(numInnerShapeFunctions, numShapeFunctions, 0);
+      constraintValueProj.resize(numConstraintShapeFunctions, numShapeFunctions, 0);
       // right hand sides and solvers for CLS for value projection (b: ls, d: constraints)
       Dune::DynamicVector<DomainFieldType> b, d;
-      d.resize(numInnerShapeFunctions, 0);
+      d.resize(numConstraintShapeFunctions, 0);
 
       // matrices for edge projections
       Std::vector<Dune::DynamicMatrix<double> > edgePhiVector(2);
-      edgePhiVector[0].resize(interpolation.edgeSize(0), interpolation.edgeSize(0), 0);
-      edgePhiVector[1].resize(interpolation.edgeSize(1), interpolation.edgeSize(1), 0);
+      edgePhiVector[0].resize(basisSets_.edgeSize(0), basisSets_.edgeSize(0), 0);
+      edgePhiVector[1].resize(basisSets_.edgeSize(1), basisSets_.edgeSize(1), 0);
+
+      std::cout << "edgePhiVector:" << basisSets_.edgeSize(0) << "," <<  basisSets_.edgeSize(1)
+                << std::endl;
 
       // matrix for rhs of gradient and hessian projections
       DynamicMatrix<DomainFieldType> R;
@@ -313,7 +323,8 @@ namespace Dune
       // start iteration over all polygons
       for (std::size_t agglomerate = start; agglomerate < end; ++agglomerate)
       {
-        const std::size_t numDofs = blockMapper().numDofs(agglomerate) * baseRangeDimension;
+        const std::size_t numDofs = blockMapper().numDofs(agglomerate); // * dimRange;
+        std::cout << "numDofs: " << numDofs << std::endl;
 
         phi0Values.resize(numDofs);
         psi1Values.resize(numDofs);
@@ -351,7 +362,6 @@ namespace Dune
         /// compute L(B) and the mass matrices ///////////////////////////////////
         //////////////////////////////////////////////////////////////////////////
 
-        Hp = 0;
         HpGrad = 0;
         HpHess = 0;
         for (const ElementSeedType &entitySeed : entitySeeds[agglomerate])
@@ -364,18 +374,16 @@ namespace Dune
           // GENERAL: these are the same as used as test function in 'interpolation'
           const auto &shapeFunctionSet = basisSets_.basisFunctionSet(agglomeration(), element);
 
-          interpolation.interpolateBasis(element, shapeFunctionSet.valueBasisSet(), D);
+          interpolation_.interpolateBasis(element, shapeFunctionSet.valueBasisSet(), D);
 
-          // compute mass matrices Hp, HpGrad, and the gradient matrices G^l
-          // TO DO change here to call shapeFunctionSet.jacobianEach and hessianEach from methods in hk
+          // compute mass matrices
           for (std::size_t qp = 0; qp < quadrature.nop(); ++qp)
           {
             const DomainFieldType weight =
                     geometry.integrationElement(quadrature.point(qp)) * quadrature.weight(qp);
             shapeFunctionSet.evaluateEach(quadrature[qp], [&](std::size_t alpha, RangeType phi) {
               shapeFunctionSet.evaluateEach(quadrature[qp], [&](std::size_t beta, RangeType psi) {
-                Hp[alpha][beta] += phi * psi * weight;
-                if (alpha < numInnerShapeFunctions) // ??? numInnerShapeShapeFunctions from space implementation
+                if (alpha < numConstraintShapeFunctions)
                   constraintValueProj[alpha][beta] += phi * psi * weight;
               });
             });
@@ -395,14 +403,25 @@ namespace Dune
               });
             });
           } // quadrature loop
+
         } // loop over triangles in agglomerate
 
         // compute inverse mass matrix
-        // GENERAL: should we simply assume that the mass matrix is diagonal and not compute anything here?
-        HpInv = Hp;
-        HpInv.invert();
-        HpGradInv = HpGrad;
-        HpGradInv.invert();
+        if (numGradShapeFunctions>0)
+        {
+          HpGradInv = HpGrad;
+          try
+          {
+            HpGradInv.invert();
+          }
+          catch (const FMatrixError&)
+          {
+            std::cout << "HpGradInv.invert() failed!\n";
+            assert(0);
+            throw FMatrixError();
+          }
+        }
+
         if (numHessShapeFunctions>0)
         {
           HpHessInv = HpHess;
@@ -414,22 +433,54 @@ namespace Dune
         //////////////////////////////////////////////////////////////////////////
 
         DomainFieldType H0 = blockMapper_.indexSet().volume(agglomerate);
-        auto leastSquaresMinimizer = LeastSquares(D, constraintValueProj);
-        for ( std::size_t beta = 0; beta < numDofs; ++beta )
-        {
-          // set up vectors b (rhs for least squares)
-          b[ beta ] = 1;
+        if (numConstraintShapeFunctions < numShapeFunctions)
+        { // need to use a CLS approach
+          auto leastSquaresMinimizer = LeastSquares(D, constraintValueProj);
+          for ( std::size_t beta = 0; beta < numDofs; ++beta )
+          {
+            // set up vectors b (rhs for least squares)
+            b[ beta ] = 1;
 
-          // set up vector d (rhs for constraints)
-          interpolation.valueL2constraints(beta, H0, D, d);
-          if( beta >= numDofs - numInnerShapeFunctions )
-            assert( std::abs( d[ beta - numDofs + numInnerShapeFunctions ] - H0 ) < 1e-13);
+            // set up vector d (rhs for constraints)
+            interpolation_.valueL2constraints(beta, H0, D, d);
+            // if( beta >= numDofs - numConstraintShapeFunctions )
+              // assert( std::abs( d[ beta - numDofs + numConstraintShapeFunctions ] - H0 ) < 1e-13);
 
-          // compite CLS solution and store in right column of 'valueProjection'
-          auto colValueProjection = vectorizeMatrixCol( valueProjection, beta );
-          colValueProjection = leastSquaresMinimizer.solve(b, d);
+            // compite CLS solution and store in right column of 'valueProjection'
+            auto colValueProjection = vectorizeMatrixCol( valueProjection, beta );
+            colValueProjection = leastSquaresMinimizer.solve(b, d);
 
-          b[beta] = 0;
+            b[beta] = 0;
+          }
+        }
+        else
+        { // constraintValueProj is square and can be inverted
+          try
+          {
+            constraintValueProj.invert();
+          }
+          catch (const FMatrixError&)
+          {
+            std::cout << "constraintValueProj.invert() failed!\n";
+            for (std::size_t alpha=0;alpha<constraintValueProj.size();++alpha)
+            {
+              for (std::size_t beta=0;beta<constraintValueProj[alpha].size();++beta)
+                std::cout << constraintValueProj[alpha][beta] << " ";
+              std::cout << std::endl;
+            }
+            assert(0);
+            throw FMatrixError();
+          }
+          for (std::size_t beta = 0; beta < numDofs; ++beta )
+          {
+            interpolation_.valueL2constraints(beta, H0, D, d);
+            for (std::size_t alpha = 0; alpha < numShapeFunctions; ++alpha)
+            {
+              valueProjection[alpha][beta] = 0;
+              for (std::size_t i = 0; i < constraintValueProj.cols(); ++i)
+                valueProjection[alpha][beta] += constraintValueProj[alpha][i] * d[i];
+            }
+          }
         }
 
         //////////////////////////////////////////////////////////////////////////
@@ -444,8 +495,6 @@ namespace Dune
 
           // get the bounding box monomials and apply all dofs to them
           const auto &shapeFunctionSet = basisSets_.basisFunctionSet(agglomeration(), element);
-          const typename BasisSetsType::EdgeShapeFunctionSetType &edgeShapeFunctionSet
-                  = basisSets_.edgeBasisFunctionSet(agglomeration(), element);
 
           auto vemBasisFunction = scalarBasisFunctionSet(element);
 
@@ -457,11 +506,15 @@ namespace Dune
               continue;
             assert(intersection.conforming());
 
+            const typename BasisSetsType::EdgeShapeFunctionSetType edgeShapeFunctionSet
+                  = basisSets_.edgeBasisFunctionSet(agglomeration(), intersection);
+
             Std::vector<Std::vector<unsigned int>>
               mask(2,Std::vector<unsigned int>(0)); // contains indices with Phi_mask[i] is attached to given edge
             edgePhiVector[0] = 0;
             edgePhiVector[1] = 0;
-            interpolation(intersection, edgeShapeFunctionSet, edgePhiVector, mask);
+
+            interpolation_(intersection, edgeShapeFunctionSet, edgePhiVector, mask);
 
             auto normal = intersection.centerUnitOuterNormal();
             typename Dune::FieldMatrix<DomainFieldType,dimDomain,dimDomain> factorTN, factorNN;
@@ -487,8 +540,8 @@ namespace Dune
                   // evaluate each here for edge shape fns
                   // first check if we should be using interpolation (for the
                   // existing edge moments - or for H4 space)
-                  // !!!!! sfs.degree(alpha) <= agIndexSet_.edgeOrders()[0]
-                  if (alpha < dimDomain*sizeONB<0>(agIndexSet_.edgeOrders()[0])       // have enough edge momentsa
+                  // !!!!! sfs.degree(alpha) <= basisSets_.edgeOrders()[0]
+                  if (alpha < dimDomain*sizeONB<0>(basisSets_.edgeValueMoments())       // have enough edge momentsa
                       || edgePhiVector[0].size() == dimRange*(polOrder+1)               // interpolation is exact
                       || edgeInterpolation_)                                 // user want interpolation no matter what
                   {
@@ -695,6 +748,14 @@ namespace Dune
       } // end iteration over polygons
 
     } // end build projections
+
+    // IsAgglomerationVEMSpace
+    // -----------------------
+
+    template<class DiscreteFunctionSpace>
+    struct IsAgglomerationVEMSpace
+            : std::integral_constant<bool, false> {
+    };
 
   } // namespace Vem
 } // namespace Dune

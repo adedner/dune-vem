@@ -35,11 +35,6 @@ namespace Dune
     // IsAgglomerationVEMSpace
     // -----------------------
 
-    template<class DiscreteFunctionSpace>
-    struct IsAgglomerationVEMSpace
-            : std::integral_constant<bool, false> {
-    };
-
     template<class FunctionSpace, class GridPart, bool vectorSpace>
     struct IsAgglomerationVEMSpace<AgglomerationVEMSpace<FunctionSpace, GridPart,vectorSpace> >
             : std::integral_constant<bool, true> {
@@ -48,14 +43,14 @@ namespace Dune
     // AgglomerationVEMSpaceTraits
     // ---------------------------
 
-    template<class FunctionSpace, class GridPart, bool vectorspace,
-              bool reduced=false>
+    template<class FunctionSpace, class GridPart, bool vectorspace, bool reduced=false>
     struct AgglomerationVEMBasisSets
     {
       typedef GridPart GridPartType;
-      static const bool vectorSpace = vectorspace;
-      static const int dimDomain = GridPartType::dimension;
+      static constexpr bool vectorSpace = vectorspace;
+      static constexpr int dimDomain = GridPartType::dimension;
       typedef typename GridPart::template Codim<0>::EntityType EntityType;
+      typedef typename GridPart::IntersectionType IntersectionType;
 
       // a scalar function space
       typedef Dune::Fem::FunctionSpace<
@@ -75,9 +70,8 @@ namespace Dune
       // Next we define test function space for the edges
       typedef Dune::Fem::FunctionSpace<double,double,GridPartType::dimensionworld-1,1> EdgeFSType;
       typedef Dune::Fem::OrthonormalShapeFunctionSet<EdgeFSType> ScalarEdgeShapeFunctionSetType;
-      typedef std::conditional_t< vectorSpace,
-              Fem::VectorialShapeFunctionSet<ScalarEdgeShapeFunctionSetType, typename FunctionSpace::RangeType>,
-              ScalarEdgeShapeFunctionSetType > EdgeShapeFunctionSetType;
+
+      typedef std::array<std::vector<int>,dimDomain+1> TestSpacesType;
 
     private:
       // implement three shape functions sets for
@@ -95,7 +89,7 @@ namespace Dune
         static_assert(vectorSpace || dimRange==1);
         ShapeFunctionSet() = default;
         template <class Agglomeration>
-        ShapeFunctionSet(bool useOnb, ONBShapeFunctionSetType onbSFS,
+        ShapeFunctionSet(bool useOnb, const ONBShapeFunctionSetType& onbSFS,
                          std::size_t numValueSFS, std::size_t numGradSFS, std::size_t numHessSFS,
                          std::size_t innerNumSFS,
                          const Agglomeration &agglomeration, const EntityType &entity)
@@ -299,14 +293,71 @@ namespace Dune
         std::size_t innerShapeFunctions_;
         std::size_t numInnerShapeFunctions_;
       };
+      struct EdgeShapeFunctionSet
+      {
+        typedef typename BBBasisFunctionSetType::FunctionSpaceType FunctionSpaceType;
+        typedef typename FunctionSpaceType::DomainType DomainType;
+        typedef typename FunctionSpaceType::RangeType RangeType;
+        typedef typename FunctionSpaceType::JacobianRangeType JacobianRangeType;
+        typedef typename FunctionSpaceType::HessianRangeType HessianRangeType;
+        static const int dimDomain = DomainType::dimension;
+        static const int dimRange = RangeType::dimension;
+
+        typedef std::conditional_t< vectorSpace,
+              Fem::VectorialShapeFunctionSet<ScalarEdgeShapeFunctionSetType, RangeType>,
+              ScalarEdgeShapeFunctionSetType > VectorEdgeShapeFunctionSetType;
+        typedef typename VectorEdgeShapeFunctionSetType::JacobianRangeType EdgeJacobianRangeType;
+
+        EdgeShapeFunctionSet(const IntersectionType &intersection, const ScalarEdgeShapeFunctionSetType &sfs,
+                             unsigned int numEdgeTestFunctions)
+        : intersection_(intersection), sfs_(sfs), numEdgeTestFunctions_(numEdgeTestFunctions)
+        {}
+        template< class Point, class Functor >
+        void evaluateEach ( const Point &x, Functor functor ) const
+        {
+          sfs_.evaluateEach(x,functor);
+        }
+        template< class Point, class Functor >
+        void jacobianEach ( const Point &x, Functor functor ) const
+        {
+          JacobianRangeType jac;
+          const auto &geo = intersection_.geometry();
+          const auto &jit = geo.jacobianInverseTransposed(x);
+          sfs_.jacobianEach(x, [&](std::size_t alpha, EdgeJacobianRangeType dphi)
+          {
+            for (std::size_t r=0;r<dimRange;++r)
+              jit.mv(dphi[r],jac[r]);
+            functor(alpha,jac);
+          });
+        }
+        template< class Point, class Functor >
+        void evaluateTestEach ( const Point &x, Functor functor ) const
+        {
+          sfs_.evaluateEach(x, [&](std::size_t alpha, RangeType phi)
+          {
+            if (alpha<numEdgeTestFunctions_)
+              functor(alpha,phi);
+          });
+        }
+        private:
+        const IntersectionType &intersection_;
+        VectorEdgeShapeFunctionSetType sfs_;
+        unsigned int numEdgeTestFunctions_;
+      };
 
       public:
       typedef ShapeFunctionSet ShapeFunctionSetType;
+      typedef EdgeShapeFunctionSet EdgeShapeFunctionSetType;
 
-      AgglomerationVEMBasisSets( const int order, const int edgeOrder, bool useOnb)
-      : onbSFS_(Dune::GeometryType(Dune::GeometryType::cube, dimDomain), order)
-      , edgeSFS_( Dune::GeometryType(Dune::GeometryType::cube,dimDomain-1), edgeOrder )
-      , useOnb_(useOnb)
+      AgglomerationVEMBasisSets( const int order,
+                                 const TestSpacesType &testSpaces,
+                                 int basisChoice )
+      // use order2size
+      : testSpaces_(testSpaces)
+      , useOnb_(basisChoice == 2)
+      , dofsPerCodim_(calcDofsPerCodim())
+      , onbSFS_(Dune::GeometryType(Dune::GeometryType::cube, dimDomain), order)
+      , edgeSFS_( Dune::GeometryType(Dune::GeometryType::cube,dimDomain-1), maxEdgeDegree() )
       , numValueShapeFunctions_( onbSFS_.size()*BBBasisFunctionSetType::RangeType::dimension)
       , numGradShapeFunctions_ (
           !reduced? std::min( numValueShapeFunctions_, sizeONB<0>(std::max(0, order - 1)) )
@@ -318,12 +369,25 @@ namespace Dune
         )
       // ????
       , numInnerShapeFunctions_( order-4<0 ? 0 : sizeONB<0>(order - 4) )
+      , numEdgeTestShapeFunctions_( sizeONB<1>(
+                 *std::max_element( testSpaces_[1].begin(), testSpaces_[1].end()) ) )
       {
+        auto degrees = edgeDegrees();
         std::cout << "[" << numValueShapeFunctions_ << ","
                   << numGradShapeFunctions_ << ","
                   << numHessShapeFunctions_ << ","
                   << numInnerShapeFunctions_ << "]"
-                  << "   edge( " << edgeOrder << "): " << edgeSFS_.size() << std::endl;
+                  << "   edge: ["
+                  << edgeSize(0) << "," << edgeSize(1) << ","
+                  << numEdgeTestShapeFunctions_ << "]"
+                  << " " << degrees[0] << " " << degrees[1]
+                  << " max size of edge set: " << edgeSFS_.size()
+                  << std::endl;
+      }
+
+      const std::array< std::pair< int, unsigned int >, dimDomain+1 > &dofsPerCodim() const
+      {
+        return dofsPerCodim_;
       }
 
       template <class Agglomeration>
@@ -335,10 +399,10 @@ namespace Dune
                                 agglomeration,entity);
       }
       template <class Agglomeration>
-      const EdgeShapeFunctionSetType &edgeBasisFunctionSet(
-             const Agglomeration &agglomeration, const EntityType &entity) const
+      EdgeShapeFunctionSetType edgeBasisFunctionSet(
+             const Agglomeration &agglomeration, const IntersectionType &intersection) const
       {
-        return edgeSFS_;
+        return EdgeShapeFunctionSetType(intersection, edgeSFS_, numEdgeTestShapeFunctions_);
       }
       std::size_t size( std::size_t orderSFS ) const
       {
@@ -363,31 +427,107 @@ namespace Dune
         assert(0);
         return 0;
       }
-      int innerTestSize() const
+      int constraintSize() const
       {
         return numInnerShapeFunctions_;
       }
+      int edgeValueMoments() const
+      {
+        return testSpaces_[1][0];
+      }
+      std::size_t edgeSize(int deriv) const
+      {
+        auto degrees = edgeDegrees();
+        return degrees[deriv] < 0 ? 0 : sizeONB<1>( degrees[deriv] );
+        /* Dune::Fem::OrthonormalShapeFunctions<1>::size( degrees[deriv] )
+           * BBBasisFunctionSetType::RangeType::dimension; */
+      }
+
+      ////////////////////////////
+      // used in interpolation
+      ////////////////////////////
       std::size_t edgeSize() const
       {
-        // the edge sfs already has baseRangeDimension since it can be defined over the reference edge
-        return edgeSFS_.size();
+        return edgeSFS_.size() * BBBasisFunctionSetType::RangeType::dimension;
       }
+      std::size_t numEdgeTestShapeFunctions() const
+      {
+        return numEdgeTestShapeFunctions_;
+      }
+      const TestSpacesType &testSpaces() const
+      {
+        return testSpaces_;
+      }
+      template <int dim>
+      std::size_t order2size(unsigned int deriv) const
+      {
+        if (testSpaces_[dim].size()<=deriv || testSpaces_[dim][deriv]<0)
+          return 0;
+        else
+        {
+          if constexpr (dim>0)
+            return Dune::Fem::OrthonormalShapeFunctions<dim>::
+              size(testSpaces_[dim][deriv]);
+          else
+            return pow(dimDomain,deriv);
+        }
+      }
+
       private:
+      Std::vector<int> edgeDegrees() const
+      {
+        assert( testSpaces_[2].size()<2 );
+        Std::vector<int> degrees(2, -1);
+        for (std::size_t i=0;i<testSpaces_[0].size();++i)
+          degrees[i] += 2*(testSpaces_[0][i]+1);
+        if (testSpaces_[0].size()>1 && testSpaces_[0][1]>-1) // add tangential derivatives
+          degrees[0] += 2;
+        for (std::size_t i=0;i<testSpaces_[1].size();++i)
+          degrees[i] += std::max(0,testSpaces_[1][i]+1);
+        return degrees;
+      }
+      std::size_t maxEdgeDegree() const
+      {
+        auto degrees = edgeDegrees();
+        return *std::max_element(degrees.begin(),degrees.end());
+      }
+
       template <int codim>
       static std::size_t sizeONB(std::size_t order)
       {
         return Dune::Fem::OrthonormalShapeFunctions<dimDomain - codim> :: size(order) *
                BBBasisFunctionSetType::RangeType::dimension;
       }
+
+      std::array< std::pair< int, unsigned int >, dimDomain+1 > calcDofsPerCodim () const
+      {
+        int vSize = 0;
+        int eSize = 0;
+        int iSize = 0;
+        for (size_t i=0;i<testSpaces_[0].size();++i)
+          vSize += order2size<0>(i);
+        for (size_t i=0;i<testSpaces_[1].size();++i)
+          eSize += order2size<1>(i);
+        for (size_t i=0;i<testSpaces_[2].size();++i)
+          iSize += order2size<2>(i);
+        return std::array< std::pair< int, unsigned int >, dimDomain+1 >
+               { std::make_pair( dimDomain,   vSize ),
+                 std::make_pair( dimDomain-1, eSize ),
+                 std::make_pair( dimDomain-2, iSize ) };
+      }
+
       // note: the actual shape function set depends on the entity so
       // we can only construct the underlying monomial basis in the ctor
-      ONBShapeFunctionSetType onbSFS_;
-      EdgeShapeFunctionSetType edgeSFS_;
-      std::size_t numValueShapeFunctions_;
-      std::size_t numGradShapeFunctions_;
-      std::size_t numHessShapeFunctions_;
-      std::size_t numInnerShapeFunctions_;
-      bool useOnb_;
+      const TestSpacesType testSpaces_;
+      const bool useOnb_;
+      std::array< std::pair< int, unsigned int >, dimDomain+1 > dofsPerCodim_;
+      const ONBShapeFunctionSetType onbSFS_;
+      const ScalarEdgeShapeFunctionSetType edgeSFS_;
+      const std::size_t numValueShapeFunctions_;
+      const std::size_t numGradShapeFunctions_;
+      const std::size_t numHessShapeFunctions_;
+      const std::size_t numInnerShapeFunctions_;
+      const std::size_t numEdgeTestShapeFunctions_;
     };
 
 
@@ -441,8 +581,18 @@ namespace Dune
     struct AgglomerationVEMSpace
     : public DefaultAgglomerationVEMSpace< AgglomerationVEMSpaceTraits<FunctionSpace,GridPart,vectorSpace> >
     {
-      typedef DefaultAgglomerationVEMSpace< AgglomerationVEMSpaceTraits<FunctionSpace,GridPart,vectorSpace> > BaseType;
-      using BaseType::BaseType;
+      typedef AgglomerationVEMSpaceTraits<FunctionSpace,GridPart,vectorSpace> TraitsType;
+      typedef DefaultAgglomerationVEMSpace<TraitsType> BaseType;
+      typedef Agglomeration<GridPart> AgglomerationType;
+      AgglomerationVEMSpace(AgglomerationType &agglomeration,
+          const unsigned int polOrder,
+          const typename TraitsType::BasisSetsType::TestSpacesType &testSpaces,
+          int basisChoice,
+          bool edgeInterpolation)
+      : BaseType(agglomeration,polOrder,
+                 typename TraitsType::BasisSetsType(polOrder, testSpaces, basisChoice),
+                 basisChoice,edgeInterpolation)
+      {}
     };
 
     //////////////////////////////////////////////////////////////////////////////
@@ -505,15 +655,11 @@ namespace Dune
       typedef typename ElementType::Geometry::ctype ctype;
 
     public:
-      explicit AgglomerationVEMInterpolation ( const IndexSetType &indexSet, unsigned int polOrder, bool useOnb ) noexcept
+      explicit AgglomerationVEMInterpolation ( const IndexSetType &indexSet,
+                                               const BasisSetsType &basisSets,
+                                               unsigned int polOrder, bool useOnb ) noexcept
         : indexSet_( indexSet )
-        // ?????
-        /*
-        , basisSets_( std::max(indexSet_.maxDegreePerCodim()[2],0),
-                          std::max(indexSet_.maxDegreePerCodim()[1],0),
-                          useOnb )
-        */
-        , basisSets_(polOrder, std::max(indexSet_.maxDegreePerCodim()[1],0), useOnb)
+        , basisSets_( basisSets )
         , polOrder_( polOrder )
         , useOnb_(useOnb)
       {}
@@ -543,7 +689,7 @@ namespace Dune
         unsigned int numInnerShapeFunctions = d.size();
         if (numInnerShapeFunctions == 0) return;
         unsigned int numDofs = D.rows();
-        assert( numInnerShapeFunctions == basisSets_.innerTestSize() );
+        assert( numInnerShapeFunctions == basisSets_.constraintSize() );
         for (int alpha=0; alpha<numInnerShapeFunctions; ++alpha)
         {
           // d[alpha] = e_gamma * D_beta
@@ -581,14 +727,14 @@ namespace Dune
 #ifndef NDEBUG
           auto kStart = k;
 #endif
-          for (std::size_t alpha=0;alpha<basisSets_.edgeSize()/baseRangeDimension;++alpha)
+          for (std::size_t alpha=0;alpha<basisSets_.numEdgeTestShapeFunctions()/baseRangeDimension;++alpha)
           {
-            if (alpha < indexSet_.template order2size<1>(0))
+            if (alpha < basisSets_.template order2size<1>(0))
             {
               mask[k] = 1;
               ++k;
             }
-            if (alpha < indexSet_.template order2size<1>(1))
+            if (alpha < basisSets_.template order2size<1>(1))
             {
               mask[k] = 2;
               ++k;
@@ -615,7 +761,6 @@ namespace Dune
 
         // use the bb set for this polygon for the inner testing space
         const auto &innerShapeFunctionSet = basisSets_.basisFunctionSet( indexSet_.agglomeration(), element );
-        const auto &edgeBFS = basisSets_.edgeBasisFunctionSet( indexSet_.agglomeration(), element );
 
         // define the corresponding vertex,edge, and inner parts of the interpolation
         auto vertex = [&] (int poly,int i,int k,int numDofs)
@@ -644,6 +789,7 @@ namespace Dune
         auto edge = [&,this] (int poly,auto intersection,int k,int numDofs)
         { //!TS add nomral derivatives
           int kStart = k;
+          const auto &edgeBFS = basisSets_.edgeBasisFunctionSet( indexSet_.agglomeration(), intersection );
           // int edgeNumber = intersection.indexInInside();
           EdgeQuadratureType edgeQuad( gridPart(), intersection, 2*polOrder_, EdgeQuadratureType::INSIDE );
           auto normal = intersection.centerUnitOuterNormal();
@@ -656,7 +802,7 @@ namespace Dune
             auto x = edgeQuad.localPoint(qp);
             auto y = intersection.geometryInInside().global(x);
             double weight = edgeQuad.weight(qp) * intersection.geometry().integrationElement(x);
-            edgeBFS.evaluateEach(x,
+            edgeBFS.evaluateTestEach(x,
                 [&](std::size_t alpha, RangeType phi ) {
                 if (alpha < order2size<1>(0))
                 {
@@ -727,7 +873,7 @@ namespace Dune
         for (std::size_t i=0;i<mask.size();++i)
           mask[i].clear();
         const ElementType &element = intersection.inside();
-        const auto &edgeBFS = basisSets_.edgeBasisFunctionSet( indexSet_.agglomeration(), element );
+        const auto &edgeBFS = basisSets_.edgeBasisFunctionSet( indexSet_.agglomeration(), intersection );
         const auto &refElement = ReferenceElements< ctype, dimension >::general( element.type() );
         int edgeNumber = intersection.indexInInside();
         const auto &edgeGeo = refElement.template geometry<1>(edgeNumber);
@@ -790,7 +936,7 @@ namespace Dune
             auto xx = x;
             double weight = edgeQuad.weight(qp) * intersection.geometry().integrationElement(x);
             edgeShapeFunctionSet.evaluateEach( x, [ & ] ( std::size_t beta, typename EdgeShapeFunctionSet::RangeType value ) {
-                edgeBFS.evaluateEach( xx,
+                edgeBFS.evaluateTestEach( xx,
                   [&](std::size_t alpha, typename EdgeShapeFunctionSet::RangeType phi ) {
                     //!TS add alpha<...
                     if (alpha < order2size<1>(0) && beta < edgeSize(0))
@@ -813,7 +959,9 @@ namespace Dune
           entry[0] += order2size<1>(0);
           entry[1] += order2size<1>(1);
         };
+
         applyOnIntersection(intersection,vertex,edge,mask);
+
         assert( entry[0] == localDofVectorMatrix[0].size() );
         assert( entry[1] == localDofVectorMatrix[1].size() );
 
@@ -888,7 +1036,7 @@ namespace Dune
                         refElement.subEntity(intersection.indexInInside(),1,0,2)
                       );
           otherTau /= otherTau.two_norm();
-          if (indexSet_.vertexOrders()[0]>=0) // vertices might have to be flipped
+          if (basisSets_.testSpaces()[0][0]>=0) // vertices might have to be flipped
           {
             if (otherTau*tau<0)
             {
@@ -914,14 +1062,14 @@ namespace Dune
 
       std::size_t edgeSize(int deriv) const
       {
-        return indexSet_.edgeSize(deriv) * baseRangeDimension;
+        return basisSets_.edgeSize(deriv);
       }
 
     private:
       template <int dim>
       std::size_t order2size(unsigned int deriv) const
       {
-        return indexSet_.template order2size<dim>(deriv) * baseRangeDimension;
+        return basisSets_.template order2size<dim>(deriv) * baseRangeDimension;
       }
 
       void getSizesAndOffsets(int poly,
@@ -929,7 +1077,7 @@ namespace Dune
                   int &edgeOffset, int &edgeSize,
                   int &innerOffset, int &innerSize) const
       {
-        auto dofs   = indexSet_.dofsPerCodim();  // assume always three entries in dim order (i.e. 2d)
+        auto dofs   = basisSets_.dofsPerCodim();  // assume always three entries in dim order (i.e. 2d)
         assert(dofs.size()==3);
         vertexSize  = dofs[0].second*baseRangeDimension;
         edgeOffset  = indexSet_.subAgglomerates(poly,dimension)*vertexSize;
@@ -953,7 +1101,7 @@ namespace Dune
 
         // vertex dofs
         //!TS needs changing
-        if (indexSet_.vertexOrders()[0] >= 0)
+        if (basisSets_.testSpaces()[0][0] >= 0)
         {
           for( int i = 0; i < refElement.size( dimension ); ++i )
           {
@@ -980,7 +1128,7 @@ namespace Dune
           }
         }
         //! needs changing
-        if (indexSet_.innerOrders()[0] >=0)
+        if (basisSets_.testSpaces()[2][0] >=0)
         {
           // inner dofs
           const int k = indexSet_.localIndex( element, 0, 0 )*innerSize + innerOffset;
@@ -1001,7 +1149,6 @@ namespace Dune
 
         // use the bb set for this polygon for the inner testing space
         const auto &innerShapeFunctionSet = basisSets_.basisFunctionSet( indexSet_.agglomeration(), element );
-        const auto &edgeBFS = basisSets_.edgeBasisFunctionSet( indexSet_.agglomeration(), element );
 
         // define the vertex,edge, and inner parts of the interpolation
         auto vertex = [&] (int poly,auto i,int k,int numDofs)
@@ -1025,6 +1172,7 @@ namespace Dune
         auto edge = [&] (int poly,auto intersection,int k,int numDofs)
         { //!TS edge derivatives
           int kStart = k;
+          const auto &edgeBFS = basisSets_.edgeBasisFunctionSet( indexSet_.agglomeration(), intersection );
           auto normal = intersection.centerUnitOuterNormal();
           if (intersection.neighbor()) // we need to check the orientation of the normal
             if (indexSet_.index(intersection.inside()) > indexSet_.index(intersection.outside()))
@@ -1043,7 +1191,7 @@ namespace Dune
             typename LocalFunction::RangeType dnvalue;
             dvalue.mv(normal,dnvalue);
             assert( dnvalue[0] == dvalue[0]*normal );
-            edgeBFS.evaluateEach(x,
+            edgeBFS.evaluateTestEach(x,
               [&](std::size_t alpha, typename LocalFunction::RangeType phi ) {
                 //! SubDofWrapper has no size assert( kk < localDofVector.size() );
                 if (alpha < order2size<1>(0))
@@ -1138,7 +1286,7 @@ namespace Dune
         if (k>=0)  // this doesn't make sense - remove?
         {
           std::size_t i = 0;
-          if (indexSet_.vertexOrders()[0]>=0) //!TS
+          if (basisSets_.testSpaces()[0][0]>=0) //!TS
           {
             for( ; i < refElement.size( edgeNumber, dimension-1, dimension ); ++i )
             {
@@ -1181,7 +1329,7 @@ namespace Dune
       }
 
       const IndexSetType &indexSet_;
-      BasisSetsType basisSets_;
+      const BasisSetsType &basisSets_;
       const unsigned int polOrder_;
       const bool useOnb_;
     };

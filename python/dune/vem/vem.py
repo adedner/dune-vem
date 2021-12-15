@@ -263,6 +263,89 @@ def space(view, order=1, dimRange=None,
                         conforming=False, basisChoice=basisChoice)
     raise AttributeError("wrong version string provided:",version)
 
+###############################
+
+def curlFreeSpace(view, order=1,
+             field="double", storage="numpy",
+             basisChoice=2, rotatedBB=True):
+    """create a virtual element space over an agglomerated grid
+
+    Args:
+        view: the underlying grid view
+        order: polynomial order of the finite element functions
+        field: field of the range space
+        storage: underlying linear algebra backend
+
+    Returns:
+        Space: the constructed Space
+    """
+
+    from dune.fem.space import module, addStorage
+
+    if order < 0:
+        raise KeyError(\
+            "Parameter error in DiscontinuousGalerkinSpace with "+
+            "order=" + str(order) + ": " +\
+            "order has to be greater or equal to 0")
+
+    agglomerate = view.hierarchicalGrid.agglomerate
+
+    includes = [ "dune/fem/gridpart/common/gridpart.hh", "dune/vem/space/curlfree.hh" ] + view.cppIncludes
+    dimw = view.dimWorld
+    viewType = view.cppTypeName
+
+    gridPartName = "Dune::FemPy::GridPart< " + view.cppTypeName + " >"
+    typeName = "Dune::Vem::CurlFreeVEMSpace< " + gridPartName + " >"
+    constructor = Constructor(
+                   ['pybind11::handle gridView',
+                    'const pybind11::object agglomerate',
+                    'unsigned int order',
+                    'int basisChoice','bool rotatedBB'],
+                   ['typedef Dune::Vem::Agglomeration<' + gridPartName + '> AggloType;',
+                    'AggloType *agglo = nullptr;',
+                    '// check storage',
+                    'pybind11::function retrieve = pybind11::module::import("dune.vem.vem").attr("retrieveAgglo_");',
+                    'pybind11::function insert   = pybind11::module::import("dune.vem.vem").attr("insertAgglo_");',
+                    'pybind11::function remove   = pybind11::module::import("dune.vem.vem").attr("removeAgglo_");',
+                    'pybind11::handle aggloExists = retrieve(gridView);',
+                    'if (! pybind11::isinstance<pybind11::none>(aggloExists) ) {',
+                    '  // std::cout << "retrieve agglo\\n";',
+                    '  agglo = static_cast<AggloType*>(aggloExists.cast<void*>());',
+                    '}',
+                    'else {',
+                    '  agglo = new AggloType(',
+                    '           Dune::FemPy::gridPart<' + viewType + '>(gridView),rotatedBB,',
+                    '      [agglomerate](const auto& idx)',
+                    '      { return agglomerate(idx).template cast<unsigned int>(); } );',
+                    '  insert(gridView,(void*)agglo);',
+                    '  pybind11::cpp_function aggloCleanup(',
+                    '        [agglo,remove](pybind11::handle weakref) {',
+                    '        // std::cout << "remove agglo\\n";',
+                    '        remove((void*)agglo);',
+                    '        delete agglo;',
+                    '        weakref.dec_ref();',
+                    '    });',
+                    '  (void) pybind11::weakref(gridView, aggloCleanup).release();',
+                    '  // std::cout << "new agglo\\n";',
+                    '}',
+                    'auto obj = new DuneType(*agglo, order, basisChoice );',
+                    'return obj;'],
+                   ['"gridView"_a', '"agglomerate"_a',
+                    '"order"_a',
+                    '"basisChoice"_a', '"rotatedBB"_a',
+                    'pybind11::keep_alive< 1, 2 >()'] )
+    diameterMethod = Method('diameters',
+       '''[]( DuneType &self ) { return self.blockMapper().indexSet().diameters(); }''' )
+    updateMethod = Method('update',
+       '''[]( DuneType &self ) { self.update(); }''' )
+
+    spc = module(field, includes, typeName, constructor, diameterMethod, updateMethod,
+                storage=storage,
+                ctorArgs=[view, agglomerate, order, basisChoice, rotatedBB])
+    addStorage(spc, storage)
+    return spc.as_ufl()
+
+#########################################################
 #########################################################
 
 # from dune.fem.model import elliptic
