@@ -65,7 +65,8 @@ namespace Dune
       typedef typename GridPartType::template Codim<0>::EntityType ElementType;
       typedef typename GridPartType::template Codim<0>::EntitySeedType ElementSeedType;
 
-      static const int dimDomain = Traits::dimDomain;
+      static constexpr int dimDomain = Traits::dimDomain;
+      static constexpr int blockSize = BaseType::localBlockSize;
 
       typedef Dune::Fem::ElementQuadrature<GridPartType, 0> Quadrature0Type;
       typedef Dune::Fem::ElementQuadrature<GridPartType, 1> Quadrature1Type;
@@ -323,13 +324,18 @@ namespace Dune
       // start iteration over all polygons
       for (std::size_t agglomerate = start; agglomerate < end; ++agglomerate)
       {
-        // !!!!!!!!!!!!!: block size
-        const std::size_t numDofs = blockMapper().numDofs(agglomerate) * dimRange;
+        const std::size_t numDofs = blockMapper().numDofs(agglomerate) * blockSize;
+        /*
+        std::cout << "numDofs: " << numDofs << " = "
+                  << blockMapper().numDofs(agglomerate) << " * "
+                  << blockSize << std::endl;
+        */
 
         phi0Values.resize(numDofs);
         psi1Values.resize(numDofs);
 
         const int numEdges = agIndexSet_.subAgglomerates(agglomerate, IndexSetType::dimension - 1);
+        const DomainFieldType H0 = blockMapper_.indexSet().volume(agglomerate);
 
         //////////////////////////////////////////////////////////////////////////////
         /// resize matrices that depend on the local number of degrees of freedom  ///
@@ -381,10 +387,14 @@ namespace Dune
           {
             const DomainFieldType weight =
                     geometry.integrationElement(quadrature.point(qp)) * quadrature.weight(qp);
-            shapeFunctionSet.evaluateEach(quadrature[qp], [&](std::size_t alpha, RangeType phi) {
-              shapeFunctionSet.evaluateEach(quadrature[qp], [&](std::size_t beta, RangeType psi) {
+            shapeFunctionSet.evaluateEach(quadrature[qp], [&](std::size_t alpha, RangeType phi)
+            {
+              shapeFunctionSet.evaluateEach(quadrature[qp], [&](std::size_t beta, RangeType psi)
+              {
                 if (alpha < numConstraintShapeFunctions)
-                  constraintValueProj[alpha][beta] += phi * psi * weight;
+                {
+                  constraintValueProj[alpha][beta] += phi * psi * weight / H0;
+                }
               });
             });
             shapeFunctionSet.jacobianEach(quadrature[qp], [&](std::size_t alpha, JacobianRangeType phi) {
@@ -432,7 +442,20 @@ namespace Dune
         /// ValueProjection /////////////////////////////////////////////////////
         //////////////////////////////////////////////////////////////////////////
 
-        DomainFieldType H0 = blockMapper_.indexSet().volume(agglomerate);
+#if 0
+        {
+          for (std::size_t beta = 0; beta < numConstraintShapeFunctions; ++beta )
+          {
+            std::cout << "M_" << beta << " = ";
+            for (std::size_t alpha = 0; alpha < numShapeFunctions; ++alpha)
+            {
+              std::cout << constraintValueProj[alpha][beta] << " ";
+            }
+            std::cout << std::endl;
+          }
+        }
+#endif
+
         if (numConstraintShapeFunctions < numShapeFunctions)
         { // need to use a CLS approach
           auto leastSquaresMinimizer = LeastSquares(D, constraintValueProj);
@@ -482,6 +505,20 @@ namespace Dune
             }
           }
         }
+#if 0
+        std::cout << "*******************************\n";
+        for (std::size_t beta = 0; beta < numDofs; ++beta )
+        {
+          std::cout << "phi_" << beta << " = ";
+          for (std::size_t alpha = 0; alpha < numShapeFunctions; ++alpha)
+          {
+            std::cout << valueProjection[alpha][beta] << " ";
+          }
+          std::cout << std::endl;
+        }
+        std::cout << "*******************************\n";
+#endif
+
 
         //////////////////////////////////////////////////////////////////////////
         /// GradientProjection //////////////////////////////////////////////////
@@ -515,6 +552,12 @@ namespace Dune
             edgePhiVector[1] = 0;
 
             interpolation_(intersection, edgeShapeFunctionSet, edgePhiVector, mask);
+#if 0
+            std::cout << "edge phi vector = ";
+            for (int i=0;i<edgePhiVector[0].size();++i)
+              std::cout << mask[0][i] << " : " << edgePhiVector[0][i] << " ";
+            std::cout << std::endl;
+#endif
 
             auto normal = intersection.centerUnitOuterNormal();
             typename Dune::FieldMatrix<DomainFieldType,dimDomain,dimDomain> factorTN, factorNN;
@@ -536,7 +579,8 @@ namespace Dune
               auto x = quadrature.localPoint(qp);
               auto y = intersection.geometryInInside().global(x);
               const DomainFieldType weight = intersection.geometry().integrationElement(x) * quadrature.weight(qp);
-              shapeFunctionSet.jacobianEach(y, [&](std::size_t alpha, JacobianRangeType phi) {
+              shapeFunctionSet.jacobianEach(y, [&](std::size_t alpha, JacobianRangeType phi)
+              {
                   // evaluate each here for edge shape fns
                   // first check if we should be using interpolation (for the
                   // existing edge moments - or for H4 space)
@@ -554,10 +598,13 @@ namespace Dune
                             for (std::size_t j=0;j<dimDomain;++j)
                               R[alpha][mask[0][s]] += weight *
                                 edgePhiVector[0][beta][s] * psi[i] * phi[i][j] * normal[j];
+                      else
+                        assert(0);
                     });
                   }
                   else // use value projection
                   {
+                    assert(0); // !!!!!!
                     vemBasisFunction.evaluateAll(y, phi0Values);
                     for (std::size_t s=0;s<numDofs;++s)
                       for (std::size_t i=0;i<dimRange;++i)
@@ -567,6 +614,7 @@ namespace Dune
               });
               shapeFunctionSet.hessianEach(y, [&](std::size_t alpha, HessianRangeType phi)
               {
+                  assert(0);
                   // compute the phi.tau boundary terms for the hessian projection using d/ds Pi^e
                   if ( basisSets_.edgeSize(1) > 0 )
                   {
@@ -596,7 +644,8 @@ namespace Dune
                   // compute the phi.n boundary terms for the hessian projection in
                   // the case that there are dofs for the normal gradient on the edge
                   // int_e Pi^1_e u m  n x n
-                  if ( basisSets_.edgeSize(1) > 0 ) {
+                  if ( basisSets_.edgeSize(1) > 0 )
+                  {
                     edgeShapeFunctionSet.evaluateEach(x, [&](std::size_t beta, typename EdgeTestSpace::RangeType psi) {
                       if (beta < edgePhiVector[1].size())
                         // GENERAL: could use Pi_0 here as suggested in varying coeff paper
@@ -621,8 +670,10 @@ namespace Dune
             const DomainFieldType weight =
                     geometry.integrationElement(quadrature.point(qp)) * quadrature.weight(qp);
             vemBasisFunction.evaluateAll(quadrature[qp], phi0Values);
-            shapeFunctionSet.divJacobianEach(quadrature[qp], [&](std::size_t alpha, RangeType divGradPhi) {
-                // divGradPhi = RangeType = tr( D GradSF )
+            shapeFunctionSet.divJacobianEach(quadrature[qp], [&](std::size_t alpha, RangeType divGradPhi)
+            {
+                assert(alpha>=0 && alpha<R.size());
+                // divGradPhi = RangeType = div( D GradSF )
                 for (std::size_t s=0; s<numDofs; ++s)
                   R[alpha][s] -= weight * phi0Values[s] * divGradPhi;
             });
@@ -637,6 +688,22 @@ namespace Dune
             for (std::size_t beta = 0; beta < numGradShapeFunctions; ++beta)
               jacobianProjection[alpha][i] += HpGradInv[alpha][beta] * R[beta][i];
           }
+
+#if 0
+        std::cout << "*******************************\n";
+        std::cout << "****  Gradient projection  ****\n";
+        std::cout << "*******************************\n";
+        for (std::size_t beta = 0; beta < numDofs; ++beta )
+        {
+          std::cout << "phi_" << beta << " = ";
+          for (std::size_t alpha = 0; alpha < numGradShapeFunctions; ++alpha)
+          {
+            std::cout << jacobianProjection[alpha][beta] << " ";
+          }
+          std::cout << std::endl;
+        }
+        std::cout << "*******************************\n";
+#endif
 
         /////////////////////////////////////////////////////////////////////
         // HessianProjection ////////////////////////////////////////////////

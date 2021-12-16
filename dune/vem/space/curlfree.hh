@@ -90,41 +90,95 @@ namespace Dune
 
         int order () const { return sfs_.order()-1;  }
 
+        const auto &valueBasisSet() const
+        {
+          return *this;
+        }
+
         template< class Point, class Functor >
         void evaluateEach ( const Point &xx, Functor functor ) const
         {
-          // RangeType phi;
+          auto x = sfs_.entity().geometry().global( Fem::coordinate(xx) );
+          // auto x = sfs_.position(xx);
           sfs_.jacobianEach(xx, [&](std::size_t alpha, ScalarJacobianRangeType dphi)
           {
-            auto x = Dune::Fem::coordinate(xx);
             if (alpha>=1)
             {
               // div: phi[0] = -dphi[0][1]; phi[1] = dphi[0][0];
               /*
-              if (alpha==1) dphi[0] = {1,0};
-              if (alpha==2) dphi[0] = {0,1};
-              if (alpha==3) dphi[0] = {x[1],x[0]};
-              if (alpha==4) dphi[0] = {2*x[0],0};
-              if (alpha==5) dphi[0] = {0,2*x[1]};
+              value:      (1)  (0)   (y)   (2x)   (0)     (2xy)    (y^2)    (3x^2)  (0)
+                          (0)  (1)   (x)   (0)    (2y)    (x^2)    (2xy)    (0)     (3y^2)
               */
+              assert(alpha<10);
+              if (alpha==1) dphi[0] = {1,0};                       // 1
+              if (alpha==2) dphi[0] = {0,1};
+              if (alpha==3) dphi[0] = {x[1],x[0]};                 // y     x
+              if (alpha==4) dphi[0] = {2*x[0],0};                  // x
+              if (alpha==5) dphi[0] = {0,2*x[1]};
+              if (alpha==6) dphi[0] = {2*x[0]*x[1],x[0]*x[0]};     // xy    x^2
+              if (alpha==7) dphi[0] = {x[1]*x[1],2*x[0]*x[1]};     // y^2   2xy
+              if (alpha==8) dphi[0] = {3*x[0]*x[0],0};             // x^2
+              if (alpha==9) dphi[0] = {0,3*x[1]*x[1]};
               functor(alpha-1, dphi[0]);
             }
           });
         }
         template< class Point, class Functor >
-        void jacobianEach ( const Point &x, Functor functor ) const
+        void jacobianEach ( const Point &xx, Functor functor ) const
         {
+          auto x = sfs_.entity().geometry().global( Fem::coordinate(xx) );
+          // auto x = sfs_.position(xx);
           JacobianRangeType dphi;
-          sfs_.hessianEach(x, [&](std::size_t alpha, ScalarHessianRangeType d2phi)
+          sfs_.hessianEach(xx, [&](std::size_t alpha, ScalarHessianRangeType d2phi)
           {
             if (alpha>=dimDomain+1)
             {
+              assert(alpha>=3 && alpha<10);
               /*
               // (dx) (-dy dx) = (-dxdy dxdx)
               // (dy)            (-dydy dxdy)
               dphi[0][0] = -d2phi[0][0][1]; dphi[0][0][1] = d2phi[0][0][0];
               dphi[1][0] = -d2phi[0][1][1]; dphi[0][1][1] = d2phi[0][1][0];
               */
+              /*
+                       (0 1)  (2 0)  (0 0)  (2y 2x)  (0  2y)  (6x 0)  (0  0)
+                       (1 0)  (0 0)  (0 2)  (2x  0)  (2y 2x)  (0  0)  (0 6y)
+              */
+              /*
+              if (alpha==3) d2phi[0] = { {0,1},
+                                         {1,0} };
+              if (alpha==4) d2phi[0] = { {2,0},
+                                         {0,0} };
+              if (alpha==5) d2phi[0] = { {0,0},
+                                         {0,2} };
+              if (alpha==6) d2phi[0] = { {2*x[1],2*x[0]},
+                                         {2*x[0],0} };
+              if (alpha==7) d2phi[0] = { {0,2*x[1]},
+                                         {2*x[1],2*x[0]} };
+              if (alpha==8) d2phi[0] = { {6*x[0],0},
+                                         {0,0} };
+              if (alpha==9) d2phi[0] = { {0,0},
+                                         {0,6*x[1]} };
+              */
+              switch (alpha)
+              {
+              case 3:  d2phi[0][0] = {0,1};           d2phi[0][1] = {1,0};
+                       break;
+              case 4:  d2phi[0][0] = {2,0};           d2phi[0][1] = {0,0};
+                       break;
+              case 5:  d2phi[0][0] = {0,0};           d2phi[0][1] = {0,2};
+                       break;
+              case 6:  d2phi[0][0] = {2*x[1],2*x[0]}; d2phi[0][1] = {2*x[0],0};
+                       break;
+              case 7:  d2phi[0][0] = {0,2*x[1]};      d2phi[0][1] = {2*x[1],2*x[0]};
+                       break;
+              case 8:  d2phi[0][0] = {6*x[0],0};      d2phi[0][1] = {0,0};
+                       break;
+              case 9:  d2phi[0][0] = {0,0};           d2phi[0][1] = {0,6*x[1]};
+                       break;
+              default: assert(0);
+              }
+              assert( d2phi[0][1][0] == d2phi[0][0][1] );
               functor(alpha-(dimDomain+1),d2phi[0]);
             }
           });
@@ -143,42 +197,62 @@ namespace Dune
         // g_{ij} = m_i delta_{js}   (m=m_alpha and fixed s=1,..,dimDomain)
         // psi_i = sum_j d_j g_ij = sum_j d_j m_i delta_{js} = d_s m_i
         template< class Point, class Functor >
-        void divJacobianEach( const Point &x, Functor functor ) const
+        void divJacobianEach( const Point &xx, Functor functor ) const
         {
-          assert( sfs_.order() <= 3);
-          return; // !!!
-          // RangeType divGrad(0);
-          /*
-          sfs_.hessianEach(x, [&](std::size_t alpha, HessianRangeType d2phi)
+          auto x = sfs_.entity().geometry().global( Fem::coordinate(xx) );
+          RangeType divGrad(0);
+          sfs_.hessianEach(xx, [&](std::size_t alpha, ScalarHessianRangeType d2phi)
           {
-            if (alpha>=dimRange)
+            if (alpha>=dimDomain+1)
             {
-              for (size_t i=0;i<divGrad.size();++i)
-              {
-                divGrad[i] = 0;
-                for (size_t s=0;s<dimDomain;++s)
-                  divGrad[i] += d2phi[i][s][s];
-              }
-              functor(alpha-dimRange, divGrad);
+              /*
+              sum_j d_j g_ij:        (0)    (0)    (0)    (0)      (2)      (6)     (0)
+                                     (0)    (0)    (0)    (2)      (0)      (0)     (6)
+              */
+              assert(alpha>=3 && alpha<10);
+              if (alpha==3) divGrad = {0,0};
+              if (alpha==4) divGrad = {0,0};
+              if (alpha==5) divGrad = {0,0};
+              if (alpha==6) divGrad = {0,2};
+              if (alpha==7) divGrad = {2,0};
+              if (alpha==8) divGrad = {6,0};
+              if (alpha==9) divGrad = {0,6};
+              functor(alpha-(dimDomain+1), divGrad);
             }
           });
-          */
+        }
+        template< class Point, class Functor >
+        void divHessianEach( const Point &x, Functor functor ) const
+        {
         }
         template< class Point, class Functor >
         void evaluateTestEach ( const Point &xx, Functor functor ) const
         {
+          auto x = sfs_.entity().geometry().global( Fem::coordinate(xx) );
+          // auto x = sfs_.position(xx);
+          /*
+          auto y = Fem::coordinate(x);
+          std::cout << y[0] << "," << y[1] << " -> "
+                    << x[0] << "," << x[1] << std::endl;
+          */
           sfs_.jacobianEach(xx, [&](std::size_t alpha, ScalarJacobianRangeType dphi)
           {
-            auto x = Dune::Fem::coordinate(xx);
             if (alpha>=1 && alpha < numInnerShapeFunctions_+1)
             {
               /*
+              value:      (1)  (0)   (y)   (2x)   (0)     (2xy)    (y^2)    (3x^2)  (0)
+                          (0)  (1)   (x)   (0)    (2y)    (x^2)    (2xy)    (0)     (3y^2)
+              */
+              assert(alpha<10);
               if (alpha==1) dphi[0] = {1,0};
               if (alpha==2) dphi[0] = {0,1};
               if (alpha==3) dphi[0] = {x[1],x[0]};
               if (alpha==4) dphi[0] = {2*x[0],0};
               if (alpha==5) dphi[0] = {0,2*x[1]};
-              */
+              if (alpha==6) dphi[0] = {2*x[0]*x[1],x[0]*x[0]};
+              if (alpha==7) dphi[0] = {x[1]*x[1],2*x[0]*x[1]};
+              if (alpha==8) dphi[0] = {3*x[0]*x[0],0};
+              if (alpha==9) dphi[0] = {0,3*x[1]*x[1]};
               functor(alpha-1, dphi[0]);
             }
           });
@@ -226,6 +300,7 @@ namespace Dune
         template< class Point, class Functor >
         void jacobianEach ( const Point &x, Functor functor ) const
         {
+          assert(0);
           const auto &geo = intersection_.geometry();
           const auto &jit = geo.jacobianInverseTransposed(x);
           // dphihat = (1,1)
@@ -260,21 +335,23 @@ namespace Dune
       typedef EdgeShapeFunctionSet EdgeShapeFunctionSetType;
 
       CurlFreeVEMBasisSets( const int order, bool useOnb)
-      : dofsPerCodim_( calcDofsPerCodim(order) )
-      , onbSFS_( Dune::GeometryType(Dune::GeometryType::cube, dimDomain), order+1 ) // !!!
-      , edgeSFS_( Dune::GeometryType(Dune::GeometryType::cube,dimDomain-1), order )
+      : innerOrder_( order )
+      , onbSFS_( Dune::GeometryType(Dune::GeometryType::cube, dimDomain), order+1 )
+      , edgeSFS_( Dune::GeometryType(Dune::GeometryType::cube,dimDomain-1), order)
+      , dofsPerCodim_( calcDofsPerCodim(order) )
       , useOnb_(useOnb)
       , numValueShapeFunctions_( onbSFS_.size()-1 )
       , numGradShapeFunctions_ ( onbSFS_.size()-(dimDomain+1) )
       , numHessShapeFunctions_ ( 0 ) // not implemented - needs third/forth derivatives
-      , numInnerShapeFunctions_( sizeONB<0>(order)-1 ) // !!!!
+      , numInnerShapeFunctions_( sizeONB<0>(innerOrder_)-1 ) // !!!!
       {
         std::cout << "[" << numValueShapeFunctions_ << ","
                   << numGradShapeFunctions_ << ","
                   << numHessShapeFunctions_ << ","
                   << numInnerShapeFunctions_ << "]"
                   << "   edge: " << edgeSFS_.size() << std::endl;
-        std::cout << dofsPerCodim_[0].second << " " << dofsPerCodim_[1].second << " " << dofsPerCodim_[2].second
+        std::cout << "dofs per codim: "
+                  << dofsPerCodim_[0].second << " " << dofsPerCodim_[1].second << " " << dofsPerCodim_[2].second
                   << std::endl;
       }
 
@@ -300,10 +377,9 @@ namespace Dune
         auto normal = intersection.centerUnitOuterNormal();
         if (intersection.neighbor())
           // !!! if (indexSet_.index(intersection.inside()) > indexSet_.index(intersection.outside()))
-          if (normal[0] + normal[1] < 0)
+          if (normal[0] + std::sqrt(2.)*normal[1] < 0)
             flip = -1;
         normal *= flip;
-        // std::cout << intersection.geometry().center() << " : " << flip << " -> " << normal << std::endl;
         return EdgeShapeFunctionSetType(intersection, flip, edgeSFS_);
       }
       std::size_t size( std::size_t orderSFS ) const
@@ -335,8 +411,8 @@ namespace Dune
       std::array< std::pair< int, unsigned int >, dimDomain+1 > calcDofsPerCodim (unsigned int order) const
       {
         int vSize = 0;
-        int eSize = sizeONB<1>(order);
-        int iSize = sizeONB<0>(order+1)-1;
+        int eSize = edgeSFS_.size();
+        int iSize = sizeONB<0>(innerOrder_)-1;
         return std::array< std::pair< int, unsigned int >, dimDomain+1 >
                { std::make_pair( dimDomain,   vSize ),
                  std::make_pair( dimDomain-1, eSize ),
@@ -350,9 +426,10 @@ namespace Dune
       }
       // note: the actual shape function set depends on the entity so
       // we can only construct the underlying monomial basis in the ctor
-      std::array< std::pair< int, unsigned int >, dimDomain+1 > dofsPerCodim_;
+      std::size_t innerOrder_;
       ONBShapeFunctionSetType onbSFS_;
       ScalarEdgeShapeFunctionSetType edgeSFS_;
+      std::array< std::pair< int, unsigned int >, dimDomain+1 > dofsPerCodim_;
       std::size_t numValueShapeFunctions_;
       std::size_t numGradShapeFunctions_;
       std::size_t numHessShapeFunctions_;
@@ -509,7 +586,7 @@ namespace Dune
         for (int alpha=0; alpha<numInnerShapeFunctions; ++alpha)
         {
           if( beta - numDofs + numInnerShapeFunctions == alpha )
-            d[ alpha ] = volume;
+            d[ alpha ] = 1.; // volume; // !!!!
           else
             d[ alpha ] = 0;
         }
@@ -521,7 +598,6 @@ namespace Dune
       // example
       void operator() ( const ElementType &element, Std::vector<char> &mask) const
       {
-        assert(0);
         std::fill(mask.begin(),mask.end(),-1);
         auto vertex = [&] (int poly,auto i,int k,int numDofs)
         {};
@@ -578,8 +654,6 @@ namespace Dune
                   basisFunctionSet.evaluateEach( y,
                     [&] ( std::size_t beta, typename BasisFunctionSet::RangeType value )
                     {
-                      // std::cout << alpha << " " << beta << " " << k << " : "
-                      //           << phi << ", " << value << std::endl;
                       assert(k<localDofMatrix.size());
                       localDofMatrix[ k ][ beta ] += value*phi * weight;
                     });
@@ -589,7 +663,6 @@ namespace Dune
         };
         auto inner = [&] (int poly,int i,int k,int numDofs)
         {
-          // ???? assert(numDofs == basisSets_.innerSize());
           InnerQuadratureType innerQuad( element, 2*polOrder_ );
           for (int qp=0;qp<innerQuad.nop();++qp)
           {
@@ -600,10 +673,7 @@ namespace Dune
               {
                 innerShapeFunctionSet.evaluateTestEach( innerQuad[qp],
                   [&](std::size_t alpha, RangeType phi ) {
-                    int kk = alpha+k;
-                    // std::cout << alpha << " " << beta << " " << kk << " : " << phi << ", " << value << std::endl;
-                    assert(kk<localDofMatrix.size());
-                    localDofMatrix[ kk ][ beta ] += value*phi * weight;
+                    localDofMatrix[ alpha+k ][ beta ] += value*phi * weight;
                   }
                 );
               }
@@ -620,7 +690,6 @@ namespace Dune
                        const EdgeShapeFunctionSet &edgeShapeFunctionSet, Std::vector < Dune::DynamicMatrix<double> > &localDofVectorMatrix,
                        Std::vector<Std::vector<unsigned int>> &mask) const
       {
-        assert(0);
         for (std::size_t i=0;i<mask.size();++i)
           mask[i].clear();
         const ElementType &element = intersection.inside();
@@ -637,11 +706,9 @@ namespace Dune
           for (unsigned int qp=0;qp<edgeQuad.nop();++qp)
           {
             auto x = edgeQuad.localPoint(qp);
-            auto xx = x;
             double weight = edgeQuad.weight(qp) * intersection.geometry().integrationElement(x);
             edgeShapeFunctionSet.evaluateEach( x, [ & ] ( std::size_t beta, typename EdgeShapeFunctionSet::RangeType value ) {
-                edgeBFS.evaluateEach( xx,
-                  [&](std::size_t alpha, typename EdgeShapeFunctionSet::RangeType phi ) {
+                edgeBFS.evaluateEach( x, [&](std::size_t alpha, typename EdgeShapeFunctionSet::RangeType phi ) {
                     assert( entry[0]+alpha < localDofVectorMatrix[0].size() );
                     localDofVectorMatrix[0][ entry[0]+alpha ][ beta ] += value*phi * weight
                                                                          / intersection.geometry().volume();
@@ -765,15 +832,13 @@ namespace Dune
         };
         auto inner = [&] (int poly,int i,int k,int numDofs)
         {
-          // ??? assert(numDofs == innerShapeFunctionSet.size());
-          //! SubVector has no size: assert(k+numDofs == localDofVector.size());
           InnerQuadratureType innerQuad( element, 2*polOrder_ );
           for (unsigned int qp=0;qp<innerQuad.nop();++qp)
           {
             auto y = innerQuad.point(qp);
             localFunction.evaluate( innerQuad[qp], value );
             double weight = innerQuad.weight(qp) * element.geometry().integrationElement(y) / indexSet_.volume(poly);
-            innerShapeFunctionSet.evaluateTestEach(innerQuad[qp],
+            innerShapeFunctionSet.evaluateEach(innerQuad[qp],
               [&](std::size_t alpha, typename LocalFunction::RangeType phi ) {
                 localDofVector[ alpha+k ] += value*phi * weight;
               }
@@ -791,7 +856,6 @@ namespace Dune
                                 const Vertex &vertex, const Edge &edge,
                                 Std::vector<Std::vector<unsigned int>> &mask) const
       {
-        assert(0);
         const ElementType &element = intersection.inside();
         const auto &refElement = ReferenceElements< ctype, dimension >::general( element.type() );
 
