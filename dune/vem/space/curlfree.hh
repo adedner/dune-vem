@@ -96,90 +96,39 @@ namespace Dune
         }
 
         template< class Point, class Functor >
-        void evaluateEach ( const Point &xx, Functor functor ) const
+        void evaluateEach ( const Point &x, Functor functor ) const
         {
-          auto x = sfs_.entity().geometry().global( Fem::coordinate(xx) );
-          // auto x = sfs_.position(xx);
-          sfs_.jacobianEach(xx, [&](std::size_t alpha, ScalarJacobianRangeType dphi)
+          sfs_.jacobianEach(x, [&](std::size_t alpha, ScalarJacobianRangeType dphi)
           {
             if (alpha>=1)
-            {
-              // div: phi[0] = -dphi[0][1]; phi[1] = dphi[0][0];
-              /*
-              value:      (1)  (0)   (y)   (2x)   (0)     (2xy)    (y^2)    (3x^2)  (0)
-                          (0)  (1)   (x)   (0)    (2y)    (x^2)    (2xy)    (0)     (3y^2)
-              */
-              assert(alpha<10);
-              if (alpha==1) dphi[0] = {1,0};                       // 1
-              if (alpha==2) dphi[0] = {0,1};
-              if (alpha==3) dphi[0] = {x[1],x[0]};                 // y     x
-              if (alpha==4) dphi[0] = {2*x[0],0};                  // x
-              if (alpha==5) dphi[0] = {0,2*x[1]};
-              if (alpha==6) dphi[0] = {2*x[0]*x[1],x[0]*x[0]};     // xy    x^2
-              if (alpha==7) dphi[0] = {x[1]*x[1],2*x[0]*x[1]};     // y^2   2xy
-              if (alpha==8) dphi[0] = {3*x[0]*x[0],0};             // x^2
-              if (alpha==9) dphi[0] = {0,3*x[1]*x[1]};
               functor(alpha-1, dphi[0]);
-            }
           });
         }
         template< class Point, class Functor >
-        void jacobianEach ( const Point &xx, Functor functor ) const
+        void jacobianEach ( const Point &x, Functor functor ) const
         {
-          auto x = sfs_.entity().geometry().global( Fem::coordinate(xx) );
-          // auto x = sfs_.position(xx);
-          JacobianRangeType dphi;
-          sfs_.hessianEach(xx, [&](std::size_t alpha, ScalarHessianRangeType d2phi)
+          JacobianRangeType dphi(0);
+          sfs_.evaluateEach(x, [&](std::size_t alpha, ScalarRangeType phi)
           {
-            if (alpha>=dimDomain+1)
+            if (alpha<numGradShapeFunctions_)
             {
-              assert(alpha>=3 && alpha<10);
-              /*
-              // (dx) (-dy dx) = (-dxdy dxdx)
-              // (dy)            (-dydy dxdy)
-              dphi[0][0] = -d2phi[0][0][1]; dphi[0][0][1] = d2phi[0][0][0];
-              dphi[1][0] = -d2phi[0][1][1]; dphi[0][1][1] = d2phi[0][1][0];
-              */
-              /*
-                       (0 1)  (2 0)  (0 0)  (2y 2x)  (0  2y)  (6x 0)  (0  0)
-                       (1 0)  (0 0)  (0 2)  (2x  0)  (2y 2x)  (0  0)  (0 6y)
-              */
-              /*
-              if (alpha==3) d2phi[0] = { {0,1},
-                                         {1,0} };
-              if (alpha==4) d2phi[0] = { {2,0},
-                                         {0,0} };
-              if (alpha==5) d2phi[0] = { {0,0},
-                                         {0,2} };
-              if (alpha==6) d2phi[0] = { {2*x[1],2*x[0]},
-                                         {2*x[0],0} };
-              if (alpha==7) d2phi[0] = { {0,2*x[1]},
-                                         {2*x[1],2*x[0]} };
-              if (alpha==8) d2phi[0] = { {6*x[0],0},
-                                         {0,0} };
-              if (alpha==9) d2phi[0] = { {0,0},
-                                         {0,6*x[1]} };
-              */
-              switch (alpha)
-              {
-              case 3:  d2phi[0][0] = {0,1};           d2phi[0][1] = {1,0};
-                       break;
-              case 4:  d2phi[0][0] = {2,0};           d2phi[0][1] = {0,0};
-                       break;
-              case 5:  d2phi[0][0] = {0,0};           d2phi[0][1] = {0,2};
-                       break;
-              case 6:  d2phi[0][0] = {2*x[1],2*x[0]}; d2phi[0][1] = {2*x[0],0};
-                       break;
-              case 7:  d2phi[0][0] = {0,2*x[1]};      d2phi[0][1] = {2*x[1],2*x[0]};
-                       break;
-              case 8:  d2phi[0][0] = {6*x[0],0};      d2phi[0][1] = {0,0};
-                       break;
-              case 9:  d2phi[0][0] = {0,0};           d2phi[0][1] = {0,6*x[1]};
-                       break;
-              default: assert(0);
-              }
-              assert( d2phi[0][1][0] == d2phi[0][0][1] );
-              functor(alpha-(dimDomain+1),d2phi[0]);
+              dphi[0][0] = phi[0];
+              dphi[1][1] = phi[0];
+              functor(alpha,dphi);
+#if 0
+              dphi = 0;
+              dphi[0][0] = phi[0];
+              dphi[1][1] = 0;
+              functor(3*alpha,dphi);
+              dphi[0][0] = 0;
+              dphi[1][1] = phi[0];
+              functor(3*alpha+1,dphi);
+              dphi[0][0] = 0;
+              dphi[1][1] = 0;
+              dphi[0][1] = phi[0];
+              dphi[1][0] = phi[0];
+              functor(3*alpha+2,dphi);
+#endif
             }
           });
         }
@@ -197,27 +146,28 @@ namespace Dune
         // g_{ij} = m_i delta_{js}   (m=m_alpha and fixed s=1,..,dimDomain)
         // psi_i = sum_j d_j g_ij = sum_j d_j m_i delta_{js} = d_s m_i
         template< class Point, class Functor >
-        void divJacobianEach( const Point &xx, Functor functor ) const
+        void divJacobianEach( const Point &x, Functor functor ) const
         {
-          auto x = sfs_.entity().geometry().global( Fem::coordinate(xx) );
-          RangeType divGrad(0);
-          sfs_.hessianEach(xx, [&](std::size_t alpha, ScalarHessianRangeType d2phi)
+          RangeType divGrad;
+          sfs_.jacobianEach(x, [&](std::size_t alpha, ScalarJacobianRangeType dphi)
           {
-            if (alpha>=dimDomain+1)
+            if (alpha<numGradShapeFunctions_)
             {
-              /*
-              sum_j d_j g_ij:        (0)    (0)    (0)    (0)      (2)      (6)     (0)
-                                     (0)    (0)    (0)    (2)      (0)      (0)     (6)
-              */
-              assert(alpha>=3 && alpha<10);
-              if (alpha==3) divGrad = {0,0};
-              if (alpha==4) divGrad = {0,0};
-              if (alpha==5) divGrad = {0,0};
-              if (alpha==6) divGrad = {0,2};
-              if (alpha==7) divGrad = {2,0};
-              if (alpha==8) divGrad = {6,0};
-              if (alpha==9) divGrad = {0,6};
-              functor(alpha-(dimDomain+1), divGrad);
+              divGrad[0] = dphi[0][0];
+              divGrad[1] = dphi[0][1];
+              functor(alpha,divGrad);
+#if 0
+              divGrad[0] = dphi[0][0];
+              divGrad[1] = 0;
+              functor(3*alpha,divGrad);
+              functor(3*alpha,divGrad);
+              divGrad[0] = 0;
+              divGrad[1] = dphi[0][1];
+              functor(3*alpha+1,divGrad);
+              divGrad[0] = dphi[0][1];
+              divGrad[1] = dphi[0][0];
+              functor(3*alpha+2,divGrad);
+#endif
             }
           });
         }
@@ -228,33 +178,10 @@ namespace Dune
         template< class Point, class Functor >
         void evaluateTestEach ( const Point &xx, Functor functor ) const
         {
-          auto x = sfs_.entity().geometry().global( Fem::coordinate(xx) );
-          // auto x = sfs_.position(xx);
-          /*
-          auto y = Fem::coordinate(x);
-          std::cout << y[0] << "," << y[1] << " -> "
-                    << x[0] << "," << x[1] << std::endl;
-          */
           sfs_.jacobianEach(xx, [&](std::size_t alpha, ScalarJacobianRangeType dphi)
           {
             if (alpha>=1 && alpha < numInnerShapeFunctions_+1)
-            {
-              /*
-              value:      (1)  (0)   (y)   (2x)   (0)     (2xy)    (y^2)    (3x^2)  (0)
-                          (0)  (1)   (x)   (0)    (2y)    (x^2)    (2xy)    (0)     (3y^2)
-              */
-              assert(alpha<10);
-              if (alpha==1) dphi[0] = {1,0};
-              if (alpha==2) dphi[0] = {0,1};
-              if (alpha==3) dphi[0] = {x[1],x[0]};
-              if (alpha==4) dphi[0] = {2*x[0],0};
-              if (alpha==5) dphi[0] = {0,2*x[1]};
-              if (alpha==6) dphi[0] = {2*x[0]*x[1],x[0]*x[0]};
-              if (alpha==7) dphi[0] = {x[1]*x[1],2*x[0]*x[1]};
-              if (alpha==8) dphi[0] = {3*x[0]*x[0],0};
-              if (alpha==9) dphi[0] = {0,3*x[1]*x[1]};
               functor(alpha-1, dphi[0]);
-            }
           });
         }
 
@@ -341,9 +268,9 @@ namespace Dune
       , dofsPerCodim_( calcDofsPerCodim(order) )
       , useOnb_(useOnb)
       , numValueShapeFunctions_( onbSFS_.size()-1 )
-      , numGradShapeFunctions_ ( onbSFS_.size()-(dimDomain+1) )
+      , numGradShapeFunctions_ ( sizeONB<0>(order) )
       , numHessShapeFunctions_ ( 0 ) // not implemented - needs third/forth derivatives
-      , numInnerShapeFunctions_( sizeONB<0>(innerOrder_)-1 ) // !!!!
+      , numInnerShapeFunctions_( sizeONB<0>(innerOrder_)-1 )
       {
         std::cout << "[" << numValueShapeFunctions_ << ","
                   << numGradShapeFunctions_ << ","
@@ -599,28 +526,19 @@ namespace Dune
       void operator() ( const ElementType &element, Std::vector<char> &mask) const
       {
         std::fill(mask.begin(),mask.end(),-1);
-        auto vertex = [&] (int poly,auto i,int k,int numDofs)
-        {};
+        auto vertex = [&] (int poly,auto i,int k,int numDofs) {};
         auto edge = [&] (int poly,auto i,int k,int numDofs)
         {
-#ifndef NDEBUG
-          auto kStart = k;
-#endif
-          for (std::size_t alpha=0;alpha<basisSets_.edgeSize();++alpha)
-          {
-            if (alpha < basisSets_.edgeSize())
-            {
-              mask[k] = 1;
-              ++k;
-            }
-          }
+          assert(k+numDofs<=mask.size());
+          assert(numDofs==basisSets_.edgeSize(0));
+          std::fill(mask.begin()+k,mask.begin()+k+numDofs,1);
         };
         auto inner = [&mask] (int poly,auto i,int k,int numDofs)
         {
+          assert(k+numDofs<=mask.size());
           std::fill(mask.begin()+k,mask.begin()+k+numDofs,1);
         };
         apply(element,vertex,edge,inner);
-        // assert( std::none_of(mask.begin(),mask.end(), [](char m){return // m==-1;}) ); // ???? needs investigation - issue with DirichletBCs
       }
 
       // preform interpolation of a full shape function set filling a transformation matrix
