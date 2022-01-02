@@ -123,27 +123,18 @@ namespace Dune {
     template< class LocalLinearOperator >
     void dirichletDofsCorrectOnEntity ( LocalLinearOperator &&localMatrix ) const
     {
-      std::cout << "dirichletDofsCorrectOnEntity(localMatrix): ";
       const EntityType &entity = localMatrix.rangeEntity();
       const auto &slaveDofs = localMatrix.rangeSpace().slaveDofs();
 
       // get number of basis functions
       const int localBlocks = space_.blockMapper().numDofs( entity );
-      // std::cout << "   " << localBlocks << " : ";
 
       // map local to global dofs
       std::vector<std::size_t> globalBlockDofs(localBlocks);
       // obtain all DofBlocks for this element
       space_.blockMapper().map( entity, globalBlockDofs );
-      // std::cout << "global=";
-      // for (auto g : globalBlockDofs)
-      //   std::cout << g << ",";
       Vem::Std::vector< char > mask( localBlocks );
       space_.interpolation()( entity, mask );
-      // std::cout << " mask=";
-      // for (auto m : mask)
-      //   std::cout << (m==1)?1:0 << ",";
-      // std::cout << std::endl << "   ";
       // counter for all local dofs (i.e. localBlockDof * localBlockSize + ... )
       int localDof = 0;
       // iterate over face dofs and set unit row
@@ -152,11 +143,9 @@ namespace Dune {
         int global = globalBlockDofs[localBlockDof];
         for( int l = 0; l < localBlockSize; ++ l, ++ localDof )
         {
-          // std::cout << "(" << localBlockDof << "," << l << ") ";
           if( dirichletBlocks_[global][l] &&
               applyConstraint(mask[localBlockDof]) )
           {
-            std::cout << global << " ";
             // clear all other columns
             localMatrix.clearRow( localDof );
 
@@ -166,13 +155,11 @@ namespace Dune {
           }
         }
       }
-      std::cout << std::endl;
     }
     //! set the dirichlet points to exact values
     template< class LocalFunctionType >
     void dirichletDofTreatment( LocalFunctionType &&wLocal ) const
     {
-      std::cout << "dirichletDofsCorrectOnEntity(wLocal): ";
       // get entity
       const typename LocalFunctionType::EntityType &entity = wLocal.entity();
       model_.init(entity);
@@ -206,13 +193,11 @@ namespace Dune {
           }
         }
       }
-      std::cout << std::endl;
     }
     template< class LocalFunctionType >
     void dirichletDofTreatment( const LocalFunctionType &uLocal,
                                 LocalFunctionType &&wLocal, Operation op ) const
     {
-      std::cout << "dirichletDofsCorrectOnEntity(uLocal,wLocal,op): ";
       // get entity
       const typename LocalFunctionType::EntityType &entity = wLocal.entity();
       if (op == Operation::sub)
@@ -256,7 +241,6 @@ namespace Dune {
           }
         }
       }
-      // std::cout << std::endl;
     }
   private:
     using BaseType::model_;
