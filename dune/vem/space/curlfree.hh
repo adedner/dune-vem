@@ -96,6 +96,15 @@ namespace Dune
         }
 
         template< class Point, class Functor >
+        void scalarEach ( const Point &x, Functor functor ) const
+        {
+          sfs_.evaluateEach(x, [&](std::size_t alpha, ScalarRangeType phi)
+          {
+            if (alpha>=1)
+              functor(alpha-1, phi[0]);
+          });
+        }
+        template< class Point, class Functor >
         void evaluateEach ( const Point &x, Functor functor ) const
         {
           sfs_.jacobianEach(x, [&](std::size_t alpha, ScalarJacobianRangeType dphi)
@@ -153,9 +162,7 @@ namespace Dune
           {
             if (alpha<numGradShapeFunctions_)
             {
-              divGrad[0] = dphi[0][0];
-              divGrad[1] = dphi[0][1];
-              functor(alpha,divGrad);
+              functor(alpha,dphi[0]);
 #if 0
               divGrad[0] = dphi[0][0];
               divGrad[1] = 0;
@@ -267,7 +274,7 @@ namespace Dune
       , edgeSFS_( Dune::GeometryType(Dune::GeometryType::cube,dimDomain-1), order)
       , dofsPerCodim_( calcDofsPerCodim(order) )
       , useOnb_(useOnb)
-      , numValueShapeFunctions_( onbSFS_.size()-1 )
+      , numValueShapeFunctions_( sizeONB<0>(order+1)-1 )
       , numGradShapeFunctions_ ( sizeONB<0>(order) )
       , numHessShapeFunctions_ ( 0 ) // not implemented - needs third/forth derivatives
       , numInnerShapeFunctions_( sizeONB<0>(innerOrder_)-1 )
@@ -276,7 +283,8 @@ namespace Dune
                   << numGradShapeFunctions_ << ","
                   << numHessShapeFunctions_ << ","
                   << numInnerShapeFunctions_ << "]"
-                  << "   edge: " << edgeSFS_.size() << std::endl;
+                  << "   edge: " << edgeSFS_.size()
+                  << std::endl;
         std::cout << "dofs per codim: "
                   << dofsPerCodim_[0].second << " " << dofsPerCodim_[1].second << " " << dofsPerCodim_[2].second
                   << std::endl;
@@ -302,10 +310,13 @@ namespace Dune
       {
         int flip = 1;
         auto normal = intersection.centerUnitOuterNormal();
+        assert( abs(normal[0] + std::sqrt(2.)*normal[1]) > 1e-5 );
         if (intersection.neighbor())
+        {
           // !!! if (indexSet_.index(intersection.inside()) > indexSet_.index(intersection.outside()))
           if (normal[0] + std::sqrt(2.)*normal[1] < 0)
             flip = -1;
+        }
         normal *= flip;
         return EdgeShapeFunctionSetType(intersection, flip, edgeSFS_);
       }
@@ -321,6 +332,11 @@ namespace Dune
         return 0;
       }
       int constraintSize() const
+      {
+        return numInnerShapeFunctions_;
+        // return numValueShapeFunctions_;
+      }
+      int innerSize() const
       {
         return numInnerShapeFunctions_;
       }
@@ -485,6 +501,7 @@ namespace Dune
         : indexSet_( indexSet )
         , basisSets_( basisSets )
         , polOrder_( polOrder )
+        , edgeVolumes_()
       {}
 
       const GridPartType &gridPart() const { return indexSet_.agglomeration().gridPart(); }
@@ -507,13 +524,32 @@ namespace Dune
                               Dune::DynamicVector<DomainFieldType> &d)
       {
         // !!!!!
-        unsigned int numInnerShapeFunctions = d.size();
-        if (numInnerShapeFunctions == 0) return;
+        unsigned int numConstrainedShapeFunctions = d.size();
+        unsigned int numInnerShapeFunctions = basisSets_.innerSize();
+        assert( numInnerShapeFunctions <= numConstrainedShapeFunctions );
+        if (numConstrainedShapeFunctions == 0) return;
         unsigned int numDofs = D.rows();
         for (int alpha=0; alpha<numInnerShapeFunctions; ++alpha)
         {
-          if( beta - numDofs + numInnerShapeFunctions == alpha )
-            d[ alpha ] = 1.; // volume; // !!!!
+          if( beta - numDofs + numConstrainedShapeFunctions == alpha )
+            d[ alpha ] = std::sqrt(volume);
+          else
+            d[ alpha ] = 0;
+        }
+        // here we are using that
+        // 1. div u in P_{l-1}
+        // 2. the basis functions are ONB
+        // -> int_E div(u) m = 0 if grad(m)=l
+        // Therefore for grad(m_alpha)=l:
+        // int_E phi_beta . grad(m_alpha) = -int_E div(phi_beta) m_alpha + sum_e int_e phi_beta.n m_alpha
+        //       = sum_e int_e phi_beta.n m_alpha = sum_e |e| lambda^e_alpha(phi_beta)
+        //       = |e| if beta,alpha,e match
+        for (int alpha=numInnerShapeFunctions; alpha<numConstrainedShapeFunctions; ++alpha)
+        {
+          if( beta - numDofs + numConstrainedShapeFunctions == alpha )
+          {
+            d[ alpha ] = std::sqrt(volume);
+          }
           else
             d[ alpha ] = 0;
         }
@@ -546,6 +582,7 @@ namespace Dune
       void interpolateBasis ( const ElementType &element,
                    const BasisFunctionSet &basisFunctionSet, LocalDofMatrix &localDofMatrix ) const
       {
+        edgeVolumes_.clear();
         const auto &refElement = ReferenceElements< ctype, dimension >::general( element.type() );
 
         // use the bb set for this polygon for the inner testing space
@@ -585,7 +622,8 @@ namespace Dune
           for (int qp=0;qp<innerQuad.nop();++qp)
           {
             auto y = innerQuad.point(qp);
-            double weight = innerQuad.weight(qp) * element.geometry().integrationElement(y) / indexSet_.volume(poly);
+            double weight = innerQuad.weight(qp) * element.geometry().integrationElement(y)
+                                                 / std::sqrt(indexSet_.volume(poly));
             basisFunctionSet.evaluateEach( innerQuad[qp],
               [ & ] ( std::size_t beta, typename BasisFunctionSet::RangeType value )
               {
@@ -610,6 +648,7 @@ namespace Dune
       {
         for (std::size_t i=0;i<mask.size();++i)
           mask[i].clear();
+
         const ElementType &element = intersection.inside();
         const auto &edgeBFS = basisSets_.edgeBasisFunctionSet( indexSet_.agglomeration(), intersection );
         const auto &refElement = ReferenceElements< ctype, dimension >::general( element.type() );
@@ -628,14 +667,20 @@ namespace Dune
             edgeShapeFunctionSet.evaluateEach( x, [ & ] ( std::size_t beta, typename EdgeShapeFunctionSet::RangeType value ) {
                 edgeBFS.evaluateEach( x, [&](std::size_t alpha, typename EdgeShapeFunctionSet::RangeType phi ) {
                     assert( entry[0]+alpha < localDofVectorMatrix[0].size() );
-                    localDofVectorMatrix[0][ entry[0]+alpha ][ beta ] += value*phi * weight
-                                                                         / intersection.geometry().volume();
+                    localDofVectorMatrix[0][ entry[0]+alpha ][ beta ] += value*phi * weight / intersection.geometry().volume();
                   });
               }
             );
           }
           entry[0] += edgeBFS.size();
         };
+
+        /* drop interpolation on the boundary intersection - combine with
+         * setting edge basis functions to zero (e.g. flip=0)
+        if (intersection.boundary())
+          return;
+        */
+
         applyOnIntersection(intersection,vertex,edge,mask);
         assert( entry[0] == localDofVectorMatrix[0].size() );
         assert( entry[1] == localDofVectorMatrix[1].size() );
@@ -755,7 +800,8 @@ namespace Dune
           {
             auto y = innerQuad.point(qp);
             localFunction.evaluate( innerQuad[qp], value );
-            double weight = innerQuad.weight(qp) * element.geometry().integrationElement(y) / indexSet_.volume(poly);
+            double weight = innerQuad.weight(qp) * element.geometry().integrationElement(y)
+                                                 / std::sqrt(indexSet_.volume(poly));
             innerShapeFunctionSet.evaluateEach(innerQuad[qp],
               [&](std::size_t alpha, typename LocalFunction::RangeType phi ) {
                 localDofVector[ alpha+k ] += value*phi * weight;
@@ -800,6 +846,7 @@ namespace Dune
       const IndexSetType &indexSet_;
       BasisSetsType basisSets_;
       const unsigned int polOrder_;
+      mutable std::vector<double> edgeVolumes_;
     };
 
   } // namespace Vem
