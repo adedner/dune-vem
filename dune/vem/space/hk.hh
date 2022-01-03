@@ -594,7 +594,11 @@ namespace Dune
       : BaseType(agglomeration,polOrder,
                  typename TraitsType::BasisSetsType(polOrder, testSpaces, basisChoice),
                  basisChoice,edgeInterpolation)
-      {}
+      {
+        if (basisChoice != 3) // !!!!! get order information from BasisSets
+          BaseType::agglomeration().onbBasis(polOrder);
+        BaseType::update(true);
+      }
     };
 
     //////////////////////////////////////////////////////////////////////////////

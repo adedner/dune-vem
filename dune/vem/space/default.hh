@@ -116,9 +116,6 @@ namespace Dune
         stabilizations_(new Vector<Stabilization>())
       {
         std::cout << "using " << useThreads_ << " threads\n";
-        if (basisChoice != 3) // !!!!! get order information from BasisSets
-          this->agglomeration().onbBasis(order()+1);
-        update(true);
       }
       DefaultAgglomerationVEMSpace(const DefaultAgglomerationVEMSpace&) = delete;
       DefaultAgglomerationVEMSpace& operator=(const DefaultAgglomerationVEMSpace&) = delete;
@@ -213,7 +210,7 @@ namespace Dune
         return interpolation_;
       }
 
-    private:
+    protected:
       template <int codim>
       static std::size_t sizeONB(std::size_t order)
       {
@@ -228,8 +225,8 @@ namespace Dune
       auto& hessianProjections() const { return *hessianProjections_; }
       auto& stabilizations() const { return *stabilizations_; }
 
-      virtual void buildValueProjection(const Std::vector<Std::vector<ElementSeedType> > &entitySeeds,
-                                        unsigned int start, unsigned int end);
+      virtual void finalize(const Std::vector<Std::vector<ElementSeedType> > &entitySeeds, unsigned int agglomerate)
+      {}
       void buildProjections(const Std::vector<Std::vector<ElementSeedType> > &entitySeeds,
                             unsigned int start, unsigned int end);
 
@@ -248,16 +245,6 @@ namespace Dune
       std::shared_ptr<Vector<typename Traits::ScalarBasisFunctionSetType::HessianProjection>> hessianProjections_;
       std::shared_ptr<Vector<Stabilization>> stabilizations_;
     };
-
-    // Computation of value projection for DefaultAgglomerationVEMSpace
-    // ------------------------------------------------------------
-
-    template<class Traits>
-    inline void DefaultAgglomerationVEMSpace<Traits> :: buildValueProjection(
-          const Std::vector<Std::vector<ElementSeedType> > &entitySeeds,
-          unsigned int start, unsigned int end )
-    {
-    }
 
     // Computation of  projections for DefaultAgglomerationVEMSpace
     // ------------------------------------------------------------
@@ -295,8 +282,7 @@ namespace Dune
 
       // Mass matrices and their inverse: HpGrad, HpHess, HpGradInv, HpHessInv
       // !!! HpGrad/HpHess are not needed after inversion so use HpGradInv/HpHessInv from the start
-      DynamicMatrix<DomainFieldType> HpValue, HpGrad, HpHess, HpValueInv, HpGradInv, HpHessInv;
-      HpValue.resize(numShapeFunctions, numShapeFunctions, 0);
+      DynamicMatrix<DomainFieldType> HpGrad, HpHess, HpGradInv, HpHessInv;
       HpGrad.resize(numGradShapeFunctions, numGradShapeFunctions, 0);
       HpHess.resize(numHessShapeFunctions, numHessShapeFunctions, 0);
 
@@ -370,7 +356,6 @@ namespace Dune
         /// compute L(B) and the mass matrices ///////////////////////////////////
         //////////////////////////////////////////////////////////////////////////
 
-        HpValue = 0;
         HpGrad = 0;
         HpHess = 0;
         for (const ElementSeedType &entitySeed : entitySeeds[agglomerate])
@@ -394,7 +379,6 @@ namespace Dune
             {
               shapeFunctionSet.evaluateEach(quadrature[qp], [&](std::size_t beta, RangeType psi)
               {
-                HpValue[alpha][beta] += phi * psi * weight;
                 if (alpha < numConstraintShapeFunctions)
                 {
                   constraintValueProj[alpha][beta] += phi * psi * weight;
@@ -421,17 +405,6 @@ namespace Dune
         } // loop over triangles in agglomerate
 
         // compute inverse mass matrix
-        HpValueInv = HpValue;
-        try
-        {
-          HpValueInv.invert();
-        }
-        catch (const FMatrixError&)
-        {
-          std::cout << "HpValueInv.invert() failed!\n";
-          assert(0);
-          throw FMatrixError();
-        }
         if (numGradShapeFunctions>0)
         {
           HpGradInv = HpGrad;
@@ -803,115 +776,7 @@ namespace Dune
           }
         }
 
-        //////////////////////////////////////////////////////////////////////////
-        /// Value Projection recomputed //////////////////////////////////////////
-        //////////////////////////////////////////////////////////////////////////
-
-        R.resize(numShapeFunctions, numDofs, 0);
-        R = 0;
-        for (const ElementSeedType &entitySeed : entitySeeds[agglomerate])
-        {
-          const ElementType &element = gridPart().entity(entitySeed);
-          auto vemBasisFunction = scalarBasisFunctionSet(element);
-          const auto geometry = element.geometry();
-          const auto &refElement = ReferenceElements<typename GridPartType::ctype, GridPartType::dimension>::general( element.type());
-
-          const auto &shapeFunctionSet = basisSets_.basisFunctionSet(agglomeration(), element);
-
-          // compute the boundary terms for the value projection
-          for (const auto &intersection : intersections(gridPart(), element))
-          {
-            // ignore edges inside the given polygon
-            if (!intersection.boundary() && (agglomeration().index(intersection.outside()) == agglomerate))
-              continue;
-            assert(intersection.conforming());
-
-            const typename BasisSetsType::EdgeShapeFunctionSetType edgeShapeFunctionSet
-                  = basisSets_.edgeBasisFunctionSet(agglomeration(), intersection);
-
-            Std::vector<Std::vector<unsigned int>>
-              mask(2,Std::vector<unsigned int>(0)); // contains indices with Phi_mask[i] is attached to given edge
-            edgePhiVector[0] = 0;
-            edgePhiVector[1] = 0;
-
-            interpolation_(intersection, edgeShapeFunctionSet, edgePhiVector, mask);
-
-            auto normal = intersection.centerUnitOuterNormal();
-            /*
-            int flip = 1;
-            if (intersection.neighbor())
-              if (normal[0] + std::sqrt(2.)*normal[1] < 0)
-                flip = -1;
-            normal *= flip;
-            */
-
-            // now compute int_e Phi^e m_alpha
-            Quadrature1Type quadrature(gridPart(), intersection, 2 * polOrder + 1, Quadrature1Type::INSIDE);
-            for (std::size_t qp = 0; qp < quadrature.nop(); ++qp)
-            {
-              auto x = quadrature.localPoint(qp);
-              auto y = intersection.geometryInInside().global(x);
-              const DomainFieldType weight = intersection.geometry().integrationElement(x) * quadrature.weight(qp);
-              shapeFunctionSet.scalarEach(y, [&](std::size_t alpha, RangeFieldType m)
-              {
-                edgeShapeFunctionSet.evaluateEach(x, [&](std::size_t beta,
-                      typename BasisSetsType::EdgeShapeFunctionSetType::RangeType psi)
-                {
-                  for (std::size_t s=0; s<mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
-                    for (std::size_t i=0;i<dimDomain;++i)
-                      R[alpha][mask[0][s]] += weight *
-                          edgePhiVector[0][beta][s] * psi[i] * normal[i] * m;
-                });
-              });
-            } // quadrature loop
-            // store the masks for each edge
-          } // loop over intersections
-
-          // Compute element part for the gradient projection
-          Quadrature0Type quadrature(element, 2 * polOrder + 1);
-          for (std::size_t qp = 0; qp < quadrature.nop(); ++qp)
-          {
-            const DomainFieldType weight =
-                    geometry.integrationElement(quadrature.point(qp)) * quadrature.weight(qp);
-            vemBasisFunction.jacobianAll(quadrature[qp], psi1Values);
-            shapeFunctionSet.scalarEach(quadrature[qp], [&](std::size_t alpha, RangeFieldType m)
-            {
-              for (std::size_t s=0; s<numDofs; ++s)
-              {
-                RangeFieldType div = 0;
-                for (std::size_t i=0;i<dimDomain;++i)
-                  div += psi1Values[s][i][i];
-                R[alpha][s] -= weight * div * m;
-              }
-            });
-          } // quadrature loop
-        } // loop over triangles in agglomerate
-
-        // now compute gradient projection by multiplying with inverse mass matrix
-        for (std::size_t alpha = 0; alpha < numShapeFunctions; ++alpha)
-          for (std::size_t i = 0; i < numDofs; ++i)
-          {
-            valueProjection[alpha][i] = 0;
-            for (std::size_t beta = 0; beta < numShapeFunctions; ++beta)
-              valueProjection[alpha][i] += HpValueInv[alpha][beta] * R[beta][i];
-          }
-
-#if 0
-        std::cout << "*******************************\n";
-        std::cout << "** Value Projection 2        **\n";
-        std::cout << "*******************************\n";
-        for (std::size_t beta = 0; beta < numDofs; ++beta )
-        {
-          std::cout << "phi_" << beta << " = ";
-          for (std::size_t alpha = 0; alpha < numShapeFunctions; ++alpha)
-          {
-            std::cout << valueProjection[alpha][beta] << " ";
-          }
-          std::cout << std::endl;
-        }
-        std::cout << "*******************************\n";
-#endif
-
+        finalize(entitySeeds, agglomerate);
 
         /////////////////////////////////////////////////////////////////////
         // stabilization matrix /////////////////////////////////////////////
