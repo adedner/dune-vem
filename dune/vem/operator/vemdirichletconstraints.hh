@@ -88,7 +88,6 @@ namespace Dune {
     template < class DiscreteFunctionType >
     void operator ()( const typename DiscreteFunctionType::RangeType& value, DiscreteFunctionType& w ) const
     {
-      return;
       this->operator()(w);
     }
     template < class DiscreteFunctionType >
@@ -186,7 +185,7 @@ namespace Dune {
               applyConstraint(mask[ localBlock ]))
           {
             std::fill(valuesModel.begin(),valuesModel.end(),0);
-            // space_.interpolation()( entity, BoundaryWrapper(model_,dirichletBlocks_[global][l]),  valuesModel );
+            space_.interpolation()( entity, BoundaryWrapper(model_,dirichletBlocks_[global][l]),  valuesModel );
             // store result
             assert( (unsigned int)localDof < wLocal.size() );
             wLocal[ localDof ] = valuesModel[ localDof ];
@@ -233,7 +232,7 @@ namespace Dune {
             if (op == Operation::sub)
             {
               std::fill(valuesModel.begin(),valuesModel.end(),0);
-              // space_.interpolation() ( entity, BoundaryWrapper(model_,dirichletBlocks_[global][l]), valuesModel );
+              space_.interpolation() ( entity, BoundaryWrapper(model_,dirichletBlocks_[global][l]), valuesModel );
               values[ localDof ] -= valuesModel[ localDof ];
             }
             assert( (unsigned int)localDof < wLocal.size() );

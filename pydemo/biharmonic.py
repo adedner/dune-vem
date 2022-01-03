@@ -10,15 +10,16 @@ from dune.fem import parameter
 from dune.vem import voronoiCells
 from dune.fem.operator import linear as linearOperator
 from scipy.sparse.linalg import spsolve
+from hexagons import hexaGrid
 
 from ufl import *
 import dune.ufl
 
 maxLevel     = 4
-order        = 4
-epsilon      = 1
+order        = 1
+epsilon      = 0
 laplaceCoeff = 1
-mu           = 0
+mu           = 1
 
 dune.fem.parameter.append({"fem.verboserank": 0})
 
@@ -29,14 +30,14 @@ dune.fem.parameter.append({"fem.verboserank": 0})
 # <codecell>
 # Note: suboptimal laplace error for bubble (space is reduced to polorder=3 but could be 4 = ts+2
 methods = [ ### "[space,scheme,spaceKwrags]"
-        ["vem","vem",{"order":order, "testSpaces":[ [0],  [order-3,order-2], [order-4] ] }, "C1-non-conforming"],
+        # ["vem","vem",{"order":order, "testSpaces":[ [0],  [order-3,order-2], [order-4] ] }, "C1-non-conforming"],
         # ["vem","vem",{"order":order, "testSpaces":[ [0],  [order-2,order-2], [order-2] ] }, "C1C0-conforming"],
         # ["vem","vem",{"order":order, "testSpaces":[ [0],  [order-3,order-2], [order-3] ] }, "C1mod-conforming"],
           ]
 if epsilon == 0:
     methods += [
             ["vem","vem",{"order":order, "testSpaces":[ [0],  [order-2,-1], [order-2] ] },      "C0-conforming"],
-            ["vem","vem",{"order":order-1, "testSpaces":[ [0],  [order-3,-1], [order-3] ] },      "C0pm1-conforming"],
+            # ["vem","vem",{"order":order-1, "testSpaces":[ [0],  [order-3,-1], [order-3] ] },      "C0pm1-conforming"],
                ]
 parameters = {"newton.linear.tolerance": 1e-12,
               "newton.linear.preconditioning.method": "jacobi",
@@ -129,8 +130,12 @@ for level in range(maxLevel):
     # constructor = cartesianDomain([0,0],[1,1],[4*2**level,4*2**level])
     # polyGrid = create.grid("agglomerate", constructor, cubes=False )
     constructor = cartesianDomain([0,0],[1,1],[4,4])
-    polyGrid = create.grid("agglomerate", voronoiCells(constructor,16*2**level*2**level,"voronoiseeds",
-               load=True,show=False,lloyd=5), convex=True )
+    # polyGrid = create.grid("agglomerate", voronoiCells(constructor,16*2**level*2**level,"voronoiseeds",
+    #            load=True,show=False,lloyd=5), convex=True )
+
+    N = 10*3*2**level+1 # needs to be of the form 6*i+1
+    polyGrid = hexaGrid(N, 1, 1)
+
     res = []
     for i,m in enumerate(methods):
         space = create.space(m[0], polyGrid, dimRange=1, storage="numpy", **m[2])
