@@ -371,7 +371,7 @@ namespace Dune
         for (std::size_t beta=0;beta<size();++beta)
           shapeFunctionSet_.hessianEach( y, f);
         // onb( values ); // Note: failing axpy on FV<FM> due to missing // double*FM
-        // if (!useOnb_) return;
+        if (!useOnb_) return;
         std::size_t k = 0;
         for (std::size_t i=0;i<values.size();++i,++k)
         {

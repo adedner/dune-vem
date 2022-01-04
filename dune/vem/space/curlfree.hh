@@ -116,28 +116,15 @@ namespace Dune
         template< class Point, class Functor >
         void jacobianEach ( const Point &x, Functor functor ) const
         {
-          JacobianRangeType dphi(0);
           sfs_.evaluateEach(x, [&](std::size_t alpha, ScalarRangeType phi)
           {
             if (alpha<numGradShapeFunctions_)
             {
-              dphi[0][0] = phi[0];
-              dphi[1][1] = phi[0];
-              functor(alpha,dphi);
-#if 0
-              dphi = 0;
-              dphi[0][0] = phi[0];
-              dphi[1][1] = 0;
-              functor(3*alpha,dphi);
-              dphi[0][0] = 0;
-              dphi[1][1] = phi[0];
-              functor(3*alpha+1,dphi);
-              dphi[0][0] = 0;
-              dphi[1][1] = 0;
-              dphi[0][1] = phi[0];
-              dphi[1][0] = phi[0];
-              functor(3*alpha+2,dphi);
-#endif
+              functor(alpha,{{phi[0],0},{0,phi[0]}});
+            /*
+              functor(2*alpha,   {{phi[0],0}, {0,0}});
+              functor(2*alpha+1, {{0,0},      {0,phi[0]}});
+            */
             }
           });
         }
@@ -157,24 +144,13 @@ namespace Dune
         template< class Point, class Functor >
         void divJacobianEach( const Point &x, Functor functor ) const
         {
-          RangeType divGrad;
           sfs_.jacobianEach(x, [&](std::size_t alpha, ScalarJacobianRangeType dphi)
           {
             if (alpha<numGradShapeFunctions_)
             {
               functor(alpha,dphi[0]);
-#if 0
-              divGrad[0] = dphi[0][0];
-              divGrad[1] = 0;
-              functor(3*alpha,divGrad);
-              functor(3*alpha,divGrad);
-              divGrad[0] = 0;
-              divGrad[1] = dphi[0][1];
-              functor(3*alpha+1,divGrad);
-              divGrad[0] = dphi[0][1];
-              divGrad[1] = dphi[0][0];
-              functor(3*alpha+2,divGrad);
-#endif
+              // functor(2*alpha,   {dphi[0][0],0});
+              // functor(2*alpha+1, {0,dphi[0][1]});
             }
           });
         }
@@ -223,10 +199,9 @@ namespace Dune
         {
           // phihat = (1)
           //    phi = (d) = phihat normal
-          RangeType phi;
           sfs_.evaluateEach(x, [&](std::size_t alpha, EdgeRangeType phihat)
           {
-            phi = intersection_.unitOuterNormal(x);
+            RangeType phi = intersection_.unitOuterNormal(x);
             phi *= phihat[0]*flip_;
             functor(alpha, phi);
           });
@@ -235,24 +210,6 @@ namespace Dune
         void jacobianEach ( const Point &x, Functor functor ) const
         {
           assert(0);
-          const auto &geo = intersection_.geometry();
-          const auto &jit = geo.jacobianInverseTransposed(x);
-          // dphihat = (1,1)
-          //    dphi = (1,d) = J^{-T}dphihat
-          //     jac = (d,d) = dphi x normal
-          JacobianRangeType jac;
-          sfs_.jacobianEach(x, [&](std::size_t alpha, EdgeJacobianRangeType dphihat)
-          {
-            DomainType normal = intersection_.unitOuterNormal(x);
-            jit.mv(dphihat[0], jac[0]);
-            for (int d=1;d<dimDomain;++d)
-            {
-              jac[d] = jac[0];
-              jac[d] *= normal[d]*flip_;
-            }
-            jac[0] *= normal[0]*flip_;
-            functor(alpha,jac);
-          });
         }
         unsigned int size() const
         {
@@ -317,7 +274,6 @@ namespace Dune
           if (normal[0] + std::sqrt(2.)*normal[1] < 0)
             flip = -1;
         }
-        normal *= flip;
         return EdgeShapeFunctionSetType(intersection, flip, edgeSFS_);
       }
       std::size_t size( std::size_t orderSFS ) const
@@ -495,8 +451,7 @@ namespace Dune
             const typename BaseType::BasisSetsType::EdgeShapeFunctionSetType edgeShapeFunctionSet
                   = BaseType::basisSets_.edgeBasisFunctionSet(BaseType::agglomeration(), intersection);
 
-            Std::vector<Std::vector<unsigned int>>
-              mask(2,Std::vector<unsigned int>(0)); // contains indices with Phi_mask[i] is attached to given edge
+            Std::vector<Std::vector<unsigned int>> mask(2,Std::vector<unsigned int>(0)); // contains indices with Phi_mask[i] is attached to given edge
             edgePhiVector[0] = 0;
             edgePhiVector[1] = 0;
 
@@ -518,8 +473,7 @@ namespace Dune
                 {
                   for (std::size_t s=0; s<mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
                     for (std::size_t i=0;i<dimDomain;++i)
-                      R[alpha][mask[0][s]] += weight *
-                          edgePhiVector[0][beta][s] * psi[i] * normal[i] * m;
+                      R[alpha][mask[0][s]] += weight * edgePhiVector[0][beta][s] * psi[i] * normal[i] * m;
                 });
               });
             } // quadrature loop
@@ -529,8 +483,7 @@ namespace Dune
           typename BaseType::Quadrature0Type quadrature(element, 2 * polOrder + 1);
           for (std::size_t qp = 0; qp < quadrature.nop(); ++qp)
           {
-            const DomainFieldType weight =
-                    geometry.integrationElement(quadrature.point(qp)) * quadrature.weight(qp);
+            const DomainFieldType weight = geometry.integrationElement(quadrature.point(qp)) * quadrature.weight(qp);
             vemBasisFunction.jacobianAll(quadrature[qp], psi1Values);
             shapeFunctionSet.scalarEach(quadrature[qp], [&](std::size_t alpha, RangeFieldType m)
             {
@@ -737,7 +690,6 @@ namespace Dune
                    const BasisFunctionSet &basisFunctionSet, LocalDofMatrix &localDofMatrix ) const
       {
         edgeVolumes_.clear();
-        const auto &refElement = ReferenceElements< ctype, dimension >::general( element.type() );
 
         // use the bb set for this polygon for the inner testing space
         const auto &innerShapeFunctionSet = basisSets_.basisFunctionSet( indexSet_.agglomeration(), element );
@@ -805,7 +757,6 @@ namespace Dune
 
         const ElementType &element = intersection.inside();
         const auto &edgeBFS = basisSets_.edgeBasisFunctionSet( indexSet_.agglomeration(), intersection );
-        const auto &refElement = ReferenceElements< ctype, dimension >::general( element.type() );
 
         Std::vector<std::size_t> entry(localDofVectorMatrix.size(), 0);
 
@@ -817,11 +768,11 @@ namespace Dune
           for (unsigned int qp=0;qp<edgeQuad.nop();++qp)
           {
             auto x = edgeQuad.localPoint(qp);
-            double weight = edgeQuad.weight(qp) * intersection.geometry().integrationElement(x);
+            double weight = edgeQuad.weight(qp) * intersection.geometry().integrationElement(x)/ intersection.geometry().volume();
             edgeShapeFunctionSet.evaluateEach( x, [ & ] ( std::size_t beta, typename EdgeShapeFunctionSet::RangeType value ) {
                 edgeBFS.evaluateEach( x, [&](std::size_t alpha, typename EdgeShapeFunctionSet::RangeType phi ) {
                     assert( entry[0]+alpha < localDofVectorMatrix[0].size() );
-                    localDofVectorMatrix[0][ entry[0]+alpha ][ beta ] += value*phi * weight / intersection.geometry().volume();
+                    localDofVectorMatrix[0][ entry[0]+alpha ][ beta ] += value*phi * weight;
                   });
               }
             );
@@ -885,7 +836,6 @@ namespace Dune
       void apply ( const ElementType &element,
           const Vertex &vertex, const Edge &edge, const Inner &inner) const
       {
-        const auto &refElement = ReferenceElements< ctype, dimension >::general( element.type() );
         const int poly = indexSet_.index( element );
         int vertexSize, edgeOffset,edgeSize, innerOffset,innerSize;
         getSizesAndOffsets(poly, vertexSize,edgeOffset,edgeSize,innerOffset,innerSize);
@@ -919,7 +869,6 @@ namespace Dune
       {
         typename LocalFunction::RangeType value;
         typename LocalFunction::JacobianRangeType dvalue;
-        const auto &refElement = ReferenceElements< ctype, dimension >::general( element.type() );
 
         // use the bb set for this polygon for the inner testing space
         const auto &innerShapeFunctionSet = basisSets_.basisFunctionSet( indexSet_.agglomeration(), element );
@@ -975,7 +924,6 @@ namespace Dune
                                 Std::vector<Std::vector<unsigned int>> &mask) const
       {
         const ElementType &element = intersection.inside();
-        const auto &refElement = ReferenceElements< ctype, dimension >::general( element.type() );
 
         const int poly = indexSet_.index( element );
         int vertexSize, edgeOffset,edgeSize, innerOffset,innerSize;

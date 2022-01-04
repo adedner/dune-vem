@@ -115,7 +115,6 @@ namespace Dune {
       if( BaseType::hasDirichletDofs_ )
         for( const auto &entity : space_ )
           dirichletDofsCorrectOnEntity( linearOperator.localMatrix(entity,entity) );
-
     }
 
   protected:
