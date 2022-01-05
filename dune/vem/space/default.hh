@@ -66,7 +66,7 @@ namespace Dune
       typedef typename GridPartType::template Codim<0>::EntitySeedType ElementSeedType;
 
       static constexpr int dimDomain = Traits::dimDomain;
-      static constexpr int blockSize = BaseType::localBlockSize;
+      static constexpr size_t blockSize = BaseType::localBlockSize;
 
       typedef Dune::Fem::ElementQuadrature<GridPartType, 0> Quadrature0Type;
       typedef Dune::Fem::ElementQuadrature<GridPartType, 1> Quadrature1Type;
@@ -256,6 +256,7 @@ namespace Dune
     {
       int polOrder = order();
       typedef typename BasisSetsType::EdgeShapeFunctionSetType EdgeTestSpace;
+      // this is scalar space in the case that vectorial extension is used
       typedef typename BasisSetsType::ShapeFunctionSetType::FunctionSpaceType FunctionSpaceType;
       typedef typename FunctionSpaceType::DomainType DomainType;
       typedef typename FunctionSpaceType::RangeFieldType RangeFieldType;
@@ -314,7 +315,13 @@ namespace Dune
       // start iteration over all polygons
       for (std::size_t agglomerate = start; agglomerate < end; ++agglomerate)
       {
-        const std::size_t numDofs = blockMapper().numDofs(agglomerate) * dimRange;
+        // case 1: dimRange=1 (e.g. a vector extension is applied later)
+        //         then the blockSize will be the actual vector size but we
+        //         are computing the scalar basisfunctions here
+        // case 2: dimRange>1: in this case blockSize=dimRange or blockSize=1.
+        //         In the second case the blockMapper is already returning the correct size.
+        const std::size_t numDofs = blockMapper().numDofs(agglomerate) *
+               std::min(dimRange, blockSize);
         /*
         std::cout << "numDofs: " << numDofs << " = "
                   << blockMapper().numDofs(agglomerate) << " * "
