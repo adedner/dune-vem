@@ -369,8 +369,7 @@ namespace Dune
           !reduced? std::min( numValueShapeFunctions_, sizeONB<0>(std::max(0, order - 2)) )
           : numValueShapeFunctions_-3*BBBasisFunctionSetType::RangeType::dimension
         )
-      // ????
-      , numInnerShapeFunctions_( order-4<0 ? 0 : sizeONB<0>(order - 4) )
+      , numInnerShapeFunctions_( testSpaces[2][0]<0 ? 0 : sizeONB<0>(testSpaces[2][0]) )
       , numEdgeTestShapeFunctions_( sizeONB<1>(
                  *std::max_element( testSpaces_[1].begin(), testSpaces_[1].end()) ) )
       {
