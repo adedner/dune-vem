@@ -314,7 +314,7 @@ namespace Dune
       // start iteration over all polygons
       for (std::size_t agglomerate = start; agglomerate < end; ++agglomerate)
       {
-        const std::size_t numDofs = blockMapper().numDofs(agglomerate) * blockSize;
+        const std::size_t numDofs = blockMapper().numDofs(agglomerate) * dimRange;
         /*
         std::cout << "numDofs: " << numDofs << " = "
                   << blockMapper().numDofs(agglomerate) << " * "

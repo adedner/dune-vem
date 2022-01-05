@@ -292,7 +292,6 @@ namespace Dune
         std::size_t numValueShapeFunctions_;
         std::size_t numGradShapeFunctions_;
         std::size_t numHessShapeFunctions_;
-        std::size_t innerShapeFunctions_;
         std::size_t numInnerShapeFunctions_;
       };
       struct EdgeShapeFunctionSet
@@ -369,7 +368,7 @@ namespace Dune
           !reduced? std::min( numValueShapeFunctions_, sizeONB<0>(std::max(0, order - 2)) )
           : numValueShapeFunctions_-3*BBBasisFunctionSetType::RangeType::dimension
         )
-      , numInnerShapeFunctions_( testSpaces[2][0]<0 ? 0 : sizeONB<0>(testSpaces[2][0]) )
+      , numInnerShapeFunctions_( testSpaces[2][0]<0? 0 : sizeONB<0>(testSpaces[2][0]) )
       , numEdgeTestShapeFunctions_( sizeONB<1>(
                  *std::max_element( testSpaces_[1].begin(), testSpaces_[1].end()) ) )
       {
@@ -562,7 +561,7 @@ namespace Dune
               > BasisFunctionSetType;
 
       // types for the mapper
-      typedef Hybrid::IndexRange<int, FunctionSpaceType::dimRange> LocalBlockIndices;
+      typedef Hybrid::IndexRange<int, dimRange> LocalBlockIndices;
       typedef VemAgglomerationIndexSet <GridPartType> IndexSetType;
       typedef AgglomerationDofMapper <GridPartType, IndexSetType> BlockMapperType;
 
