@@ -90,11 +90,13 @@ namespace Dune
 
         int order () const { return sfs_.order()-1;  }
 
+        // Note: jacobianEach not needed for interpolation so return 'this' works here
         const auto &valueBasisSet() const
         {
           return *this;
         }
-
+        // Note: needed for the finalizing projection
+        //       Could make this 'protected' and make the CurlFreeVemSpace 'friend'
         template< class Point, class Functor >
         void scalarEach ( const Point &x, Functor functor ) const
         {
@@ -113,6 +115,10 @@ namespace Dune
               functor(alpha-1, dphi[0]);
           });
         }
+        /*
+          int Gu : M = int Du : M = - int u . divM + int_e uxn : M
+          use M = mI so int Gu : M = int div u m
+        */
         template< class Point, class Functor >
         void jacobianEach ( const Point &x, Functor functor ) const
         {
@@ -270,7 +276,7 @@ namespace Dune
         assert( abs(normal[0] + std::sqrt(2.)*normal[1]) > 1e-5 );
         if (intersection.neighbor())
         {
-          // !!! if (indexSet_.index(intersection.inside()) > indexSet_.index(intersection.outside()))
+          // !!! FIXME: if (indexSet_.index(intersection.inside()) > indexSet_.index(intersection.outside()))
           if (normal[0] + std::sqrt(2.)*normal[1] < 0)
             flip = -1;
         }
