@@ -699,7 +699,7 @@ namespace Dune
           // d[alpha] = e_gamma * D_beta
           // with gamma = beta + numInnerShapeFunctions - numDofs
           if( beta - numDofs + numInnerShapeFunctions == alpha )
-            d[ alpha ] = D[beta][alpha] * volume;
+            d[ alpha ] = volume;
           else
             d[ alpha ] = 0;
         }
