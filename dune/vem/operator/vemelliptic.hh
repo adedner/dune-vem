@@ -90,6 +90,8 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model>
     { return dSpace_; }
     const RangeDiscreteFunctionSpaceType& rangeSpace() const
     { return rSpace_; }
+    void setQuadratureOrders(unsigned int interior, unsigned int surface)
+    { baseOperator_.setQuadratureOrders(interior,surface); }
 
   private:
     const DomainDiscreteFunctionSpaceType &dSpace_;
