@@ -414,7 +414,7 @@ namespace Dune {
             {
               const ElementType &element = gridPart().entity(entitySeed);
               const auto geometry = element.geometry();
-              Quadrature0Type quadrature(element, 2 * polOrder);
+              Quadrature0Type quadrature(element, 3 * polOrder);
 
               // get the bounding box monomials and apply all dofs to them
               BoundingBoxBasisFunctionSet <GridPart, ScalarShapeFunctionSetType> shapeFunctionSet(element, agglomerate,
@@ -651,7 +651,7 @@ namespace Dune {
                 }
 
                 // now compute int_e Phi_mask[i] m_alpha
-                Quadrature1Type quadrature(gridPart(), intersection, 2 * polOrder, Quadrature1Type::INSIDE);
+                Quadrature1Type quadrature(gridPart(), intersection, 3 * polOrder, Quadrature1Type::INSIDE);
                 for (std::size_t qp = 0; qp < quadrature.nop(); ++qp)
                 {
                   auto x = quadrature.localPoint(qp);
@@ -671,6 +671,7 @@ namespace Dune {
                         // evaluate each here for edge shape fns
                         // first check if we should be using interpolation (for the
                         // existing edge moments - or for H4 space)
+                        auto normal = intersection.unitOuterNormal();
                         if (alpha < Dune::Fem::OrthonormalShapeFunctions<DomainType::dimension>::
                                     size( agIndexSet_.edgeOrders()[0] ) // have enough edge momentsa
                             || edgePhiVector[0].size() == polOrder+1    // interpolation is exact
@@ -812,7 +813,7 @@ namespace Dune {
               } // loop over intersections
 
 
-              Quadrature0Type quadrature(element, 2 * polOrder);
+              Quadrature0Type quadrature(element, 3 * polOrder);
               for (std::size_t qp = 0; qp < quadrature.nop(); ++qp)
               {
                 const DomainFieldType weight =
@@ -908,7 +909,7 @@ namespace Dune {
 
                   // change to compute boundary term in Hessian Projection
                   // now compute int_e Phi_mask[i] m_alpha
-                  Quadrature1Type quadrature(gridPart(), intersection, 2 * polOrder, Quadrature1Type::INSIDE);
+                  Quadrature1Type quadrature(gridPart(), intersection, 3 * polOrder, Quadrature1Type::INSIDE);
                   for (std::size_t qp = 0; qp < quadrature.nop(); ++qp)
                   {
                     auto x = quadrature.localPoint(qp);
@@ -930,7 +931,7 @@ namespace Dune {
                   } // quadrature loop
                 } // loop over intersections
               }
-              Quadrature0Type quadrature(element, 2 * polOrder);
+              Quadrature0Type quadrature(element, 3 * polOrder);
               for (std::size_t qp = 0; qp < quadrature.nop(); ++qp)
               {
                 const DomainFieldType weight = geometry.integrationElement(quadrature.point(qp)) * quadrature.weight(qp);
