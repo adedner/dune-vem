@@ -671,7 +671,7 @@ namespace Dune {
                         // evaluate each here for edge shape fns
                         // first check if we should be using interpolation (for the
                         // existing edge moments - or for H4 space)
-                        auto normal = intersection.unitOuterNormal();
+                        auto normal = intersection.unitOuterNormal(x);
                         if (alpha < Dune::Fem::OrthonormalShapeFunctions<DomainType::dimension>::
                                     size( agIndexSet_.edgeOrders()[0] ) // have enough edge momentsa
                             || edgePhiVector[0].size() == polOrder+1    // interpolation is exact
