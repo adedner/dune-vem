@@ -353,7 +353,7 @@ namespace Dune
         { //!TS add nomral derivatives
           int kStart = k;
           // int edgeNumber = intersection.indexInInside();
-          EdgeQuadratureType edgeQuad( gridPart(), intersection, 2*polOrder_, EdgeQuadratureType::INSIDE );
+          EdgeQuadratureType edgeQuad( gridPart(), intersection, 3*polOrder_, EdgeQuadratureType::INSIDE );
           auto normal = intersection.centerUnitOuterNormal();
           if (intersection.neighbor()) // we need to check the orientation of the normal
             if (indexSet_.index(intersection.inside()) > indexSet_.index(intersection.outside()))
@@ -402,7 +402,7 @@ namespace Dune
         auto inner = [&] (int poly,int i,int k,int numDofs)
         {
           assert(numDofs == innerShapeFunctionSet.size());
-          InnerQuadratureType innerQuad( element, 2*polOrder_ );
+          InnerQuadratureType innerQuad( element, 3*polOrder_ );
           for (int qp=0;qp<innerQuad.nop();++qp)
           {
             auto y = innerQuad.point(qp);
@@ -491,7 +491,7 @@ namespace Dune
         auto edge = [&] (int poly,auto intersection,int k,int numDofs)
         { //!TS add normal derivatives
           EdgeQuadratureType edgeQuad( gridPart(),
-                intersection, 2*polOrder_, EdgeQuadratureType::INSIDE );
+                intersection, 3*polOrder_, EdgeQuadratureType::INSIDE );
           for (unsigned int qp=0;qp<edgeQuad.nop();++qp)
           {
             auto x = edgeQuad.localPoint(qp);
@@ -738,7 +738,7 @@ namespace Dune
             if (indexSet_.index(intersection.inside()) > indexSet_.index(intersection.outside()))
               normal *= -1;
           EdgeQuadratureType edgeQuad( gridPart(),
-                intersection, 2*polOrder_, EdgeQuadratureType::INSIDE );
+                intersection, 3*polOrder_, EdgeQuadratureType::INSIDE );
           for (unsigned int qp=0;qp<edgeQuad.nop();++qp)
           {
             k = kStart;
@@ -775,7 +775,7 @@ namespace Dune
         {
           assert(numDofs == innerShapeFunctionSet.size());
           //! SubVector has no size: assert(k+numDofs == localDofVector.size());
-          InnerQuadratureType innerQuad( element, 2*polOrder_ );
+          InnerQuadratureType innerQuad( element, 3*polOrder_ );
           for (unsigned int qp=0;qp<innerQuad.nop();++qp)
           {
             auto y = innerQuad.point(qp);
