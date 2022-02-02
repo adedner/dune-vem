@@ -105,13 +105,14 @@ def runTestPerturbation(testSpaces):
     exact = as_vector( [sin(2*pi*x[0])**2*sin(2*pi*x[1])**2] )
     spaceConstructor = lambda grid, r: dune.vem.vemSpace( grid, order=order, dimRange=r, testSpaces = testSpaces )
 
-    eoc = runTest(exact, spaceConstructor, interpolate)
+    # eoc = runTest(exact, spaceConstructor, interpolate)
 
-    # eoc = runTest(exact, spaceConstructor, perturbation)
+    eoc = runTest(exact, spaceConstructor, perturbation)
 
     if order == 2:
         expected_eoc = [order, order, order-1, order-1]
-    expected_eoc = [order+1, order, order-1, order-1]
+    else:
+        expected_eoc = [order+1, order, order-1, order-1]
 
     return eoc, expected_eoc
 
@@ -125,9 +126,9 @@ def main():
 
     # test biharmonic with non conforming C1 space
     ncC1testSpaces = [ [0], [order-3,order-2], [order-4] ]
-    # runTestBiharmonic( ncC1testSpaces )
+    C1C0testSpaces = [ [0], [order-2,order-2], [order-4] ]
 
-    eoc, expected_eoc = runTestPerturbation( ncC1testSpaces )
+    eoc, expected_eoc = runTestPerturbation( C1C0testSpaces )
 
     i = 0
     for k in expected_eoc:
