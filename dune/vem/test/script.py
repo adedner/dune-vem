@@ -17,11 +17,12 @@ from ufl import *
 import dune.ufl
 
 from perturbation import perturbation
+from interpolate import interpolate
 
 dune.fem.parameter.append({"fem.verboserank": -1})
 
-maxLevel = 3
-order = 3
+maxLevel = 4
+order = 2
 
 parameters = {"newton.linear.tolerance": 1e-12,
               "newton.linear.preconditioning.method": "jacobi",
@@ -53,8 +54,6 @@ def runTest(exact, spaceConstructor, get_df):
         errors  = [ math.sqrt(e) for e in integrate(grid, err, order=8) ]
         length = len(errors)
 
-        print("length", length)
-
         res += [ [[grid.hierarchicalGrid.agglomerate.size,space.size,*space.diameters()],*errors] ]
         results += [res]
 
@@ -62,7 +61,8 @@ def runTest(exact, spaceConstructor, get_df):
             "Size: ",grid.size(0), space.size,
             "diameters: ",space.diameters(),
             "L^2: ", errors[0], "H^1: ", errors[1],
-            "H^2: ", errors[2], "Energy: ", errors[3],
+            "H^2: ", errors[2],
+            # "Energy: ", errors[3],
             flush=True)
 
     return calculateEOC(results,length)
@@ -105,7 +105,9 @@ def runTestPerturbation(testSpaces):
     exact = as_vector( [sin(2*pi*x[0])**2*sin(2*pi*x[1])**2] )
     spaceConstructor = lambda grid, r: dune.vem.vemSpace( grid, order=order, dimRange=r, testSpaces = testSpaces )
 
-    eoc = runTest(exact, spaceConstructor, perturbation)
+    eoc = runTest(exact, spaceConstructor, interpolate)
+
+    # eoc = runTest(exact, spaceConstructor, perturbation)
 
     if order == 2:
         expected_eoc = [order, order, order-1, order-1]
