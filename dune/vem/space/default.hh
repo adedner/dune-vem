@@ -297,9 +297,10 @@ namespace Dune
       DynamicMatrix<DomainFieldType> constraintValueProj;
       constraintValueProj.resize(numConstraintShapeFunctions, numShapeFunctions, 0);
       // right hand sides and solvers for CLS for value projection (b: ls, d: constraints)
-      Dune::DynamicVector<DomainFieldType> b;
-      DynamicMatrix<DomainFieldType> d;
-      // d.resize(numConstraintShapeFunctions, 0);
+      Dune::DynamicVector<DomainFieldType> b,d;
+      DynamicMatrix<DomainFieldType> RHSconstraints;
+      // DynamicMatrix<DomainFieldType> d;
+      d.resize(numConstraintShapeFunctions, 0);
 
       // matrices for edge projections
       Std::vector<Dune::DynamicMatrix<double> > edgePhiVector(2);
@@ -357,9 +358,11 @@ namespace Dune
         // value projection CLS
         constraintValueProj = 0;
         D.resize(numDofs, numShapeFunctions, 0);
-        d.resize(numConstraintShapeFunctions, numDofs, 0);
+        RHSconstraints.resize(numDofs, numConstraintShapeFunctions, 0);
+        std::cout << "num dofs" << numDofs << std::endl;
+        // d.resize(numConstraintShapeFunctions, numDofs, 0);
         b.resize(numDofs, 0);
-        // std::fill(d.begin(),d.end(),0);
+        std::fill(d.begin(),d.end(),0);
 
         // rhs structures for gradient/hessian projection
         R.resize(numGradShapeFunctions, numDofs, 0);
@@ -466,13 +469,27 @@ namespace Dune
             b[ beta ] = 1;
 
             // set up vector d (rhs for constraints)
-            interpolation_.valueL2constraints(beta, H0, D, d[beta]);
+            // interpolation_.valueL2constraints(beta, H0, D, d);
+            interpolation_.valueL2constraints(beta, H0, D, RHSconstraints[beta]);
+            std::cout << "*******************************\n";
+            std::cout << "** RHS constraints        **\n";
+            std::cout << "*******************************\n";
+            for (std::size_t beta = 0; beta < numDofs; ++beta )
+            {
+              // std::cout << "M_" << beta << "/ = ";
+              for (std::size_t alpha = 0; alpha < numConstraintShapeFunctions; ++alpha)
+              {
+                std::cout << RHSconstraints[alpha][beta] << " ";
+              }
+              std::cout << std::endl;
+            }
+
             // if( beta >= numDofs - numConstraintShapeFunctions )
               // assert( std::abs( d[ beta - numDofs + numConstraintShapeFunctions ] - H0 ) < 1e-13);
 
             // compite CLS solution and store in right column of 'valueProjection'
             auto colValueProjection = vectorizeMatrixCol( valueProjection, beta );
-            colValueProjection = leastSquaresMinimizer.solve(b, d[beta]);
+            colValueProjection = leastSquaresMinimizer.solve(b, RHSconstraints[beta]);
 
             b[beta] = 0;
           }
@@ -497,12 +514,24 @@ namespace Dune
           }
           for (std::size_t beta = 0; beta < numDofs; ++beta )
           {
-            interpolation_.valueL2constraints(beta, H0, D, d[beta]);
+            interpolation_.valueL2constraints(beta, H0, D, RHSconstraints[beta]);
+            std::cout << "*******************************\n";
+            std::cout << "** RHS constraints        **\n";
+            std::cout << "*******************************\n";
+            for (std::size_t beta = 0; beta < numDofs; ++beta )
+            {
+              // std::cout << "M_" << beta << "/ = ";
+              for (std::size_t alpha = 0; alpha < numConstraintShapeFunctions; ++alpha)
+              {
+                std::cout << RHSconstraints[alpha][beta] << " ";
+              }
+              std::cout << std::endl;
+            }
             for (std::size_t alpha = 0; alpha < numShapeFunctions; ++alpha)
             {
               valueProjection[alpha][beta] = 0;
               for (std::size_t i = 0; i < constraintValueProj.cols(); ++i)
-                valueProjection[alpha][beta] += constraintValueProj[alpha][i] * d[beta][i];
+                valueProjection[alpha][beta] += constraintValueProj[alpha][i] * RHSconstraints[i][beta];
             }
           }
         }
