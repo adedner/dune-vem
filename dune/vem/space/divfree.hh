@@ -567,6 +567,53 @@ namespace Dune
         std::cout << "*******************************\n";
 #endif
       }
+      virtual void fixconstraintRHS(const Std::vector<Std::vector<typename BaseType::ElementSeedType> > &entitySeeds, unsigned int agglomerate,
+                                    DynamicMatrix<DomainFieldType> RHSconstraintsMatrix) override
+      {
+        ////////////////////////////////////////////////////////////////////
+        // construct the modified constraint RHS for the value projection //
+        ////////////////////////////////////////////////////////////////////
+
+        const std::size_t numInnerShapeFunctions = BaseType::basisSets_.innerSize();
+        const std::size_t numShapeFunctions = BaseType::basisSets_.size(0);
+        const std::size_t numDofs = BaseType::blockMapper().numDofs(agglomerate) * blockSize;
+
+        // set up matrix to store div projection
+        DynamicMatrix<double> divVector; // double or DFT
+        divVector.resize(numInnerShapeFunctions,numDofs,0); // size of div Vector?
+        // create matrix using inner dofs and invert
+
+        BaseType::interpolation_(element, shapeFunctionSet, divVector)
+
+        // begin loop over triangles
+        for (const typename BaseType::ElementSeedType &entitySeed : entitySeeds[agglomerate])
+        {
+          const typename BaseType::ElementType &element = BaseType::gridPart().entity(entitySeed);
+          auto vemBasisFunction = BaseType::scalarBasisFunctionSet(element);
+          const auto geometry = element.geometry();
+
+          const auto &shapeFunctionSet = BaseType::basisSets_.basisFunctionSet(BaseType::agglomeration(), element);
+
+          // Compute element part for the RHS constraints using div projection
+          typename BaseType::Quadrature0Type quadrature(element, 2 * polOrder + 1);
+          for (std::size_t qp = 0; qp < quadrature.nop(); ++qp)
+          {
+            const DomainFieldType weight = geometry.integrationElement(quadrature.point(qp)) * quadrature.weight(qp);
+            // vemBasisFunction.jacobianAll(quadrature[qp], psi1Values);
+            shapeFunctionSet.scalarEach(quadrature[qp], [&](std::size_t alpha, RangeFieldType m) {
+              shapeFunctionSet.evaluateEach(x, [&](std::size_t beta,
+                        typename BaseType::BasisSetsType::ShapeFunctionSetType::RangeType phi) {
+                if (alpha < numConstraintShapeFunctions)
+                {
+                  for (std::size_t s=0; s<numDofs; ++s)
+                    RHSconstraintsMatrix[alpha][s] -= weight * divVector[beta][alpha] * phi * m;
+                }
+              });
+            });
+          } // quadrature loop
+        } // loop over triangles in agglomerate
+
+      }
     };
 
     //////////////////////////////////////////////////////////////////////////////

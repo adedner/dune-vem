@@ -227,7 +227,7 @@ namespace Dune
 
       virtual void finalize(const Std::vector<Std::vector<ElementSeedType> > &entitySeeds, unsigned int agglomerate)
       {}
-      virtual void constraintRHS(const Std::vector<Std::vector<ElementSeedType> > &entitySeeds, unsigned int agglomerate)
+      virtual void fixconstraintRHS(const Std::vector<Std::vector<ElementSeedType> > &entitySeeds, unsigned int agglomerate)
       {}
       void buildProjections(const Std::vector<Std::vector<ElementSeedType> > &entitySeeds,
                             unsigned int start, unsigned int end);
@@ -298,7 +298,7 @@ namespace Dune
       constraintValueProj.resize(numConstraintShapeFunctions, numShapeFunctions, 0);
       // right hand sides and solvers for CLS for value projection (b: ls, d: constraints)
       Dune::DynamicVector<DomainFieldType> b;
-      DynamicMatrix<DomainFieldType> RHSconstraints;
+      DynamicMatrix<DomainFieldType> RHSconstraintsMatrix;
 
       // matrices for edge projections
       Std::vector<Dune::DynamicMatrix<double> > edgePhiVector(2);
@@ -356,7 +356,7 @@ namespace Dune
         // value projection CLS
         constraintValueProj = 0;
         D.resize(numDofs, numShapeFunctions, 0);
-        RHSconstraints.resize(numDofs, numConstraintShapeFunctions, 0);
+        RHSconstraintsMatrix.resize(numDofs, numConstraintShapeFunctions, 0);
         b.resize(numDofs, 0);
 
         // rhs structures for gradient/hessian projection
@@ -380,6 +380,9 @@ namespace Dune
           const auto &shapeFunctionSet = basisSets_.basisFunctionSet(agglomeration(), element);
 
           interpolation_.interpolateBasis(element, shapeFunctionSet.valueBasisSet(), D);
+
+          // calculate RHS constraint vector for CLS
+          fixconstraintRHS(entitySeeds, agglomerate, D, RHSconstraintsMatrix);
 
           // compute mass matrices
           for (std::size_t qp = 0; qp < quadrature.nop(); ++qp)
@@ -463,15 +466,15 @@ namespace Dune
             // set up vectors b (rhs for least squares)
             b[ beta ] = 1;
 
-            // set up vector RHSconstraints[beta] beta for each dof
-            interpolation_.valueL2constraints(beta, H0, D, RHSconstraints[beta]);
+            // set up vector RHSconstraintsMatrix[beta] beta for each dof
+            interpolation_.valueL2constraints(beta, H0, D, RHSconstraintsMatrix[beta]);
 
             // if( beta >= numDofs - numConstraintShapeFunctions )
               // assert( std::abs( d[ beta - numDofs + numConstraintShapeFunctions ] - H0 ) < 1e-13);
 
             // compite CLS solution and store in right column of 'valueProjection'
             auto colValueProjection = vectorizeMatrixCol( valueProjection, beta );
-            colValueProjection = leastSquaresMinimizer.solve(b, RHSconstraints[beta]);
+            colValueProjection = leastSquaresMinimizer.solve(b, RHSconstraintsMatrix[beta]);
 
             b[beta] = 0;
           }
@@ -496,12 +499,12 @@ namespace Dune
           }
           for (std::size_t beta = 0; beta < numDofs; ++beta )
           {
-            interpolation_.valueL2constraints(beta, H0, D, RHSconstraints[beta]);
+            interpolation_.valueL2constraints(beta, H0, D, RHSconstraintsMatrix[beta]);
             for (std::size_t alpha = 0; alpha < numShapeFunctions; ++alpha)
             {
               valueProjection[alpha][beta] = 0;
               for (std::size_t i = 0; i < constraintValueProj.cols(); ++i)
-                valueProjection[alpha][beta] += constraintValueProj[alpha][i] * RHSconstraints[i][beta];
+                valueProjection[alpha][beta] += constraintValueProj[alpha][i] * RHSconstraintsMatrix[i][beta];
             }
           }
         }
