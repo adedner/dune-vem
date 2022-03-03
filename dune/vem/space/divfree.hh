@@ -594,6 +594,49 @@ namespace Dune
 
           const auto &shapeFunctionSet = BaseType::basisSets_.basisFunctionSet(BaseType::agglomeration(), element);
 
+          // compute the boundary terms for the constraint RHS
+          for (const auto &intersection : intersections(BaseType::gridPart(), element))
+          {
+            // ignore edges inside the given polygon
+            if (!intersection.boundary() && (BaseType::agglomeration().index(intersection.outside()) == agglomerate))
+              continue;
+            assert(intersection.conforming());
+
+            const typename BaseType::BasisSetsType::EdgeShapeFunctionSetType edgeShapeFunctionSet
+                  = BaseType::basisSets_.edgeBasisFunctionSet(BaseType::agglomeration(), intersection);
+
+            Std::vector<Std::vector<unsigned int>> mask(2,Std::vector<unsigned int>(0)); // contains indices with Phi_mask[i] is attached to given edge
+            edgePhiVector[0] = 0;
+            edgePhiVector[1] = 0;
+
+            BaseType::interpolation_(intersection, edgeShapeFunctionSet, edgePhiVector, mask);
+
+            auto normal = intersection.centerUnitOuterNormal();
+
+            // now compute int_e Phi^e m_alpha
+            typename BaseType::Quadrature1Type quadrature(BaseType::gridPart(), intersection, 2 * polOrder + 1, BaseType::Quadrature1Type::INSIDE);
+            for (std::size_t qp = 0; qp < quadrature.nop(); ++qp)
+            {
+              auto x = quadrature.localPoint(qp);
+              auto y = intersection.geometryInInside().global(x);
+              const DomainFieldType weight = intersection.geometry().integrationElement(x) * quadrature.weight(qp);
+              shapeFunctionSet.scalarEach(y, [&](std::size_t alpha, RangeFieldType m)
+              {
+                // restrict to correct m_alpha up to P_{l-1}
+                if (alpha < numConstraintShapeFunctions)
+                {
+                  edgeShapeFunctionSet.evaluateEach(x, [&](std::size_t beta,
+                        typename BaseType::BasisSetsType::EdgeShapeFunctionSetType::RangeType psi)
+                  {
+                    for (std::size_t s=0; s<mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
+                      for (std::size_t i=0;i<dimDomain;++i)
+                        RHSconstraintsMatrix[alpha][s] += weight * edgePhiVector[0][beta][s] * psi[i] * normal[i] * m;
+                  });
+                }
+              });
+            } // quadrature loop
+          } // loop over intersections
+
           // Compute element part for the RHS constraints using div projection
           typename BaseType::Quadrature0Type quadrature(element, 2 * polOrder + 1);
           for (std::size_t qp = 0; qp < quadrature.nop(); ++qp)
