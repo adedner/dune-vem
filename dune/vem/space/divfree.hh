@@ -484,7 +484,7 @@ namespace Dune
                 if (alpha < numConstraintShapeFunctions)
                 {
                   for (std::size_t s=0; s<numDofs; ++s)
-                    RHSconstraintsMatrix[alpha][s] -= weight * divVector[beta][alpha] * phi * m;
+                    RHSconstraintsMatrix[alpha][s] -= weight * divVector[s][alpha] * phi * m;
                 }
               });
             });
@@ -751,6 +751,57 @@ namespace Dune
           {
             std::cout << "Interpolation: localDofVectorMatrix[0].invert() failed!\n";
             const auto &M = localDofVectorMatrix[0];
+            for (std::size_t alpha=0;alpha<M.size();++alpha)
+            {
+              for (std::size_t beta=0;beta<M[alpha].size();++beta)
+                std::cout << M[alpha][beta] << " ";
+              std::cout << std::endl;
+            }
+            assert(0);
+            throw FMatrixError();
+          }
+        }
+      }
+
+      // interpolate divergence projection using inner dofs
+      template< class BasisFunctionSet >
+      void operator() (const ElementType &element,
+                       const BasisFunctionSet &basisFunctionSet, Dune::DynamicMatrix<double> &localDofMatrix) const
+      {
+        const auto &edgeBFS = basisSets_.edgeBasisFunctionSet( indexSet_.agglomeration(), intersection );
+
+        std::size_t entry(0);
+
+        auto inner = [&] (int poly,int i,int k,int numDofs)
+        {
+          InnerQuadratureType innerQuad( element, 2*polOrder_ );
+          for (unsigned int qp=0; qp<innerQuad.nop(); ++qp)
+          {
+            auto y = innerQuad.point(qp);
+            // check if volume needed here
+            double weight = innerQuad.weight(qp) * element.geometry().integrationElement(y)
+                                                 / std::sqrt(indexSet_.volume(poly));
+            basisFunctionSet.evaluateEach( innerQuad[qp], [ & ] ( std::size_t beta, typename BasisFunctionSetType::RangeType value ) {
+                innerShapeFunctionSet.evaluateEach( x, [&](std::size_t alpha, typename RangeType phi ) {
+                    assert( entry+alpha < localDofMatrix.size() );
+                    localDofMatrix[ entry+alpha ][ beta ] += value*phi * weight;
+                  });
+              }
+            );
+          }
+          entry += innerShapeFunctionSet.size();
+        };
+
+        if (localDofMatrix.size() > 0)
+        {
+          try
+          {
+            localDofMatrix.invert();
+          }
+          catch (const FMatrixError&)
+          {
+            std::cout << "Interpolation: localDofMatrix.invert() failed!\n";
+            const auto &M = localDofMatrix;
             for (std::size_t alpha=0;alpha<M.size();++alpha)
             {
               for (std::size_t beta=0;beta<M[alpha].size();++beta)
