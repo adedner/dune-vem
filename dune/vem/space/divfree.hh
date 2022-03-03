@@ -415,10 +415,9 @@ namespace Dune
 
         // set up matrix to store div projection
         DynamicMatrix<double> divVector; // double or DFT
-        divVector.resize(numInnerShapeFunctions,numDofs,0); // size of div Vector?
+        divVector.resize(numInnerShapeFunctions,numShapeFunctions,0); // size of div Vector?
         // create matrix using inner dofs and invert
 
-        BaseType::interpolation_(element, shapeFunctionSet, divVector)
 
         // begin loop over triangles
         for (const typename BaseType::ElementSeedType &entitySeed : entitySeeds[agglomerate])
@@ -428,6 +427,8 @@ namespace Dune
           const auto geometry = element.geometry();
 
           const auto &shapeFunctionSet = BaseType::basisSets_.basisFunctionSet(BaseType::agglomeration(), element);
+          // interpolate divVector
+          BaseType::interpolation_(element, shapeFunctionSet, divVector)
 
           // compute the boundary terms for the constraint RHS
           for (const auto &intersection : intersections(BaseType::gridPart(), element))
@@ -770,7 +771,8 @@ namespace Dune
       {
         const auto &edgeBFS = basisSets_.edgeBasisFunctionSet( indexSet_.agglomeration(), intersection );
 
-        std::size_t entry(0);
+        std::size_t entry;
+        entry = 0;
 
         auto inner = [&] (int poly,int i,int k,int numDofs)
         {
@@ -784,6 +786,7 @@ namespace Dune
             basisFunctionSet.evaluateEach( innerQuad[qp], [ & ] ( std::size_t beta, typename BasisFunctionSetType::RangeType value ) {
                 innerShapeFunctionSet.evaluateEach( x, [&](std::size_t alpha, typename RangeType phi ) {
                     assert( entry+alpha < localDofMatrix.size() );
+                    // change to g_{k-2} here?
                     localDofMatrix[ entry+alpha ][ beta ] += value*phi * weight;
                   });
               }
