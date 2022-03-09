@@ -106,6 +106,15 @@ namespace Dune
               functor(alpha-1, phi[0]);
           });
         }
+        // template< class Point, class Functor >
+        // void scalarTestEach ( const Point &x, Functor functor ) const
+        // {
+        //   sfs_.evaluateEach(x, [&](std::size_t alpha, ScalarRangeType phi)
+        //   {
+        //     if (alpha<numConstraintShapeFunctions-numInnerShapeFunctions_)
+        //       functor(alpha-1, phi[0]);
+        //   });
+        // }
         template< class Point, class Functor >
         void evaluateEach ( const Point &x, Functor functor ) const
         {
@@ -295,8 +304,8 @@ namespace Dune
       }
       int constraintSize() const
       {
-        return numInnerShapeFunctions_;
-        // return numValueShapeFunctions_;
+        // return numInnerShapeFunctions_;
+        return numValueShapeFunctions_;
       }
       int innerSize() const
       {
@@ -424,6 +433,14 @@ namespace Dune
         const std::size_t numShapeFunctions = BaseType::basisSets_.size(0);
         const std::size_t numDofs = BaseType::blockMapper().numDofs(agglomerate) * blockSize;
         int polOrder = BaseType::order();
+        const std::size_t numConstraintShapeFunctions = BaseType::basisSets_.constraintSize();
+
+        // std::cout << "constraint size " << numConstraintShapeFunctions << std::endl;
+
+        RHSconstraintsMatrix.resize(numDofs, numConstraintShapeFunctions, 0);
+
+        // for (std::size_t beta = 0; beta < numDofs ; ++beta)
+          // RHSconstraintsMatrix[beta].resize(numConstraintShapeFunctions);
 
         // matrices for edge projections
         Std::vector<Dune::DynamicMatrix<double> > edgePhiVector(2);
@@ -464,36 +481,23 @@ namespace Dune
               auto x = quadrature.localPoint(qp);
               auto y = intersection.geometryInInside().global(x);
               const DomainFieldType weight = intersection.geometry().integrationElement(x) * quadrature.weight(qp);
+              // need to call shape set scalar each for the correct test functions
               shapeFunctionSet.scalarEach(y, [&](std::size_t alpha, RangeFieldType m)
               {
                 edgeShapeFunctionSet.evaluateEach(x, [&](std::size_t beta,
                       typename BaseType::BasisSetsType::EdgeShapeFunctionSetType::RangeType psi)
                 {
-                  // for (std::size_t s=0; s<mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
-                  //   for (std::size_t i=0;i<dimDomain;++i)
-                  //     RHSconstraintsMatrix[alpha][mask[0][s]] += weight * edgePhiVector[0][beta][s] * psi[i] * normal[i] * m;
+                  for (std::size_t s=0; s<mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
+                    for (std::size_t i=0;i<dimDomain;++i)
+                    {
+                      // std::cout << "mask size " << mask[0].size() << std::endl;
+                      RHSconstraintsMatrix[mask[0][s]][alpha] += weight * edgePhiVector[0][beta][s] * psi[i] * normal[i] * m;
+                    }
                 });
               });
             } // quadrature loop
           } // loop over intersections
 
-          // Compute element part for the value projection
-          typename BaseType::Quadrature0Type quadrature(element, 2 * polOrder + 1);
-          for (std::size_t qp = 0; qp < quadrature.nop(); ++qp)
-          {
-            const DomainFieldType weight = geometry.integrationElement(quadrature.point(qp)) * quadrature.weight(qp);
-            // vemBasisFunction.jacobianAll(quadrature[qp], psi1Values);
-            shapeFunctionSet.scalarEach(quadrature[qp], [&](std::size_t alpha, RangeFieldType m)
-            {
-              for (std::size_t s=0; s<numDofs; ++s)
-              {
-                // RangeFieldType div = 0;
-                // for (std::size_t i=0;i<dimDomain;++i)
-                //   div += psi1Values[s][i][i];
-                // R[alpha][s] -= weight * div * m;
-              }
-            });
-          } // quadrature loop
         } // loop over triangles in agglomerate
 
       }
