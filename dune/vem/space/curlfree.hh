@@ -112,7 +112,7 @@ namespace Dune
           sfs_.evaluateEach(x, [&](std::size_t alpha, ScalarRangeType phi)
           {
             if (alpha>numInnerShapeFunctions_)
-              functor(alpha-numInnerShapeFunctions_, phi[0]);
+              functor(alpha-1-numInnerShapeFunctions_, phi[0]);
           });
         }
         template< class Point, class Functor >
@@ -420,7 +420,6 @@ namespace Dune
         /// Fix RHS constraints for value projection /////////////////////////////
         //////////////////////////////////////////////////////////////////////////
 
-        auto &valueProjection = BaseType::valueProjections()[agglomerate];
         typedef typename BaseType::BasisSetsType::EdgeShapeFunctionSetType EdgeTestSpace;
         typedef typename FunctionSpaceType::DomainType DomainType;
         typedef typename FunctionSpaceType::RangeFieldType RangeFieldType;
@@ -451,7 +450,6 @@ namespace Dune
         for (const typename BaseType::ElementSeedType &entitySeed : entitySeeds[agglomerate])
         {
           const typename BaseType::ElementType &element = BaseType::gridPart().entity(entitySeed);
-          auto vemBasisFunction = BaseType::scalarBasisFunctionSet(element);
           const auto geometry = element.geometry();
 
           const auto &shapeFunctionSet = BaseType::basisSets_.basisFunctionSet(BaseType::agglomeration(), element);
@@ -491,19 +489,14 @@ namespace Dune
                   // if ( alpha > numInnerShapeFunctions )
                   {
                     for (std::size_t s=0; s<mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
-                      for (std::size_t i=0;i<dimDomain;++i)
-                      {
                         // put into correct offset place in constraint RHS matrix
-                        RHSconstraintsMatrix[mask[0][s]][numInnerShapeFunctions + alpha -1] += weight * edgePhiVector[0][beta][s] * psi[i] * normal[i] * m;
-                      }
+                        RHSconstraintsMatrix[mask[0][s]][numInnerShapeFunctions + alpha] += weight * edgePhiVector[0][beta][s] * psi*normal * m;
                   }
                 });
               });
             } // quadrature loop
           } // loop over intersections
-
         } // loop over triangles in agglomerate
-
       }
     };
 
@@ -608,6 +601,7 @@ namespace Dune
           // else
             // d[ alpha ] = 0;
         }
+        return;
         // here we are using that
         // 1. div u in P_{l-1}
         // 2. the basis functions are ONB

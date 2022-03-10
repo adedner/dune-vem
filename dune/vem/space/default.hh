@@ -357,6 +357,9 @@ namespace Dune
         constraintValueProj = 0;
         D.resize(numDofs, numShapeFunctions, 0);
         RHSconstraintsMatrix.resize(numDofs, numConstraintShapeFunctions, 0);
+        // calculate RHS constraint vector for CLS
+        fixconstraintRHS(entitySeeds, agglomerate, RHSconstraintsMatrix);
+
         // std::cout << "numConstraintShapeFunctions " << numConstraintShapeFunctions << std::endl;
         b.resize(numDofs, 0);
 
@@ -381,9 +384,6 @@ namespace Dune
           const auto &shapeFunctionSet = basisSets_.basisFunctionSet(agglomeration(), element);
 
           interpolation_.interpolateBasis(element, shapeFunctionSet.valueBasisSet(), D);
-
-          // calculate RHS constraint vector for CLS
-          fixconstraintRHS(entitySeeds, agglomerate, RHSconstraintsMatrix);
 
           // compute mass matrices
           for (std::size_t qp = 0; qp < quadrature.nop(); ++qp)
@@ -511,7 +511,7 @@ namespace Dune
             }
           }
         }
-// #if 0
+#if 0
         std::cout << "*******************************\n";
         std::cout << "** RHS constraints 1        **\n";
         std::cout << "*******************************\n";
@@ -525,7 +525,7 @@ namespace Dune
           std::cout << std::endl;
         }
         std::cout << "*******************************\n";
-// #endif
+#endif
 
 
         //////////////////////////////////////////////////////////////////////////
