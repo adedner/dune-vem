@@ -488,16 +488,15 @@ namespace Dune
                 edgeShapeFunctionSet.evaluateEach(x, [&](std::size_t beta,
                       typename BaseType::BasisSetsType::EdgeShapeFunctionSetType::RangeType psi)
                 {
-                  for (std::size_t s=0; s<mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
-                    for (std::size_t i=0;i<dimDomain;++i)
-                    {
-                      // if (numInnerShapeFunctions < alpha)
-                      // {
-                        // std::cout << "numInnerShapeFunctions + alpha " << numInnerShapeFunctions + alpha << std::endl;
+                  // if ( alpha > numInnerShapeFunctions )
+                  {
+                    for (std::size_t s=0; s<mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
+                      for (std::size_t i=0;i<dimDomain;++i)
+                      {
                         // put into correct offset place in constraint RHS matrix
-                        RHSconstraintsMatrix[mask[0][s]][alpha] += weight * edgePhiVector[0][beta][s] * psi[i] * normal[i] * m;
-                      // }
-                    }
+                        RHSconstraintsMatrix[mask[0][s]][numInnerShapeFunctions + alpha -1] += weight * edgePhiVector[0][beta][s] * psi[i] * normal[i] * m;
+                      }
+                  }
                 });
               });
             } // quadrature loop
@@ -619,7 +618,7 @@ namespace Dune
         //       = |e| if beta,alpha,e match
         for (int alpha=numInnerShapeFunctions; alpha<numConstrainedShapeFunctions; ++alpha)
         {
-          if( beta - numDofs + numInnerShapeFunctions == alpha )
+          if( beta - numDofs + numConstrainedShapeFunctions == alpha )
           {
             d[ alpha ] += std::sqrt(volume);
           }

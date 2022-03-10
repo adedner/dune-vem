@@ -227,7 +227,7 @@ namespace Dune
 
       virtual void finalize(const Std::vector<Std::vector<ElementSeedType> > &entitySeeds, unsigned int agglomerate)
       {}
-      virtual void fixconstraintRHS(const Std::vector<Std::vector<ElementSeedType> > &entitySeeds, unsigned int agglomerate)
+      virtual void fixconstraintRHS(const Std::vector<Std::vector<ElementSeedType> > &entitySeeds, unsigned int agglomerate, DynamicMatrix<DomainFieldType> &RHSconstraintsMatrix)
       {}
       void buildProjections(const Std::vector<Std::vector<ElementSeedType> > &entitySeeds,
                             unsigned int start, unsigned int end);
@@ -357,6 +357,7 @@ namespace Dune
         constraintValueProj = 0;
         D.resize(numDofs, numShapeFunctions, 0);
         RHSconstraintsMatrix.resize(numDofs, numConstraintShapeFunctions, 0);
+        // std::cout << "numConstraintShapeFunctions " << numConstraintShapeFunctions << std::endl;
         b.resize(numDofs, 0);
 
         // rhs structures for gradient/hessian projection
@@ -382,7 +383,7 @@ namespace Dune
           interpolation_.interpolateBasis(element, shapeFunctionSet.valueBasisSet(), D);
 
           // calculate RHS constraint vector for CLS
-          fixconstraintRHS(entitySeeds, agglomerate, D, RHSconstraintsMatrix);
+          fixconstraintRHS(entitySeeds, agglomerate, RHSconstraintsMatrix);
 
           // compute mass matrices
           for (std::size_t qp = 0; qp < quadrature.nop(); ++qp)
@@ -504,25 +505,27 @@ namespace Dune
             {
               valueProjection[alpha][beta] = 0;
               for (std::size_t i = 0; i < constraintValueProj.cols(); ++i)
-                valueProjection[alpha][beta] += constraintValueProj[alpha][i] * RHSconstraintsMatrix[i][beta];
+              {
+                valueProjection[alpha][beta] += constraintValueProj[alpha][i] * RHSconstraintsMatrix[beta][i];
+              }
             }
           }
         }
-#if 0
+// #if 0
         std::cout << "*******************************\n";
-        std::cout << "** Value Projection 1        **\n";
+        std::cout << "** RHS constraints 1        **\n";
         std::cout << "*******************************\n";
         for (std::size_t beta = 0; beta < numDofs; ++beta )
         {
           std::cout << "phi_" << beta << " = ";
-          for (std::size_t alpha = 0; alpha < numShapeFunctions; ++alpha)
+          for (std::size_t alpha = 0; alpha < numConstraintShapeFunctions; ++alpha)
           {
-            std::cout << valueProjection[alpha][beta] << " ";
+            std::cout << RHSconstraintsMatrix[beta][alpha] << " ";
           }
           std::cout << std::endl;
         }
         std::cout << "*******************************\n";
-#endif
+// #endif
 
 
         //////////////////////////////////////////////////////////////////////////
