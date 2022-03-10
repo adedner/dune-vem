@@ -106,15 +106,15 @@ namespace Dune
               functor(alpha-1, phi[0]);
           });
         }
-        // template< class Point, class Functor >
-        // void scalarTestEach ( const Point &x, Functor functor ) const
-        // {
-        //   sfs_.evaluateEach(x, [&](std::size_t alpha, ScalarRangeType phi)
-        //   {
-        //     if (alpha<numConstraintShapeFunctions-numInnerShapeFunctions_)
-        //       functor(alpha-1, phi[0]);
-        //   });
-        // }
+        template< class Point, class Functor >
+        void scalarEachInner ( const Point &x, Functor functor ) const
+        {
+          sfs_.evaluateEach(x, [&](std::size_t alpha, ScalarRangeType phi)
+          {
+            if (alpha>numInnerShapeFunctions_)
+              functor(alpha-numInnerShapeFunctions_, phi[0]);
+          });
+        }
         template< class Point, class Functor >
         void evaluateEach ( const Point &x, Functor functor ) const
         {
@@ -434,10 +434,11 @@ namespace Dune
         const std::size_t numDofs = BaseType::blockMapper().numDofs(agglomerate) * blockSize;
         int polOrder = BaseType::order();
         const std::size_t numConstraintShapeFunctions = BaseType::basisSets_.constraintSize();
+        const std::size_t numInnerShapeFunctions = BaseType::basisSets_.innerSize();
 
         // std::cout << "constraint size " << numConstraintShapeFunctions << std::endl;
 
-        RHSconstraintsMatrix.resize(numDofs, numConstraintShapeFunctions, 0);
+        // RHSconstraintsMatrix.resize(numDofs, numConstraintShapeFunctions, 0);
 
         // for (std::size_t beta = 0; beta < numDofs ; ++beta)
           // RHSconstraintsMatrix[beta].resize(numConstraintShapeFunctions);
@@ -482,7 +483,7 @@ namespace Dune
               auto y = intersection.geometryInInside().global(x);
               const DomainFieldType weight = intersection.geometry().integrationElement(x) * quadrature.weight(qp);
               // need to call shape set scalar each for the correct test functions
-              shapeFunctionSet.scalarEach(y, [&](std::size_t alpha, RangeFieldType m)
+              shapeFunctionSet.scalarEachInner(y, [&](std::size_t alpha, RangeFieldType m)
               {
                 edgeShapeFunctionSet.evaluateEach(x, [&](std::size_t beta,
                       typename BaseType::BasisSetsType::EdgeShapeFunctionSetType::RangeType psi)
@@ -490,8 +491,12 @@ namespace Dune
                   for (std::size_t s=0; s<mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
                     for (std::size_t i=0;i<dimDomain;++i)
                     {
-                      // std::cout << "mask size " << mask[0].size() << std::endl;
-                      RHSconstraintsMatrix[mask[0][s]][alpha] += weight * edgePhiVector[0][beta][s] * psi[i] * normal[i] * m;
+                      // if (numInnerShapeFunctions < alpha)
+                      // {
+                        // std::cout << "numInnerShapeFunctions + alpha " << numInnerShapeFunctions + alpha << std::endl;
+                        // put into correct offset place in constraint RHS matrix
+                        RHSconstraintsMatrix[mask[0][s]][alpha] += weight * edgePhiVector[0][beta][s] * psi[i] * normal[i] * m;
+                      // }
                     }
                 });
               });
@@ -584,7 +589,7 @@ namespace Dune
       // beta: current basis function phi_beta for which to setup CLS
       // volune: volume of current polygon
       // D:    Lambda(B) matrix (numDofs x numShapeFunctions)
-      // d:    right hand side vector (numInnerShapeFunctions)
+      // d:    right hand side vector (numConstrainedShapeFunctions)
       template <class DomainFieldType>
       void valueL2constraints(unsigned int beta, double volume,
                               Dune::DynamicMatrix<DomainFieldType> &D,
@@ -596,12 +601,13 @@ namespace Dune
         assert( numInnerShapeFunctions <= numConstrainedShapeFunctions );
         if (numConstrainedShapeFunctions == 0) return;
         unsigned int numDofs = D.rows();
+        // assert(d.size() == numInnerShapeFunctions)
         for (int alpha=0; alpha<numInnerShapeFunctions; ++alpha)
         {
-          if( beta - numDofs + numConstrainedShapeFunctions == alpha )
-            d[ alpha ] = std::sqrt(volume);
-          else
-            d[ alpha ] = 0;
+          if( beta - numDofs + numInnerShapeFunctions == alpha )
+            d[ alpha ] += std::sqrt(volume);
+          // else
+            // d[ alpha ] = 0;
         }
         // here we are using that
         // 1. div u in P_{l-1}
@@ -613,12 +619,12 @@ namespace Dune
         //       = |e| if beta,alpha,e match
         for (int alpha=numInnerShapeFunctions; alpha<numConstrainedShapeFunctions; ++alpha)
         {
-          if( beta - numDofs + numConstrainedShapeFunctions == alpha )
+          if( beta - numDofs + numInnerShapeFunctions == alpha )
           {
-            d[ alpha ] = std::sqrt(volume);
+            d[ alpha ] += std::sqrt(volume);
           }
-          else
-            d[ alpha ] = 0;
+          // else
+            // d[ alpha ] = 0;
         }
       }
 
