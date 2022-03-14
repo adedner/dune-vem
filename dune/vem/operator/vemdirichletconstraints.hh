@@ -3,6 +3,11 @@
 
 #include <dune/fem/function/common/scalarproducts.hh>
 #include <dune/fem/schemes/dirichletconstraints.hh>
+#include <dune/fem/operator/common/temporarylocalmatrix.hh>
+#include <dune/fem/function/localfunction/const.hh>
+#include <dune/fem/function/localfunction/mutable.hh>
+#include <dune/fem/common/bindguard.hh>
+
 // #include <dune/vem/space/interpolation.hh>
 #include <dune/vem/misc/vector.hh>
 
@@ -95,8 +100,14 @@ namespace Dune {
     {
       BaseType::updateDirichletDofs();
       if( BaseType::hasDirichletDofs_ )
+      {
+        Dune::Fem::MutableLocalFunction< DiscreteFunctionType > wLocal( w );
         for( const EntityType &entity : space_ )
-          dirichletDofTreatment( w.localFunction( entity ) );
+        {
+          auto wGuard = Dune::Fem::bindGuard( wLocal, entity );
+          dirichletDofTreatment( wLocal );
+        }
+      }
     }
     template < class DiscreteFunctionType >
     void operator ()( const DiscreteFunctionType &u,
@@ -107,25 +118,48 @@ namespace Dune {
 
       BaseType::updateDirichletDofs();
       if( BaseType::hasDirichletDofs_ )
+      {
+        Dune::Fem::ConstLocalFunction< DiscreteFunctionType > uLocal( u );
+        Dune::Fem::MutableLocalFunction< DiscreteFunctionType > wLocal( w );
         for( const auto &entity : space_ )
-          dirichletDofTreatment( u.localFunction(entity), w.localFunction(entity), op );
+        {
+          auto uGuard = Dune::Fem::bindGuard( uLocal, entity );
+          auto wGuard = Dune::Fem::bindGuard( wLocal, entity );
+          dirichletDofTreatment( uLocal, wLocal, op );
+        }
+      }
     }
     template <class LinearOperator>
     void applyToOperator( LinearOperator& linearOperator ) const
     {
       BaseType::updateDirichletDofs();
       if( BaseType::hasDirichletDofs_ )
-        for( const auto &entity : space_ )
-          dirichletDofsCorrectOnEntity( linearOperator.localMatrix(entity,entity) );
+      {
+        typedef typename LinearOperator::DomainSpaceType  DomainSpaceType;
+        typedef typename LinearOperator::RangeSpaceType   RangeSpaceType;
+        typedef Dune::Fem::TemporaryLocalMatrix< DomainSpaceType, RangeSpaceType > TemporaryLocalMatrixType;
+        TemporaryLocalMatrixType localMatrix( linearOperator.domainSpace(), linearOperator.rangeSpace() );
 
+        for( const auto &entity : space_ )
+        {
+          // init localMatrix to entity
+          localMatrix.init( entity, entity );
+          // obtain local matrix values
+          linearOperator.getLocalMatrix( entity, entity, localMatrix );
+          // adjust local matrix
+          dirichletDofsCorrectOnEntity( localMatrix );
+          // write back changed local matrix to linear operator
+          linearOperator.setLocalMatrix( entity, entity, localMatrix );
+        }
+      }
     }
 
   protected:
     template< class LocalLinearOperator >
-    void dirichletDofsCorrectOnEntity ( LocalLinearOperator &&localMatrix ) const
+    void dirichletDofsCorrectOnEntity ( LocalLinearOperator &localMatrix ) const
     {
       const EntityType &entity = localMatrix.rangeEntity();
-      const auto &slaveDofs = localMatrix.rangeSpace().slaveDofs();
+      const auto &auxiliaryDofs = localMatrix.rangeSpace().auxiliaryDofs();
 
       // get number of basis functions
       const int localBlocks = space_.blockMapper().numDofs( entity );
@@ -152,7 +186,7 @@ namespace Dune {
             localMatrix.clearRow( localDof );
 
             // set diagonal to 1
-            double value = slaveDofs.isSlave( global )? 0.0 : 1.0;
+            double value = auxiliaryDofs.contains( global )? 0.0 : 1.0;
             localMatrix.set( localDof, localDof, value );
           }
         }
@@ -160,10 +194,10 @@ namespace Dune {
     }
     //! set the dirichlet points to exact values
     template< class LocalFunctionType >
-    void dirichletDofTreatment( LocalFunctionType &&wLocal ) const
+    void dirichletDofTreatment( LocalFunctionType &wLocal ) const
     {
       // get entity
-      const typename LocalFunctionType::EntityType &entity = wLocal.entity();
+      const auto &entity = wLocal.entity();
       model_.init(entity);
 
       // get number of Lagrange Points
@@ -195,12 +229,12 @@ namespace Dune {
           }
       }
     }
-    template< class LocalFunctionType >
+    template< class LocalFunctionType, class LocalContributionType >
     void dirichletDofTreatment( const LocalFunctionType &uLocal,
-                                LocalFunctionType &&wLocal, Operation op ) const
+                                LocalContributionType &wLocal, Operation op ) const
     {
       // get entity
-      const typename LocalFunctionType::EntityType &entity = wLocal.entity();
+      const auto &entity = wLocal.entity();
       if (op == Operation::sub)
         model_.init(entity);
 

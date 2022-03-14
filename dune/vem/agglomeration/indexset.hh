@@ -33,7 +33,8 @@ namespace Dune
 
       typedef Agglomeration< GridPartType > AgglomerationType;
 
-      typedef typename Allocator::template rebind< std::size_t >::other AllocatorType;
+      typedef typename std::allocator_traits<Allocator>::template
+              rebind_alloc< std::size_t > AllocatorType;
 
       static const int dimension = GridPartType::dimension;
 
@@ -230,7 +231,7 @@ namespace Dune
         if( connectivity_[ 0 ] )
         {
           for( auto p = connectivity_[ 0 ]; p != connectivity_[ dimension ]; ++p )
-            allocator().destroy( p );
+            std::allocator_traits<AllocatorType>::destroy(allocator(),p);
           allocator().deallocate( connectivity_[ 0 ], connectivity_[ dimension ] - connectivity_[ 0 ] );
         }
       }
@@ -267,10 +268,12 @@ namespace Dune
         {
           connectivity_[ dim+1 ] = connectivity_[ dim ];
           for( std::size_t index : connectivity[ dim ] )
-            allocator().construct( connectivity_[ dim+1 ]++, index );
+            std::allocator_traits<AllocatorType>::construct(allocator(),
+                           connectivity_[ dim+1 ]++, index );
         }
       }
-      std::array< typename AllocatorType::pointer, dimension+1 > connectivity_;
+      std::array< typename std::allocator_traits<AllocatorType>::pointer,
+                  dimension+1 > connectivity_;
     };
 
 
