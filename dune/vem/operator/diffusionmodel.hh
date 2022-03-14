@@ -444,12 +444,12 @@ namespace Dune
         virtual bool isDirichletIntersection( const IntersectionType& inter, DirichletComponentType &dirichletComponent ) override { return impl().isDirichletIntersection(inter,dirichletComponent); }
         virtual void dirichlet( int bndId, const DomainType &x,RRangeType &value) const override { impl().dirichlet(bndId,x,value); }
 
-        virtual RRangeType hessStabilization ( const DomainType &x, const DRangeType &u ) const { return impl().hessStabilization(x,u); }
-        virtual RRangeType linHessStabilization ( const DomainType &x, const DRangeType &u ) const { return impl().linHessStabilization(x,u); }
-        virtual RRangeType gradStabilization ( const DomainType &x, const DRangeType &u ) const { return impl().gradStabilization(x,u); }
-        virtual RRangeType linGradStabilization ( const DomainType &x, const DRangeType &u ) const { return impl().linGradStabilization(x,u); }
-        virtual RRangeType massStabilization ( const DomainType &x, const DRangeType &u ) const { return impl().massStabilization(x,u); }
-        virtual RRangeType linMassStabilization ( const DomainType &x, const DRangeType &u ) const { return impl().linMassStabilization(x,u); }
+        virtual RRangeType hessStabilization ( const DomainType &x, const DRangeType &u ) const override { return impl().hessStabilization(x,u); }
+        virtual RRangeType linHessStabilization ( const DomainType &x, const DRangeType &u ) const override { return impl().linHessStabilization(x,u); }
+        virtual RRangeType gradStabilization ( const DomainType &x, const DRangeType &u ) const override { return impl().gradStabilization(x,u); }
+        virtual RRangeType linGradStabilization ( const DomainType &x, const DRangeType &u ) const override { return impl().linGradStabilization(x,u); }
+        virtual RRangeType massStabilization ( const DomainType &x, const DRangeType &u ) const override { return impl().massStabilization(x,u); }
+        virtual RRangeType linMassStabilization ( const DomainType &x, const DRangeType &u ) const override { return impl().linMassStabilization(x,u); }
 
       private:
         const auto &impl () const { return std::cref( impl_ ).get(); }
