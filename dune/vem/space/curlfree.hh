@@ -413,8 +413,8 @@ namespace Dune
       }
 
     protected:
-      virtual void fixconstraintRHS(const Std::vector<Std::vector<typename BaseType::ElementSeedType> > &entitySeeds, unsigned int agglomerate,
-                                    Dune::DynamicMatrix<DomainFieldType> &RHSconstraintsMatrix) override
+      virtual void setupConstraintRHS(const Std::vector<Std::vector<typename BaseType::ElementSeedType> > &entitySeeds, unsigned int agglomerate,
+                                    Dune::DynamicMatrix<DomainFieldType> &RHSconstraintsMatrix, double volume) override
       {
         //////////////////////////////////////////////////////////////////////////
         /// Fix RHS constraints for value projection /////////////////////////////
@@ -435,12 +435,18 @@ namespace Dune
         const std::size_t numConstraintShapeFunctions = BaseType::basisSets_.constraintSize();
         const std::size_t numInnerShapeFunctions = BaseType::basisSets_.innerSize();
 
-        // std::cout << "constraint size " << numConstraintShapeFunctions << std::endl;
+        assert( numInnerShapeFunctions <= numConstraintShapeFunctions );
+        if (numConstraintShapeFunctions == 0) return;
 
-        // RHSconstraintsMatrix.resize(numDofs, numConstraintShapeFunctions, 0);
-
-        // for (std::size_t beta = 0; beta < numDofs ; ++beta)
-          // RHSconstraintsMatrix[beta].resize(numConstraintShapeFunctions);
+        // first fill in entries relating to inner dofs (alpha < inner shape functions)
+        for ( int beta=0; beta<numDofs; ++beta)
+        {
+          for (int alpha=0; alpha<numInnerShapeFunctions; ++alpha)
+          {
+            if( beta - numDofs + numInnerShapeFunctions == alpha )
+              RHSconstraintsMatrix[ beta ][ alpha ] += std::sqrt(volume);
+          }
+        }
 
         // matrices for edge projections
         Std::vector<Dune::DynamicMatrix<double> > edgePhiVector(2);
@@ -486,12 +492,9 @@ namespace Dune
                 edgeShapeFunctionSet.evaluateEach(x, [&](std::size_t beta,
                       typename BaseType::BasisSetsType::EdgeShapeFunctionSetType::RangeType psi)
                 {
-                  // if ( alpha > numInnerShapeFunctions )
-                  {
-                    for (std::size_t s=0; s<mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
-                        // put into correct offset place in constraint RHS matrix
-                        RHSconstraintsMatrix[mask[0][s]][numInnerShapeFunctions + alpha] += weight * edgePhiVector[0][beta][s] * psi*normal * m;
-                  }
+                  for (std::size_t s=0; s<mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
+                    // put into correct offset place in constraint RHS matrix
+                    RHSconstraintsMatrix[mask[0][s]][numInnerShapeFunctions + alpha] += weight * edgePhiVector[0][beta][s] * psi*normal * m;
                 });
               });
             } // quadrature loop
@@ -587,38 +590,6 @@ namespace Dune
                               Dune::DynamicMatrix<DomainFieldType> &D,
                               Dune::DynamicVector<DomainFieldType> &d)
       {
-        // !!!!!
-        unsigned int numConstrainedShapeFunctions = d.size();
-        unsigned int numInnerShapeFunctions = basisSets_.innerSize();
-        assert( numInnerShapeFunctions <= numConstrainedShapeFunctions );
-        if (numConstrainedShapeFunctions == 0) return;
-        unsigned int numDofs = D.rows();
-        // assert(d.size() == numInnerShapeFunctions)
-        for (int alpha=0; alpha<numInnerShapeFunctions; ++alpha)
-        {
-          if( beta - numDofs + numInnerShapeFunctions == alpha )
-            d[ alpha ] += std::sqrt(volume);
-          // else
-            // d[ alpha ] = 0;
-        }
-        return;
-        // here we are using that
-        // 1. div u in P_{l-1}
-        // 2. the basis functions are ONB
-        // -> int_E div(u) m = 0 if grad(m)=l
-        // Therefore for grad(m_alpha)=l:
-        // int_E phi_beta . grad(m_alpha) = -int_E div(phi_beta) m_alpha + sum_e int_e phi_beta.n m_alpha
-        //       = sum_e int_e phi_beta.n m_alpha = sum_e |e| lambda^e_alpha(phi_beta)
-        //       = |e| if beta,alpha,e match
-        for (int alpha=numInnerShapeFunctions; alpha<numConstrainedShapeFunctions; ++alpha)
-        {
-          if( beta - numDofs + numConstrainedShapeFunctions == alpha )
-          {
-            d[ alpha ] += std::sqrt(volume);
-          }
-          // else
-            // d[ alpha ] = 0;
-        }
       }
 
       // fill a mask vector providing the information which dofs are
