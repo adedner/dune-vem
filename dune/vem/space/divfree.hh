@@ -107,6 +107,15 @@ namespace Dune
           });
         }
         template< class Point, class Functor >
+        void scalarEachInner ( const Point &x, Functor functor ) const
+        {
+          sfs_.evaluateEach(x, [&](std::size_t alpha, ScalarRangeType phi)
+          {
+            if (alpha>numInnerShapeFunctions_)
+              functor(alpha-1-numInnerShapeFunctions_, phi[0]);
+          });
+        }
+        template< class Point, class Functor >
         void evaluateEach ( const Point &x, Functor functor ) const
         {
           sfs_.jacobianEach(x, [&](std::size_t alpha, ScalarJacobianRangeType dphi)
@@ -295,8 +304,8 @@ namespace Dune
       }
       int constraintSize() const
       {
-        return numInnerShapeFunctions_;
-        // return numValueShapeFunctions_;
+        // return numInnerShapeFunctions_;
+        return numValueShapeFunctions_;
       }
       int innerSize() const
       {
@@ -389,6 +398,8 @@ namespace Dune
       typedef DivFreeVEMSpaceTraits<GridPart> TraitsType;
       typedef DefaultAgglomerationVEMSpace< TraitsType > BaseType;
       typedef typename BaseType::AgglomerationType AgglomerationType;
+      typedef typename BaseType::BasisSetsType::ShapeFunctionSetType::FunctionSpaceType FunctionSpaceType;
+      typedef typename FunctionSpaceType::DomainFieldType DomainFieldType;
       DivFreeVEMSpace(AgglomerationType &agglomeration,
           const unsigned int polOrder,
           int basisChoice)
@@ -402,35 +413,54 @@ namespace Dune
       }
 
     protected:
-      virtual void fixconstraintRHS(const Std::vector<Std::vector<typename BaseType::ElementSeedType> > &entitySeeds, unsigned int agglomerate,
-                                    DynamicMatrix<DomainFieldType> RHSconstraintsMatrix) override
+      virtual void setupConstraintRHS(const Std::vector<Std::vector<typename BaseType::ElementSeedType> > &entitySeeds, unsigned int agglomerate,
+                                    Dune::DynamicMatrix<DomainFieldType> &RHSconstraintsMatrix, double volume) override
       {
-        ////////////////////////////////////////////////////////////////////
-        // construct the modified constraint RHS for the value projection //
-        ////////////////////////////////////////////////////////////////////
+        //////////////////////////////////////////////////////////////////////////
+        /// Fix RHS constraints for value projection /////////////////////////////
+        //////////////////////////////////////////////////////////////////////////
 
-        const std::size_t numInnerShapeFunctions = BaseType::basisSets_.innerSize();
+        typedef typename BaseType::BasisSetsType::EdgeShapeFunctionSetType EdgeTestSpace;
+        typedef typename FunctionSpaceType::DomainType DomainType;
+        typedef typename FunctionSpaceType::RangeFieldType RangeFieldType;
+        typedef typename FunctionSpaceType::RangeType RangeType;
+        typedef typename FunctionSpaceType::JacobianRangeType JacobianRangeType;
+        typedef typename FunctionSpaceType::HessianRangeType HessianRangeType;
+        static constexpr int blockSize = BaseType::localBlockSize;
+        const std::size_t dimDomain = DomainType::dimension;
+        const std::size_t dimRange = RangeType::dimension;
         const std::size_t numShapeFunctions = BaseType::basisSets_.size(0);
         const std::size_t numDofs = BaseType::blockMapper().numDofs(agglomerate) * blockSize;
+        int polOrder = BaseType::order();
+        const std::size_t numConstraintShapeFunctions = BaseType::basisSets_.constraintSize();
+        const std::size_t numInnerShapeFunctions = BaseType::basisSets_.innerSize();
 
-        // set up matrix to store div projection
-        DynamicMatrix<double> divVector; // double or DFT
-        divVector.resize(numInnerShapeFunctions,numShapeFunctions,0); // size of div Vector?
-        // create matrix using inner dofs and invert
+        assert( numInnerShapeFunctions <= numConstraintShapeFunctions );
+        if (numConstraintShapeFunctions == 0) return;
 
+        // first fill in entries relating to inner dofs (alpha < inner shape functions)
+        for ( int beta=0; beta<numDofs; ++beta)
+        {
+          for (int alpha=0; alpha<numInnerShapeFunctions; ++alpha)
+          {
+            if( beta - numDofs + numInnerShapeFunctions == alpha )
+              RHSconstraintsMatrix[ beta ][ alpha ] += std::sqrt(volume);
+          }
+        }
 
-        // begin loop over triangles
+        // matrices for edge projections
+        Std::vector<Dune::DynamicMatrix<double> > edgePhiVector(2);
+        edgePhiVector[0].resize(BaseType::basisSets_.edgeSize(0), BaseType::basisSets_.edgeSize(0), 0);
+        edgePhiVector[1].resize(BaseType::basisSets_.edgeSize(1), BaseType::basisSets_.edgeSize(1), 0);
+
         for (const typename BaseType::ElementSeedType &entitySeed : entitySeeds[agglomerate])
         {
           const typename BaseType::ElementType &element = BaseType::gridPart().entity(entitySeed);
-          auto vemBasisFunction = BaseType::scalarBasisFunctionSet(element);
           const auto geometry = element.geometry();
 
           const auto &shapeFunctionSet = BaseType::basisSets_.basisFunctionSet(BaseType::agglomeration(), element);
-          // interpolate divVector
-          BaseType::interpolation_(element, shapeFunctionSet, divVector)
 
-          // compute the boundary terms for the constraint RHS
+          // compute the boundary terms for the value projection
           for (const auto &intersection : intersections(BaseType::gridPart(), element))
           {
             // ignore edges inside the given polygon
@@ -456,42 +486,20 @@ namespace Dune
               auto x = quadrature.localPoint(qp);
               auto y = intersection.geometryInInside().global(x);
               const DomainFieldType weight = intersection.geometry().integrationElement(x) * quadrature.weight(qp);
-              shapeFunctionSet.scalarEach(y, [&](std::size_t alpha, RangeFieldType m)
+              // need to call shape set scalar each for the correct test functions
+              shapeFunctionSet.scalarEachInner(y, [&](std::size_t alpha, RangeFieldType m)
               {
-                // restrict to correct m_alpha up to P_{l-1}
-                if (alpha < numConstraintShapeFunctions)
+                edgeShapeFunctionSet.evaluateEach(x, [&](std::size_t beta,
+                      typename BaseType::BasisSetsType::EdgeShapeFunctionSetType::RangeType psi)
                 {
-                  edgeShapeFunctionSet.evaluateEach(x, [&](std::size_t beta,
-                        typename BaseType::BasisSetsType::EdgeShapeFunctionSetType::RangeType psi)
-                  {
-                    for (std::size_t s=0; s<mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
-                      for (std::size_t i=0;i<dimDomain;++i)
-                        RHSconstraintsMatrix[alpha][s] += weight * edgePhiVector[0][beta][s] * psi[i] * normal[i] * m;
-                  });
-                }
+                  for (std::size_t s=0; s<mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
+                    // put into correct offset place in constraint RHS matrix
+                    RHSconstraintsMatrix[mask[0][s]][numInnerShapeFunctions + alpha] += weight * edgePhiVector[0][beta][s] * psi*normal * m;
+                });
               });
             } // quadrature loop
           } // loop over intersections
-
-          // Compute element part for the RHS constraints using div projection
-          typename BaseType::Quadrature0Type quadrature(element, 2 * polOrder + 1);
-          for (std::size_t qp = 0; qp < quadrature.nop(); ++qp)
-          {
-            const DomainFieldType weight = geometry.integrationElement(quadrature.point(qp)) * quadrature.weight(qp);
-            // vemBasisFunction.jacobianAll(quadrature[qp], psi1Values);
-            shapeFunctionSet.scalarEach(quadrature[qp], [&](std::size_t alpha, RangeFieldType m) {
-              shapeFunctionSet.evaluateEach(x, [&](std::size_t beta,
-                        typename BaseType::BasisSetsType::ShapeFunctionSetType::RangeType phi) {
-                if (alpha < numConstraintShapeFunctions)
-                {
-                  for (std::size_t s=0; s<numDofs; ++s)
-                    RHSconstraintsMatrix[alpha][s] -= weight * divVector[s][alpha] * phi * m;
-                }
-              });
-            });
-          } // quadrature loop
         } // loop over triangles in agglomerate
-
       }
     };
 
@@ -576,42 +584,12 @@ namespace Dune
       // beta: current basis function phi_beta for which to setup CLS
       // volune: volume of current polygon
       // D:    Lambda(B) matrix (numDofs x numShapeFunctions)
-      // d:    right hand side vector (numInnerShapeFunctions)
+      // d:    right hand side vector (numConstrainedShapeFunctions)
       template <class DomainFieldType>
       void valueL2constraints(unsigned int beta, double volume,
                               Dune::DynamicMatrix<DomainFieldType> &D,
                               Dune::DynamicVector<DomainFieldType> &d)
       {
-        // !!!!!
-        unsigned int numConstrainedShapeFunctions = d.size();
-        unsigned int numInnerShapeFunctions = basisSets_.innerSize();
-        assert( numInnerShapeFunctions <= numConstrainedShapeFunctions );
-        if (numConstrainedShapeFunctions == 0) return;
-        unsigned int numDofs = D.rows();
-        for (int alpha=0; alpha<numInnerShapeFunctions; ++alpha)
-        {
-          if( beta - numDofs + numConstrainedShapeFunctions == alpha )
-            d[ alpha ] = std::sqrt(volume);
-          else
-            d[ alpha ] = 0;
-        }
-        // here we are using that
-        // 1. div u in P_{l-1}
-        // 2. the basis functions are ONB
-        // -> int_E div(u) m = 0 if grad(m)=l
-        // Therefore for grad(m_alpha)=l:
-        // int_E phi_beta . grad(m_alpha) = -int_E div(phi_beta) m_alpha + sum_e int_e phi_beta.n m_alpha
-        //       = sum_e int_e phi_beta.n m_alpha = sum_e |e| lambda^e_alpha(phi_beta)
-        //       = |e| if beta,alpha,e match
-        for (int alpha=numInnerShapeFunctions; alpha<numConstrainedShapeFunctions; ++alpha)
-        {
-          if( beta - numDofs + numConstrainedShapeFunctions == alpha )
-          {
-            d[ alpha ] = std::sqrt(volume);
-          }
-          else
-            d[ alpha ] = 0;
-        }
       }
 
       // fill a mask vector providing the information which dofs are
@@ -752,59 +730,6 @@ namespace Dune
           {
             std::cout << "Interpolation: localDofVectorMatrix[0].invert() failed!\n";
             const auto &M = localDofVectorMatrix[0];
-            for (std::size_t alpha=0;alpha<M.size();++alpha)
-            {
-              for (std::size_t beta=0;beta<M[alpha].size();++beta)
-                std::cout << M[alpha][beta] << " ";
-              std::cout << std::endl;
-            }
-            assert(0);
-            throw FMatrixError();
-          }
-        }
-      }
-
-      // interpolate divergence projection using inner dofs
-      template< class BasisFunctionSet >
-      void operator() (const ElementType &element,
-                       const BasisFunctionSet &basisFunctionSet, Dune::DynamicMatrix<double> &localDofMatrix) const
-      {
-        const auto &edgeBFS = basisSets_.edgeBasisFunctionSet( indexSet_.agglomeration(), intersection );
-
-        std::size_t entry;
-        entry = 0;
-
-        auto inner = [&] (int poly,int i,int k,int numDofs)
-        {
-          InnerQuadratureType innerQuad( element, 2*polOrder_ );
-          for (unsigned int qp=0; qp<innerQuad.nop(); ++qp)
-          {
-            auto y = innerQuad.point(qp);
-            // check if volume needed here
-            double weight = innerQuad.weight(qp) * element.geometry().integrationElement(y)
-                                                 / std::sqrt(indexSet_.volume(poly));
-            basisFunctionSet.evaluateEach( innerQuad[qp], [ & ] ( std::size_t beta, typename BasisFunctionSetType::RangeType value ) {
-                innerShapeFunctionSet.evaluateEach( x, [&](std::size_t alpha, typename RangeType phi ) {
-                    assert( entry+alpha < localDofMatrix.size() );
-                    // change to g_{k-2} here?
-                    localDofMatrix[ entry+alpha ][ beta ] += value*phi * weight;
-                  });
-              }
-            );
-          }
-          entry += innerShapeFunctionSet.size();
-        };
-
-        if (localDofMatrix.size() > 0)
-        {
-          try
-          {
-            localDofMatrix.invert();
-          }
-          catch (const FMatrixError&)
-          {
-            std::cout << "Interpolation: localDofMatrix.invert() failed!\n";
-            const auto &M = localDofMatrix;
             for (std::size_t alpha=0;alpha<M.size();++alpha)
             {
               for (std::size_t beta=0;beta<M[alpha].size();++beta)
