@@ -717,19 +717,19 @@ namespace Dune
                               Dune::DynamicMatrix<DomainFieldType> &D,
                               Dune::DynamicVector<DomainFieldType> &d)
       {
-        unsigned int numInnerShapeFunctions = d.size();
-        if (numInnerShapeFunctions == 0) return;
-        unsigned int numDofs = D.rows();
-        assert( numInnerShapeFunctions == basisSets_.constraintSize() );
-        for (int alpha=0; alpha<numInnerShapeFunctions; ++alpha)
-        {
-          // d[alpha] = e_gamma * D_beta
-          // with gamma = beta + numInnerShapeFunctions - numDofs
-          if( beta - numDofs + numInnerShapeFunctions == alpha )
-            d[ alpha ] = volume;
-          else
-            d[ alpha ] = 0;
-        }
+        // unsigned int numInnerShapeFunctions = d.size();
+        // if (numInnerShapeFunctions == 0) return;
+        // unsigned int numDofs = D.rows();
+        // assert( numInnerShapeFunctions == basisSets_.constraintSize() );
+        // for (int alpha=0; alpha<numInnerShapeFunctions; ++alpha)
+        // {
+        //   // d[alpha] = e_gamma * D_beta
+        //   // with gamma = beta + numInnerShapeFunctions - numDofs
+        //   if( beta - numDofs + numInnerShapeFunctions == alpha )
+        //     d[ alpha ] = volume;
+        //   else
+        //     d[ alpha ] = 0;
+        // }
       }
 
       // fill a mask vector providing the information which dofs are
