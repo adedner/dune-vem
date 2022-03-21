@@ -597,6 +597,33 @@ namespace Dune
           BaseType::agglomeration().onbBasis(polOrder);
         BaseType::update(true);
       }
+
+    protected:
+      virtual void setupConstraintRHS(const Std::vector<Std::vector<typename BaseType::ElementSeedType> > &entitySeeds, unsigned int agglomerate,
+                                    Dune::DynamicMatrix<DomainFieldType> &RHSconstraintsMatrix, double volume) override
+      {
+        //////////////////////////////////////////////////////////////////////////
+        /// Fix RHS constraints for value projection /////////////////////////////
+        //////////////////////////////////////////////////////////////////////////
+
+        const std::size_t numShapeFunctions = BaseType::basisSets_.size(0);
+        const std::size_t numDofs = BaseType::blockMapper().numDofs(agglomerate) * blockSize;
+        const std::size_t numConstraintShapeFunctions = BaseType::basisSets_.constraintSize();
+        const std::size_t numInnerShapeFunctions = BaseType::basisSets_.innerSize();
+
+        assert( numInnerShapeFunctions <= numConstraintShapeFunctions );
+        if (numConstraintShapeFunctions == 0) return;
+
+        // first fill in entries relating to inner dofs (alpha < inner shape functions)
+        for ( int beta=0; beta<numDofs; ++beta)
+        {
+          for (int alpha=0; alpha<numInnerShapeFunctions; ++alpha)
+          {
+            if( beta - numDofs + numInnerShapeFunctions == alpha )
+              RHSconstraintsMatrix[ beta ][ alpha ] += std::sqrt(volume);
+          }
+        }
+      }
     };
 
     //////////////////////////////////////////////////////////////////////////////
