@@ -431,6 +431,10 @@ namespace Dune
       {
         return numInnerShapeFunctions_;
       }
+      int innerSize() const
+      {
+        return numInnerShapeFunctions_;
+      }
       int edgeValueMoments() const
       {
         return testSpaces_[1][0];
@@ -584,6 +588,8 @@ namespace Dune
       typedef AgglomerationVEMSpaceTraits<FunctionSpace,GridPart,vectorSpace> TraitsType;
       typedef DefaultAgglomerationVEMSpace<TraitsType> BaseType;
       typedef Agglomeration<GridPart> AgglomerationType;
+      typedef typename BaseType::BasisSetsType::ShapeFunctionSetType::FunctionSpaceType FunctionSpaceType;
+      typedef typename FunctionSpaceType::DomainFieldType DomainFieldType;
       AgglomerationVEMSpace(AgglomerationType &agglomeration,
           const unsigned int polOrder,
           const typename TraitsType::BasisSetsType::TestSpacesType &testSpaces,
@@ -606,6 +612,7 @@ namespace Dune
         /// Fix RHS constraints for value projection /////////////////////////////
         //////////////////////////////////////////////////////////////////////////
 
+        static constexpr int blockSize = BaseType::localBlockSize;
         const std::size_t numShapeFunctions = BaseType::basisSets_.size(0);
         const std::size_t numDofs = BaseType::blockMapper().numDofs(agglomerate) * blockSize;
         const std::size_t numConstraintShapeFunctions = BaseType::basisSets_.constraintSize();
