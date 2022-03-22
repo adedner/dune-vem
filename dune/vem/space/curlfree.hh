@@ -31,6 +31,8 @@ namespace Dune
     template<class GridPart>
     class CurlFreeVEMSpace;
     template< class Traits >
+    class AgglomerationVEMInterpolation;
+    // template< class Traits >
     // class CurlFreeVEMInterpolation;
 
     template<class GridPart>
@@ -58,6 +60,8 @@ namespace Dune
       // Next we define test function space for the edges
       typedef Dune::Fem::FunctionSpace<double,double,GridPartType::dimensionworld-1,1> EdgeFSType;
       typedef Dune::Fem::OrthonormalShapeFunctionSet<EdgeFSType> ScalarEdgeShapeFunctionSetType;
+
+      typedef std::array<std::vector<int>,dimDomain+1> TestSpacesType;
 
     private:
       struct ShapeFunctionSet
@@ -236,7 +240,8 @@ namespace Dune
         {
           sfs_.evaluateEach(x, [&](std::size_t alpha, RangeType phi)
           {
-            if (alpha<numEdgeTestFunctions_)
+            // alpha less than numEdgeTestFunctions_ but ESFS not initialised with this
+            if (alpha< sfs_.edgeSize())
               functor(alpha,phi);
           });
         }
@@ -251,8 +256,8 @@ namespace Dune
       typedef EdgeShapeFunctionSet EdgeShapeFunctionSetType;
 
       CurlFreeVEMBasisSets( const int order, bool useOnb)
-      : testSpaces_( [[-1],[order],[order]] )
-      : innerOrder_( order )
+      : testSpaces_() // problems
+      , innerOrder_( order )
       , onbSFS_( Dune::GeometryType(Dune::GeometryType::cube, dimDomain), order+1 )
       , edgeSFS_( Dune::GeometryType(Dune::GeometryType::cube,dimDomain-1), order)
       , dofsPerCodim_( calcDofsPerCodim(order) )
@@ -354,6 +359,7 @@ namespace Dune
       template <int dim>
       std::size_t order2size(unsigned int deriv) const
       {
+        // how to account for gradient space in inner moments?
         if (testSpaces_[dim].size()<=deriv || testSpaces_[dim][deriv]<0)
           return 0;
         else
@@ -394,6 +400,7 @@ namespace Dune
       std::size_t numGradShapeFunctions_;
       std::size_t numHessShapeFunctions_;
       std::size_t numInnerShapeFunctions_;
+      std::size_t numEdgeTestShapeFunctions_;
       bool useOnb_;
     };
 
