@@ -467,8 +467,6 @@ namespace Dune
             // set up vectors b (rhs for least squares)
             b[ beta ] = 1;
 
-            interpolation_.valueL2constraints(beta, H0, D, RHSconstraintsMatrix[beta]);
-
             // if( beta >= numDofs - numConstraintShapeFunctions )
               // assert( std::abs( d[ beta - numDofs + numConstraintShapeFunctions ] - H0 ) < 1e-13);
 
@@ -499,7 +497,6 @@ namespace Dune
           }
           for (std::size_t beta = 0; beta < numDofs; ++beta )
           {
-            interpolation_.valueL2constraints(beta, H0, D, RHSconstraintsMatrix[beta]);
             for (std::size_t alpha = 0; alpha < numShapeFunctions; ++alpha)
             {
               valueProjection[alpha][beta] = 0;

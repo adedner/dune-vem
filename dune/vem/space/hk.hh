@@ -714,31 +714,6 @@ namespace Dune
         interpolate__(element,localFunction,localDofVector, Dune::PriorityTag<LocalFunction::RangeType::dimension>() );
       }
 
-      // setup right hand side constraints vector for valueProjection CLS
-      // beta: current basis function phi_beta for which to setup CLS
-      // volune: volume of current polygon
-      // D:    Lambda(B) matrix (numDofs x numShapeFunctions)
-      // d:    right hand side vector (numInnerShapeFunctions)
-      template <class DomainFieldType>
-      void valueL2constraints(unsigned int beta, double volume,
-                              Dune::DynamicMatrix<DomainFieldType> &D,
-                              Dune::DynamicVector<DomainFieldType> &d)
-      {
-        // unsigned int numInnerShapeFunctions = d.size();
-        // if (numInnerShapeFunctions == 0) return;
-        // unsigned int numDofs = D.rows();
-        // assert( numInnerShapeFunctions == basisSets_.constraintSize() );
-        // for (int alpha=0; alpha<numInnerShapeFunctions; ++alpha)
-        // {
-        //   // d[alpha] = e_gamma * D_beta
-        //   // with gamma = beta + numInnerShapeFunctions - numDofs
-        //   if( beta - numDofs + numInnerShapeFunctions == alpha )
-        //     d[ alpha ] = volume;
-        //   else
-        //     d[ alpha ] = 0;
-        // }
-      }
-
       // fill a mask vector providing the information which dofs are
       // 'active' on the given element, i.e., are attached to a given
       // subentity of this element. Needed for dirichlet boundary data for
