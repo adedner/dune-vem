@@ -256,8 +256,7 @@ namespace Dune
       typedef EdgeShapeFunctionSet EdgeShapeFunctionSetType;
 
       CurlFreeVEMBasisSets( const int order, bool useOnb)
-      : testSpaces_() // problems
-      , innerOrder_( order )
+      : innerOrder_( order )
       , onbSFS_( Dune::GeometryType(Dune::GeometryType::cube, dimDomain), order+1 )
       , edgeSFS_( Dune::GeometryType(Dune::GeometryType::cube,dimDomain-1), order)
       , dofsPerCodim_( calcDofsPerCodim(order) )
@@ -354,22 +353,40 @@ namespace Dune
       }
       const TestSpacesType &testSpaces() const
       {
-        return testSpaces_;
+        // std::array<std::vector<int>,dimDomain+1>
+        TestSpacesType testSpaces;
+        // std::vector<int> vertex;
+        testSpaces[0][0] = -1;
+        testSpaces[0][1] = -1;
+        testSpaces[1][0] = innerOrder_;
+        testSpaces[1][1] = -1;
+        testSpaces[2][0] = innerOrder_;
+        testSpaces[2][1] = -1;
+
+        return testSpaces;
       }
       template <int dim>
       std::size_t order2size(unsigned int deriv) const
       {
-        // how to account for gradient space in inner moments?
-        if (testSpaces_[dim].size()<=deriv || testSpaces_[dim][deriv]<0)
-          return 0;
+        if (dim == 1 && deriv == 0)
+          return edgeSize();
+        if (dim == 2 && deriv == 0)
+          return innerSize();
         else
-        {
-          if constexpr (dim>0)
-            return Dune::Fem::OrthonormalShapeFunctions<dim>::
-              size(testSpaces_[dim][deriv]);
-          else
-            return pow(dimDomain,deriv);
-        }
+          return 0;
+
+        // how to account for gradient space in inner moments? use inner size?
+        // from hk
+        // if (testSpaces_[dim].size()<=deriv || testSpaces_[dim][deriv]<0)
+        //   return 0;
+        // else
+        // {
+        //   if constexpr (dim>0)
+        //     return Dune::Fem::OrthonormalShapeFunctions<dim>::
+        //       size(testSpaces_[dim][deriv]);
+        //   else
+        //     return pow(dimDomain,deriv);
+        // }
       }
 
       private:
@@ -391,7 +408,7 @@ namespace Dune
       }
       // note: the actual shape function set depends on the entity so
       // we can only construct the underlying monomial basis in the ctor
-      const TestSpacesType testSpaces_;
+      // const TestSpacesType testSpaces_;
       std::size_t innerOrder_;
       ONBShapeFunctionSetType onbSFS_;
       ScalarEdgeShapeFunctionSetType edgeSFS_;
