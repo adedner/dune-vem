@@ -393,11 +393,6 @@ namespace Dune
         // }
       }
 
-      bool sqrtScaling() const
-      {
-        return true;
-      }
-
       private:
       std::array< std::pair< int, unsigned int >, dimDomain+1 > calcDofsPerCodim (unsigned int order) const
       {

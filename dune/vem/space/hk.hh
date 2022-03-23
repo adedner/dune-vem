@@ -477,11 +477,6 @@ namespace Dune
         }
       }
 
-      bool sqrtScaling() const
-      {
-        return false;
-      }
-
       private:
       Std::vector<int> edgeDegrees() const
       {
