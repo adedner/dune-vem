@@ -344,7 +344,7 @@ namespace Dune
       {
         return numEdgeTestShapeFunctions_;
       }
-      const TestSpacesType &testSpaces() const
+      TestSpacesType testSpaces() const
       {
         // std::array<std::vector<int>,dimDomain+1>
         TestSpacesType testSpaces;
