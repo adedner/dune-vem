@@ -324,6 +324,10 @@ namespace Dune
         // return numInnerShapeFunctions_;
         return numValueShapeFunctions_;
       }
+      int vertexSize(int deriv) const
+      {
+        return 0;
+      }
       int innerSize() const
       {
         return numInnerShapeFunctions_;

@@ -431,6 +431,10 @@ namespace Dune
       {
         return numInnerShapeFunctions_;
       }
+      int vertexSize(int deriv) const
+      {
+        return pow(dimDomain,deriv);
+      }
       int innerSize() const
       {
         return numInnerShapeFunctions_;
@@ -1063,7 +1067,7 @@ namespace Dune
                         refElement.subEntity(intersection.indexInInside(),1,0,2)
                       );
           otherTau /= otherTau.two_norm();
-          if (basisSets_.testSpaces()[0][0]>=0) // vertices might have to be flipped
+          if (basisSets_.vertexSize(0)>0) // vertices might have to be flipped
           {
             if (otherTau*tau<0)
             {
@@ -1128,7 +1132,7 @@ namespace Dune
 
         // vertex dofs
         //!TS needs changing
-        if (basisSets_.testSpaces()[0][0] >= 0)
+        if (basisSets_.vertexSize(0) > 0)
         {
           for( int i = 0; i < refElement.size( dimension ); ++i )
           {
@@ -1155,7 +1159,7 @@ namespace Dune
           }
         }
         //! needs changing
-        if (basisSets_.testSpaces()[2][0] >=0)
+        if (basisSets_.innerSize() > 0)
         {
           // inner dofs
           const int k = indexSet_.localIndex( element, 0, 0 )*innerSize + innerOffset;
@@ -1315,7 +1319,7 @@ namespace Dune
         if (k>=0)  // this doesn't make sense - remove?
         {
           std::size_t i = 0;
-          if (basisSets_.testSpaces()[0][0]>=0) //!TS
+          if (basisSets_.vertexSize(0) > 0) //!TS
           {
             for( ; i < refElement.size( edgeNumber, dimension-1, dimension ); ++i )
             {
