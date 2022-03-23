@@ -629,10 +629,15 @@ namespace Dune
         // first fill in entries relating to inner dofs (alpha < inner shape functions)
         for ( int beta=0; beta<numDofs; ++beta)
         {
+          // TODO
+          // don't need loop use
+          // int alpha = beta - numDofs + numInnerShapeFunctions;
+          // if (alpha>=0) RHSconstraintsMatrix[ beta ][ alpha ] = volume;
+          // possibly even fix loop for beta
           for (int alpha=0; alpha<numInnerShapeFunctions; ++alpha)
           {
             if( beta - numDofs + numInnerShapeFunctions == alpha )
-              RHSconstraintsMatrix[ beta ][ alpha ] += volume;
+              RHSconstraintsMatrix[ beta ][ alpha ] = volume;
           }
         }
       }
@@ -742,6 +747,7 @@ namespace Dune
         auto edge = [&] (int poly,auto i,int k,int numDofs)
         {
           k /= baseRangeDimension;
+          /*
 #ifndef NDEBUG
           auto kStart = k;
 #endif
@@ -759,6 +765,9 @@ namespace Dune
             }
           }
           // assert(k-kStart == numDofs/baseRangeDimension);
+          */
+          assert( numDofs == basisSets_.template order2size<1>(0) );
+          std::fill(mask.begin()+k,mask.begin()+k+numDofs,1);
         };
         auto inner = [&mask] (int poly,auto i,int k,int numDofs)
         {
@@ -819,17 +828,19 @@ namespace Dune
             k = kStart;
             auto x = edgeQuad.localPoint(qp);
             auto y = intersection.geometryInInside().global(x);
-            double weight = edgeQuad.weight(qp) * intersection.geometry().integrationElement(x);
+            double weight = edgeQuad.weight(qp) *
+                            intersection.geometry().integrationElement(x) /
+                            intersection.geometry().volume();
             edgeBFS.evaluateTestEach(x,
                 [&](std::size_t alpha, RangeType phi ) {
+                assert( alpha < order2size<1>(0) );
                 if (alpha < order2size<1>(0))
                 {
                   basisFunctionSet.evaluateEach( y,
                     [ & ] ( std::size_t beta, typename BasisFunctionSet::RangeType value )
                     {
                       assert(k<localDofMatrix.size());
-                      localDofMatrix[ k ][ beta ] += value*phi * weight
-                                                     / intersection.geometry().volume();
+                      localDofMatrix[ k ][ beta ] += value*phi * weight;
                     }
                   );
                   ++k;
@@ -862,15 +873,9 @@ namespace Dune
           for (int qp=0;qp<innerQuad.nop();++qp)
           {
             auto y = innerQuad.point(qp);
-            double weight = innerQuad.weight(qp) * element.geometry().integrationElement(y) / indexSet_.volume(poly);
-            if (basisSets_.sqrtScaling())
-            {
-              weight /= std::sqrt(indexSet_.volume(poly));
-            }
-            else
-            {
-              weight /= indexSet_.volume(poly);
-            }
+            double weight = innerQuad.weight(qp) *
+                            element.geometry().integrationElement(y) /
+                            indexSet_.volume(poly);
             basisFunctionSet.evaluateEach( innerQuad[qp],
               [ & ] ( std::size_t beta, typename BasisFunctionSet::RangeType value )
               {
@@ -960,7 +965,9 @@ namespace Dune
           {
             auto x = edgeQuad.localPoint(qp);
             auto xx = x;
-            double weight = edgeQuad.weight(qp) * intersection.geometry().integrationElement(x);
+            double weight = edgeQuad.weight(qp) *
+                            intersection.geometry().integrationElement(x) /
+                            intersection.geometry().volume();
             edgeShapeFunctionSet.evaluateEach( x, [ & ] ( std::size_t beta, typename EdgeShapeFunctionSet::RangeType value ) {
                 edgeBFS.evaluateTestEach( xx,
                   [&](std::size_t alpha, typename EdgeShapeFunctionSet::RangeType phi ) {
@@ -968,8 +975,7 @@ namespace Dune
                     if (alpha < order2size<1>(0) && beta < edgeSize(0))
                     {
                       assert( entry[0]+alpha < localDofVectorMatrix[0].size() );
-                      localDofVectorMatrix[0][ entry[0]+alpha ][ beta ] += value*phi * weight
-                                                                           / intersection.geometry().volume();
+                      localDofVectorMatrix[0][ entry[0]+alpha ][ beta ] += value*phi * weight;
                     }
                     // FIX ME
                     if (alpha < order2size<1>(1) && beta < edgeSize(1))
@@ -1170,7 +1176,7 @@ namespace Dune
       {
         typename LocalFunction::RangeType value;
         typename LocalFunction::JacobianRangeType dvalue;
-        assert( value.dimension == baseRangeDimension );
+        // assert( value.dimension == baseRangeDimension );
         const auto &refElement = ReferenceElements< ctype, dimension >::general( element.type() );
 
         // use the bb set for this polygon for the inner testing space
@@ -1246,15 +1252,9 @@ namespace Dune
           {
             auto y = innerQuad.point(qp);
             localFunction.evaluate( innerQuad[qp], value );
-            double weight = innerQuad.weight(qp) * element.geometry().integrationElement(y);
-            if (basisSets_.sqrtScaling())
-            {
-              weight /= std::sqrt(indexSet_.volume(poly));
-            }
-            else
-            {
-              weight /= indexSet_.volume(poly);
-            }
+            double weight = innerQuad.weight(qp) *
+                            element.geometry().integrationElement(y) /
+                            indexSet_.volume(poly);
             innerShapeFunctionSet.evaluateTestEach(innerQuad[qp],
               [&](std::size_t alpha, typename LocalFunction::RangeType phi ) {
                 int kk = alpha+k;

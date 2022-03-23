@@ -85,6 +85,7 @@ namespace Dune
                          const Agglomeration &agglomeration, const EntityType &entity)
         : sfs_(entity, agglomeration.index(entity),
                agglomeration.boundingBoxes(), useOnb, onbSFS)
+        , scale_( std::sqrt( sfs_.bbox().volume() ) )
         , numValueShapeFunctions_(numValueSFS)
         , numGradShapeFunctions_(numGradSFS)
         , numHessShapeFunctions_(numHessSFS)
@@ -124,7 +125,10 @@ namespace Dune
           sfs_.jacobianEach(x, [&](std::size_t alpha, ScalarJacobianRangeType dphi)
           {
             if (alpha>=1)
+            {
+              // dphi[0] *= scale_;
               functor(alpha-1, dphi[0]);
+            }
           });
         }
         /*
@@ -182,12 +186,16 @@ namespace Dune
           sfs_.jacobianEach(xx, [&](std::size_t alpha, ScalarJacobianRangeType dphi)
           {
             if (alpha>=1 && alpha < numInnerShapeFunctions_+1)
+            {
+              dphi[0] *= scale_;
               functor(alpha-1, dphi[0]);
+            }
           });
         }
 
         private:
         ScalarBBBasisFunctionSetType sfs_;
+        double scale_;
         std::size_t numValueShapeFunctions_;
         std::size_t numGradShapeFunctions_;
         std::size_t numHessShapeFunctions_;
@@ -517,7 +525,7 @@ namespace Dune
           for (int alpha=0; alpha<numInnerShapeFunctions; ++alpha)
           {
             if( beta - numDofs + numInnerShapeFunctions == alpha )
-              RHSconstraintsMatrix[ beta ][ alpha ] += std::sqrt(volume);
+              RHSconstraintsMatrix[ beta ][ alpha ] = std::sqrt(volume);
           }
         }
 
