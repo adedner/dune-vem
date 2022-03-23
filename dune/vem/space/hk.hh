@@ -477,6 +477,11 @@ namespace Dune
         }
       }
 
+      bool sqrtScaling() const
+      {
+        return false;
+      }
+
       private:
       Std::vector<int> edgeDegrees() const
       {
@@ -627,7 +632,7 @@ namespace Dune
           for (int alpha=0; alpha<numInnerShapeFunctions; ++alpha)
           {
             if( beta - numDofs + numInnerShapeFunctions == alpha )
-              RHSconstraintsMatrix[ beta ][ alpha ] += std::sqrt(volume);
+              RHSconstraintsMatrix[ beta ][ alpha ] += volume;
           }
         }
       }
@@ -858,6 +863,14 @@ namespace Dune
           {
             auto y = innerQuad.point(qp);
             double weight = innerQuad.weight(qp) * element.geometry().integrationElement(y) / indexSet_.volume(poly);
+            if (basisSets_.sqrtScaling())
+            {
+              weight /= std::sqrt(indexSet_.volume(poly));
+            }
+            else
+            {
+              weight /= indexSet_.volume(poly);
+            }
             basisFunctionSet.evaluateEach( innerQuad[qp],
               [ & ] ( std::size_t beta, typename BasisFunctionSet::RangeType value )
               {
@@ -1233,7 +1246,15 @@ namespace Dune
           {
             auto y = innerQuad.point(qp);
             localFunction.evaluate( innerQuad[qp], value );
-            double weight = innerQuad.weight(qp) * element.geometry().integrationElement(y) / indexSet_.volume(poly);
+            double weight = innerQuad.weight(qp) * element.geometry().integrationElement(y);
+            if (basisSets_.sqrtScaling())
+            {
+              weight /= std::sqrt(indexSet_.volume(poly));
+            }
+            else
+            {
+              weight /= indexSet_.volume(poly);
+            }
             innerShapeFunctionSet.evaluateTestEach(innerQuad[qp],
               [&](std::size_t alpha, typename LocalFunction::RangeType phi ) {
                 int kk = alpha+k;
