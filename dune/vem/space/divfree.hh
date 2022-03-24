@@ -1,5 +1,5 @@
-#ifndef DUNE_VEM_SPACE_HK_HH
-#define DUNE_VEM_SPACE_HK_HH
+#ifndef DUNE_VEM_SPACE_DIVFREE_HH
+#define DUNE_VEM_SPACE_DIVFREE_HH
 
 #include <cassert>
 #include <utility>
@@ -30,8 +30,6 @@ namespace Dune
 
     template<class GridPart>
     class DivFreeVEMSpace;
-    template< class Traits >
-    class DivFreeVEMInterpolation;
 
     template<class GridPart>
     struct IsAgglomerationVEMSpace<DivFreeVEMSpace<GridPart> >
@@ -59,6 +57,8 @@ namespace Dune
       typedef Dune::Fem::FunctionSpace<double,double,GridPartType::dimensionworld-1,1> EdgeFSType;
       typedef Dune::Fem::OrthonormalShapeFunctionSet<EdgeFSType> ScalarEdgeShapeFunctionSetType;
 
+      typedef std::array<std::vector<int>,dimDomain+1> TestSpacesType;
+
     private:
       struct ShapeFunctionSet
       {
@@ -83,6 +83,7 @@ namespace Dune
                          const Agglomeration &agglomeration, const EntityType &entity)
         : sfs_(entity, agglomeration.index(entity),
                agglomeration.boundingBoxes(), useOnb, onbSFS)
+        , scale_( 1 )
         , numValueShapeFunctions_(numValueSFS)
         , numGradShapeFunctions_(numGradSFS)
         , numHessShapeFunctions_(numHessSFS)
@@ -119,10 +120,10 @@ namespace Dune
         template< class Point, class Functor >
         void evaluateEach ( const Point &x, Functor functor ) const
         {
-          sfs_.jacobianEach(x, [&](std::size_t alpha, ScalarJacobianRangeType dphi)
+          sfs_.evaluateEach(x, [&](std::size_t alpha, ScalarRangeType phi)
           {
-            if (alpha>=1)
-              functor(alpha-1, dphi[0]);
+            // TODO change this for G perp space?
+            functor(alpha, phi[0]);
           });
         }
         /*
@@ -180,12 +181,16 @@ namespace Dune
           sfs_.jacobianEach(xx, [&](std::size_t alpha, ScalarJacobianRangeType dphi)
           {
             if (alpha>=1 && alpha < numInnerShapeFunctions_+1)
+            {
+              dphi[0] *= scale_;
               functor(alpha-1, dphi[0]);
+            }
           });
         }
 
         private:
         ScalarBBBasisFunctionSetType sfs_;
+        double scale_;
         std::size_t numValueShapeFunctions_;
         std::size_t numGradShapeFunctions_;
         std::size_t numHessShapeFunctions_;
@@ -231,6 +236,11 @@ namespace Dune
         {
           return sfs_.size();
         }
+        template< class Point, class Functor >
+        void evaluateTestEach ( const Point &x, Functor functor ) const
+        {
+          evaluateEach(x, functor);
+        }
         private:
         const IntersectionType &intersection_;
         const int flip_;
@@ -247,10 +257,11 @@ namespace Dune
       , edgeSFS_( Dune::GeometryType(Dune::GeometryType::cube,dimDomain-1), order)
       , dofsPerCodim_( calcDofsPerCodim(order) )
       , useOnb_(useOnb)
-      , numValueShapeFunctions_( sizeONB<0>(order+1)-1 )
-      , numGradShapeFunctions_ ( sizeONB<0>(order) )
+      , numValueShapeFunctions_( sizeONB<0>(order+1)-1 ) // TODO
+      , numGradShapeFunctions_ ( sizeONB<0>(order) ) // TODO
       , numHessShapeFunctions_ ( 0 ) // not implemented - needs third/forth derivatives
-      , numInnerShapeFunctions_( sizeONB<0>(innerOrder_)-1 )
+      , numInnerShapeFunctions_( sizeONB<0>(order-3) ) // size of G_{k-2}^perp space
+      , numEdgeTestShapeFunctions_( sizeONB<1>(order-2) )
       {
         std::cout << "[" << numValueShapeFunctions_ << ","
                   << numGradShapeFunctions_ << ","
@@ -305,8 +316,15 @@ namespace Dune
       }
       int constraintSize() const
       {
-        // return numInnerShapeFunctions_;
         return numValueShapeFunctions_;
+      }
+      int vertexSize(int deriv) const
+      {
+        // vertex values in div free space
+        if ( deriv==1 )
+          return 0;
+        else
+          return pow(dimDomain,deriv);
       }
       int innerSize() const
       {
@@ -314,12 +332,55 @@ namespace Dune
       }
       int edgeValueMoments() const
       {
+        // curl free case this is equal to order of ESFS
+        // equal to entry of testSpaces[1][0] in hk case
         return edgeSFS_.order();
       }
 
       std::size_t edgeSize(int deriv) const
       {
         return (deriv==0)? edgeSFS_.size() : 0;
+      }
+
+      ///////////////////////////
+      // used in interpolation //
+      // modified from hk      //
+      ///////////////////////////
+      std::size_t edgeSize() const
+      {
+        // returns size of edge shape function set -> same as above method for curl free space
+        // (as no vertex values or edge normal moments)
+        return edgeSize(0);
+      }
+      std::size_t numEdgeTestShapeFunctions() const
+      {
+        return numEdgeTestShapeFunctions_;
+      }
+      // this can be removed now
+      // TestSpacesType testSpaces() const
+      // {
+      //   TestSpacesType testSpaces;
+      //   testSpaces[0].resize(2,-1);
+      //   testSpaces[1].resize(2,-1);
+      //   testSpaces[2].resize(2,-1);
+
+      //   testSpaces[0][0] = 0;
+      //   testSpaces[1][0] = innerOrder_;
+      //   testSpaces[2][0] = innerOrder_;
+
+      //   return testSpaces;
+      // }
+      template <int dim>
+      std::size_t order2size(unsigned int deriv) const
+      {
+        // size of either edge value moments or inner moments
+        // only return sizes in these two cases
+        if (dim == 1 && deriv == 0)
+          return edgeSize();
+        if (dim == 2 && deriv == 0)
+          return innerSize();
+        else
+          return 0;
       }
 
       private:
@@ -341,15 +402,17 @@ namespace Dune
       }
       // note: the actual shape function set depends on the entity so
       // we can only construct the underlying monomial basis in the ctor
-      std::size_t innerOrder_;
-      ONBShapeFunctionSetType onbSFS_;
-      ScalarEdgeShapeFunctionSetType edgeSFS_;
-      std::array< std::pair< int, unsigned int >, dimDomain+1 > dofsPerCodim_;
-      std::size_t numValueShapeFunctions_;
-      std::size_t numGradShapeFunctions_;
-      std::size_t numHessShapeFunctions_;
-      std::size_t numInnerShapeFunctions_;
-      bool useOnb_;
+      // const TestSpacesType testSpaces_;
+      const int innerOrder_;
+      const ONBShapeFunctionSetType onbSFS_;
+      const ScalarEdgeShapeFunctionSetType edgeSFS_;
+      const std::array< std::pair< int, unsigned int >, dimDomain+1 > dofsPerCodim_;
+      const std::size_t numValueShapeFunctions_;
+      const std::size_t numGradShapeFunctions_;
+      const std::size_t numHessShapeFunctions_;
+      const std::size_t numInnerShapeFunctions_;
+      const std::size_t numEdgeTestShapeFunctions_;
+      const bool useOnb_;
     };
 
 
@@ -368,6 +431,8 @@ namespace Dune
       static const int dimDomain = FunctionSpaceType::DomainType::dimension;
       static const int dimRange = FunctionSpaceType::RangeType::dimension;
       static const int codimension = 0;
+      static const bool vectorSpace = true;
+      static const int baseRangeDimension = 1; // dimRange;
 
       typedef typename GridPartType::template Codim<0>::EntityType EntityType;
 
@@ -445,7 +510,7 @@ namespace Dune
           for (int alpha=0; alpha<numInnerShapeFunctions; ++alpha)
           {
             if( beta - numDofs + numInnerShapeFunctions == alpha )
-              RHSconstraintsMatrix[ beta ][ alpha ] += std::sqrt(volume);
+              RHSconstraintsMatrix[ beta ][ alpha ] = std::sqrt(volume);
           }
         }
 
@@ -518,4 +583,4 @@ namespace Dune
   } // namespace Fem
 } // namespace Dune
 
-#endif // #ifndef DUNE_VEM_SPACE_HK_HH
+#endif // #ifndef DUNE_VEM_SPACE_DIVFREE_HH
