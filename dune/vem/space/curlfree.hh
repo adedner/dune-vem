@@ -30,8 +30,6 @@ namespace Dune
 
     template<class GridPart>
     class CurlFreeVEMSpace;
-    // template< class Traits >
-    // class CurlFreeVEMInterpolation;
 
     template<class GridPart>
     struct IsAgglomerationVEMSpace<CurlFreeVEMSpace<GridPart> >
@@ -321,11 +319,11 @@ namespace Dune
       }
       int constraintSize() const
       {
-        // return numInnerShapeFunctions_;
         return numValueShapeFunctions_;
       }
       int vertexSize(int deriv) const
       {
+        // no vertex moments in curl free space
         return 0;
       }
       int innerSize() const
@@ -334,6 +332,8 @@ namespace Dune
       }
       int edgeValueMoments() const
       {
+        // curl free case this is equal to order of ESFS
+        // equal to entry of testSpaces[1][0] in hk case
         return edgeSFS_.order();
       }
 
@@ -358,43 +358,27 @@ namespace Dune
       }
       TestSpacesType testSpaces() const
       {
-        // std::array<std::vector<int>,dimDomain+1>
         TestSpacesType testSpaces;
         testSpaces[0].resize(2,-1);
         testSpaces[1].resize(2,-1);
         testSpaces[2].resize(2,-1);
-        // std::vector<int> vertex;
-        // testSpaces[0][0] = -1;
-        // testSpaces[0][1] = -1;
+
         testSpaces[1][0] = innerOrder_;
-        // testSpaces[1][1] = -1;
         testSpaces[2][0] = innerOrder_;
-        // testSpaces[2][1] = -1;
 
         return testSpaces;
       }
       template <int dim>
       std::size_t order2size(unsigned int deriv) const
       {
+        // size of either edge value moments or inner moments
+        // only return sizes in these two cases
         if (dim == 1 && deriv == 0)
           return edgeSize();
         if (dim == 2 && deriv == 0)
           return innerSize();
         else
           return 0;
-
-        // how to account for gradient space in inner moments? use inner size?
-        // from hk
-        // if (testSpaces_[dim].size()<=deriv || testSpaces_[dim][deriv]<0)
-        //   return 0;
-        // else
-        // {
-        //   if constexpr (dim>0)
-        //     return Dune::Fem::OrthonormalShapeFunctions<dim>::
-        //       size(testSpaces_[dim][deriv]);
-        //   else
-        //     return pow(dimDomain,deriv);
-        // }
       }
 
       private:
