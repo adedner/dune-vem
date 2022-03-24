@@ -433,7 +433,10 @@ namespace Dune
       }
       int vertexSize(int deriv) const
       {
-        return pow(dimDomain,deriv);
+        if (testSpaces_[0][deriv]<0)
+          return 0;
+        else
+          return pow(dimDomain,deriv);
       }
       int innerSize() const
       {
@@ -441,6 +444,7 @@ namespace Dune
       }
       int edgeValueMoments() const
       {
+        // returns order of edge moments up to P_k where k is the entry in dof tuple
         return testSpaces_[1][0];
       }
       std::size_t edgeSize(int deriv) const
@@ -1067,7 +1071,7 @@ namespace Dune
                         refElement.subEntity(intersection.indexInInside(),1,0,2)
                       );
           otherTau /= otherTau.two_norm();
-          if (basisSets_.vertexSize(0)>0) // vertices might have to be flipped
+          if (basisSets_.vertexSize(0) > 0) // vertices might have to be flipped
           {
             if (otherTau*tau<0)
             {
