@@ -57,8 +57,6 @@ namespace Dune
       typedef Dune::Fem::FunctionSpace<double,double,GridPartType::dimensionworld-1,1> EdgeFSType;
       typedef Dune::Fem::OrthonormalShapeFunctionSet<EdgeFSType> ScalarEdgeShapeFunctionSetType;
 
-      typedef std::array<std::vector<int>,dimDomain+1> TestSpacesType;
-
     private:
       struct ShapeFunctionSet
       {
@@ -105,16 +103,10 @@ namespace Dune
           sfs_.evaluateEach(x, [&](std::size_t alpha, ScalarRangeType phi)
           {
             if (alpha>=1)
+            {
+              // phi[0] *= scale_;
               functor(alpha-1, phi[0]);
-          });
-        }
-        template< class Point, class Functor >
-        void scalarEachInner ( const Point &x, Functor functor ) const
-        {
-          sfs_.evaluateEach(x, [&](std::size_t alpha, ScalarRangeType phi)
-          {
-            if (alpha>numInnerShapeFunctions_)
-              functor(alpha-1-numInnerShapeFunctions_, phi[0]);
+            }
           });
         }
         template< class Point, class Functor >
@@ -356,18 +348,6 @@ namespace Dune
       {
         return numEdgeTestShapeFunctions_;
       }
-      TestSpacesType testSpaces() const
-      {
-        TestSpacesType testSpaces;
-        testSpaces[0].resize(2,-1);
-        testSpaces[1].resize(2,-1);
-        testSpaces[2].resize(2,-1);
-
-        testSpaces[1][0] = innerOrder_;
-        testSpaces[2][0] = innerOrder_;
-
-        return testSpaces;
-      }
       template <int dim>
       std::size_t order2size(unsigned int deriv) const
       {
@@ -400,7 +380,6 @@ namespace Dune
       }
       // note: the actual shape function set depends on the entity so
       // we can only construct the underlying monomial basis in the ctor
-      // const TestSpacesType testSpaces_;
       const int innerOrder_;
       const ONBShapeFunctionSetType onbSFS_;
       const ScalarEdgeShapeFunctionSetType edgeSFS_;
@@ -551,15 +530,18 @@ namespace Dune
               auto y = intersection.geometryInInside().global(x);
               const DomainFieldType weight = intersection.geometry().integrationElement(x) * quadrature.weight(qp);
               // need to call shape set scalar each for the correct test functions
-              shapeFunctionSet.scalarEachInner(y, [&](std::size_t alpha, RangeFieldType m)
+              shapeFunctionSet.scalarEach(y, [&](std::size_t alpha, RangeFieldType m)
               {
-                edgeShapeFunctionSet.evaluateEach(x, [&](std::size_t beta,
-                      typename BaseType::BasisSetsType::EdgeShapeFunctionSetType::RangeType psi)
+                if (alpha>=numInnerShapeFunctions)
                 {
-                  for (std::size_t s=0; s<mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
-                    // put into correct offset place in constraint RHS matrix
-                    RHSconstraintsMatrix[mask[0][s]][numInnerShapeFunctions + alpha] += weight * edgePhiVector[0][beta][s] * psi*normal * m;
-                });
+                  edgeShapeFunctionSet.evaluateEach(x, [&](std::size_t beta,
+                        typename BaseType::BasisSetsType::EdgeShapeFunctionSetType::RangeType psi)
+                  {
+                    for (std::size_t s=0; s<mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
+                      // put into correct offset place in constraint RHS matrix
+                      RHSconstraintsMatrix[mask[0][s]][alpha] += weight * edgePhiVector[0][beta][s] * psi*normal * m;
+                  });
+                }
               });
             } // quadrature loop
           } // loop over intersections
