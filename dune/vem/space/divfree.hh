@@ -107,6 +107,8 @@ namespace Dune
         {
           sfs_.evaluateEach(x, [&](std::size_t alpha, ScalarRangeType phi)
           {
+            // TODO check what condition on alpha needed here
+            // scalarEach used in RHS constraints set up
             if (alpha>=1)
             {
               functor(alpha-1, phi[0]);
@@ -116,20 +118,23 @@ namespace Dune
         template< class Point, class Functor >
         void evaluateEach ( const Point &x, Functor functor ) const
         {
-          // add ortho part
           sfs_.evaluateEach(x, [&](std::size_t alpha, ScalarRangeType phi)
           {
-            if (alpha)
+            if (alpha < numInnerShapeFunctions_)
             {
+              RangeType ret = phi[0];
+              ret[0] *= phi[0][1];
+              ret[1] *= -phi[0][0];
 
-              functor(,)
+              functor(alpha,ret);
             }
           });
           sfs_.jacobianEach(x, [&](std::size_t alpha, ScalarJacobianRangeType dphi)
           {
             if (alpha>=1)
             {
-              functor(alpha-1, dphi[0]);
+              // dphi[0] *= scale_; why is this not needed here?
+              functor(alpha-1+numInnerShapeFunctions_, dphi[0]);
             }
           });
         }
@@ -265,36 +270,6 @@ namespace Dune
         template< class Point, class Functor >
         void divHessianEach( const Point &x, Functor functor ) const
         {
-          JacobianRangeType divHess(0);
-          std::size_t beta=0;
-          if constexpr (!reduced)
-          {
-            vsfs_.jacobianEach(x, [&](std::size_t alpha, JacobianRangeType dphi)
-            {
-              if (alpha<numHessShapeFunctions_)
-              {
-                for (size_t d1=0;d1<dimDomain;++d1)
-                {
-                  for (size_t d2=0;d2<=d1;++d2)
-                  {
-                    divHess = 0;
-                    for (size_t r=0;r<dimRange;++r)
-                    {
-                      divHess[r][d1] = dphi[r][d2];
-                      divHess[r][d2] = dphi[r][d1];
-                    }
-                    functor(beta, divHess);
-                    ++beta;
-                  }
-                }
-              }
-            });
-          }
-          else
-          {
-            if (vsfs_.order()>2)
-              DUNE_THROW( NotImplemented, "hessianEach not implemented for reduced space - needs third order derivative" );
-          }
         }
 
         template< class Point, class Functor >
@@ -304,7 +279,11 @@ namespace Dune
           {
             if (alpha < numInnerShapeFunctions_)
             {
-              functor(alpha,phi[0])
+              RangeType ret = phi[0];
+              ret[0] *= ret[1];
+              ret[1] *= -ret[0];
+
+              functor(alpha,ret);
             }
           });
           sfs_.jacobianEach(xx, [&](std::size_t alpha, ScalarJacobianRangeType dphi)
@@ -312,7 +291,7 @@ namespace Dune
             if (alpha>=1 && alpha < numInnerShapeFunctions_+1)
             {
               dphi[0] *= scale_;
-              functor(alpha-1, dphi[0]);
+              functor(alpha+numInnerShapeFunctions_-1, dphi[0]);
             }
           });
         }
@@ -387,7 +366,9 @@ namespace Dune
       , dofsPerCodim_(calcDofsPerCodim(order))
       , useOnb_(useOnb)
       , numValueShapeFunctions_( onbSFS_.size()*BBBasisFunctionSetType::RangeType::dimension )
-      , numGradShapeFunctions_ ( sizeONB<0>(std::max(0, order - 1)) )
+      , numGradShapeFunctions_ (
+          !reduced? std::min( numValueShapeFunctions_, sizeONB<0>(std::max(0, order - 1)) )
+          : numValueShapeFunctions_-1*BBBasisFunctionSetType::RangeType::dimension )
       , numHessShapeFunctions_ ( 0 )
       , numInnerShapeFunctions_( sizeONB<0>(innerOrder_)/BBBasisFunctionSetType::RangeType::dimension )
       , numEdgeTestShapeFunctions_( sizeONB<1>(order-2) )
@@ -449,14 +430,15 @@ namespace Dune
       }
       int constraintSize() const
       {
-        return numInnerShapeFunctions_;
+        return numValueShapeFunctions_;
       }
       int vertexSize(int deriv) const
       {
-        if (testSpaces_[0][deriv]<0)
-          return 0;
+        // vertex values in div free space
+        if (deriv==0)
+          return pow(dimDomain,deriv)
         else
-          return pow(dimDomain,deriv);
+          return 0;
       }
       int innerSize() const
       {
@@ -465,7 +447,7 @@ namespace Dune
       int edgeValueMoments() const
       {
         // returns order of edge moments up to P_k where k is the entry in dof tuple
-        return testSpaces_[1][0];
+        return order-2;
       }
       std::size_t edgeSize(int deriv) const
       {
@@ -476,7 +458,7 @@ namespace Dune
       }
 
       ////////////////////////////
-      // used in interpolation
+      // used in interpolation  //
       ////////////////////////////
       std::size_t edgeSize() const
       {
@@ -486,23 +468,24 @@ namespace Dune
       {
         return numEdgeTestShapeFunctions_;
       }
-      const TestSpacesType &testSpaces() const
-      {
-        return testSpaces_;
-      }
+      // const TestSpacesType &testSpaces() const
+      // {
+      //   return testSpaces_;
+      // }
       template <int dim>
       std::size_t order2size(unsigned int deriv) const
       {
-        if (testSpaces_[dim].size()<=deriv || testSpaces_[dim][deriv]<0)
-          return 0;
-        else
+        if (dim == 0 && deriv == 0) // vertex size
+          return pow(dimDomain,deriv);
+        if (dim == 1 && deriv == 0)
         {
-          if constexpr (dim>0)
-            return Dune::Fem::OrthonormalShapeFunctions<dim>::
-              size(testSpaces_[dim][deriv]);
-          else
-            return pow(dimDomain,deriv);
+          assert(Dune::Fem::OrthonormalShapeFunctions<dim>::size(order-2))==edgeSize(deriv))
+          return edgeSize(deriv);
         }
+        if (dim == 2 && deriv == 0)
+          return innerSize();
+        else
+          return 0;
       }
 
       private:
@@ -531,7 +514,7 @@ namespace Dune
                BBBasisFunctionSetType::RangeType::dimension;
       }
 
-      std::array< std::pair< int, unsigned int >, dimDomain+1 > calcDofsPerCodim () const
+      std::array< std::pair< int, unsigned int >, dimDomain+1 > calcDofsPerCodim (unsigned int order) const
       {
         int vSize = 0;
         int eSize = 0;
@@ -550,7 +533,6 @@ namespace Dune
 
       // note: the actual shape function set depends on the entity so
       // we can only construct the underlying monomial basis in the ctor
-      const TestSpacesType testSpaces_;
       const bool useOnb_;
       std::array< std::pair< int, unsigned int >, dimDomain+1 > dofsPerCodim_;
       const ONBShapeFunctionSetType onbSFS_;
