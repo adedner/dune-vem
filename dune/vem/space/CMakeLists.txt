@@ -2,6 +2,7 @@ set(HEADERS
   basisfunctionset.hh
   curlfree.hh
   default.hh
+  divfree.hh
   indexset.hh
   interpolate.hh
   hk.hh
