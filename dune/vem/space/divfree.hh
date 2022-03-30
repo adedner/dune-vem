@@ -360,7 +360,7 @@ namespace Dune
       typedef EdgeShapeFunctionSet EdgeShapeFunctionSetType;
 
       DivFreeVEMBasisSets( const int order, bool useOnb )
-      : innerOrder_( order-3 )
+      : innerOrder_( order )
       , onbSFS_(Dune::GeometryType(Dune::GeometryType::cube, dimDomain), order)
       , edgeSFS_( Dune::GeometryType(Dune::GeometryType::cube,dimDomain-1), maxEdgeDegree() )
       , dofsPerCodim_(calcDofsPerCodim(order))
@@ -370,7 +370,7 @@ namespace Dune
           !reduced? std::min( numValueShapeFunctions_, sizeONB<0>(std::max(0, order - 1)) )
           : numValueShapeFunctions_-1*BBBasisFunctionSetType::RangeType::dimension )
       , numHessShapeFunctions_ ( 0 )
-      , numInnerShapeFunctions_( sizeONB<0>(innerOrder_)/BBBasisFunctionSetType::RangeType::dimension )
+      , numInnerShapeFunctions_( sizeONB<0>(order-3)/BBBasisFunctionSetType::RangeType::dimension )
       , numEdgeTestShapeFunctions_( sizeONB<1>(order-2) )
       {
         auto degrees = edgeDegrees();
@@ -491,14 +491,28 @@ namespace Dune
       private:
       Std::vector<int> edgeDegrees() const
       {
-        assert( testSpaces_[2].size()<2 );
+        // std::array<std::vector<int>,dimDomain+1> testSpaces;
+
+        // testSpaces[0].resize(2,-1);
+        // testSpaces[1].resize(2,-1);
+        // testSpaces[2].resize(2,-1);
+
+        // testSpaces[0][0] = 0;
+        // testSpaces[1][0] = order-2;
+        // testSpaces[2][0] = order-2;
+
+        // assert( testSpaces_[2].size()<2 );
+
         Std::vector<int> degrees(2, -1);
-        for (std::size_t i=0;i<testSpaces_[0].size();++i)
-          degrees[i] += 2*(testSpaces_[0][i]+1);
-        if (testSpaces_[0].size()>1 && testSpaces_[0][1]>-1) // add tangential derivatives
-          degrees[0] += 2;
-        for (std::size_t i=0;i<testSpaces_[1].size();++i)
-          degrees[i] += std::max(0,testSpaces_[1][i]+1);
+        degrees[0] += 2
+        degrees[0] += std::max(0,order-2+1)
+
+        // for (std::size_t i=0;i<testSpaces_[0].size();++i)
+        //   degrees[i] += 2*(testSpaces_[0][i]+1);
+        // if (testSpaces_[0].size()>1 && testSpaces_[0][1]>-1) // add tangential derivatives
+        //   degrees[0] += 2;
+        // for (std::size_t i=0;i<testSpaces_[1].size();++i)
+        //   degrees[i] += std::max(0,testSpaces_[1][i]+1);
         return degrees;
       }
       std::size_t maxEdgeDegree() const
@@ -516,15 +530,9 @@ namespace Dune
 
       std::array< std::pair< int, unsigned int >, dimDomain+1 > calcDofsPerCodim (unsigned int order) const
       {
-        int vSize = 0;
-        int eSize = 0;
-        int iSize = 0;
-        for (size_t i=0;i<testSpaces_[0].size();++i)
-          vSize += order2size<0>(i);
-        for (size_t i=0;i<testSpaces_[1].size();++i)
-          eSize += order2size<1>(i);
-        for (size_t i=0;i<testSpaces_[2].size();++i)
-          iSize += order2size<2>(i);
+        int vSize = order2size<0>(0);
+        int eSize = order2size<1>(0);
+        int iSize = innerSize();
         return std::array< std::pair< int, unsigned int >, dimDomain+1 >
                { std::make_pair( dimDomain,   vSize ),
                  std::make_pair( dimDomain-1, eSize ),
@@ -533,6 +541,7 @@ namespace Dune
 
       // note: the actual shape function set depends on the entity so
       // we can only construct the underlying monomial basis in the ctor
+      const int innerOrder_;
       const bool useOnb_;
       std::array< std::pair< int, unsigned int >, dimDomain+1 > dofsPerCodim_;
       const ONBShapeFunctionSetType onbSFS_;
@@ -567,10 +576,7 @@ namespace Dune
 
       // vem basis function sets
       typedef VEMBasisFunctionSet <EntityType, typename BasisSetsType::ShapeFunctionSetType> ScalarBasisFunctionSetType;
-      typedef std::conditional_t< vectorSpace,
-              ScalarBasisFunctionSetType,
-              Fem::VectorialBasisFunctionSet<ScalarBasisFunctionSetType, typename FunctionSpaceType::RangeType>
-              > BasisFunctionSetType;
+      typedef ScalarBasisFunctionSetType BasisFunctionSetType;
 
       // types for the mapper
       typedef Hybrid::IndexRange<int, dimRange> LocalBlockIndices;
@@ -600,11 +606,10 @@ namespace Dune
       typedef typename FunctionSpaceType::DomainFieldType DomainFieldType;
       DivFreeVEMSpace(AgglomerationType &agglomeration,
           const unsigned int polOrder,
-          const typename TraitsType::BasisSetsType::TestSpacesType &testSpaces,
           int basisChoice,
           bool edgeInterpolation)
       : BaseType(agglomeration,polOrder,
-                 typename TraitsType::BasisSetsType(polOrder, testSpaces, basisChoice),
+                 typename TraitsType::BasisSetsType(polOrder, basisChoice),
                  basisChoice,edgeInterpolation)
       {
         if (basisChoice != 3) // !!!!! get order information from BasisSets
