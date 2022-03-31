@@ -349,7 +349,7 @@ def curlFreeSpace(view, order=1,
 
 def divFreeSpace(view, order=1,
              field="double", storage="numpy",
-             basisChoice=2, rotatedBB=True):
+             basisChoice=2, edgeInterpolation=False, rotatedBB=True):
     """create a virtual element space over an agglomerated grid
 
     Args:
@@ -423,7 +423,7 @@ def divFreeSpace(view, order=1,
 
     spc = module(field, includes, typeName, constructor, diameterMethod, updateMethod,
                 storage=storage,
-                ctorArgs=[view, agglomerate, order, basisChoice, rotatedBB])
+                ctorArgs=[view, agglomerate, order, basisChoice, edgeInterpolation, rotatedBB])
     addStorage(spc, storage)
     return spc.as_ufl()
 
