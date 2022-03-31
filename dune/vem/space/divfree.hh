@@ -121,19 +121,16 @@ namespace Dune
         template< class Point, class Functor >
         void evaluateEach ( const Point &x, Functor functor ) const
         {
-          sfs_.evaluateEach(x, [&](std::size_t alpha, ScalarRangeType phi)
+          vsfs_.evaluateEach(x, [&](std::size_t alpha, RangeType phi)
           {
             if (alpha < numInnerShapeFunctions_)
             {
-              RangeType ret(0);
-              ret = phi[0];
+              auto copy = phi[0];
 
-              auto copy = ret[0];
+              phi[0] *= phi[1];
+              phi[1] *= -copy;
 
-              ret[0] *= -ret[1];
-              ret[1] *= copy;
-
-              functor(alpha,ret);
+              functor(alpha,phi);
             }
           });
           sfs_.jacobianEach(x, [&](std::size_t alpha, ScalarJacobianRangeType dphi)
@@ -282,15 +279,15 @@ namespace Dune
         template< class Point, class Functor >
         void evaluateTestEach ( const Point &xx, Functor functor ) const
         {
-          sfs_.evaluateEach(xx, [&](std::size_t alpha, ScalarRangeType phi)
+          vsfs_.evaluateEach(xx, [&](std::size_t alpha, RangeType phi)
           {
             if (alpha < numInnerShapeFunctions_)
             {
-              RangeType ret = phi[0];
-              ret[0] *= ret[1];
-              ret[1] *= -ret[0];
+              auto copy = phi[0];
+              phi[0] *= phi[1];
+              phi[1] *= -copy;
 
-              functor(alpha,ret);
+              functor(alpha,phi);
             }
           });
           sfs_.jacobianEach(xx, [&](std::size_t alpha, ScalarJacobianRangeType dphi)
