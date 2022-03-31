@@ -40,9 +40,10 @@ namespace Dune
     // ---------------------------
 
     template<class FunctionSpace, class GridPart, bool reduced=true>
-    struct DivFreeVEMSpaceBasisSets
+    struct DivFreeVEMBasisSets
     {
       typedef GridPart GridPartType;
+      static constexpr bool vectorSpace = true;
       static constexpr int dimDomain = GridPartType::dimension;
       typedef typename GridPart::template Codim<0>::EntityType EntityType;
       typedef typename GridPart::IntersectionType IntersectionType;
@@ -57,7 +58,10 @@ namespace Dune
       typedef BoundingBoxBasisFunctionSet< GridPartType, ONBShapeFunctionSetType > ScalarBBBasisFunctionSetType;
 
       // vector version of the BB basis for use with vector spaces
-      typedef Fem::VectorialShapeFunctionSet<ScalarBBBasisFunctionSetType, typename FunctionSpace::RangeType> BBBasisFunctionSetType;
+      typedef std::conditional_t< vectorSpace,
+              Fem::VectorialShapeFunctionSet<ScalarBBBasisFunctionSetType, typename FunctionSpace::RangeType>,
+              ScalarBBBasisFunctionSetType
+              > BBBasisFunctionSetType;
 
       // Next we define test function space for the edges
       typedef Dune::Fem::FunctionSpace<double,double,GridPartType::dimensionworld-1,1> EdgeFSType;
@@ -77,7 +81,6 @@ namespace Dune
         static const int dimDomain = FunctionSpaceType::DomainType::dimension;
         static const int dimRange = RangeType::dimension;
 
-        static_assert(vectorSpace || dimRange==1);
         ShapeFunctionSet() = default;
         template <class Agglomeration>
         ShapeFunctionSet(bool useOnb, const ONBShapeFunctionSetType& onbSFS,
@@ -122,9 +125,13 @@ namespace Dune
           {
             if (alpha < numInnerShapeFunctions_)
             {
-              RangeType ret = phi[0];
-              ret[0] *= phi[0][1];
-              ret[1] *= -phi[0][0];
+              RangeType ret(0);
+              ret = phi[0];
+
+              auto copy = ret[0];
+
+              ret[0] *= -ret[1];
+              ret[1] *= copy;
 
               functor(alpha,ret);
             }
@@ -436,7 +443,7 @@ namespace Dune
       {
         // vertex values in div free space
         if (deriv==0)
-          return pow(dimDomain,deriv)
+          return pow(dimDomain,deriv);
         else
           return 0;
       }
@@ -447,7 +454,7 @@ namespace Dune
       int edgeValueMoments() const
       {
         // returns order of edge moments up to P_k where k is the entry in dof tuple
-        return order-2;
+        return innerOrder_-2;
       }
       std::size_t edgeSize(int deriv) const
       {
@@ -479,7 +486,7 @@ namespace Dune
           return pow(dimDomain,deriv);
         if (dim == 1 && deriv == 0)
         {
-          assert(Dune::Fem::OrthonormalShapeFunctions<dim>::size(order-2))==edgeSize(deriv))
+          assert( Dune::Fem::OrthonormalShapeFunctions<dim>::size(order-2) == edgeSize(deriv) );
           return edgeSize(deriv);
         }
         if (dim == 2 && deriv == 0)
@@ -504,8 +511,8 @@ namespace Dune
         // assert( testSpaces_[2].size()<2 );
 
         Std::vector<int> degrees(2, -1);
-        degrees[0] += 2
-        degrees[0] += std::max(0,order-2+1)
+        degrees[0] += 2;
+        degrees[0] += std::max(0,innerOrder_-1);
 
         // for (std::size_t i=0;i<testSpaces_[0].size();++i)
         //   degrees[i] += 2*(testSpaces_[0][i]+1);
@@ -559,24 +566,27 @@ namespace Dune
     struct DivFreeVEMSpaceTraits
     {
       typedef GridPart GridPartType;
+      static const int dimension = GridPartType::dimension;
+      typedef Dune::Fem::FunctionSpace<double,double,dimension,dimension> FunctionSpaceType;
+
       typedef DivFreeVEMBasisSets<FunctionSpaceType,GridPart> BasisSetsType;
       friend class DivFreeVEMSpace<GridPart>;
       typedef DivFreeVEMSpace<GridPart> DiscreteFunctionSpaceType;
 
-      static const int dimension = GridPartType::dimension;
-      typedef Dune::Fem::FunctionSpace<double,double,dimension,dimension> FunctionSpaceType;
       static const int codimension = 0;
       static const bool vectorSpace = true;
-      static const int dimDomain = FunctionSpace::DomainType::dimension;
-      static const int dimRange = FunctionSpace::RangeType::dimension;
+      static const int dimDomain = FunctionSpaceType::DomainType::dimension;
+      static const int dimRange = FunctionSpaceType::RangeType::dimension;
       static const int baseRangeDimension = vectorSpace ? dimRange : 1;
 
       typedef typename GridPartType::template Codim<codimension>::EntityType EntityType;
-      typedef FunctionSpace FunctionSpaceType;
 
       // vem basis function sets
       typedef VEMBasisFunctionSet <EntityType, typename BasisSetsType::ShapeFunctionSetType> ScalarBasisFunctionSetType;
-      typedef ScalarBasisFunctionSetType BasisFunctionSetType;
+      typedef std::conditional_t< vectorSpace,
+              ScalarBasisFunctionSetType,
+              Fem::VectorialBasisFunctionSet<ScalarBasisFunctionSetType, typename FunctionSpaceType::RangeType>
+              > BasisFunctionSetType;
 
       // types for the mapper
       typedef Hybrid::IndexRange<int, dimRange> LocalBlockIndices;
