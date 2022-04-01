@@ -275,6 +275,11 @@ namespace Dune
 
       double maxStab = 0;
 
+      std::cout << "pol order / dimDomain / dimRange: "
+                << polOrder << " / "
+                << dimDomain << " / "
+                << dimRange << std::endl;
+
       std::cout << "num val / grad / hess / constr shapefunctions: "
                 << numShapeFunctions << " / "
                 << numGradShapeFunctions << " / "
@@ -324,11 +329,11 @@ namespace Dune
         //         In the second case the blockMapper is already returning the correct size.
         const std::size_t numDofs = blockMapper().numDofs(agglomerate) *
                std::min(dimRange, blockSize);
-        /*
+        // /*
         std::cout << "numDofs: " << numDofs << " = "
                   << blockMapper().numDofs(agglomerate) << " * "
                   << blockSize << std::endl;
-        */
+        // */
 
         phi0Values.resize(numDofs);
         psi1Values.resize(numDofs);
@@ -382,7 +387,6 @@ namespace Dune
           const auto &shapeFunctionSet = basisSets_.basisFunctionSet(agglomeration(), element);
 
           interpolation_.interpolateBasis(element, shapeFunctionSet.valueBasisSet(), D);
-
           // compute mass matrices
           for (std::size_t qp = 0; qp < quadrature.nop(); ++qp)
           {

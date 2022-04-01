@@ -387,6 +387,10 @@ namespace Dune
                   << numEdgeTestShapeFunctions_ << "]"
                   << " " << degrees[0] << " " << degrees[1]
                   << " max size of edge set: " << edgeSFS_.size()
+                  << " edgeSize(): " << edgeSize()
+                  << std::endl;
+        std::cout << "dofs per codim: "
+                  << dofsPerCodim_[0].second << " " << dofsPerCodim_[1].second << " " << dofsPerCodim_[2].second
                   << std::endl;
       }
 
@@ -483,10 +487,13 @@ namespace Dune
           return pow(dimDomain,deriv);
         if (dim == 1 && deriv == 0)
         {
-          assert( Dune::Fem::OrthonormalShapeFunctions<dim>::size(order-2) == edgeSize(deriv) );
-          return edgeSize(deriv);
+          // assert(  == edgeSize(deriv) );
+          if (innerOrder_-2<0)
+            return 0;
+          else
+            return Dune::Fem::OrthonormalShapeFunctions<1>::size(innerOrder_-2);
         }
-        if (dim == 2 && deriv == 0)
+        if (dim == 2 && deriv == 0 && innerOrder_ >=3)
           return innerSize();
         else
           return 0;
@@ -535,8 +542,11 @@ namespace Dune
       std::array< std::pair< int, unsigned int >, dimDomain+1 > calcDofsPerCodim (unsigned int order) const
       {
         int vSize = order2size<0>(0);
+        std::cout << "vSize: " << vSize << std::endl;
         int eSize = order2size<1>(0);
-        int iSize = innerSize();
+        std::cout << "eSize: " << eSize << std::endl;
+        int iSize = order2size<2>(0);
+        std::cout << "iSize: " << iSize << std::endl;
         return std::array< std::pair< int, unsigned int >, dimDomain+1 >
                { std::make_pair( dimDomain,   vSize ),
                  std::make_pair( dimDomain-1, eSize ),
