@@ -175,43 +175,6 @@ namespace Dune
         template< class Point, class Functor >
         void hessianEach ( const Point &x, Functor functor ) const
         {
-          if constexpr (!reduced)
-          {
-            HessianRangeType hess(0);
-            std::size_t beta = 0;
-            vsfs_.evaluateEach(x, [&](std::size_t alpha, RangeType phi)
-            {
-              if (alpha<numHessShapeFunctions_)
-              {
-                for (size_t d1=0;d1<dimDomain;++d1)
-                {
-                  for (size_t d2=0;d2<=d1;++d2)
-                  {
-                    for (size_t r=0;r<phi.size();++r)
-                    {
-                      hess[r][d1][d2] = phi[r];
-                      hess[r][d2][d1] = phi[r];
-                    }
-                    functor(beta,hess);
-                    ++beta;
-                    for (size_t r=0;r<phi.size();++r)
-                    {
-                      hess[r][d1][d2] = 0;
-                      hess[r][d2][d1] = 0;
-                    }
-                  }
-                }
-              }
-            });
-          }
-          else
-          {
-            vsfs_.hessianEach(x, [&](std::size_t alpha, HessianRangeType d2phi)
-            {
-              if (alpha>=(dimDomain+1)*dimRange)
-                functor(alpha-(dimDomain+1)*dimRange,d2phi);
-            });
-          }
         }
         // functor(alpha, psi) with psi in R^r
         //
@@ -365,7 +328,7 @@ namespace Dune
 
       DivFreeVEMBasisSets( const int order, bool useOnb )
       : innerOrder_( order )
-      , onbSFS_(Dune::GeometryType(Dune::GeometryType::cube, dimDomain), order)
+      , onbSFS_(Dune::GeometryType(Dune::GeometryType::cube, dimDomain), order-1)
       , edgeSFS_( Dune::GeometryType(Dune::GeometryType::cube,dimDomain-1), maxEdgeDegree() )
       , dofsPerCodim_(calcDofsPerCodim(order))
       , useOnb_(useOnb)
