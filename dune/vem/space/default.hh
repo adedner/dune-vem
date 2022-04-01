@@ -320,6 +320,7 @@ namespace Dune
       std::vector<JacobianRangeType> psi1Values;
 
       // start iteration over all polygons
+      std::cout << "iterate over polygons\n";
       for (std::size_t agglomerate = start; agglomerate < end; ++agglomerate)
       {
         // case 1: dimRange=1 (e.g. a vector extension is applied later)
@@ -376,6 +377,7 @@ namespace Dune
 
         HpGrad = 0;
         HpHess = 0;
+        std::cout << "first element iteration\n";
         for (const ElementSeedType &entitySeed : entitySeeds[agglomerate])
         {
           const ElementType &element = gridPart().entity(entitySeed);
@@ -527,11 +529,12 @@ namespace Dune
         std::cout << "*******************************\n";
 #endif
 
-
+        continue;
         //////////////////////////////////////////////////////////////////////////
         /// GradientProjection //////////////////////////////////////////////////
         //////////////////////////////////////////////////////////////////////////
 
+        std::cout << "second element iteration\n";
         for (const ElementSeedType &entitySeed : entitySeeds[agglomerate])
         {
           const ElementType &element = gridPart().entity(entitySeed);
@@ -711,6 +714,7 @@ namespace Dune
         /////////////////////////////////////////////////////////////////////
 
         // iterate over the triangles of this polygon (for Hessian projection)
+        std::cout << "third element iteration\n";
         for (const ElementSeedType &entitySeed : entitySeeds[agglomerate])
         {
           const ElementType &element = gridPart().entity(entitySeed);

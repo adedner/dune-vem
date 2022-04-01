@@ -174,45 +174,7 @@ namespace Dune
         }
         template< class Point, class Functor >
         void hessianEach ( const Point &x, Functor functor ) const
-        {
-          if constexpr (!reduced)
-          {
-            HessianRangeType hess(0);
-            std::size_t beta = 0;
-            vsfs_.evaluateEach(x, [&](std::size_t alpha, RangeType phi)
-            {
-              if (alpha<numHessShapeFunctions_)
-              {
-                for (size_t d1=0;d1<dimDomain;++d1)
-                {
-                  for (size_t d2=0;d2<=d1;++d2)
-                  {
-                    for (size_t r=0;r<phi.size();++r)
-                    {
-                      hess[r][d1][d2] = phi[r];
-                      hess[r][d2][d1] = phi[r];
-                    }
-                    functor(beta,hess);
-                    ++beta;
-                    for (size_t r=0;r<phi.size();++r)
-                    {
-                      hess[r][d1][d2] = 0;
-                      hess[r][d2][d1] = 0;
-                    }
-                  }
-                }
-              }
-            });
-          }
-          else
-          {
-            vsfs_.hessianEach(x, [&](std::size_t alpha, HessianRangeType d2phi)
-            {
-              if (alpha>=(dimDomain+1)*dimRange)
-                functor(alpha-(dimDomain+1)*dimRange,d2phi);
-            });
-          }
-        }
+        {}
         // functor(alpha, psi) with psi in R^r
         //
         // for each g = g_{alpha*dimDomain+s} = m_alpha e_s    (1<=alpha<=numGradSF and 1<=s<=dimDomain)
@@ -378,6 +340,9 @@ namespace Dune
       , numEdgeTestShapeFunctions_( sizeONB<1>(order-2) )
       {
         auto degrees = edgeDegrees();
+        std::cout << "dofsPerCodim:" << dofsPerCodim_[0].second << " "
+                                     << dofsPerCodim_[1].second << " "
+                                     << dofsPerCodim_[2].second << std::endl;
         std::cout << "[" << numValueShapeFunctions_ << ","
                   << numGradShapeFunctions_ << ","
                   << numHessShapeFunctions_ << ","
@@ -438,7 +403,7 @@ namespace Dune
       }
       int constraintSize() const
       {
-        return numValueShapeFunctions_;
+        return numInnerShapeFunctions_; // numValueShapeFunctions_;
       }
       int vertexSize(int deriv) const
       {
@@ -629,9 +594,12 @@ namespace Dune
                  typename TraitsType::BasisSetsType(polOrder, basisChoice),
                  basisChoice,edgeInterpolation)
       {
+        std::cout << "CTOR\n";
         if (basisChoice != 3) // !!!!! get order information from BasisSets
           BaseType::agglomeration().onbBasis(polOrder);
+        std::cout << "update\n";
         BaseType::update(true);
+        std::cout << "   CTOR\n";
       }
 
     protected:
@@ -669,6 +637,7 @@ namespace Dune
           }
         }
 
+        /*
         // matrices for edge projections
         Std::vector<Dune::DynamicMatrix<double> > edgePhiVector(2);
         edgePhiVector[0].resize(BaseType::basisSets_.edgeSize(0), BaseType::basisSets_.edgeSize(0), 0);
@@ -724,6 +693,7 @@ namespace Dune
             } // quadrature loop
           } // loop over intersections
         } // loop over triangles in agglomerate
+        */
       }
     };
 
