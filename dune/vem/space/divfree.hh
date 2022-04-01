@@ -145,33 +145,8 @@ namespace Dune
 
         template< class Point, class Functor >
         void jacobianEach ( const Point &x, Functor functor ) const
-        {
-          if constexpr (!reduced)
-          {
-            JacobianRangeType jac(0);
-            vsfs_.evaluateEach(x, [&](std::size_t alpha, RangeType phi)
-            {
-              if (alpha<numGradShapeFunctions_)
-              {
-                for (size_t d=0;d<dimDomain;++d)
-                {
-                  for (size_t r=0;r<phi.size();++r)
-                    jac[r][d] = phi[r];
-                  functor(dimDomain*alpha+d,jac);
-                  for (size_t r=0;r<phi.size();++r)
-                    jac[r][d] = 0;
-                }
-              }
-            });
-          }
-          else
-          {
-            vsfs_.jacobianEach(x, [&](std::size_t alpha, JacobianRangeType dphi)
-            {
-              if (alpha>=dimRange) functor(alpha-dimRange,dphi);
-            });
-          }
-        }
+        {}
+
         template< class Point, class Functor >
         void hessianEach ( const Point &x, Functor functor ) const
         {}
@@ -331,12 +306,12 @@ namespace Dune
       , edgeSFS_( Dune::GeometryType(Dune::GeometryType::cube,dimDomain-1), maxEdgeDegree() )
       , dofsPerCodim_(calcDofsPerCodim(order))
       , useOnb_(useOnb)
-      , numValueShapeFunctions_( onbSFS_.size()*BBBasisFunctionSetType::RangeType::dimension )
+      , numValueShapeFunctions_( sizeONB<0>(order-2) )
       , numGradShapeFunctions_ (
           !reduced? std::min( numValueShapeFunctions_, sizeONB<0>(std::max(0, order - 1)) )
           : numValueShapeFunctions_-1*BBBasisFunctionSetType::RangeType::dimension )
       , numHessShapeFunctions_ ( 0 )
-      , numInnerShapeFunctions_( sizeONB<0>(order-3)/BBBasisFunctionSetType::RangeType::dimension )
+      , numInnerShapeFunctions_( 0 )
       , numEdgeTestShapeFunctions_( sizeONB<1>(order-2) )
       {
         auto degrees = edgeDegrees();
@@ -633,7 +608,7 @@ namespace Dune
           for (int alpha=0; alpha<numInnerShapeFunctions; ++alpha)
           {
             if( beta - numDofs + numInnerShapeFunctions == alpha )
-              RHSconstraintsMatrix[ beta ][ alpha ] = std::sqrt(volume);
+              RHSconstraintsMatrix[ beta ][ alpha ] = volume;
           }
         }
 
