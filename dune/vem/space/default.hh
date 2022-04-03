@@ -329,11 +329,11 @@ namespace Dune
         //         In the second case the blockMapper is already returning the correct size.
         const std::size_t numDofs = blockMapper().numDofs(agglomerate) *
                std::min(dimRange, blockSize);
-        // /*
+        /*
         std::cout << "numDofs: " << numDofs << " = "
                   << blockMapper().numDofs(agglomerate) << " * "
                   << blockSize << std::endl;
-        // */
+        */
 
         phi0Values.resize(numDofs);
         psi1Values.resize(numDofs);
@@ -615,7 +615,6 @@ namespace Dune
               });
               shapeFunctionSet.hessianEach(y, [&](std::size_t alpha, HessianRangeType phi)
               {
-                  assert(0);
                   // compute the phi.tau boundary terms for the hessian projection using d/ds Pi^e
                   if ( basisSets_.edgeSize(1) > 0 )
                   {
