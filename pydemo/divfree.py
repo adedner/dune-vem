@@ -19,8 +19,15 @@ maxLevel     = 4
 order        = 2
 level        = 5
 constructor = cartesianDomain([0,0],[1,1],[2**level,2**level])
-polyGrid = create.grid("agglomerate", constructor, cubes=False )
+polyGrid = dune.vem.polyGrid( constructor, cubes=False )
 space = divFreeSpace(polyGrid, order=order, storage="numpy")
 x = SpatialCoordinate(space)
-uh = space.interpolate([x[1],-x[0]],name="hallo")
+exact = [x[1],-x[0]]
+uh = space.interpolate(exact,name="solution")
 uh.plot()
+
+errors = []
+edf = exact - vh
+err = [inner(edf,edf)]
+errors += [ numpy.sqrt(e) for e in integrate(polyGrid,err,order=8) ]
+print(errors, "#", space.diameters())
