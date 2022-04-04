@@ -27,7 +27,9 @@ namespace Dune
     // Internal Forward Declarations
     // -----------------------------
 
-    template<class FunctionSpace, class GridPart, bool vectorSpace = false>
+    template<class FunctionSpace, class GridPart,
+             bool vectorSpace, bool reduced>
+             // bool vectorSpace = false, bool reduced = false>
     class AgglomerationVEMSpace;
     template< class Traits >
     class AgglomerationVEMInterpolation;
@@ -35,15 +37,15 @@ namespace Dune
     // IsAgglomerationVEMSpace
     // -----------------------
 
-    template<class FunctionSpace, class GridPart, bool vectorSpace>
-    struct IsAgglomerationVEMSpace<AgglomerationVEMSpace<FunctionSpace, GridPart,vectorSpace> >
+    template<class FunctionSpace, class GridPart, bool vectorSpace, bool reduced>
+    struct IsAgglomerationVEMSpace<AgglomerationVEMSpace<FunctionSpace, GridPart, vectorSpace,reduced> >
             : std::integral_constant<bool, true> {
     };
 
     // AgglomerationVEMSpaceTraits
     // ---------------------------
 
-    template<class FunctionSpace, class GridPart, bool vectorspace, bool reduced=false>
+    template<class FunctionSpace, class GridPart, bool vectorspace, bool reduced>
     struct AgglomerationVEMBasisSets
     {
       typedef GridPart GridPartType;
@@ -178,11 +180,13 @@ namespace Dune
           }
           else
           {
+            /*
             sfs_.hessianEach(x, [&](std::size_t alpha, HessianRangeType d2phi)
             {
               if (alpha>=(dimDomain+1)*dimRange)
                 functor(alpha-(dimDomain+1)*dimRange,d2phi);
             });
+            */
           }
         }
         template< class Point, class Functor >
@@ -282,8 +286,7 @@ namespace Dune
           }
           else
           {
-            if (sfs_.order()>2)
-              DUNE_THROW( NotImplemented, "hessianEach not implemented for reduced space - needs third order derivative" );
+            // if (sfs_.order()>2) DUNE_THROW( NotImplemented, "hessianEach not implemented for reduced space - needs third order derivative" );
           }
         }
 
@@ -366,7 +369,7 @@ namespace Dune
         )
       , numHessShapeFunctions_ (
           !reduced? std::min( numValueShapeFunctions_, sizeONB<0>(std::max(0, order - 2)) )
-          : numValueShapeFunctions_-3*BBBasisFunctionSetType::RangeType::dimension
+          : 0 // numValueShapeFunctions_-3*BBBasisFunctionSetType::RangeType::dimension
         )
       , numInnerShapeFunctions_( testSpaces[2][0]<0? 0 : sizeONB<0>(testSpaces[2][0]) )
       , numEdgeTestShapeFunctions_( sizeONB<1>(
@@ -544,15 +547,16 @@ namespace Dune
 
 
 
-    template<class FunctionSpace, class GridPart, bool vectorspace>
+    template<class FunctionSpace, class GridPart,
+             bool vectorspace, bool reduced>
     struct AgglomerationVEMSpaceTraits
     {
-      typedef AgglomerationVEMBasisSets<FunctionSpace,GridPart,vectorspace> BasisSetsType;
+      typedef AgglomerationVEMBasisSets<FunctionSpace,GridPart,vectorspace,reduced> BasisSetsType;
 
       static const bool vectorSpace = vectorspace;
-      friend class AgglomerationVEMSpace<FunctionSpace, GridPart, vectorSpace>;
+      friend class AgglomerationVEMSpace<FunctionSpace, GridPart, vectorSpace, reduced>;
 
-      typedef AgglomerationVEMSpace<FunctionSpace, GridPart, vectorSpace> DiscreteFunctionSpaceType;
+      typedef AgglomerationVEMSpace<FunctionSpace, GridPart, vectorSpace, reduced> DiscreteFunctionSpaceType;
 
       typedef GridPart GridPartType;
 
@@ -589,14 +593,15 @@ namespace Dune
 
     // AgglomerationVEMSpace
     // ---------------------
-    template<class FunctionSpace, class GridPart, bool vectorSpace>
+    template<class FunctionSpace, class GridPart,
+             bool vectorSpace, bool reduced>
     struct AgglomerationVEMSpace
-    : public DefaultAgglomerationVEMSpace< AgglomerationVEMSpaceTraits<FunctionSpace,GridPart,vectorSpace> >
+    : public DefaultAgglomerationVEMSpace< AgglomerationVEMSpaceTraits<FunctionSpace,GridPart,vectorSpace,reduced> >
     {
-      typedef AgglomerationVEMSpaceTraits<FunctionSpace,GridPart,vectorSpace> TraitsType;
+      typedef AgglomerationVEMSpaceTraits<FunctionSpace,GridPart,vectorSpace,reduced> TraitsType;
       typedef DefaultAgglomerationVEMSpace<TraitsType> BaseType;
       typedef Agglomeration<GridPart> AgglomerationType;
-      typedef typename BaseType::BasisSetsType::ShapeFunctionSetType::FunctionSpaceType FunctionSpaceType;
+      typedef typename TraitsType::FunctionSpaceType FunctionSpaceType;
       typedef typename FunctionSpaceType::DomainFieldType DomainFieldType;
       AgglomerationVEMSpace(AgglomerationType &agglomeration,
           const unsigned int polOrder,
@@ -620,12 +625,14 @@ namespace Dune
         /// Fix RHS constraints for value projection /////////////////////////////
         //////////////////////////////////////////////////////////////////////////
 
-        static constexpr int blockSize = BaseType::localBlockSize;
+        static constexpr int blockSize = TraitsType::baseRangeDimension;
         const std::size_t numShapeFunctions = BaseType::basisSets_.size(0);
         const std::size_t numDofs = BaseType::blockMapper().numDofs(agglomerate) * blockSize;
         const std::size_t numConstraintShapeFunctions = BaseType::basisSets_.constraintSize();
         const std::size_t numInnerShapeFunctions = BaseType::basisSets_.innerSize();
 
+        assert( numDofs == RHSconstraintsMatrix.rows() );
+        assert( numInnerShapeFunctions == RHSconstraintsMatrix.cols() );
         assert( numInnerShapeFunctions <= numConstraintShapeFunctions );
         if (numConstraintShapeFunctions == 0) return;
 
@@ -750,7 +757,6 @@ namespace Dune
         auto edge = [&] (int poly,auto i,int k,int numDofs)
         {
           k /= baseRangeDimension;
-          /*
 #ifndef NDEBUG
           auto kStart = k;
 #endif
@@ -768,9 +774,8 @@ namespace Dune
             }
           }
           // assert(k-kStart == numDofs/baseRangeDimension);
-          */
-          assert( numDofs == basisSets_.template order2size<1>(0) );
-          std::fill(mask.begin()+k,mask.begin()+k+numDofs,1);
+          // assert( numDofs == basisSets_.template order2size<1>(0) );
+          // std::fill(mask.begin()+k,mask.begin()+k+numDofs,1);
         };
         auto inner = [&mask] (int poly,auto i,int k,int numDofs)
         {
@@ -1377,8 +1382,8 @@ namespace Dune
   {
     namespace Capabilities
     {
-        template<class FunctionSpace, class GridPart, bool vectorSpace>
-        struct hasInterpolation<Vem::AgglomerationVEMSpace<FunctionSpace, GridPart, vectorSpace> > {
+        template<class FunctionSpace, class GridPart, bool vectorSpace, bool reduced>
+        struct hasInterpolation<Vem::AgglomerationVEMSpace<FunctionSpace, GridPart, vectorSpace, reduced> > {
             static const bool v = false;
         };
     }
