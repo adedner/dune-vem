@@ -848,7 +848,7 @@ namespace Dune
                     [ & ] ( std::size_t beta, typename BasisFunctionSet::RangeType value )
                     {
                       assert(k<localDofMatrix.size());
-                      assert(beta<localMatrix[k].size());
+                      assert(beta<localDofMatrix[k].size());
                       localDofMatrix[ k ][ beta ] += value*phi * weight;
                     }
                   );
