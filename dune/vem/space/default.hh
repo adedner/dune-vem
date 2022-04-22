@@ -320,6 +320,7 @@ namespace Dune
       std::vector<JacobianRangeType> psi1Values;
 
       // start iteration over all polygons
+      std::cout << "iterate over polygons\n";
       for (std::size_t agglomerate = start; agglomerate < end; ++agglomerate)
       {
         // case 1: dimRange=1 (e.g. a vector extension is applied later)
@@ -376,6 +377,7 @@ namespace Dune
 
         HpGrad = 0;
         HpHess = 0;
+        std::cout << "first element iteration\n";
         for (const ElementSeedType &entitySeed : entitySeeds[agglomerate])
         {
           const ElementType &element = gridPart().entity(entitySeed);
@@ -387,6 +389,7 @@ namespace Dune
           const auto &shapeFunctionSet = basisSets_.basisFunctionSet(agglomeration(), element);
 
           interpolation_.interpolateBasis(element, shapeFunctionSet.valueBasisSet(), D);
+          std::cout << "checkpoint inerpolate basis" << std::endl;
           // compute mass matrices
           for (std::size_t qp = 0; qp < quadrature.nop(); ++qp)
           {
@@ -418,7 +421,7 @@ namespace Dune
               });
             });
           } // quadrature loop
-
+        std::cout << "checkpoint mass matrices" << std::endl;
         } // loop over triangles in agglomerate
 
         // compute inverse mass matrix
@@ -446,7 +449,7 @@ namespace Dune
         //////////////////////////////////////////////////////////////////////////
         /// ValueProjection /////////////////////////////////////////////////////
         //////////////////////////////////////////////////////////////////////////
-
+        std::cout << "checkpoint constructed constraint value proj matrix " << std::endl;
 #if 0
         {
           for (std::size_t beta = 0; beta < numConstraintShapeFunctions; ++beta )
@@ -463,8 +466,11 @@ namespace Dune
         // set up matrix RHSconstraintsMatrix
         setupConstraintRHS(entitySeeds, agglomerate, RHSconstraintsMatrix, H0);
 
+        std::cout << "checkpoint setupRHS constraints matrix done" << std::endl;
+
         if (numConstraintShapeFunctions < numShapeFunctions)
         { // need to use a CLS approach
+          std::cout << "HERE" << std::endl;
           auto leastSquaresMinimizer = LeastSquares(D, constraintValueProj);
           for ( std::size_t beta = 0; beta < numDofs; ++beta )
           {
@@ -511,6 +517,20 @@ namespace Dune
             }
           }
         }
+
+        std::cout << "*******************************\n";
+        std::cout << "****  Value projection  ****\n";
+        std::cout << "*******************************\n";
+        for (std::size_t beta = 0; beta < numDofs; ++beta )
+        {
+          std::cout << "phi_" << beta << " = ";
+          for (std::size_t alpha = 0; alpha < numShapeFunctions; ++alpha)
+          {
+            std::cout << valueProjection[alpha][beta] << " ";
+          }
+          std::cout << std::endl;
+        }
+        std::cout << "*******************************\n";
 #if 0
         std::cout << "*******************************\n";
         std::cout << "** RHS constraints 1        **\n";
@@ -527,11 +547,13 @@ namespace Dune
         std::cout << "*******************************\n";
 #endif
 
-
+        // continue;
+#if 0
         //////////////////////////////////////////////////////////////////////////
         /// GradientProjection //////////////////////////////////////////////////
         //////////////////////////////////////////////////////////////////////////
 
+        std::cout << "second element iteration\n";
         for (const ElementSeedType &entitySeed : entitySeeds[agglomerate])
         {
           const ElementType &element = gridPart().entity(entitySeed);
@@ -710,6 +732,7 @@ namespace Dune
         /////////////////////////////////////////////////////////////////////
 
         // iterate over the triangles of this polygon (for Hessian projection)
+        std::cout << "third element iteration\n";
         for (const ElementSeedType &entitySeed : entitySeeds[agglomerate])
         {
           const ElementType &element = gridPart().entity(entitySeed);
@@ -787,7 +810,7 @@ namespace Dune
         }
 
         finalize(entitySeeds, agglomerate);
-
+#endif
         /////////////////////////////////////////////////////////////////////
         // stabilization matrix /////////////////////////////////////////////
         /////////////////////////////////////////////////////////////////////
