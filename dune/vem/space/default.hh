@@ -405,21 +405,23 @@ namespace Dune
                 }
               });
             });
-            shapeFunctionSet.jacobianEach(quadrature[qp], [&](std::size_t alpha, JacobianRangeType phi) {
-              shapeFunctionSet.jacobianEach(quadrature[qp], [&](std::size_t beta, JacobianRangeType psi) {
+            if (numGradShapeFunctions>0)
+              shapeFunctionSet.jacobianEach(quadrature[qp], [&](std::size_t alpha, JacobianRangeType phi) {
+                shapeFunctionSet.jacobianEach(quadrature[qp], [&](std::size_t beta, JacobianRangeType psi) {
                   for (std::size_t i=0;i<dimRange;++i)
                     for (std::size_t j=0;j<dimDomain;++j)
                       HpGrad[alpha][beta] += phi[i][j] * psi[i][j] * weight;
+                });
               });
-            });
-            shapeFunctionSet.hessianEach(quadrature[qp], [&](std::size_t alpha, HessianRangeType phi) {
-              shapeFunctionSet.hessianEach(quadrature[qp], [&](std::size_t beta, HessianRangeType psi) {
+            if (numHessShapeFunctions>0)
+              shapeFunctionSet.hessianEach(quadrature[qp], [&](std::size_t alpha, HessianRangeType phi) {
+                shapeFunctionSet.hessianEach(quadrature[qp], [&](std::size_t beta, HessianRangeType psi) {
                   for (std::size_t i=0;i<dimRange;++i)
                     for (std::size_t j=0;j<dimDomain;++j)
                       for (std::size_t k=0;k<dimDomain;++k)
                         HpHess[alpha][beta] += phi[i][j][k] * psi[i][j][k] * weight;
+                });
               });
-            });
           } // quadrature loop
         std::cout << "checkpoint mass matrices" << std::endl;
         } // loop over triangles in agglomerate
@@ -517,20 +519,6 @@ namespace Dune
             }
           }
         }
-
-        std::cout << "*******************************\n";
-        std::cout << "****  Value projection  ****\n";
-        std::cout << "*******************************\n";
-        for (std::size_t beta = 0; beta < numDofs; ++beta )
-        {
-          std::cout << "phi_" << beta << " = ";
-          for (std::size_t alpha = 0; alpha < numShapeFunctions; ++alpha)
-          {
-            std::cout << valueProjection[alpha][beta] << " ";
-          }
-          std::cout << std::endl;
-        }
-        std::cout << "*******************************\n";
 #if 0
         std::cout << "*******************************\n";
         std::cout << "** RHS constraints 1        **\n";
@@ -547,8 +535,23 @@ namespace Dune
         std::cout << "*******************************\n";
 #endif
 
-        // continue;
 #if 0
+        std::cout << "*******************************\n";
+        std::cout << "****  Value projection  ****\n";
+        std::cout << "*******************************\n";
+        for (std::size_t beta = 0; beta < numDofs; ++beta )
+        {
+          std::cout << "phi_" << beta << " = ";
+          for (std::size_t alpha = 0; alpha < numShapeFunctions; ++alpha)
+          {
+            std::cout << valueProjection[alpha][beta] << " ";
+          }
+          std::cout << std::endl;
+        }
+        std::cout << "*******************************\n";
+#endif
+        continue;
+
         //////////////////////////////////////////////////////////////////////////
         /// GradientProjection //////////////////////////////////////////////////
         //////////////////////////////////////////////////////////////////////////

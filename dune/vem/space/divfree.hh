@@ -88,9 +88,10 @@ namespace Dune
                          std::size_t innerNumSFS,
                          const Agglomeration &agglomeration, const EntityType &entity)
         : vsfs_(entity, agglomeration.index(entity),
-               agglomeration.boundingBoxes(), useOnb, onbSFS)
+                agglomeration.boundingBoxes(), useOnb, onbSFS)
         , sfs_(entity, agglomeration.index(entity),
                agglomeration.boundingBoxes(), useOnb, onbSFS)
+        , entity_(entity)
         , scale_( std::sqrt( sfs_.bbox().volume() ) )
         , numValueShapeFunctions_(numValueSFS)
         , numGradShapeFunctions_(numGradSFS)
@@ -98,11 +99,11 @@ namespace Dune
         , numInnerShapeFunctions_(innerNumSFS)
         {}
 
-        int order () const { return vsfs_.order();  }
+        int order () const { return sfs_.order()-1;  }
 
-        const BBBasisFunctionSetType &valueBasisSet() const
+        const auto &valueBasisSet() const
         {
-          return vsfs_;
+          return *this;
         }
 
         template< class Point, class Functor >
@@ -121,16 +122,16 @@ namespace Dune
         template< class Point, class Functor >
         void evaluateEach ( const Point &x, Functor functor ) const
         {
-          vsfs_.evaluateEach(x, [&](std::size_t alpha, RangeType phi)
+          sfs_.evaluateEach(x, [&](std::size_t alpha, ScalarRangeType phi)
           {
             if (alpha < numInnerShapeFunctions_)
             {
-              auto copy = phi[0];
-
-              phi[0] *= phi[1];
-              phi[1] *= -copy;
-
-              functor(alpha,phi);
+              //// (-y,x) * phi(x,y)
+              RangeType y = entity_.geometry().global(Dune::Fem::coordinate(x));
+              auto copy = y[0];
+              y[0] = -y[1]*phi[0];
+              y[1] =  copy*phi[0];
+              functor(alpha,y);
             }
           });
           sfs_.jacobianEach(x, [&](std::size_t alpha, ScalarJacobianRangeType dphi)
@@ -216,23 +217,16 @@ namespace Dune
         template< class Point, class Functor >
         void evaluateTestEach ( const Point &xx, Functor functor ) const
         {
-          vsfs_.evaluateEach(xx, [&](std::size_t alpha, RangeType phi)
+          sfs_.evaluateEach(xx, [&](std::size_t alpha, ScalarRangeType phi)
           {
             if (alpha < numInnerShapeFunctions_)
             {
-              auto copy = phi[0];
-              phi[0] *= phi[1];
-              phi[1] *= -copy;
+              RangeType y = entity_.geometry().global(Dune::Fem::coordinate(xx));
+              auto copy = y[0];
+              y[0] = -y[1]*phi[0];
+              y[1] =  copy*phi[0];
 
-              functor(alpha,phi);
-            }
-          });
-          sfs_.jacobianEach(xx, [&](std::size_t alpha, ScalarJacobianRangeType dphi)
-          {
-            if (alpha>=1 && alpha < numInnerShapeFunctions_+1)
-            {
-              dphi[0] *= scale_;
-              functor(alpha+numInnerShapeFunctions_-1, dphi[0]);
+              functor(alpha,y);
             }
           });
         }
@@ -240,6 +234,7 @@ namespace Dune
         private:
         BBBasisFunctionSetType vsfs_;
         ScalarBBBasisFunctionSetType sfs_;
+        EntityType entity_;
         double scale_;
         std::size_t numValueShapeFunctions_;
         std::size_t numGradShapeFunctions_;
@@ -302,16 +297,18 @@ namespace Dune
 
       DivFreeVEMBasisSets( const int order, bool useOnb )
       : innerOrder_( order )
+      // test order+1 later
       , onbSFS_(Dune::GeometryType(Dune::GeometryType::cube, dimDomain), order-1)
       , edgeSFS_( Dune::GeometryType(Dune::GeometryType::cube,dimDomain-1), maxEdgeDegree() )
       , dofsPerCodim_(calcDofsPerCodim(order))
       , useOnb_(useOnb)
-      , numValueShapeFunctions_( sizeONB<0>(order-2) )
-      , numGradShapeFunctions_ (
-          !reduced? std::min( numValueShapeFunctions_, sizeONB<0>(std::max(0, order - 1)) )
-          : numValueShapeFunctions_-1*BBBasisFunctionSetType::RangeType::dimension )
+      , numValueShapeFunctions_( sizeONB<0>(onbSFS_.order()-1) )
+      , numGradShapeFunctions_ ( 0 )
+         // !reduced? std::min( numValueShapeFunctions_, sizeONB<0>(std::max(0, order - 1)) )
+         // : numValueShapeFunctions_-1*BBBasisFunctionSetType::RangeType::dimension )
       , numHessShapeFunctions_ ( 0 )
-      , numInnerShapeFunctions_( 0 )
+      , numInnerShapeFunctions_( order==2 ? 0 :
+                                 sizeONB<0>(order-3)/BBBasisFunctionSetType::RangeType::dimension )
       , numEdgeTestShapeFunctions_( sizeONB<1>(order-2) )
       {
         auto degrees = edgeDegrees();
@@ -376,11 +373,11 @@ namespace Dune
         assert(0);
         return 0;
       }
-      int constraintSize() const
+      std::size_t constraintSize() const
       {
-        return numInnerShapeFunctions_; // numValueShapeFunctions_;
+        return sizeONB<0>(innerOrder_-2);
       }
-      int vertexSize(int deriv) const
+      std::size_t vertexSize(int deriv) const
       {
         // vertex values in div free space
         if (deriv==0)
@@ -388,11 +385,11 @@ namespace Dune
         else
           return 0;
       }
-      int innerSize() const
+      std::size_t innerSize() const
       {
         return numInnerShapeFunctions_;
       }
-      int edgeValueMoments() const
+      std::size_t edgeValueMoments() const
       {
         // returns order of edge moments up to P_k where k is the entry in dof tuple
         return innerOrder_-2;
@@ -434,7 +431,7 @@ namespace Dune
             return Dune::Fem::OrthonormalShapeFunctions<1>::size(innerOrder_-2);
         }
         if (dim == 2 && deriv == 0 && innerOrder_ >=3)
-          return innerSize();
+          return Dune::Fem::OrthonormalShapeFunctions<2>::size(innerOrder_-3);
         else
           return 0;
       }
@@ -481,11 +478,11 @@ namespace Dune
 
       std::array< std::pair< int, unsigned int >, dimDomain+1 > calcDofsPerCodim (unsigned int order) const
       {
-        int vSize = order2size<0>(0);
+        auto vSize = order2size<0>(0);
         std::cout << "vSize: " << vSize << std::endl;
-        int eSize = order2size<1>(0);
+        auto eSize = order2size<1>(0);
         std::cout << "eSize: " << eSize << std::endl;
-        int iSize = order2size<2>(0);
+        auto iSize = order2size<2>(0);
         std::cout << "iSize: " << iSize << std::endl;
         return std::array< std::pair< int, unsigned int >, dimDomain+1 >
                { std::make_pair( dimDomain,   vSize ),
@@ -569,10 +566,10 @@ namespace Dune
                  typename TraitsType::BasisSetsType(polOrder, basisChoice),
                  basisChoice,edgeInterpolation)
       {
-        std::cout << "CTOR\n";
+        // TODO: move this to the default and add a method to the baisisSets to
+        // obtain the required order (here polOrder+1)
         if (basisChoice != 3) // !!!!! get order information from BasisSets
-          BaseType::agglomeration().onbBasis(polOrder);
-        std::cout << "update\n";
+          BaseType::agglomeration().onbBasis(polOrder+1);
         BaseType::update(true);
         std::cout << "   CTOR\n";
       }
@@ -613,6 +610,13 @@ namespace Dune
         }
 
         /*
+          q in P_{k-1}\R
+          int_E v grad q = - int_E div(v) q + int_bE q v.n
+                         = - div(v) int_E q + int_bE q v.n
+                         = int_bE q v.n
+          since int_E q = int_E 1 q = 0 since q is from ONB set
+        */
+
         // matrices for edge projections
         Std::vector<Dune::DynamicMatrix<double> > edgePhiVector(2);
         edgePhiVector[0].resize(BaseType::basisSets_.edgeSize(0), BaseType::basisSets_.edgeSize(0), 0);
@@ -654,7 +658,8 @@ namespace Dune
               // need to call shape set scalar each for the correct test functions
               shapeFunctionSet.scalarEach(y, [&](std::size_t alpha, RangeFieldType m)
               {
-                if (alpha>=numInnerShapeFunctions)
+                alpha += numInnerShapeFunctions;
+                if (alpha<RHSconstraintsMatrix[0].size())
                 {
                   edgeShapeFunctionSet.evaluateEach(x, [&](std::size_t beta,
                         typename BaseType::BasisSetsType::EdgeShapeFunctionSetType::RangeType psi)
@@ -664,11 +669,15 @@ namespace Dune
                       RHSconstraintsMatrix[mask[0][s]][alpha] += weight * edgePhiVector[0][beta][s] * psi*normal * m;
                   });
                 }
+                else
+                {
+                  std::cout << "shouldn't get here!\n";
+                  abort();
+                }
               });
             } // quadrature loop
           } // loop over intersections
         } // loop over triangles in agglomerate
-        */
       }
     };
 
