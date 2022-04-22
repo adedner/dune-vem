@@ -119,15 +119,22 @@ namespace Dune
             }
           });
         }
+        /*
+             ortho  1      x    y        scalar   x     y    xy    x^2   y^2
+        k=2                                      (1)   (0)
+                                                 (0)   (1)
+        k=3         (-y)                         (1)   (0)   (y)   (2x)  (0)
+                    ( x)                         (0)   (1)   (x)   (0)   (2y)
+        */
         template< class Point, class Functor >
         void evaluateEach ( const Point &x, Functor functor ) const
         {
+          RangeType y = entity_.geometry().global(Dune::Fem::coordinate(x));
           sfs_.evaluateEach(x, [&](std::size_t alpha, ScalarRangeType phi)
           {
             if (alpha < numInnerShapeFunctions_)
             {
               //// (-y,x) * phi(x,y)
-              RangeType y = entity_.geometry().global(Dune::Fem::coordinate(x));
               auto copy = y[0];
               y[0] = -y[1]*phi[0];
               y[1] =  copy*phi[0];
@@ -215,17 +222,16 @@ namespace Dune
         }
 
         template< class Point, class Functor >
-        void evaluateTestEach ( const Point &xx, Functor functor ) const
+        void evaluateTestEach ( const Point &x, Functor functor ) const
         {
-          sfs_.evaluateEach(xx, [&](std::size_t alpha, ScalarRangeType phi)
+          RangeType y = entity_.geometry().global(Dune::Fem::coordinate(x));
+          sfs_.evaluateEach(x, [&](std::size_t alpha, ScalarRangeType phi)
           {
             if (alpha < numInnerShapeFunctions_)
             {
-              RangeType y = entity_.geometry().global(Dune::Fem::coordinate(xx));
               auto copy = y[0];
               y[0] = -y[1]*phi[0];
               y[1] =  copy*phi[0];
-
               functor(alpha,y);
             }
           });
@@ -375,6 +381,7 @@ namespace Dune
       }
       std::size_t constraintSize() const
       {
+        return numInnerShapeFunctions_;
         return sizeONB<0>(innerOrder_-2);
       }
       std::size_t vertexSize(int deriv) const
@@ -571,7 +578,6 @@ namespace Dune
         if (basisChoice != 3) // !!!!! get order information from BasisSets
           BaseType::agglomeration().onbBasis(polOrder+1);
         BaseType::update(true);
-        std::cout << "   CTOR\n";
       }
 
     protected:
@@ -617,6 +623,7 @@ namespace Dune
           since int_E q = int_E 1 q = 0 since q is from ONB set
         */
 
+#if 0
         // matrices for edge projections
         Std::vector<Dune::DynamicMatrix<double> > edgePhiVector(2);
         edgePhiVector[0].resize(BaseType::basisSets_.edgeSize(0), BaseType::basisSets_.edgeSize(0), 0);
@@ -647,6 +654,12 @@ namespace Dune
             BaseType::interpolation_(intersection, edgeShapeFunctionSet, edgePhiVector, mask);
 
             auto normal = intersection.centerUnitOuterNormal();
+            /*
+            if (intersection.neighbor()) // we need to check the orientation of the normal
+              if (BaseType::agIndexSet_.index(intersection.inside()) >
+                  BaseType::agIndexSet_.index(intersection.outside()))
+                normal *= -1;
+            */
 
             // now compute int_e Phi^e m_alpha
             typename BaseType::Quadrature1Type quadrature(BaseType::gridPart(), intersection, 2 * polOrder + 1, BaseType::Quadrature1Type::INSIDE);
@@ -678,6 +691,7 @@ namespace Dune
             } // quadrature loop
           } // loop over intersections
         } // loop over triangles in agglomerate
+#endif
       }
     };
 

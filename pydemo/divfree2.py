@@ -46,9 +46,9 @@ def model(space):
 
 oldErrors = []
 oldDiams = None
-for i in range(1,6):
+for i in range(0,6):
     errors = []
-    N = 2**(i+1)
+    N = 2**i # 2**(i+1)
     polyGrid = dune.vem.polyGrid(
           # dune.vem.voronoiCells([[0,0],[Lx,Ly]], N*N, lloyd=200, fileName="test", load=True)
           cartesianDomain([0.,0.],[Lx,Ly],[N,N]), cubes=False
@@ -63,7 +63,7 @@ for i in range(1,6):
     dfI = space.interpolate(exact,name="interpol")
     if True:
         df = space.interpolate(exact,name="solution")
-        # df.plot()
+        df.plot()
     else:
         df = space.interpolate(exact,name="solution")
         scheme = dune.vem.vemScheme(

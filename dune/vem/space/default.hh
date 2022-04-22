@@ -377,7 +377,7 @@ namespace Dune
 
         HpGrad = 0;
         HpHess = 0;
-        std::cout << "first element iteration\n";
+        // std::cout << "first element iteration\n";
         for (const ElementSeedType &entitySeed : entitySeeds[agglomerate])
         {
           const ElementType &element = gridPart().entity(entitySeed);
@@ -389,7 +389,7 @@ namespace Dune
           const auto &shapeFunctionSet = basisSets_.basisFunctionSet(agglomeration(), element);
 
           interpolation_.interpolateBasis(element, shapeFunctionSet.valueBasisSet(), D);
-          std::cout << "checkpoint inerpolate basis" << std::endl;
+          // std::cout << "checkpoint inerpolate basis" << std::endl;
           // compute mass matrices
           for (std::size_t qp = 0; qp < quadrature.nop(); ++qp)
           {
@@ -423,7 +423,7 @@ namespace Dune
                 });
               });
           } // quadrature loop
-          std::cout << "checkpoint mass matrices" << std::endl;
+          // std::cout << "checkpoint mass matrices" << std::endl;
         } // loop over triangles in agglomerate
 
         // compute inverse mass matrix
@@ -451,7 +451,7 @@ namespace Dune
         //////////////////////////////////////////////////////////////////////////
         /// ValueProjection /////////////////////////////////////////////////////
         //////////////////////////////////////////////////////////////////////////
-        std::cout << "checkpoint constructed constraint value proj matrix " << std::endl;
+        // std::cout << "checkpoint constructed constraint value proj matrix " << std::endl;
 #if 0
         {
           for (std::size_t beta = 0; beta < numConstraintShapeFunctions; ++beta )
@@ -468,11 +468,11 @@ namespace Dune
         // set up matrix RHSconstraintsMatrix
         setupConstraintRHS(entitySeeds, agglomerate, RHSconstraintsMatrix, H0);
 
-        std::cout << "checkpoint setupRHS constraints matrix done" << std::endl;
+        // std::cout << "checkpoint setupRHS constraints matrix done" << std::endl;
 
         if (numConstraintShapeFunctions < numShapeFunctions)
         { // need to use a CLS approach
-          std::cout << "HERE" << std::endl;
+          // std::cout << "CLS" << std::endl;
           auto leastSquaresMinimizer = LeastSquares(D, constraintValueProj);
           for ( std::size_t beta = 0; beta < numDofs; ++beta )
           {
@@ -519,7 +519,7 @@ namespace Dune
             }
           }
         }
-#if 0
+#if 1
         std::cout << "*******************************\n";
         std::cout << "** RHS constraints 1        **\n";
         std::cout << "*******************************\n";
