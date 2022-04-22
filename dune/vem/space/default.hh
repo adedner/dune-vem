@@ -423,7 +423,7 @@ namespace Dune
                 });
               });
           } // quadrature loop
-        std::cout << "checkpoint mass matrices" << std::endl;
+          std::cout << "checkpoint mass matrices" << std::endl;
         } // loop over triangles in agglomerate
 
         // compute inverse mass matrix
@@ -813,7 +813,7 @@ namespace Dune
         }
 
         finalize(entitySeeds, agglomerate);
-#endif
+
         /////////////////////////////////////////////////////////////////////
         // stabilization matrix /////////////////////////////////////////////
         /////////////////////////////////////////////////////////////////////
