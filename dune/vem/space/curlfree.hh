@@ -256,7 +256,7 @@ namespace Dune
       , numGradShapeFunctions_ ( sizeONB<0>(order) )
       , numHessShapeFunctions_ ( 0 ) // not implemented - needs third/forth derivatives
       , numInnerShapeFunctions_( sizeONB<0>(innerOrder_)-1 )
-      , numEdgeTestShapeFunctions_( sizeONB<1>(order-2) )
+      , numEdgeTestShapeFunctions_( edgeSFS_.size() )
       {
         std::cout << "[" << numValueShapeFunctions_ << ","
                   << numGradShapeFunctions_ << ","
