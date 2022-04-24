@@ -704,6 +704,7 @@ namespace Dune
       typedef typename IndexSetType::GridPartType GridPartType;
       typedef typename GridPartType::IntersectionType IntersectionType;
 
+      static constexpr int blockSize = Traits::LocalBlockIndices::size();
       static const int dimension = IndexSetType::dimension;
       static const int baseRangeDimension = Traits::baseRangeDimension;
     private:
@@ -745,7 +746,7 @@ namespace Dune
         std::fill(mask.begin(),mask.end(),-1);
         auto vertex = [&] (int poly,auto i,int k,int numDofs)
         {
-          k /= baseRangeDimension;
+          k /= baseRangeDimension; // ????
           mask[k] = 1;
           ++k;
           if (order2size<0>(1)>0)
@@ -756,7 +757,7 @@ namespace Dune
         };
         auto edge = [&] (int poly,auto i,int k,int numDofs)
         {
-          k /= baseRangeDimension;
+          k /= baseRangeDimension; // ????
 #ifndef NDEBUG
           auto kStart = k;
 #endif
@@ -802,12 +803,11 @@ namespace Dune
         { //!TS add derivatives at vertex for conforming space
           const auto &x = refElement.position( i, dimension );
           basisFunctionSet.evaluateEach( x, [ &localDofMatrix, k ] ( std::size_t alpha, typename BasisFunctionSet::RangeType phi ) {
-              assert( phi.dimension == baseRangeDimension );
               if (alpha < localDofMatrix[k].size())
                 for (int r=0;r<phi.dimension;++r)
                   localDofMatrix[ k+r ][ alpha ] = phi[ r ];
             } );
-          k += baseRangeDimension;
+          k += BasisFunctionSet::RangeType::dimension;
           if (order2size<0>(1)>0)
             basisFunctionSet.jacobianEach( x, [ & ] ( std::size_t alpha, typename BasisFunctionSet::JacobianRangeType dphi ) {
               assert( dphi[0].dimension == 2 );
@@ -935,15 +935,16 @@ namespace Dune
         // on intersectionn
         auto vertex = [&] (int poly,int i,int k,int numDofs)
         { //!TS add derivatives at vertex (probably only normal component - is the mask then correct?)
+          std::cout << "vertex:" << poly << "," << i << "," << k << "," << numDofs
+                    << " | " << entry[0] << std::endl;
           const auto &x = edgeGeo.local( refElement.position( i, dimension ) );
           edgeShapeFunctionSet.evaluateEach( x, [ &localDofVectorMatrix, &entry ] ( std::size_t alpha, typename EdgeShapeFunctionSet::RangeType phi ) {
-              assert( phi.dimension == baseRangeDimension );
               assert( entry[0] < localDofVectorMatrix[0].size() );
               if (alpha < localDofVectorMatrix[0][ entry[0] ].size())
                 for (int r=0;r<phi.dimension;++r)
                   localDofVectorMatrix[0][ entry[0]+r ][ alpha ] = phi[ r ];
             } );
-          entry[0] += baseRangeDimension;
+          entry[0] += EdgeShapeFunctionSet::RangeType::dimension;
           if (order2size<0>(1)>0)
           {
             edgeShapeFunctionSet.jacobianEach( x, [ & ] ( std::size_t alpha, typename EdgeShapeFunctionSet::JacobianRangeType dphi ) {
@@ -962,12 +963,14 @@ namespace Dune
                   localDofVectorMatrix[ 1 ][ entry[1]+r ][ alpha ] = phi[r]*flipNormal
                                                                  * indexSet_.vertexDiameter(element, i);
             } );
-            entry[0] += baseRangeDimension;
-            entry[1] += baseRangeDimension;
+            entry[0] += EdgeShapeFunctionSet::RangeType::dimension;
+            entry[1] += EdgeShapeFunctionSet::RangeType::dimension;
           }
         };
         auto edge = [&] (int poly,auto intersection,int k,int numDofs)
         { //!TS add normal derivatives
+          std::cout << "edge:" << poly << "," << k << "," << numDofs
+                    << " | " << entry[0] << std::endl;
           EdgeQuadratureType edgeQuad( gridPart(),
                 intersection, 2*polOrder_, EdgeQuadratureType::INSIDE );
           for (unsigned int qp=0;qp<edgeQuad.nop();++qp)
@@ -980,6 +983,9 @@ namespace Dune
             edgeShapeFunctionSet.evaluateEach( x, [ & ] ( std::size_t beta, typename EdgeShapeFunctionSet::RangeType value ) {
                 edgeBFS.evaluateTestEach( xx,
                   [&](std::size_t alpha, typename EdgeShapeFunctionSet::RangeType phi ) {
+                    /* std::cout << "alpha=" << alpha << " row=" << entry[0]+alpha << " | "
+                              << value << "*" << phi << "=" << value*phi
+                              << std::endl; */
                     //!TS add alpha<...
                     if (alpha < order2size<1>(0) && beta < edgeSize(0))
                     {
@@ -1003,6 +1009,8 @@ namespace Dune
 
         applyOnIntersection(intersection,vertex,edge,mask);
 
+        std::cout << "final entry=" << entry[0] << std::endl;
+
         assert( entry[0] == localDofVectorMatrix[0].size() );
         assert( entry[1] == localDofVectorMatrix[1].size() );
 
@@ -1011,7 +1019,22 @@ namespace Dune
         tau -= intersection.geometry().corner(0);
         if (localDofVectorMatrix[0].size() > 0)
         {
-          localDofVectorMatrix[0].invert();
+          try
+          {
+            localDofVectorMatrix[0].invert();
+          }
+          catch (const FMatrixError&)
+          {
+            std::cout << "localDofVectorMatrix.invert() failed!\n";
+            for (std::size_t alpha=0;alpha<localDofVectorMatrix[0].size();++alpha)
+            {
+              for (std::size_t beta=0;beta<localDofVectorMatrix[0][alpha].size();++beta)
+                std::cout << localDofVectorMatrix[0][alpha][beta] << " ";
+              std::cout << std::endl;
+            }
+            assert(0);
+            throw FMatrixError();
+          }
 
           if (mask[1].size() > edgeSize(1))
           { // need to take tangential derivatives at vertices into account
@@ -1093,7 +1116,7 @@ namespace Dune
               else
               {
                 // swap vertex values
-                for (int r=0;r<baseRangeDimension;++r)
+                for (int r=0;r<EdgeShapeFunctionSet::RangeType::dimension;++r)
                   std::swap(mask[0][r], mask[0][baseRangeDimension+r]);
               }
             }
@@ -1120,11 +1143,11 @@ namespace Dune
       {
         auto dofs   = basisSets_.dofsPerCodim();  // assume always three entries in dim order (i.e. 2d)
         assert(dofs.size()==3);
-        vertexSize  = dofs[0].second*baseRangeDimension;
+        vertexSize  = dofs[0].second*blockSize;
         edgeOffset  = indexSet_.subAgglomerates(poly,dimension)*vertexSize;
-        edgeSize    = dofs[1].second*baseRangeDimension;
+        edgeSize    = dofs[1].second*blockSize;
         innerOffset = edgeOffset + indexSet_.subAgglomerates(poly,dimension-1)*edgeSize;
-        innerSize   = dofs[2].second*baseRangeDimension;
+        innerSize   = dofs[2].second*blockSize;
       }
 
       // carry out actual interpolation giving the three components, i.e.,

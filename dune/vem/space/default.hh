@@ -535,7 +535,7 @@ namespace Dune
         std::cout << "*******************************\n";
 #endif
 
-#if 0
+#if 1
         std::cout << "*******************************\n";
         std::cout << "****  Value projection  ****\n";
         std::cout << "*******************************\n";

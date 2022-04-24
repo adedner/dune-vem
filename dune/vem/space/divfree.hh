@@ -84,8 +84,8 @@ namespace Dune
         ShapeFunctionSet() = default;
         template <class Agglomeration>
         ShapeFunctionSet(bool useOnb, const ONBShapeFunctionSetType& onbSFS,
-                         std::size_t numValueSFS, std::size_t numGradSFS, std::size_t numHessSFS,
-                         std::size_t innerNumSFS,
+                         std::size_t numValueSF, std::size_t numGradSF, std::size_t numHessSF,
+                         std::size_t numInnerSF, std::size_t numOrthoSF,
                          const Agglomeration &agglomeration, const EntityType &entity)
         : vsfs_(entity, agglomeration.index(entity),
                 agglomeration.boundingBoxes(), useOnb, onbSFS)
@@ -93,10 +93,11 @@ namespace Dune
                agglomeration.boundingBoxes(), useOnb, onbSFS)
         , entity_(entity)
         , scale_( std::sqrt( sfs_.bbox().volume() ) )
-        , numValueShapeFunctions_(numValueSFS)
-        , numGradShapeFunctions_(numGradSFS)
-        , numHessShapeFunctions_(numHessSFS)
-        , numInnerShapeFunctions_(innerNumSFS)
+        , numValueShapeFunctions_(numValueSF)
+        , numGradShapeFunctions_(numGradSF)
+        , numHessShapeFunctions_(numHessSF)
+        , numInnerShapeFunctions_(numInnerSF)
+        , numOrthoShapeFunctions_(numOrthoSF)
         {}
 
         int order () const { return sfs_.order()-1;  }
@@ -115,12 +116,13 @@ namespace Dune
             // scalarEach used in RHS constraints set up
             if (alpha>=1)
             {
+              phi[0] *= scale_;
               functor(alpha-1, phi[0]);
             }
           });
         }
         /*
-             ortho  1      x    y        scalar   x     y    xy    x^2   y^2
+             ortho   1     x    y        scalar   x     y    xy    x^2   y^2
         k=2                                      (1)   (0)
                                                  (0)   (1)
         k=3         (-y)                         (1)   (0)   (y)   (2x)  (0)
@@ -129,26 +131,38 @@ namespace Dune
         template< class Point, class Functor >
         void evaluateEach ( const Point &x, Functor functor ) const
         {
-          RangeType y = entity_.geometry().global(Dune::Fem::coordinate(x));
+          // Note: basis functions that are included in the constraint have
+          // to be evaluated first and unconstraint basis functions have to
+          // be together at the end.
+          // To achieve this the 'ortho' part of the basis set is split
+          // with the 'alpha' for the 'inner' once being 0,..,numInner-1
+          // and the additional 'ortho' basisfunctions getting 'alpha'
+          // values so that a gap is left for the 'grad' basisfunctions.
+          int test = 0;
+          RangeType y = sfs_.position( x );
           sfs_.evaluateEach(x, [&](std::size_t alpha, ScalarRangeType phi)
           {
-            if (alpha < numInnerShapeFunctions_)
+            if (alpha < numOrthoShapeFunctions_)
             {
               //// (-y,x) * phi(x,y)
-              auto copy = y[0];
-              y[0] = -y[1]*phi[0];
-              y[1] =  copy*phi[0];
-              functor(alpha,y);
+              RangeType val{-y[1]*phi[0], y[0]*phi[0]};
+              if (alpha<numInnerShapeFunctions_)
+                functor(alpha,val);
+              else
+                functor(alpha+sfs_.size()-1,val);
+              ++test;
             }
           });
           sfs_.jacobianEach(x, [&](std::size_t alpha, ScalarJacobianRangeType dphi)
           {
             if (alpha>=1)
             {
-              // dphi[0] *= scale_; why is this not needed here?
+              dphi[0] *= scale_;
               functor(alpha-1+numInnerShapeFunctions_, dphi[0]);
+              ++test;
             }
           });
+          assert(test == numValueShapeFunctions_);
         }
 
         template< class Point, class Functor >
@@ -224,15 +238,12 @@ namespace Dune
         template< class Point, class Functor >
         void evaluateTestEach ( const Point &x, Functor functor ) const
         {
-          RangeType y = entity_.geometry().global(Dune::Fem::coordinate(x));
+          RangeType y = sfs_.position( x );
           sfs_.evaluateEach(x, [&](std::size_t alpha, ScalarRangeType phi)
           {
             if (alpha < numInnerShapeFunctions_)
             {
-              auto copy = y[0];
-              y[0] = -y[1]*phi[0];
-              y[1] =  copy*phi[0];
-              functor(alpha,y);
+              functor(alpha, {-y[1]*phi[0], y[0]*phi[0]} );
             }
           });
         }
@@ -246,6 +257,7 @@ namespace Dune
         std::size_t numGradShapeFunctions_;
         std::size_t numHessShapeFunctions_;
         std::size_t numInnerShapeFunctions_;
+        std::size_t numOrthoShapeFunctions_;
       };
       struct EdgeShapeFunctionSet
       {
@@ -304,7 +316,7 @@ namespace Dune
       DivFreeVEMBasisSets( const int order, bool useOnb )
       : innerOrder_( order )
       // test order+1 later
-      , onbSFS_(Dune::GeometryType(Dune::GeometryType::cube, dimDomain), order-1)
+      , onbSFS_(Dune::GeometryType(Dune::GeometryType::cube, dimDomain), order+1)
       , edgeSFS_( Dune::GeometryType(Dune::GeometryType::cube,dimDomain-1), maxEdgeDegree() )
       , dofsPerCodim_(calcDofsPerCodim(order))
       , useOnb_(useOnb)
@@ -315,6 +327,7 @@ namespace Dune
       , numHessShapeFunctions_ ( 0 )
       , numInnerShapeFunctions_( order==2 ? 0 :
                                  sizeONB<0>(order-3)/BBBasisFunctionSetType::RangeType::dimension )
+      , numOrthoShapeFunctions_( sizeONB<0>(order-1)/BBBasisFunctionSetType::RangeType::dimension )
       , numEdgeTestShapeFunctions_( sizeONB<1>(order-2) )
       {
         auto degrees = edgeDegrees();
@@ -329,7 +342,7 @@ namespace Dune
                   << edgeSize(0) << "," << edgeSize(1) << ","
                   << numEdgeTestShapeFunctions_ << "]"
                   << " " << degrees[0] << " " << degrees[1]
-                  << " max size of edge set: " << edgeSFS_.size()
+                  << " max size of edge set: " << edgeSFS_.size()*2
                   << " edgeSize(): " << edgeSize()
                   << std::endl;
         std::cout << "dofs per codim: "
@@ -347,7 +360,7 @@ namespace Dune
              const Agglomeration &agglomeration, const EntityType &entity) const
       {
         return ShapeFunctionSet(useOnb_, onbSFS_, numValueShapeFunctions_, numGradShapeFunctions_, numHessShapeFunctions_,
-                                numInnerShapeFunctions_,
+                                numInnerShapeFunctions_,numOrthoShapeFunctions_,
                                 agglomeration,entity);
       }
       template <class Agglomeration>
@@ -381,7 +394,8 @@ namespace Dune
       }
       std::size_t constraintSize() const
       {
-        return numInnerShapeFunctions_;
+        return numInnerShapeFunctions_ + onbSFS_.size()-1;
+        return numInnerShapeFunctions_; // add for div in P_0 constraints: + onbSFS_.size()-1;
         return sizeONB<0>(innerOrder_-2);
       }
       std::size_t vertexSize(int deriv) const
@@ -420,10 +434,6 @@ namespace Dune
       {
         return numEdgeTestShapeFunctions_;
       }
-      // const TestSpacesType &testSpaces() const
-      // {
-      //   return testSpaces_;
-      // }
       template <int dim>
       std::size_t order2size(unsigned int deriv) const
       {
@@ -485,9 +495,9 @@ namespace Dune
 
       std::array< std::pair< int, unsigned int >, dimDomain+1 > calcDofsPerCodim (unsigned int order) const
       {
-        auto vSize = order2size<0>(0);
+        auto vSize = order2size<0>(0) * BBBasisFunctionSetType::RangeType::dimension;
         std::cout << "vSize: " << vSize << std::endl;
-        auto eSize = order2size<1>(0);
+        auto eSize = order2size<1>(0) * BBBasisFunctionSetType::RangeType::dimension;
         std::cout << "eSize: " << eSize << std::endl;
         auto iSize = order2size<2>(0);
         std::cout << "iSize: " << iSize << std::endl;
@@ -508,6 +518,7 @@ namespace Dune
       const std::size_t numGradShapeFunctions_;
       const std::size_t numHessShapeFunctions_;
       const std::size_t numInnerShapeFunctions_;
+      const std::size_t numOrthoShapeFunctions_;
       const std::size_t numEdgeTestShapeFunctions_;
     };
 
@@ -525,10 +536,10 @@ namespace Dune
       typedef DivFreeVEMSpace<GridPart> DiscreteFunctionSpaceType;
 
       static const int codimension = 0;
-      static const bool vectorSpace = true;
       static const int dimDomain = FunctionSpaceType::DomainType::dimension;
       static const int dimRange = FunctionSpaceType::RangeType::dimension;
-      static const int baseRangeDimension = vectorSpace ? dimRange : 1;
+      static const bool vectorSpace = true;
+      static const int baseRangeDimension = dimRange;
 
       typedef typename GridPartType::template Codim<codimension>::EntityType EntityType;
 
@@ -540,7 +551,7 @@ namespace Dune
               > BasisFunctionSetType;
 
       // types for the mapper
-      typedef Hybrid::IndexRange<int, dimRange> LocalBlockIndices;
+      typedef Hybrid::IndexRange<int, 1> LocalBlockIndices;
       typedef VemAgglomerationIndexSet <GridPartType> IndexSetType;
       typedef AgglomerationDofMapper <GridPartType, IndexSetType> BlockMapperType;
 
@@ -594,9 +605,9 @@ namespace Dune
         typedef typename FunctionSpaceType::RangeType RangeType;
         typedef typename FunctionSpaceType::JacobianRangeType JacobianRangeType;
         typedef typename FunctionSpaceType::HessianRangeType HessianRangeType;
-        static constexpr int blockSize = BaseType::localBlockSize;
         const std::size_t dimDomain = DomainType::dimension;
         const std::size_t dimRange = RangeType::dimension;
+        static constexpr int blockSize = BaseType::localBlockSize;
         const std::size_t numDofs = BaseType::blockMapper().numDofs(agglomerate) * blockSize;
         int polOrder = BaseType::order();
         const std::size_t numConstraintShapeFunctions = BaseType::basisSets_.constraintSize();
@@ -623,7 +634,7 @@ namespace Dune
           since int_E q = int_E 1 q = 0 since q is from ONB set
         */
 
-#if 0
+#if 1
         // matrices for edge projections
         Std::vector<Dune::DynamicMatrix<double> > edgePhiVector(2);
         edgePhiVector[0].resize(BaseType::basisSets_.edgeSize(0), BaseType::basisSets_.edgeSize(0), 0);
@@ -654,12 +665,6 @@ namespace Dune
             BaseType::interpolation_(intersection, edgeShapeFunctionSet, edgePhiVector, mask);
 
             auto normal = intersection.centerUnitOuterNormal();
-            /*
-            if (intersection.neighbor()) // we need to check the orientation of the normal
-              if (BaseType::agIndexSet_.index(intersection.inside()) >
-                  BaseType::agIndexSet_.index(intersection.outside()))
-                normal *= -1;
-            */
 
             // now compute int_e Phi^e m_alpha
             typename BaseType::Quadrature1Type quadrature(BaseType::gridPart(), intersection, 2 * polOrder + 1, BaseType::Quadrature1Type::INSIDE);
@@ -685,6 +690,7 @@ namespace Dune
                 else
                 {
                   std::cout << "shouldn't get here!\n";
+                  std::cout << "should have " << alpha << "<" << RHSconstraintsMatrix[0].size() << std::endl;
                   abort();
                 }
               });

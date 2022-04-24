@@ -50,9 +50,9 @@ for i in range(0,6):
     errors = []
     N = 2**i # 2**(i+1)
     polyGrid = dune.vem.polyGrid(
-          # dune.vem.voronoiCells([[0,0],[Lx,Ly]], N*N, lloyd=200, fileName="test", load=True)
+          # dune.vem.voronoiCells([[0,0],[Lx,Ly]], 10*N*N, lloyd=200, fileName="test", load=True)
           cartesianDomain([0.,0.],[Lx,Ly],[N,N]), cubes=False
-          # cartesianDomain([0.,0.],[Lx,Ly],[N,N]), cubes=True
+          # cartesianDomain([0.,0.],[Lx,Ly],[2*N,2*N]), cubes=True
       )
     indexSet = polyGrid.indexSet
     @gridFunction(polyGrid, name="cells")
