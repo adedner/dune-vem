@@ -704,7 +704,8 @@ namespace Dune
       typedef typename IndexSetType::GridPartType GridPartType;
       typedef typename GridPartType::IntersectionType IntersectionType;
 
-      static constexpr int blockSize = Traits::LocalBlockIndices::size();
+      static constexpr int blockSize = Traits::vectorSpace?
+                                       Traits::LocalBlockIndices::size() : 1;
       static const int dimension = IndexSetType::dimension;
       static const int baseRangeDimension = Traits::baseRangeDimension;
     private:
