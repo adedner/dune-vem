@@ -116,7 +116,7 @@ namespace Dune
             // scalarEach used in RHS constraints set up
             if (alpha>=1)
             {
-              phi[0] *= scale_;
+              // phi[0] *= scale_;
               functor(alpha-1, phi[0]);
             }
           });
@@ -140,6 +140,7 @@ namespace Dune
           // values so that a gap is left for the 'grad' basisfunctions.
           int test = 0;
           RangeType y = sfs_.position( x );
+          assert( y.two_norm() < 1.5 );
           sfs_.evaluateEach(x, [&](std::size_t alpha, ScalarRangeType phi)
           {
             if (alpha < numOrthoShapeFunctions_)
@@ -157,7 +158,7 @@ namespace Dune
           {
             if (alpha>=1)
             {
-              dphi[0] *= scale_;
+              // dphi[0] *= scale_;
               functor(alpha-1+numInnerShapeFunctions_, dphi[0]);
               ++test;
             }

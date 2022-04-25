@@ -63,7 +63,7 @@ for i in range(0,6):
     dfI = space.interpolate(exact,name="interpol")
     if True:
         df = space.interpolate(exact,name="solution")
-        df.plot()
+        # df.plot()
     else:
         df = space.interpolate(exact,name="solution")
         scheme = dune.vem.vemScheme(
