@@ -19,11 +19,12 @@ import dune.ufl
 from perturbation import perturbation
 from interpolate import interpolate
 from hk import hk
+from curlfree import curlfree
 
 dune.fem.parameter.append({"fem.verboserank": -1})
 
 maxLevel = 4
-order = 3
+order = 1
 
 parameters = {"newton.linear.tolerance": 1e-12,
               "newton.linear.preconditioning.method": "jacobi",
@@ -41,12 +42,13 @@ def runTest(exact, spaceConstructor, get_df):
         # constructor = cartesianDomain([0,0],[1,1],[N,N])
         # cells = voronoiCells(constructor,N*N,"voronoiseeds",load=True,show=False,lloyd=10)
         # grid = dune.vem.polyGrid("agglomerate", cells, convex=True)
-
-        N = 2*2**level
+        ln,lm, Lx,Ly = 1,0, 1,1.1
+        N = 2**(level+1)
         grid = dune.vem.polyGrid(
-        #   dune.vem.voronoiCells([[-0.5,-0.5],[1,1]], N*N, lloyd=100, fileName="test", load=True)
-          cartesianDomain([-0.5,-0.5],[1,1],[N,N]),
-          )
+            #  dune.vem.voronoiCells([[0,0],[Lx,Ly]], N*N, lloyd=200, fileName="test", load=True)
+          cartesianDomain([0.,0.],[Lx,Ly],[N,N]), cubes=False
+          # cartesianDomain([0.,0.],[Lx,Ly],[N,N]), cubes=True
+        )
 
         # get dimension of range
         dimRange = exact.ufl_shape[0]
@@ -138,7 +140,17 @@ def runTesthk(testSpaces, vectorSpace, reduced):
 
     return eoc, expected_eoc
 
+def runTestCurlfree():
+    ln,lm, Lx,Ly = 1,0, 1,1.1
+    x = SpatialCoordinate(triangle)
 
+    exact = -grad( (cos(ln/Lx*pi*x[0])*cos(lm/Ly*pi*x[1])) )
+    spaceConstructor = lambda grid, r: dune.vem.curlFreeSpace( grid, order=order )
+    eoc = runTest(exact, spaceConstructor, curlfree)
+
+    expected_eoc = [order+1,order+1]
+
+    return eoc, expected_eoc
 
 def main():
     # test elliptic with conforming second order VEM space
@@ -153,7 +165,7 @@ def main():
 
     # eoc, expected_eoc = runTestPerturbation( C1C0testSpaces, False, False )
 
-    eoc, expected_eoc = runTesthk( C0testSpaces, True, True )
+    eoc, expected_eoc = runTestCurlfree()
 
     i = 0
     for k in expected_eoc:
