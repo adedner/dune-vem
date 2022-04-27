@@ -1,3 +1,13 @@
+from ufl import *
+import dune.ufl
+
+parameters = {"newton.linear.tolerance": 1e-12,
+              "newton.linear.preconditioning.method": "jacobi",
+              "penalty": 40,  # for the dg schemes
+              "newton.linear.verbose": False,
+              "newton.verbose": False
+              }
+
 def elliptic(space, exact):
     # set up scheme, df, and solve
     u = TrialFunction(space)
@@ -19,6 +29,9 @@ def elliptic(space, exact):
                             massStabilization=massCoeff,
                             parameters=parameters )
 
-    scheme.solve(target=df)
+    info = scheme.solve(target=df)
 
-    return df
+    edf = exact-df
+    err = [inner(edf,edf), inner(grad(edf),grad(edf))]
+
+    return err

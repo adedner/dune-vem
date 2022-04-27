@@ -16,15 +16,16 @@ import ufl.algorithms
 from ufl import *
 import dune.ufl
 
+from elliptic import elliptic
 from perturbation import perturbation
 from interpolate import interpolate
 from hk import hk
 from curlfree import curlfree
+from divfree import divfree
 
 dune.fem.parameter.append({"fem.verboserank": -1})
 
 maxLevel = 4
-order = 1
 
 parameters = {"newton.linear.tolerance": 1e-12,
               "newton.linear.preconditioning.method": "jacobi",
@@ -37,18 +38,8 @@ def runTest(exact, spaceConstructor, get_df):
     results = []
     for level in range(1,maxLevel):
         # set up grid for testing
-        # constructor = cartesianDomain([0,0],[1,1],[3*2**level,3*2**level])
-        # grid = dune.vem.polyGrid( constructor, cubes=False )
-        # constructor = cartesianDomain([0,0],[1,1],[N,N])
-        # cells = voronoiCells(constructor,N*N,"voronoiseeds",load=True,show=False,lloyd=10)
-        # grid = dune.vem.polyGrid("agglomerate", cells, convex=True)
-        ln,lm, Lx,Ly = 1,0, 1,1.1
-        N = 2**(level+1)
-        grid = dune.vem.polyGrid(
-            #  dune.vem.voronoiCells([[0,0],[Lx,Ly]], N*N, lloyd=200, fileName="test", load=True)
-          cartesianDomain([0.,0.],[Lx,Ly],[N,N]), cubes=False
-          # cartesianDomain([0.,0.],[Lx,Ly],[N,N]), cubes=True
-        )
+        N = 2**(level)
+        grid = dune.vem.polyGrid( dune.vem.voronoiCells([[-0.5,-0.5],[1,1]], 50, lloyd=100) )
 
         # get dimension of range
         dimRange = exact.ufl_shape[0]
@@ -59,20 +50,12 @@ def runTest(exact, spaceConstructor, get_df):
         # construct space to use using spaceConstructor passed in
         space = spaceConstructor(grid,dimRange)
 
-        df, err = get_df(space,exact)
+        err = get_df(space,exact)
         errors  = [ math.sqrt(e) for e in integrate(grid, err, order=8) ]
         length = len(errors)
 
         res += [ [[grid.hierarchicalGrid.agglomerate.size,space.size,*space.diameters()],*errors] ]
         results += [res]
-
-        print("[",level,"]",
-            "Size: ",grid.size(0), space.size,
-            "diameters: ",space.diameters(),
-            "L^2: ", errors[0], "H^1: ", errors[1],
-            # "H^2: ", errors[2],
-            # "Energy: ", errors[3],
-            flush=True)
 
     return calculateEOC(results,length)
 
@@ -90,10 +73,13 @@ def calculateEOC(results,length):
     return eoc
 
 
-def runTestElliptic(testSpaces):
-    x = ufl.SpatialCoordinate(ufl.triangle)
+def runTestElliptic(testSpaces, order):
+    x = SpatialCoordinate(triangle)
     exact = as_vector( [x[0]*x[1] * cos(pi*x[0]*x[1])] )
-    spaceConstructor = lambda grid, r: dune.vem.vemSpace( grid, order=order, dimRange=r, testSpaces = testSpaces )
+    spaceConstructor = lambda grid, r: dune.vem.vemSpace( grid,
+                                                          order=order,
+                                                          dimRange=r,
+                                                          testSpaces=testSpaces )
 
     eoc = runTest(exact, spaceConstructor, elliptic)
     expected_eoc = [order]
@@ -101,7 +87,7 @@ def runTestElliptic(testSpaces):
     return eoc, expected_eoc
 
 def runTestBiharmonic(testSpaces):
-    x = ufl.SpatialCoordinate(ufl.triangle)
+    x = SpatialCoordinate(triangle)
     exact = as_vector( [sin(2*pi*x[0])**2*sin(2*pi*x[1])**2] )
     spaceConstructor = lambda grid, r: dune.vem.vemSpace( grid, order=order, dimRange=r, testSpaces = testSpaces )
 
@@ -125,11 +111,10 @@ def runTestPerturbation(testSpaces):
 
     return eoc, expected_eoc
 
-def runTesthk(testSpaces, vectorSpace, reduced):
+def runTesthk(testSpaces, vectorSpace, reduced, dimRange):
     x = SpatialCoordinate(triangle)
-    dimR = 3
 
-    exact = as_vector( dimR*[x[0]*x[1] * cos(pi*x[0]*x[1])] )
+    exact = as_vector( dimRange*[x[0]*x[1] * cos(pi*x[0]*x[1])] )
     spaceConstructor = lambda grid, r: dune.vem.vemSpace( grid, order=order,
                                                           dimRange=r,
                                                           testSpaces=testSpaces,
@@ -152,20 +137,42 @@ def runTestCurlfree():
 
     return eoc, expected_eoc
 
+def runTestDivFree():
+    x = SpatialCoordinate(triangle)
+
+    exact = as_vector([-x[1]+x[0]**2*x[1],
+                            x[0]-x[1]**2*x[0]])
+
+    spaceConstructor = lambda grid, r: dune.vem.divFreeSpace( grid, order=order )
+    # eoc = runTest(exact, spaceConstructor, interpolate)
+
+    eoc = runTest(exact, spaceConstructor, divfree)
+    expected_eoc = [order+1]
+
+    return eoc, expected_eoc
+
 def main():
     # test elliptic with conforming second order VEM space
-    C0testSpaces = [0,order-2,order-2]
+    orderslist_secondorder = [3]
+    # for order in orderslist_secondorder:
+    #     # C0testSpaces = [0,order-2,order-2]
+
+    #     # eoc, expected eoc = runTestElliptic( C0testSpaces )
+    #     eoc, expected_eoc = runTestElliptic( C0NCtestSpaces, order )
+
+    order = 3
     C0NCtestSpaces = [-1,order-1,order-2]
+    eoc, expected_eoc = runTestElliptic( C0NCtestSpaces, order )
 
-    # runTestElliptic( C0testSpaces )
+    # # test biharmonic with non conforming C1 space
+    # C1NCtestSpaces = [ [0], [order-3,order-2], [order-4] ]
+    # C1C0testSpaces = [ [0], [order-2,order-2], [order-4] ]
 
-    # test biharmonic with non conforming C1 space
-    C1NCtestSpaces = [ [0], [order-3,order-2], [order-4] ]
-    C1C0testSpaces = [ [0], [order-2,order-2], [order-4] ]
+    # # eoc, expected_eoc = runTestPerturbation( C1C0testSpaces, False, False, dimRange=3 )
 
-    # eoc, expected_eoc = runTestPerturbation( C1C0testSpaces, False, False )
+    # # eoc, expected_eoc = runTestCurlfree()
 
-    eoc, expected_eoc = runTestCurlfree()
+    # eoc, expected_eoc = runTestDivFree()
 
     i = 0
     for k in expected_eoc:
