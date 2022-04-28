@@ -18,6 +18,7 @@ import dune.ufl
 
 from interpolate import interpolate_secondorder, interpolate_fourthorder
 from elliptic import elliptic
+from biharmonic import biharmonic
 from perturbation import perturbation
 from hk import hk
 from curlfree import curlfree
@@ -94,9 +95,9 @@ def runTestBiharmonic(testSpaces, order):
                                                           testSpaces=testSpaces )
 
     expected_eoc = [order+1, order, order-1]
-    eoc_interpolation = runTest(exact, spaceConstructor, interpolate_fourthorder)
+    eoc_interpolation = runTest(exact, spaceConstructor, biharmonic)
 
-    return eoc
+    return eoc_interpolation, expected_eoc
 
 def runTestPerturbation(testSpaces):
     x = ufl.SpatialCoordinate(ufl.triangle)
@@ -188,7 +189,7 @@ def main():
     #     print("order: ", order)
     #     C1NCtestSpaces = [ [0], [order-3,order-2], [order-4] ]
     #     print("C1 non conforming test spaces: ", C1NCtestSpaces)
-    #     eoc_interpolation, eoc_solve, expected_eoc = runTestBiharmonic( C1NCtestSpaces, order )
+    #     eoc_interpolation, expected_eoc = runTestBiharmonic( C1NCtestSpaces, order )
 
     #     checkEOC(eoc_interpolation, expected_eoc)
     #     checkEOC(eoc_solve, expected_eoc)
@@ -196,11 +197,11 @@ def main():
     # test curl free interpolation
     for order in orderslist_secondorder:
         print("order: ", order)
-        # eoc_interpolation, expected_eoc = runTestCurlfree( order )
-        # checkEOC(eoc_interpolation, expected_eoc)
-
-        eoc_interpolation, expected_eoc = runTestDivFree( order )
+        eoc_interpolation, expected_eoc = runTestCurlfree( order )
         checkEOC(eoc_interpolation, expected_eoc)
+
+    #     eoc_interpolation, expected_eoc = runTestDivFree( order )
+    #     checkEOC(eoc_interpolation, expected_eoc)
 
     # hk tests
 

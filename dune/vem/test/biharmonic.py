@@ -33,13 +33,13 @@ def biharmonic(space, exact):
     b = ( epsilon*laplace(laplace(exact[0])) -\
           laplaceCoeff*laplace(exact[0]) +\
           mu*exact[0] ) * v[0] * dx
-    dbcs = [dune.ufl.DirichletBC(space, [0], i+1) for i in range(4)]
+    dbc = [dune.ufl.DirichletBC(space, [0], i+1) for i in range(4)]
 
     biLaplaceCoeff = epsilon
     diffCoeff      = laplaceCoeff
     massCoeff      = mu
 
-    scheme = create.scheme(schemeName, [a==b, *dbc], space,
+    scheme = dune.vem.vemScheme([a==b, *dbc], space,
                             solver="cg",
                             hessStabilization=biLaplaceCoeff,
                             gradStabilization=diffCoeff,
