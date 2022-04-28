@@ -16,9 +16,9 @@ import ufl.algorithms
 from ufl import *
 import dune.ufl
 
+from interpolate import interpolate_secondorder, interpolate_fourthorder
 from elliptic import elliptic
 from perturbation import perturbation
-from interpolate import interpolate
 from hk import hk
 from curlfree import curlfree
 from divfree import divfree
@@ -27,19 +27,17 @@ dune.fem.parameter.append({"fem.verboserank": -1})
 
 maxLevel = 4
 
-parameters = {"newton.linear.tolerance": 1e-12,
-              "newton.linear.preconditioning.method": "jacobi",
-              "penalty": 40,  # for the dg schemes
-              "newton.linear.verbose": False,
-              "newton.verbose": False
-              }
-
 def runTest(exact, spaceConstructor, get_df):
     results = []
     for level in range(1,maxLevel):
         # set up grid for testing
         N = 2**(level)
-        grid = dune.vem.polyGrid( dune.vem.voronoiCells([[-0.5,-0.5],[1,1]], 50, lloyd=100) )
+        Lx,Ly = 1,1
+        grid = dune.vem.polyGrid(
+          dune.vem.voronoiCells([[0,0],[Lx,Ly]], 10*N*N, lloyd=200, fileName="voronoiseeds", load=True)
+        #   cartesianDomain([0.,0.],[Lx,Ly],[N,N]), cubes=False
+        #   cartesianDomain([0.,0.],[Lx,Ly],[2*N,2*N]), cubes=True
+        )
 
         # get dimension of range
         dimRange = exact.ufl_shape[0]
@@ -81,10 +79,11 @@ def runTestElliptic(testSpaces, order):
                                                           dimRange=r,
                                                           testSpaces=testSpaces )
 
-    eoc = runTest(exact, spaceConstructor, elliptic)
-    expected_eoc = [order]
+    expected_eoc = [order+1,order]
+    eoc_interpolation = runTest(exact, spaceConstructor, interpolate_secondorder)
+    eoc_solve = runTest(exact, spaceConstructor, elliptic)
 
-    return eoc, expected_eoc
+    return eoc_interpolation, eoc_solve, expected_eoc
 
 def runTestBiharmonic(testSpaces):
     x = SpatialCoordinate(triangle)
@@ -151,18 +150,33 @@ def runTestDivFree():
 
     return eoc, expected_eoc
 
+def checkEOC(eoc, expected_eoc):
+    i = 0
+    for k in expected_eoc:
+        assert(0.8*k <= eoc[i] <= 1.2*k), "eoc out of expected range"
+        i += 1
+
+    return
+
 def main():
-    # test elliptic with conforming second order VEM space
-    orderslist_secondorder = [3]
-    # for order in orderslist_secondorder:
-    #     # C0testSpaces = [0,order-2,order-2]
+    # test elliptic with conforming and nonconforming second order VEM space
+    orderslist_secondorder = [1,3]
+    for order in orderslist_secondorder:
+        print("order: ", order)
+        C0NCtestSpaces = [-1,order-1,order-2]
+        print("C0 non conforming test spaces: ", C0NCtestSpaces)
+        eoc_interpolation, eoc_solve, expected_eoc = runTestElliptic( C0NCtestSpaces, order )
 
-    #     # eoc, expected eoc = runTestElliptic( C0testSpaces )
-    #     eoc, expected_eoc = runTestElliptic( C0NCtestSpaces, order )
+        checkEOC(eoc_interpolation, expected_eoc)
+        checkEOC(eoc_solve, expected_eoc)
 
-    order = 3
-    C0NCtestSpaces = [-1,order-1,order-2]
-    eoc, expected_eoc = runTestElliptic( C0NCtestSpaces, order )
+        C0testSpaces = [0,order-2,order-2]
+        print("C0 test spaces: ", C0testSpaces)
+        eoc_interpolation, eoc_solve, expected_eoc = runTestElliptic( C0testSpaces, order )
+
+        checkEOC(eoc_interpolation, expected_eoc)
+        checkEOC(eoc_solve, expected_eoc)
+
 
     # # test biharmonic with non conforming C1 space
     # C1NCtestSpaces = [ [0], [order-3,order-2], [order-4] ]
@@ -174,10 +188,7 @@ def main():
 
     # eoc, expected_eoc = runTestDivFree()
 
-    i = 0
-    for k in expected_eoc:
-        assert(0.8*k <= eoc[i] <= 1.2*k), "eoc out of expected range"
-        i += 1
+
 
 
 main()
