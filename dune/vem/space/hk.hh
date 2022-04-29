@@ -848,8 +848,9 @@ namespace Dune
                     {
                       assert(k<localDofMatrix.size());
                       assert(beta<localDofMatrix[k].size());
-                      localDofMatrix[ k ][ beta ] += value*phi * weight/
-                            intersection.geometry().volume();
+                      localDofMatrix[ k ][ beta ] += value*phi * weight /
+                                                     intersection.geometry().volume();
+
                     }
                   );
                   ++k;

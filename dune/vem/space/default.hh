@@ -469,6 +469,14 @@ namespace Dune
         setupConstraintRHS(entitySeeds, agglomerate, RHSconstraintsMatrix, H0);
 
         // std::cout << "checkpoint setupRHS constraints matrix done" << std::endl;
+        {
+            for (std::size_t alpha=0;alpha<D.size();++alpha)
+            {
+              for (std::size_t beta=0;beta<D[alpha].size();++beta)
+                std::cout << D[alpha][beta] << " ";
+              std::cout << std::endl;
+            }
+        }
 
         if (numConstraintShapeFunctions < numShapeFunctions)
         { // need to use a CLS approach
