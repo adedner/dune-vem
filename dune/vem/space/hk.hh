@@ -979,8 +979,7 @@ namespace Dune
             auto x = edgeQuad.localPoint(qp);
             auto xx = x;
             double weight = edgeQuad.weight(qp) *
-                            intersection.geometry().integrationElement(x) /
-                            intersection.geometry().volume();
+                            intersection.geometry().integrationElement(x);
             edgeShapeFunctionSet.evaluateEach( x, [ & ] ( std::size_t beta, typename EdgeShapeFunctionSet::RangeType value ) {
                 edgeBFS.evaluateTestEach( xx,
                   [&](std::size_t alpha, typename EdgeShapeFunctionSet::RangeType phi ) {
@@ -991,7 +990,8 @@ namespace Dune
                     if (alpha < order2size<1>(0) && beta < edgeSize(0))
                     {
                       assert( entry[0]+alpha < localDofVectorMatrix[0].size() );
-                      localDofVectorMatrix[0][ entry[0]+alpha ][ beta ] += value*phi * weight;
+                      localDofVectorMatrix[0][ entry[0]+alpha ][ beta ] += value*phi * weight /
+                                               intersection.geometry().volume();
                     }
                     // FIX ME
                     if (alpha < order2size<1>(1) && beta < edgeSize(1))
