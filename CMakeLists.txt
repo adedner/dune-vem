@@ -22,8 +22,7 @@ include(AddMPIFlags)
 
 add_subdirectory("dune")
 add_subdirectory("cmake/modules")
-# add_subdirectory("lib")
-add_subdirectory(python)
+add_subdirectory("python")
 
 # finalize the dune project, e.g. generating config.h etc.
 finalize_dune_project(GENERATE_CONFIG_H_CMAKE)
