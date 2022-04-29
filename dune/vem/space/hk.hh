@@ -838,8 +838,7 @@ namespace Dune
             auto x = edgeQuad.localPoint(qp);
             auto y = intersection.geometryInInside().global(x);
             double weight = edgeQuad.weight(qp) *
-                            intersection.geometry().integrationElement(x) /
-                            intersection.geometry().volume();
+                            intersection.geometry().integrationElement(x);
             edgeBFS.evaluateTestEach(x,
                 [&](std::size_t alpha, RangeType phi ) {
                 if (alpha < order2size<1>(0))
@@ -849,7 +848,9 @@ namespace Dune
                     {
                       assert(k<localDofMatrix.size());
                       assert(beta<localDofMatrix[k].size());
-                      localDofMatrix[ k ][ beta ] += value*phi * weight;
+                      localDofMatrix[ k ][ beta ] += value*phi * weight /
+                                                     intersection.geometry().volume();
+
                     }
                   );
                   ++k;
