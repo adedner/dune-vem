@@ -842,7 +842,6 @@ namespace Dune
                             intersection.geometry().volume();
             edgeBFS.evaluateTestEach(x,
                 [&](std::size_t alpha, RangeType phi ) {
-                assert( alpha < order2size<1>(0) );
                 if (alpha < order2size<1>(0))
                 {
                   basisFunctionSet.evaluateEach( y,
