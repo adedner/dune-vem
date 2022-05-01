@@ -734,7 +734,7 @@ a grid with non convex polygons requires the 'triangle' package.
 Run 'pip install triangle' and try again.
 Note that 'convex=False' is the default - if all your polygons are convex
 change the parameter to 'True' which will also speedup the grid construction.
-"""
+""")
         index = SortedDict()
         if cubes:
             for i,poly in enumerate(polygons):
