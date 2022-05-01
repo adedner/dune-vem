@@ -6,5 +6,5 @@ Description: Implementation of a number of virtual element spaces and bilinear f
 URL: https://gitlab.dune-project.org/dune-fem/dune-vem
 Depends: dune-fem (>= 2.9) dune-alugrid (>= 2.9)
 Suggests:
-Python-Requires: matplotlib triangle scipy sortedcontainers
+Python-Requires: matplotlib scipy sortedcontainers
 Whitespace-Hook: Yes

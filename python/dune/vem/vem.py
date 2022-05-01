@@ -706,7 +706,11 @@ from dune.vem.voronoi import triangulated_voronoi
 from scipy.spatial import Voronoi, voronoi_plot_2d, cKDTree, Delaunay
 import numpy
 
-import triangle
+try:
+    import triangle
+except ImportError:
+    triangle = None
+
 from sortedcontainers import SortedDict
 import matplotlib.pyplot as plt
 class PolyAgglomerate:
@@ -724,6 +728,13 @@ class PolyAgglomerate:
     def roundBary(a):
         return tuple(round(aa,8) for aa in a)
     def construct(cubes,convex,vertices,polygons):
+        if not triangle and not convex:
+            raise ValueError("""
+a grid with non convex polygons requires the 'triangle' package.
+Run 'pip install triangle' and try again.
+Note that 'convex=False' is the default - if all your polygons are convex
+change the parameter to 'True' which will also speedup the grid construction.
+"""
         index = SortedDict()
         if cubes:
             for i,poly in enumerate(polygons):
