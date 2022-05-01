@@ -10,8 +10,11 @@ import ufl.algorithms
 from ufl import *
 import dune.ufl
 
+from script import runTest, checkEOC, interpolate
+from interpolate import interpolate_fourthorder
+
 def perturbation(space, exact):
-    epsilon = 1
+    epsilon = 1e-8
 
     laplace = lambda w: div(grad(w))
     H = lambda w: grad(grad(w))
@@ -49,16 +52,41 @@ def perturbation(space, exact):
                             hessStabilization=biLaplaceCoeff,
                             gradStabilization=diffCoeff,
                             massStabilization=massCoeff,
-                            # solver=("cg")
                           )
 
     scheme.solve(target=df)
 
     edf = exact-df
     energy  = replace(a,{u:edf,v:edf}).integrals()[0].integrand()
-    err = [inner(edf,edf),
-           inner(grad(edf),grad(edf)),
-           inner(grad(grad(edf)),grad(grad(edf))),
-           energy]
+    err = [energy]
 
-    return df, err
+    return err
+
+def runTestPerturbation(testSpaces, order):
+    x = SpatialCoordinate(triangle)
+    exact = as_vector( [sin(2*pi*x[0])**2*sin(2*pi*x[1])**2] )
+    spaceConstructor = lambda grid, r: dune.vem.vemSpace( grid,
+                                                          order=order,
+                                                          dimRange=r,
+                                                          testSpaces=testSpaces )
+
+    if (interpolate()):
+      eoc = runTest(exact, spaceConstructor, interpolate_fourthorder)
+      expected_eoc = [order+1, order, order-1]
+    else:
+      eoc = runTest(exact, spaceConstructor, perturbation)
+      expected_eoc = [order]
+
+    return eoc, expected_eoc
+
+def main():
+  orders = [2,4]
+  for order in orders:
+    print("order: ", order)
+    C1C0testSpaces = [ [0], [order-2, order-2], [order-4] ]
+    print("C1 C0 test spaces: ", C1C0testSpaces)
+
+    eoc, eoc_expected = runTestPerturbation(C1C0testSpaces, order)
+    checkEOC(eoc, eoc_expected)
+
+main()
