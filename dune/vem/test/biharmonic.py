@@ -9,8 +9,10 @@ import ufl.algorithms
 from ufl import *
 import dune.ufl
 
-from script import runTest, checkEOC
+from script import runTest, checkEOC, interpolate
 from interpolate import interpolate_fourthorder
+
+dimR = 1
 
 parameters = {"newton.linear.tolerance": 1e-12,
               "newton.linear.preconditioning.method": "jacobi",
@@ -60,27 +62,30 @@ def biharmonic(space, exact):
     return err
 
 def runTestBiharmonic(testSpaces, order):
-    x = SpatialCoordinate(triangle)
-    exact = as_vector( [sin(2*pi*x[0])**2*sin(2*pi*x[1])**2] )
-    spaceConstructor = lambda grid, r: dune.vem.vemSpace( grid,
-                                                          order=order,
-                                                          dimRange=r,
-                                                          testSpaces=testSpaces )
+      x = SpatialCoordinate(triangle)
+      exact = as_vector( dimR*[sin(2*pi*x[0])**2*sin(2*pi*x[1])**2] )
+      spaceConstructor = lambda grid, r: dune.vem.vemSpace( grid,
+                                                            order=order,
+                                                            dimRange=r,
+                                                            testSpaces=testSpaces )
 
-    expected_eoc = [order+1, order, order-1]
-    eoc_interpolation = runTest(exact, spaceConstructor, interpolate_fourthorder)
-    eoc_solve = runTest(exact, spaceConstructor, biharmonic)
+      expected_eoc = [order, order, order-1]
+      if (interpolate()):
+            eoc = runTest(exact, spaceConstructor, interpolate_fourthorder)
+      else:
+            eoc = runTest(exact, spaceConstructor, biharmonic)
 
-    return eoc_interpolation, eoc_solve, expected_eoc
+      return eoc, expected_eoc
 
 def main():
-      orderslist_fourthorder = [3]
-      for order in orderslist_fourthorder:
+      orders = [3,4]
+      for order in orders:
             print("order: ", order)
             C1NCtestSpaces = [ [0], [order-3,order-2], [order-4] ]
             print("C1 non conforming test spaces: ", C1NCtestSpaces)
-            eoc_interpolation, eoc_solve, expected_eoc = runTestBiharmonic( C1NCtestSpaces, order )
 
-            checkEOC(eoc_interpolation, expected_eoc)
+            eoc, expected_eoc = runTestBiharmonic( C1NCtestSpaces, order )
+
+            checkEOC(eoc, expected_eoc)
 
 main()
