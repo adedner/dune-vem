@@ -17,23 +17,25 @@ from ufl import *
 import dune.ufl
 
 from interpolate import interpolate_secondorder, interpolate_fourthorder
-from elliptic import elliptic
-from biharmonic import biharmonic
-from perturbation import perturbation
-from hk import hk
-from curlfree import curlfree
 from divfree import divfree
 
 dune.fem.parameter.append({"fem.verboserank": -1})
 
 maxLevel = 4
 
+def interpolate():
+    return False
+
+def getParameters():
+    ln,lm, Lx,Ly = 1,0, 1,1.1
+    return ln, lm, Lx, Ly
+
 def runTest(exact, spaceConstructor, get_df):
     results = []
     for level in range(1,maxLevel):
+        ln, lm, Lx, Ly = getParameters()
         # set up grid for testing
         N = 2**(level)
-        Lx,Ly = 1,1
         grid = dune.vem.polyGrid(
           dune.vem.voronoiCells([[0,0],[Lx,Ly]], 10*N*N, lloyd=200, fileName="voronoiseeds", load=True)
         #   cartesianDomain([0.,0.],[Lx,Ly],[N,N]), cubes=False
@@ -71,77 +73,6 @@ def calculateEOC(results,length):
 
     return eoc
 
-
-def runTestElliptic(testSpaces, order):
-    x = SpatialCoordinate(triangle)
-    exact = as_vector( [x[0]*x[1] * cos(pi*x[0]*x[1])] )
-    spaceConstructor = lambda grid, r: dune.vem.vemSpace( grid,
-                                                          order=order,
-                                                          dimRange=r,
-                                                          testSpaces=testSpaces )
-
-    expected_eoc = [order+1,order]
-    eoc_interpolation = runTest(exact, spaceConstructor, interpolate_secondorder)
-    eoc_solve = runTest(exact, spaceConstructor, elliptic)
-
-    return eoc_interpolation, eoc_solve, expected_eoc
-
-def runTestBiharmonic(testSpaces, order):
-    x = SpatialCoordinate(triangle)
-    exact = as_vector( [sin(2*pi*x[0])**2*sin(2*pi*x[1])**2] )
-    spaceConstructor = lambda grid, r: dune.vem.vemSpace( grid,
-                                                          order=order,
-                                                          dimRange=r,
-                                                          testSpaces=testSpaces )
-
-    expected_eoc = [order+1, order, order-1]
-    eoc_interpolation = runTest(exact, spaceConstructor, biharmonic)
-
-    return eoc_interpolation, expected_eoc
-
-def runTestPerturbation(testSpaces):
-    x = ufl.SpatialCoordinate(ufl.triangle)
-    exact = as_vector( [sin(2*pi*x[0])**2*sin(2*pi*x[1])**2] )
-    spaceConstructor = lambda grid, r: dune.vem.vemSpace( grid, order=order, dimRange=r, testSpaces = testSpaces )
-
-    # eoc = runTest(exact, spaceConstructor, interpolate)
-
-    eoc = runTest(exact, spaceConstructor, perturbation)
-
-    if order == 2:
-        expected_eoc = [order, order, order-1, order-1]
-    else:
-        expected_eoc = [order+1, order, order-1, order-1]
-
-    return eoc, expected_eoc
-
-def runTesthk(testSpaces, vectorSpace, reduced, dimRange):
-    x = SpatialCoordinate(triangle)
-
-    exact = as_vector( dimRange*[x[0]*x[1] * cos(pi*x[0]*x[1])] )
-    spaceConstructor = lambda grid, r: dune.vem.vemSpace( grid, order=order,
-                                                          dimRange=r,
-                                                          testSpaces=testSpaces,
-                                                          vectorSpace=vectorSpace,
-                                                          reduced=reduced)
-    eoc = runTest(exact, spaceConstructor, hk)
-    expected_eoc = [order+1,order]
-
-    return eoc, expected_eoc
-
-def runTestCurlfree(order):
-    ln,lm, Lx,Ly = 1,0, 1,1.1
-    x = SpatialCoordinate(triangle)
-
-    exact = -grad( (cos(ln/Lx*pi*x[0])*cos(lm/Ly*pi*x[1])) )
-    spaceConstructor = lambda grid, r: dune.vem.curlFreeSpace( grid,
-                                                               order=order )
-    eoc_interpolation = runTest(exact, spaceConstructor, curlfree)
-
-    expected_eoc = [order+1,order+1]
-
-    return eoc_interpolation, expected_eoc
-
 def runTestDivFree(order):
     x = SpatialCoordinate(triangle)
 
@@ -164,46 +95,21 @@ def checkEOC(eoc, expected_eoc):
 
     return
 
-def main():
-    # test elliptic with conforming and nonconforming second order VEM space
-    orderslist_secondorder = [2]
-    # for order in orderslist_secondorder:
-    #     print("order: ", order)
-    #     C0NCtestSpaces = [-1,order-1,order-2]
-    #     print("C0 non conforming test spaces: ", C0NCtestSpaces)
-    #     eoc_interpolation, eoc_solve, expected_eoc = runTestElliptic( C0NCtestSpaces, order )
+# def main():
+#     # test elliptic with conforming and nonconforming second order VEM space
+#     orderslist_secondorder = [2]
+#     for order in orderslist_secondorder:
+#         print("order: ", order)
+#         eoc_solve, expected_eoc = runTestCurlfree( order )
 
-    #     checkEOC(eoc_interpolation, expected_eoc)
-    #     checkEOC(eoc_solve, expected_eoc)
+#         checkEOC(eoc_solve, expected_eoc)
 
-    #     C0testSpaces = [0,order-2,order-2]
-    #     print("C0 test spaces: ", C0testSpaces)
-    #     eoc_interpolation, eoc_solve, expected_eoc = runTestElliptic( C0testSpaces, order )
+#     #     C0testSpaces = [0,order-2,order-2]
+#     #     print("C0 test spaces: ", C0testSpaces)
+#     #     eoc_interpolation, eoc_solve, expected_eoc = runTestElliptic( C0testSpaces, order )
 
-    #     checkEOC(eoc_interpolation, expected_eoc)
-    #     checkEOC(eoc_solve, expected_eoc)
-
-    # test biharmonic fourth order with nonconforming VEM space
-    # orderslist_fourthorder = [3]
-    # for order in orderslist_fourthorder:
-    #     print("order: ", order)
-    #     C1NCtestSpaces = [ [0], [order-3,order-2], [order-4] ]
-    #     print("C1 non conforming test spaces: ", C1NCtestSpaces)
-    #     eoc_interpolation, expected_eoc = runTestBiharmonic( C1NCtestSpaces, order )
-
-    #     checkEOC(eoc_interpolation, expected_eoc)
-    #     checkEOC(eoc_solve, expected_eoc)
-
-    # test curl free interpolation
-    for order in orderslist_secondorder:
-        print("order: ", order)
-        eoc_interpolation, expected_eoc = runTestCurlfree( order )
-        checkEOC(eoc_interpolation, expected_eoc)
-
-    #     eoc_interpolation, expected_eoc = runTestDivFree( order )
-    #     checkEOC(eoc_interpolation, expected_eoc)
-
-    # hk tests
+#     #     checkEOC(eoc_interpolation, expected_eoc)
+#     #     checkEOC(eoc_solve, expected_eoc)
 
 
-main()
+# main()
