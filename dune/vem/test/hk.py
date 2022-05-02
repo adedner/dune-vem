@@ -36,7 +36,8 @@ def runTesthk(testSpaces, order, vectorSpace, reduced):
     x = SpatialCoordinate(triangle)
 
     exact = as_vector( dimR*[x[0]*x[1] * cos(pi*x[0]*x[1])] )
-    spaceConstructor = lambda grid, r: dune.vem.vemSpace( grid, order=order,
+    spaceConstructor = lambda grid, r: dune.vem.vemSpace( grid,
+                                                          order=order,
                                                           dimRange=r,
                                                           testSpaces=testSpaces,
                                                           vectorSpace=vectorSpace,

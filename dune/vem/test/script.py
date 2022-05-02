@@ -16,18 +16,15 @@ import ufl.algorithms
 from ufl import *
 import dune.ufl
 
-from interpolate import interpolate_secondorder, interpolate_fourthorder
-from divfree import divfree
-
 dune.fem.parameter.append({"fem.verboserank": -1})
 
-maxLevel = 4
+maxLevel = 3
 
 def interpolate():
     return False
 
 def getParameters():
-    ln,lm, Lx,Ly = 1,0, 1,1.1
+    ln, lm, Lx, Ly = 1,0, 1,1.1
     return ln, lm, Lx, Ly
 
 def runTest(exact, spaceConstructor, get_df):
@@ -37,7 +34,7 @@ def runTest(exact, spaceConstructor, get_df):
         # set up grid for testing
         N = 2**(level)
         grid = dune.vem.polyGrid(
-          dune.vem.voronoiCells([[0,0],[Lx,Ly]], 10*N*N, lloyd=200, fileName="voronoiseeds", load=True)
+          dune.vem.voronoiCells([[0,0],[Lx,Ly]], 50*N*N, lloyd=200, fileName="voronoiseeds", load=True)
         #   cartesianDomain([0.,0.],[Lx,Ly],[N,N]), cubes=False
         #   cartesianDomain([0.,0.],[Lx,Ly],[2*N,2*N]), cubes=True
         )
@@ -60,7 +57,6 @@ def runTest(exact, spaceConstructor, get_df):
 
     return calculateEOC(results,length)
 
-
 def calculateEOC(results,length):
     eoc = length*[-1]
 
@@ -73,43 +69,8 @@ def calculateEOC(results,length):
 
     return eoc
 
-def runTestDivFree(order):
-    x = SpatialCoordinate(triangle)
-
-    exact = as_vector([-x[1]+x[0]**2*x[1],
-                            x[0]-x[1]**2*x[0]])
-
-    spaceConstructor = lambda grid, r: dune.vem.divFreeSpace( grid, order=order )
-    expected_eoc = [order+1]
-
-    # eoc = runTest(exact, spaceConstructor, interpolate)
-    eoc_interpolation = runTest(exact, spaceConstructor, divfree)
-
-    return eoc_interpolation, expected_eoc
-
 def checkEOC(eoc, expected_eoc):
     i = 0
     for k in expected_eoc:
         assert(0.8*k <= eoc[i] <= 1.2*k), "eoc out of expected range"
         i += 1
-
-    return
-
-# def main():
-#     # test elliptic with conforming and nonconforming second order VEM space
-#     orderslist_secondorder = [2]
-#     for order in orderslist_secondorder:
-#         print("order: ", order)
-#         eoc_solve, expected_eoc = runTestCurlfree( order )
-
-#         checkEOC(eoc_solve, expected_eoc)
-
-#     #     C0testSpaces = [0,order-2,order-2]
-#     #     print("C0 test spaces: ", C0testSpaces)
-#     #     eoc_interpolation, eoc_solve, expected_eoc = runTestElliptic( C0testSpaces, order )
-
-#     #     checkEOC(eoc_interpolation, expected_eoc)
-#     #     checkEOC(eoc_solve, expected_eoc)
-
-
-# main()
