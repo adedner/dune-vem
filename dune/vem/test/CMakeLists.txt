@@ -1,5 +1,5 @@
-set( SCRIPTS biharmonic  curlfree     elliptic     hk     divfree
-             hktest      interpolate  perturbation script )
+set( SCRIPTS varyingcoeff  curlfree     hk     divfree
+             hk_laplace     perturbation )
 add_python_targets(testscripts ${SCRIPTS})
 
 foreach( script ${SCRIPTS} )

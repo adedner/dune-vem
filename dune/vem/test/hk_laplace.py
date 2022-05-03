@@ -12,7 +12,7 @@ import dune.ufl
 from script import runTest, checkEOC, interpolate
 from interpolate import interpolate_secondorder
 
-dimR = 1
+dimR = 3
 
 parameters = {"newton.linear.tolerance": 1e-12,
               "newton.linear.preconditioning.method": "jacobi",

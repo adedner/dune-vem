@@ -24,7 +24,7 @@ def interpolate():
     return False
 
 def getParameters():
-    ln, lm, Lx, Ly = 1,0, 1,1.1
+    ln, lm, Lx, Ly = 1,0, 1,1
     return ln, lm, Lx, Ly
 
 def runTest(exact, spaceConstructor, get_df):
