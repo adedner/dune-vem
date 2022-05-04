@@ -71,6 +71,12 @@ def main():
 
        checkEOC(eoc, expected_eoc)
 
+       # C0 conforming VEM with vectorSpace=true
+       print("C0 conforming test spaces with vectorSpace=True")
+       eoc, expected_eoc = runTesthk( C0testSpaces, order, True, False )
+
+       checkEOC(eoc, expected_eoc)
+
        # C0 serendipity VEM
        C0serendipitytestSpaces = [0,order-2,order-3]
        print("C0 serendipity test spaces: ", C0serendipitytestSpaces)

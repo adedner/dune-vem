@@ -72,16 +72,12 @@ def main():
       orders = [1,3]
       for order in orders:
             print("order: ", order)
-            # C0 non conforming VEM
-            C0NCtestSpaces = [-1, order-1, order-2 ]
-            print("C0 non conforming test spaces: ", C0NCtestSpaces)
+            # C0 conforming VEM
+            C0testSpaces = [0,order-2,order-2]
+            print("C0 conforming test spaces: ", C0testSpaces)
 
             # vectorSpace=False, reduced=True
-            eoc, expected_eoc = runTesthk( C0NCtestSpaces, order, vectorSpace=False, reduced=True )
-            checkEOC(eoc, expected_eoc)
-
-            # vectorSpace=True, reduced=True
-            eoc, expected_eoc = runTesthk( C0NCtestSpaces, order, vectorSpace=True, reduced=True )
+            eoc, expected_eoc = runTesthk( C0testSpaces, order, vectorSpace=False, reduced=True )
             checkEOC(eoc, expected_eoc)
 
 main()
