@@ -116,7 +116,7 @@ namespace Dune
             // scalarEach used in RHS constraints set up
             if (alpha>=1)
             {
-              // phi[0] *= scale_;
+              phi[0] *= scale_;
               functor(alpha-1, phi[0]);
             }
           });
@@ -158,7 +158,7 @@ namespace Dune
           {
             if (alpha>=1)
             {
-              // dphi[0] *= scale_;
+              dphi[0] *= scale_;
               functor(alpha-1+numInnerShapeFunctions_, dphi[0]);
               ++test;
             }
@@ -168,7 +168,12 @@ namespace Dune
 
         template< class Point, class Functor >
         void jacobianEach ( const Point &x, Functor functor ) const
-        {}
+        {
+          vsfs_.jacobianEach(x, [&](std::size_t alpha, JacobianRangeType dphi)
+          {
+            if (alpha>=dimRange) functor(alpha-dimRange,dphi);
+          });
+        }
 
         template< class Point, class Functor >
         void hessianEach ( const Point &x, Functor functor ) const
@@ -187,20 +192,6 @@ namespace Dune
         void divJacobianEach( const Point &x, Functor functor ) const
         {
           RangeType divGrad(0);
-          if constexpr (!reduced)
-          {
-            vsfs_.jacobianEach(x, [&](std::size_t alpha, JacobianRangeType dphi)
-            {
-              if (alpha<numGradShapeFunctions_)
-                for (size_t s=0;s<dimDomain;++s)
-                {
-                  for (size_t i=0;i<divGrad.size();++i)
-                    divGrad[i] = dphi[i][s];
-                  functor(dimDomain*alpha+s, divGrad);
-                }
-            });
-          }
-          else
           {
             vsfs_.hessianEach(x, [&](std::size_t alpha, HessianRangeType d2phi)
             {
@@ -244,7 +235,8 @@ namespace Dune
           {
             if (alpha < numInnerShapeFunctions_)
             {
-              functor(alpha, {-y[1]*phi[0], y[0]*phi[0]} );
+              RangeType val{-y[1]*phi[0], y[0]*phi[0]};
++             functor(alpha, val );
             }
           });
         }
@@ -322,9 +314,8 @@ namespace Dune
       , dofsPerCodim_(calcDofsPerCodim(order))
       , useOnb_(useOnb)
       , numValueShapeFunctions_( sizeONB<0>(onbSFS_.order()-1) )
-      , numGradShapeFunctions_ ( 0 )
-         // !reduced? std::min( numValueShapeFunctions_, sizeONB<0>(std::max(0, order - 1)) )
-         // : numValueShapeFunctions_-1*BBBasisFunctionSetType::RangeType::dimension )
+      , numGradShapeFunctions_ (
++          (onbSFS_.size()-1)*BBBasisFunctionSetType::RangeType::dimension )
       , numHessShapeFunctions_ ( 0 )
       , numInnerShapeFunctions_( order==2 ? 0 :
                                  sizeONB<0>(order-3)/BBBasisFunctionSetType::RangeType::dimension )
