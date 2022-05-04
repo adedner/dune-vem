@@ -936,8 +936,8 @@ namespace Dune
         // on intersectionn
         auto vertex = [&] (int poly,int i,int k,int numDofs)
         { //!TS add derivatives at vertex (probably only normal component - is the mask then correct?)
-          std::cout << "vertex:" << poly << "," << i << "," << k << "," << numDofs
-                    << " | " << entry[0] << std::endl;
+          // std::cout << "vertex:" << poly << "," << i << "," << k << "," << numDofs
+          //           << " | " << entry[0] << std::endl;
           const auto &x = edgeGeo.local( refElement.position( i, dimension ) );
           edgeShapeFunctionSet.evaluateEach( x, [ &localDofVectorMatrix, &entry ] ( std::size_t alpha, typename EdgeShapeFunctionSet::RangeType phi ) {
               assert( entry[0] < localDofVectorMatrix[0].size() );
@@ -970,8 +970,8 @@ namespace Dune
         };
         auto edge = [&] (int poly,auto intersection,int k,int numDofs)
         { //!TS add normal derivatives
-          std::cout << "edge:" << poly << "," << k << "," << numDofs
-                    << " | " << entry[0] << std::endl;
+          // std::cout << "edge:" << poly << "," << k << "," << numDofs
+          //           << " | " << entry[0] << std::endl;
           EdgeQuadratureType edgeQuad( gridPart(),
                 intersection, 2*polOrder_, EdgeQuadratureType::INSIDE );
           for (unsigned int qp=0;qp<edgeQuad.nop();++qp)
@@ -1010,7 +1010,7 @@ namespace Dune
 
         applyOnIntersection(intersection,vertex,edge,mask);
 
-        std::cout << "final entry=" << entry[0] << std::endl;
+        // std::cout << "final entry=" << entry[0] << std::endl;
 
         assert( entry[0] == localDofVectorMatrix[0].size() );
         assert( entry[1] == localDofVectorMatrix[1].size() );
