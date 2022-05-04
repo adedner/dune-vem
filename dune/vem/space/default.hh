@@ -320,7 +320,6 @@ namespace Dune
       std::vector<JacobianRangeType> psi1Values;
 
       // start iteration over all polygons
-      std::cout << "iterate over polygons\n";
       for (std::size_t agglomerate = start; agglomerate < end; ++agglomerate)
       {
         // case 1: dimRange=1 (e.g. a vector extension is applied later)
@@ -377,7 +376,6 @@ namespace Dune
 
         HpGrad = 0;
         HpHess = 0;
-        // std::cout << "first element iteration\n";
         for (const ElementSeedType &entitySeed : entitySeeds[agglomerate])
         {
           const ElementType &element = gridPart().entity(entitySeed);
@@ -468,6 +466,7 @@ namespace Dune
         // set up matrix RHSconstraintsMatrix
         setupConstraintRHS(entitySeeds, agglomerate, RHSconstraintsMatrix, H0);
 
+#if 0
         // std::cout << "checkpoint setupRHS constraints matrix done" << std::endl;
         {
             for (std::size_t alpha=0;alpha<D.size();++alpha)
@@ -477,6 +476,7 @@ namespace Dune
               std::cout << std::endl;
             }
         }
+#endif
 
         if (numConstraintShapeFunctions < numShapeFunctions)
         { // need to use a CLS approach
@@ -527,7 +527,7 @@ namespace Dune
             }
           }
         }
-#if 1
+#if 0
         std::cout << "*******************************\n";
         std::cout << "** RHS constraints 1        **\n";
         std::cout << "*******************************\n";
@@ -543,7 +543,7 @@ namespace Dune
         std::cout << "*******************************\n";
 #endif
 
-#if 1
+#if 0
         std::cout << "*******************************\n";
         std::cout << "****  Value projection  ****\n";
         std::cout << "*******************************\n";
@@ -564,7 +564,6 @@ namespace Dune
         /// GradientProjection //////////////////////////////////////////////////
         //////////////////////////////////////////////////////////////////////////
 
-        std::cout << "second element iteration\n";
         for (const ElementSeedType &entitySeed : entitySeeds[agglomerate])
         {
           const ElementType &element = gridPart().entity(entitySeed);
@@ -743,7 +742,6 @@ namespace Dune
         /////////////////////////////////////////////////////////////////////
 
         // iterate over the triangles of this polygon (for Hessian projection)
-        std::cout << "third element iteration\n";
         for (const ElementSeedType &entitySeed : entitySeeds[agglomerate])
         {
           const ElementType &element = gridPart().entity(entitySeed);
