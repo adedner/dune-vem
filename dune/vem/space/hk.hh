@@ -625,7 +625,8 @@ namespace Dune
         /// Fix RHS constraints for value projection /////////////////////////////
         //////////////////////////////////////////////////////////////////////////
 
-        static constexpr int blockSize = TraitsType::baseRangeDimension;
+        static constexpr int blockSize = vectorSpace ? dimRange : 1;
+        // static constexpr int blockSize = TraitsType::baseRangeDimension;
         const std::size_t numShapeFunctions = BaseType::basisSets_.size(0);
         const std::size_t numDofs = BaseType::blockMapper().numDofs(agglomerate) * blockSize;
         const std::size_t numConstraintShapeFunctions = BaseType::basisSets_.constraintSize();
@@ -748,6 +749,7 @@ namespace Dune
         auto vertex = [&] (int poly,auto i,int k,int numDofs)
         {
           k /= baseRangeDimension; // ????
+          // k /= blockSize
           mask[k] = 1;
           ++k;
           if (order2size<0>(1)>0)
@@ -759,11 +761,14 @@ namespace Dune
         auto edge = [&] (int poly,auto i,int k,int numDofs)
         {
           k /= baseRangeDimension; // ????
+          // k /= blockSize
 #ifndef NDEBUG
           auto kStart = k;
 #endif
+          // for (std::size_t alpha=0;alpha<basisSets_.numEdgeTestShapeFunctions()/blockSize;++alpha)
           for (std::size_t alpha=0;alpha<basisSets_.numEdgeTestShapeFunctions()/baseRangeDimension;++alpha)
           {
+            // if (alpha < basisSets_.template order2size<1>(0)*2)
             if (alpha < basisSets_.template order2size<1>(0))
             {
               mask[k] = 1;
@@ -783,6 +788,8 @@ namespace Dune
         {
           // ???? assert( basisSets_.innerTestSize() == numDofs );
           k /= baseRangeDimension;
+          // k /= blockSize
+          // std::fill(mask.begin()+k,mask.begin()+k+numDofs/blockSize,1);
           std::fill(mask.begin()+k,mask.begin()+k+numDofs/baseRangeDimension,1);
         };
         apply(element,vertex,edge,inner);
