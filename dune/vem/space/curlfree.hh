@@ -95,6 +95,12 @@ namespace Dune
         {
           return *this;
         }
+
+        template <int codim>
+        int vectordofs() const
+        {
+          return 1;
+        }
         // Note: needed for the finalizing projection
         //       Could make this 'protected' and make the CurlFreeVemSpace 'friend'
         template< class Point, class Functor >
@@ -421,6 +427,9 @@ namespace Dune
       typedef Hybrid::IndexRange<int, 1> LocalBlockIndices;
       typedef VemAgglomerationIndexSet <GridPartType> IndexSetType;
       typedef AgglomerationDofMapper <GridPartType, IndexSetType> BlockMapperType;
+
+      // replace vectorSpace with basisFunctionSet::RangeType::dimension == dimRange
+      static const int baseBlockSize = vectorSpace ? LocalBlockIndices::size() : 1;
 
       template<class DiscreteFunction, class Operation = Fem::DFCommunicationOperation::Copy>
       struct CommDataHandle {

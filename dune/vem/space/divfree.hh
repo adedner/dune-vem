@@ -107,6 +107,15 @@ namespace Dune
           return *this;
         }
 
+        template <int codim>
+        int vectordofs() const
+        {
+          if (codim == 0)
+            return 1;
+          if (codim == 1 || codim == 2)
+            return dimRange;
+        }
+
         template< class Point, class Functor >
         void scalarEach ( const Point &x, Functor functor ) const
         {
@@ -236,7 +245,7 @@ namespace Dune
             if (alpha < numInnerShapeFunctions_)
             {
               RangeType val{-y[1]*phi[0], y[0]*phi[0]};
-+             functor(alpha, val );
+              functor(alpha, val );
             }
           });
         }
@@ -546,6 +555,8 @@ namespace Dune
       typedef Hybrid::IndexRange<int, 1> LocalBlockIndices;
       typedef VemAgglomerationIndexSet <GridPartType> IndexSetType;
       typedef AgglomerationDofMapper <GridPartType, IndexSetType> BlockMapperType;
+
+      static const int baseBlockSize = vectorSpace ? LocalBlockIndices::size() : 1;
 
       template<class DiscreteFunction, class Operation = Fem::DFCommunicationOperation::Copy>
       struct CommDataHandle {
