@@ -112,6 +112,13 @@ namespace Dune
           return sfs_;
         }
 
+        template <int codim>
+        int vectordofs() const
+        {
+          // want: (basisFunctionSet::RangeType::dimension == RangeType::dimension) ? RangeType::dimension : 1
+          return vectorSpace ? dimRange : 1;
+        }
+
         template< class Point, class Functor >
         void evaluateEach ( const Point &x, Functor functor ) const
         {
@@ -581,6 +588,9 @@ namespace Dune
       typedef VemAgglomerationIndexSet <GridPartType> IndexSetType;
       typedef AgglomerationDofMapper <GridPartType, IndexSetType> BlockMapperType;
 
+      // static const int baseBlockSize = (basisFunctionSet::RangeType::dimension == RangeType::dimension) ? LocalBlockIndices::size() : 1;
+      static const int baseBlockSize = vectorSpace ? LocalBlockIndices::size() : 1;
+
       template<class DiscreteFunction, class Operation = Fem::DFCommunicationOperation::Copy>
       struct CommDataHandle {
           typedef Operation OperationType;
@@ -625,8 +635,8 @@ namespace Dune
         /// Fix RHS constraints for value projection /////////////////////////////
         //////////////////////////////////////////////////////////////////////////
 
-        static constexpr int blockSize = vectorSpace ? dimRange : 1;
-        // static constexpr int blockSize = TraitsType::baseRangeDimension;
+        // static constexpr int blockSize = vectorSpace ? dimRange : 1;
+        static constexpr int blockSize = TraitsType::baseRangeDimension;
         const std::size_t numShapeFunctions = BaseType::basisSets_.size(0);
         const std::size_t numDofs = BaseType::blockMapper().numDofs(agglomerate) * blockSize;
         const std::size_t numConstraintShapeFunctions = BaseType::basisSets_.constraintSize();
@@ -709,6 +719,7 @@ namespace Dune
                                        Traits::LocalBlockIndices::size() : 1;
       static const int dimension = IndexSetType::dimension;
       static const int baseRangeDimension = Traits::baseRangeDimension;
+      static const int baseBlockSize = Traits::vectorSpace ? Traits::LocalBlockIndices::size() : 1;
     private:
       typedef Dune::Fem::ElementQuadrature<GridPartType,0> InnerQuadratureType;
       typedef Dune::Fem::ElementQuadrature<GridPartType,1> EdgeQuadratureType;
@@ -748,8 +759,8 @@ namespace Dune
         std::fill(mask.begin(),mask.end(),-1);
         auto vertex = [&] (int poly,auto i,int k,int numDofs)
         {
-          k /= baseRangeDimension; // ????
-          // k /= blockSize
+          // k /= baseRangeDimension; // ????
+          k /= baseBlockSize;
           mask[k] = 1;
           ++k;
           if (order2size<0>(1)>0)
@@ -760,13 +771,13 @@ namespace Dune
         };
         auto edge = [&] (int poly,auto i,int k,int numDofs)
         {
-          k /= baseRangeDimension; // ????
-          // k /= blockSize
+          // k /= baseRangeDimension; // ????
+          k /= baseBlockSize;
+          std::cout << "baseBlockSize" << baseBlockSize << std::endl;
 #ifndef NDEBUG
           auto kStart = k;
 #endif
-          // for (std::size_t alpha=0;alpha<basisSets_.numEdgeTestShapeFunctions()/blockSize;++alpha)
-          for (std::size_t alpha=0;alpha<basisSets_.numEdgeTestShapeFunctions()/baseRangeDimension;++alpha)
+          for (std::size_t alpha=0;alpha<basisSets_.numEdgeTestShapeFunctions()/baseBlockSize;++alpha)
           {
             // if (alpha < basisSets_.template order2size<1>(0)*2)
             if (alpha < basisSets_.template order2size<1>(0))
@@ -787,10 +798,9 @@ namespace Dune
         auto inner = [&mask] (int poly,auto i,int k,int numDofs)
         {
           // ???? assert( basisSets_.innerTestSize() == numDofs );
-          k /= baseRangeDimension;
-          // k /= blockSize
-          // std::fill(mask.begin()+k,mask.begin()+k+numDofs/blockSize,1);
-          std::fill(mask.begin()+k,mask.begin()+k+numDofs/baseRangeDimension,1);
+          // k /= baseRangeDimension;
+          k /= baseBlockSize;
+          std::fill(mask.begin()+k,mask.begin()+k+numDofs/baseBlockSize,1);
         };
         apply(element,vertex,edge,inner);
         // assert( std::none_of(mask.begin(),mask.end(), [](char m){return // m==-1;}) ); // ???? needs investigation - issue with DirichletBCs
