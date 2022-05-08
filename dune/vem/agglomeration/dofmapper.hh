@@ -136,7 +136,7 @@ namespace Dune
       SizeType size_;
       std::vector< SubEntityInfo > subEntityInfo_;
       std::array< int, dimension+1 > codimIndex_;
-      std::vector< bool > edgeTwist_;
+      // std::vector< bool > edgeTwist_;
     };
 
 
@@ -229,7 +229,7 @@ namespace Dune
           const SizeType subIndex = indexSet().subIndex( element, subAgglomerate, info.codim );
           SizeType index = info.offset + SizeType( info.numDofs ) * subIndex;
 
-          if( (info.codim == 1) && (edgeTwist_[ subIndex ] == 1) )
+          if( false ) // (info.codim == 1) && (edgeTwist_[ subIndex ] == 1) )
           {
             const SizeType begin = index;
             for( index += info.numDofs; index > begin; )
@@ -259,7 +259,7 @@ namespace Dune
         return;
 
       SizeType index = info.offset + SizeType( info.numDofs ) * result.first;
-      if( (Entity::codimension == 1) && (edgeTwist_[ result.first ]) )
+      if( false ) // (Entity::codimension == 1) && (edgeTwist_[ result.first ]) )
       {
         for( unsigned int i = info.numDofs; i > 0; )
           f( --i, index++ );
@@ -284,6 +284,7 @@ namespace Dune
         maxNumDofs_ += SizeType( info.numDofs ) * SizeType( indexSet().maxSubAgglomerates( info.codim ) );
       }
 
+#if 0
       if( dimension > 1 )
       {
         const auto &idSet = agglomeration().gridPart().grid().globalIdSet();
@@ -298,10 +299,11 @@ namespace Dune
           {
             const auto left = idSet.subId( Dune::Fem::gridEntity(element), refElement.subEntity( i, dimension-1, 0, dimension ), dimension );
             const auto right = idSet.subId( Dune::Fem::gridEntity(element), refElement.subEntity( i, dimension-1, 1, dimension ), dimension );
-            edgeTwist_[ indexSet().subIndex( element, i, dimension-1 ) ] = (right < left);
+            edgeTwist_[ indexSet().subIndex( element, i, dimension-1 ) ] = false; // (right < left);
           }
         }
       }
+#endif
     }
 
   } // namespace Fem

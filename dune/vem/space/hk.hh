@@ -403,7 +403,8 @@ namespace Dune
       }
       template <class Agglomeration>
       EdgeShapeFunctionSetType edgeBasisFunctionSet(
-             const Agglomeration &agglomeration, const IntersectionType &intersection) const
+             const Agglomeration &agglomeration, const IntersectionType
+             &intersection, bool twist) const
       {
         return EdgeShapeFunctionSetType(intersection, edgeSFS_, numEdgeTestShapeFunctions_);
       }
@@ -747,9 +748,9 @@ namespace Dune
         std::fill(mask.begin(),mask.end(),-1);
         auto vertex = [&] (int poly,auto i,int k,int numDofs)
         {
-          k /= baseRangeDimension; // ????
           mask[k] = 1;
-          ++k;
+          mask[k+1] = 1;
+          k += 2;
           if (order2size<0>(1)>0)
           {
               mask[k]   = 2;
@@ -758,13 +759,12 @@ namespace Dune
         };
         auto edge = [&] (int poly,auto i,int k,int numDofs)
         {
-          k /= baseRangeDimension; // ????
 #ifndef NDEBUG
           auto kStart = k;
 #endif
-          for (std::size_t alpha=0;alpha<basisSets_.numEdgeTestShapeFunctions()/baseRangeDimension;++alpha)
+          for (std::size_t alpha=0;alpha<basisSets_.numEdgeTestShapeFunctions();++alpha)
           {
-            if (alpha < basisSets_.template order2size<1>(0))
+            if (alpha < basisSets_.template order2size<1>(0)*2)
             {
               mask[k] = 1;
               ++k;
@@ -782,8 +782,7 @@ namespace Dune
         auto inner = [&mask] (int poly,auto i,int k,int numDofs)
         {
           // ???? assert( basisSets_.innerTestSize() == numDofs );
-          k /= baseRangeDimension;
-          std::fill(mask.begin()+k,mask.begin()+k+numDofs/baseRangeDimension,1);
+          std::fill(mask.begin()+k,mask.begin()+k+numDofs,1);
         };
         apply(element,vertex,edge,inner);
         // assert( std::none_of(mask.begin(),mask.end(), [](char m){return // m==-1;}) ); // ???? needs investigation - issue with DirichletBCs
@@ -825,13 +824,16 @@ namespace Dune
         auto edge = [&,this] (int poly,auto intersection,int k,int numDofs)
         { //!TS add nomral derivatives
           int kStart = k;
-          const auto &edgeBFS = basisSets_.edgeBasisFunctionSet( indexSet_.agglomeration(), intersection );
+          const auto &edgeBFS = basisSets_.edgeBasisFunctionSet( indexSet_.agglomeration(),
+                             intersection, indexSet_.twist(intersection) );
           // int edgeNumber = intersection.indexInInside();
           EdgeQuadratureType edgeQuad( gridPart(), intersection, 2*polOrder_, EdgeQuadratureType::INSIDE );
           auto normal = intersection.centerUnitOuterNormal();
           if (intersection.neighbor()) // we need to check the orientation of the normal
             if (indexSet_.index(intersection.inside()) > indexSet_.index(intersection.outside()))
+            {
               normal *= -1;
+            }
           for (unsigned int qp=0;qp<edgeQuad.nop();++qp)
           {
             k = kStart;
@@ -914,7 +916,8 @@ namespace Dune
         for (std::size_t i=0;i<mask.size();++i)
           mask[i].clear();
         const ElementType &element = intersection.inside();
-        const auto &edgeBFS = basisSets_.edgeBasisFunctionSet( indexSet_.agglomeration(), intersection );
+        const auto &edgeBFS = basisSets_.edgeBasisFunctionSet( indexSet_.agglomeration(),
+                             intersection, indexSet_.twist(intersection) );
         const auto &refElement = ReferenceElements< ctype, dimension >::general( element.type() );
         int edgeNumber = intersection.indexInInside();
         const auto &edgeGeo = refElement.template geometry<1>(edgeNumber);
@@ -1237,11 +1240,14 @@ namespace Dune
         auto edge = [&] (int poly,auto intersection,int k,int numDofs)
         { //!TS edge derivatives
           int kStart = k;
-          const auto &edgeBFS = basisSets_.edgeBasisFunctionSet( indexSet_.agglomeration(), intersection );
+          const auto &edgeBFS = basisSets_.edgeBasisFunctionSet( indexSet_.agglomeration(),
+                                      intersection, indexSet_.twist(intersection) );
           auto normal = intersection.centerUnitOuterNormal();
           if (intersection.neighbor()) // we need to check the orientation of the normal
             if (indexSet_.index(intersection.inside()) > indexSet_.index(intersection.outside()))
+            {
               normal *= -1;
+            }
           EdgeQuadratureType edgeQuad( gridPart(),
                 intersection, 2*polOrder_, EdgeQuadratureType::INSIDE );
           for (unsigned int qp=0;qp<edgeQuad.nop();++qp)

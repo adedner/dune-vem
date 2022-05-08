@@ -45,6 +45,8 @@ namespace Dune
       typedef GridPart GridPartType;
       static constexpr bool vectorSpace = true;
       static constexpr int dimDomain = GridPartType::dimension;
+      static constexpr bool valReduced = false;   // true: only project values into k-1 polynomials
+      static constexpr bool jacReduced = false;   // true: only use grad phi_ for gradient basisfunctions
       typedef typename GridPart::template Codim<0>::EntityType EntityType;
       typedef typename GridPart::IntersectionType IntersectionType;
 
@@ -92,7 +94,7 @@ namespace Dune
         , sfs_(entity, agglomeration.index(entity),
                agglomeration.boundingBoxes(), useOnb, onbSFS)
         , entity_(entity)
-        , scale_( std::sqrt( sfs_.bbox().volume() ) )
+        , scale_( 1 ) // std::sqrt( sfs_.bbox().volume() ) )
         , numValueShapeFunctions_(numValueSF)
         , numGradShapeFunctions_(numGradSF)
         , numHessShapeFunctions_(numHessSF)
@@ -116,7 +118,7 @@ namespace Dune
             // scalarEach used in RHS constraints set up
             if (alpha>=1)
             {
-              // phi[0] *= scale_;
+              phi[0] *= scale_;
               functor(alpha-1, phi[0]);
             }
           });
@@ -140,6 +142,7 @@ namespace Dune
           // values so that a gap is left for the 'grad' basisfunctions.
           int test = 0;
           RangeType y = sfs_.position( x );
+          sfs_.bbox().gradientTransform(y, true);
           assert( y.two_norm() < 1.5 );
           sfs_.evaluateEach(x, [&](std::size_t alpha, ScalarRangeType phi)
           {
@@ -158,46 +161,81 @@ namespace Dune
           {
             if (alpha>=1)
             {
-              // dphi[0] *= scale_;
+              dphi[0] *= scale_;
               functor(alpha-1+numInnerShapeFunctions_, dphi[0]);
               ++test;
             }
           });
+          if (test != numValueShapeFunctions_)
+            std::cout << "evaluated " << test << " basis functions instead of " << numValueShapeFunctions_ << std::endl;
           assert(test == numValueShapeFunctions_);
         }
 
         template< class Point, class Functor >
         void jacobianEach ( const Point &x, Functor functor ) const
-        {}
+        {
+          if constexpr (!jacReduced)
+          {
+            JacobianRangeType jac(0);
+            sfs_.evaluateEach(x, [&](std::size_t alpha, ScalarRangeType phi)
+            {
+              if (alpha*dimDomain*dimDomain < numGradShapeFunctions_)
+              {
+                for (size_t d1=0;d1<dimDomain;++d1)
+                {
+                  for (size_t d2=0;d2<dimDomain;++d2)
+                  {
+                    jac[d1][d2] = phi[0];
+                    functor(alpha*dimDomain*dimDomain+d1*dimDomain+d2, jac);
+                    jac[d1][d2] = 0;
+                  }
+                }
+              }
+            });
+          }
+          else
+          {
+            vsfs_.jacobianEach(x, [&](std::size_t alpha, JacobianRangeType dphi)
+            {
+              if (alpha>=dimRange) functor(alpha-dimRange,dphi);
+            });
+          }
+        }
 
         template< class Point, class Functor >
         void hessianEach ( const Point &x, Functor functor ) const
         {}
         // functor(alpha, psi) with psi in R^r
         //
-        // for each g = g_{alpha*dimDomain+s} = m_alpha e_s    (1<=alpha<=numGradSF and 1<=s<=dimDomain)
-        // sum_{rj} int_E d_j v_r g_rj = - sum_{rj} int_E v_r d_j g_rj + ...
-        //     = - int_E sum_r ( v_r sum_j d_j g_rj )
+        // for each g = g_{alpha*D+s*D+t} = m_alpha e_s e_t           (1<=alpha<=numGradSF and 1<=s,t<=dimDomain)
+        // sum_{ij} int_E d_j v_i g_ij = - sum_{ij} int_E v_i d_j g_ij + ...
+        //     = - int_E sum_i ( v_i sum_j d_j g_ij )
         //     = - int_E v . psi
-        // with psi_r = sum_j d_j g_rj
+        // with psi=(psi_i) and psi_i = sum_j d_j g_ij
         //
-        // g_{rj} = m_r delta_{js}   (m=m_alpha and fixed s=1,..,dimDomain)
-        // psi_r = sum_j d_j g_rj = sum_j d_j m_r delta_{js} = d_s m_r
+        // g_{ij} = m_a delta_{js} delta_{it}   (m=m_alpha and fixed s=1,..,dimDomain)
+        // psi_i = sum_j d_j g_ij = sum_j d_j m_a delta_{js} delta_{it}
+        //                        = d_s m_a delta_t
         template< class Point, class Functor >
         void divJacobianEach( const Point &x, Functor functor ) const
         {
           RangeType divGrad(0);
-          if constexpr (!reduced)
+          if constexpr (!jacReduced)
           {
-            vsfs_.jacobianEach(x, [&](std::size_t alpha, JacobianRangeType dphi)
+            sfs_.jacobianEach(x, [&](std::size_t alpha, ScalarJacobianRangeType dphi)
             {
-              if (alpha<numGradShapeFunctions_)
-                for (size_t s=0;s<dimDomain;++s)
+              if (alpha*dimDomain*dimDomain < numGradShapeFunctions_)
+              {
+                for (size_t d1=0;d1<dimDomain;++d1)
                 {
-                  for (size_t i=0;i<divGrad.size();++i)
-                    divGrad[i] = dphi[i][s];
-                  functor(dimDomain*alpha+s, divGrad);
+                  for (size_t d2=0;d2<dimDomain;++d2)
+                  {
+                    divGrad[d1] = dphi[0][d2];
+                    functor(alpha*dimDomain*dimDomain+d1*dimDomain+d2, divGrad);
+                    divGrad[d1] = 0;
+                  }
                 }
+              }
             });
           }
           else
@@ -240,11 +278,14 @@ namespace Dune
         void evaluateTestEach ( const Point &x, Functor functor ) const
         {
           RangeType y = sfs_.position( x );
+          sfs_.bbox().gradientTransform(y, true);
+          assert( y.two_norm() < 1.5 );
           sfs_.evaluateEach(x, [&](std::size_t alpha, ScalarRangeType phi)
           {
             if (alpha < numInnerShapeFunctions_)
             {
-              functor(alpha, {-y[1]*phi[0], y[0]*phi[0]} );
+              RangeType val{-y[1]*phi[0], y[0]*phi[0]};
+              functor(alpha, val );
             }
           });
         }
@@ -274,30 +315,38 @@ namespace Dune
         typedef typename VectorEdgeShapeFunctionSetType::JacobianRangeType EdgeJacobianRangeType;
 
         EdgeShapeFunctionSet(const IntersectionType &intersection, const ScalarEdgeShapeFunctionSetType &sfs,
+                             bool twist,
                              unsigned int numEdgeTestFunctions)
-        : intersection_(intersection), sfs_(sfs), numEdgeTestFunctions_(numEdgeTestFunctions)
+        : intersection_(intersection), sfs_(sfs), twist_(twist), numEdgeTestFunctions_(numEdgeTestFunctions)
         {}
         template< class Point, class Functor >
-        void evaluateEach ( const Point &x, Functor functor ) const
+        void evaluateEach ( const Point &xx, Functor functor ) const
         {
+          auto x = Dune::Fem::coordinate(xx);
+          if (twist_) x[0] = 1.-x[0];
           sfs_.evaluateEach(x,functor);
         }
         template< class Point, class Functor >
-        void jacobianEach ( const Point &x, Functor functor ) const
+        void jacobianEach ( const Point &xx, Functor functor ) const
         {
+          auto x = Dune::Fem::coordinate(xx);
+          if (twist_) x[0] = 1.-x[0];
           JacobianRangeType jac;
           const auto &geo = intersection_.geometry();
           const auto &jit = geo.jacobianInverseTransposed(x);
           sfs_.jacobianEach(x, [&](std::size_t alpha, EdgeJacobianRangeType dphi)
           {
+            if (twist_) dphi *= -1;
             for (std::size_t r=0;r<dimRange;++r)
               jit.mv(dphi[r],jac[r]);
             functor(alpha,jac);
           });
         }
         template< class Point, class Functor >
-        void evaluateTestEach ( const Point &x, Functor functor ) const
+        void evaluateTestEach ( const Point &xx, Functor functor ) const
         {
+          auto x = Dune::Fem::coordinate(xx);
+          if (twist_) x[0] = 1.-x[0];
           sfs_.evaluateEach(x, [&](std::size_t alpha, RangeType phi)
           {
             if (alpha<numEdgeTestFunctions_)
@@ -308,6 +357,7 @@ namespace Dune
         const IntersectionType &intersection_;
         VectorEdgeShapeFunctionSetType sfs_;
         unsigned int numEdgeTestFunctions_;
+        bool twist_;
       };
 
       public:
@@ -316,19 +366,25 @@ namespace Dune
 
       DivFreeVEMBasisSets( const int order, bool useOnb )
       : innerOrder_( order )
-      // test order+1 later
-      , onbSFS_(Dune::GeometryType(Dune::GeometryType::cube, dimDomain), order+1)
+      , onbSFS_(Dune::GeometryType(Dune::GeometryType::cube, dimDomain),
+          valReduced? order-1:order+1
+        )
       , edgeSFS_( Dune::GeometryType(Dune::GeometryType::cube,dimDomain-1), maxEdgeDegree() )
       , dofsPerCodim_(calcDofsPerCodim(order))
       , useOnb_(useOnb)
       , numValueShapeFunctions_( sizeONB<0>(onbSFS_.order()-1) )
-      , numGradShapeFunctions_ ( 0 )
-         // !reduced? std::min( numValueShapeFunctions_, sizeONB<0>(std::max(0, order - 1)) )
-         // : numValueShapeFunctions_-1*BBBasisFunctionSetType::RangeType::dimension )
+      , numGradShapeFunctions_ (
+              (!jacReduced)?
+              sizeONB<0>(order-1)*BBBasisFunctionSetType::RangeType::dimension:
+              (onbSFS_.size()-1)*BBBasisFunctionSetType::RangeType::dimension
+          )
       , numHessShapeFunctions_ ( 0 )
       , numInnerShapeFunctions_( order==2 ? 0 :
                                  sizeONB<0>(order-3)/BBBasisFunctionSetType::RangeType::dimension )
-      , numOrthoShapeFunctions_( sizeONB<0>(order-1)/BBBasisFunctionSetType::RangeType::dimension )
+      , numOrthoShapeFunctions_(valReduced?
+          numInnerShapeFunctions_:
+          sizeONB<0>(order-1)/BBBasisFunctionSetType::RangeType::dimension
+        )
       , numEdgeTestShapeFunctions_( sizeONB<1>(order-2) )
       {
         auto degrees = edgeDegrees();
@@ -366,22 +422,23 @@ namespace Dune
       }
       template <class Agglomeration>
       EdgeShapeFunctionSetType edgeBasisFunctionSet(
-             const Agglomeration &agglomeration, const IntersectionType &intersection) const
+             const Agglomeration &agglomeration,
+             const IntersectionType &intersection, bool twist) const
       {
-        return EdgeShapeFunctionSetType(intersection, edgeSFS_, numEdgeTestShapeFunctions_);
+        int flip = 1;
+        auto normal = intersection.centerUnitOuterNormal();
+        assert( abs(normal[0] + std::sqrt(2.)*normal[1]) > 1e-5 );
+        if (intersection.neighbor())
+        {
+          // !!! FIXME: if (indexSet_.index(intersection.inside()) > indexSet_.index(intersection.outside()))
+          if (normal[0] + std::sqrt(2.)*normal[1] < 0)
+              flip = -1;
+        }
+        // std::cout << "fip=" << flip << " " << twist << std::endl;
+        return EdgeShapeFunctionSetType(intersection, edgeSFS_, 0, numEdgeTestShapeFunctions_);
       }
       std::size_t size( std::size_t orderSFS ) const
       {
-        if constexpr (!reduced)
-        {
-          if (orderSFS == 0)
-            return numValueShapeFunctions_;
-          else if (orderSFS == 1)
-            return dimDomain*numGradShapeFunctions_;
-          else if (orderSFS == 2)
-            return dimDomain*(dimDomain+1)/2*numHessShapeFunctions_;
-        }
-        else
         {
           if (orderSFS == 0)
             return numValueShapeFunctions_;
@@ -657,7 +714,8 @@ namespace Dune
             assert(intersection.conforming());
 
             const typename BaseType::BasisSetsType::EdgeShapeFunctionSetType edgeShapeFunctionSet
-                  = BaseType::basisSets_.edgeBasisFunctionSet(BaseType::agglomeration(), intersection);
+                  = BaseType::basisSets_.edgeBasisFunctionSet(BaseType::agglomeration(),
+                               intersection, BaseType::blockMapper().indexSet().twist(intersection) );
 
             Std::vector<Std::vector<unsigned int>> mask(2,Std::vector<unsigned int>(0)); // contains indices with Phi_mask[i] is attached to given edge
             edgePhiVector[0] = 0;
