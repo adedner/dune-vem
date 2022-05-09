@@ -112,13 +112,6 @@ namespace Dune
           return sfs_;
         }
 
-        template <int codim>
-        int vectordofs() const
-        {
-          // want: (basisFunctionSet::RangeType::dimension == RangeType::dimension) ? RangeType::dimension : 1
-          return vectorSpace ? dimRange : 1;
-        }
-
         template< class Point, class Functor >
         void evaluateEach ( const Point &x, Functor functor ) const
         {
@@ -494,6 +487,12 @@ namespace Dune
             return pow(dimDomain,deriv);
         }
       }
+      int vectorDofs(int dim) const
+      {
+        // return 1 for scalar dofs or dimRange for vector dofs
+        // want: (basisFunctionSet::RangeType::dimension == RangeType::dimension) ? RangeType::dimension : 1
+        return vectorSpace ? BBBasisFunctionSetType::FunctionSpaceType::RangeType::dimension : 1;
+      }
 
       private:
       Std::vector<int> edgeDegrees() const
@@ -571,7 +570,7 @@ namespace Dune
       static const int codimension = 0;
       static const int dimDomain = FunctionSpace::DomainType::dimension;
       static const int dimRange = FunctionSpace::RangeType::dimension;
-      static const int baseRangeDimension = vectorSpace ? dimRange : 1;
+      // static const int baseRangeDimension = vectorSpace ? dimRange : 1;
 
       typedef typename GridPartType::template Codim<codimension>::EntityType EntityType;
       typedef FunctionSpace FunctionSpaceType;
@@ -588,7 +587,7 @@ namespace Dune
       typedef VemAgglomerationIndexSet <GridPartType> IndexSetType;
       typedef AgglomerationDofMapper <GridPartType, IndexSetType> BlockMapperType;
 
-      // static const int baseBlockSize = (basisFunctionSet::RangeType::dimension == RangeType::dimension) ? LocalBlockIndices::size() : 1;
+      // static const int baseBlockSize = (BasisFunctionSetType::RangeType::dimension == RangeType::dimension) ? LocalBlockIndices::size() : 1;
       static const int baseBlockSize = vectorSpace ? LocalBlockIndices::size() : 1;
 
       template<class DiscreteFunction, class Operation = Fem::DFCommunicationOperation::Copy>
@@ -635,8 +634,8 @@ namespace Dune
         /// Fix RHS constraints for value projection /////////////////////////////
         //////////////////////////////////////////////////////////////////////////
 
-        // static constexpr int blockSize = vectorSpace ? dimRange : 1;
-        static constexpr int blockSize = TraitsType::baseRangeDimension;
+        static constexpr int dimRange = TraitsType::dimRange;
+        static constexpr int blockSize = TraitsType::vectorSpace ? dimRange : 1;
         const std::size_t numShapeFunctions = BaseType::basisSets_.size(0);
         const std::size_t numDofs = BaseType::blockMapper().numDofs(agglomerate) * blockSize;
         const std::size_t numConstraintShapeFunctions = BaseType::basisSets_.constraintSize();
@@ -718,8 +717,7 @@ namespace Dune
       static constexpr int blockSize = Traits::vectorSpace?
                                        Traits::LocalBlockIndices::size() : 1;
       static const int dimension = IndexSetType::dimension;
-      static const int baseRangeDimension = Traits::baseRangeDimension;
-      static const int baseBlockSize = Traits::vectorSpace ? Traits::LocalBlockIndices::size() : 1;
+      static const int baseBlockSize = Traits::baseBlockSize;
     private:
       typedef Dune::Fem::ElementQuadrature<GridPartType,0> InnerQuadratureType;
       typedef Dune::Fem::ElementQuadrature<GridPartType,1> EdgeQuadratureType;
@@ -759,7 +757,6 @@ namespace Dune
         std::fill(mask.begin(),mask.end(),-1);
         auto vertex = [&] (int poly,auto i,int k,int numDofs)
         {
-          // k /= baseRangeDimension; // ????
           k /= baseBlockSize;
           mask[k] = 1;
           ++k;
@@ -771,9 +768,7 @@ namespace Dune
         };
         auto edge = [&] (int poly,auto i,int k,int numDofs)
         {
-          // k /= baseRangeDimension; // ????
           k /= baseBlockSize;
-          std::cout << "baseBlockSize" << baseBlockSize << std::endl;
 #ifndef NDEBUG
           auto kStart = k;
 #endif
@@ -798,7 +793,6 @@ namespace Dune
         auto inner = [&mask] (int poly,auto i,int k,int numDofs)
         {
           // ???? assert( basisSets_.innerTestSize() == numDofs );
-          // k /= baseRangeDimension;
           k /= baseBlockSize;
           std::fill(mask.begin()+k,mask.begin()+k+numDofs/baseBlockSize,1);
         };
@@ -1125,17 +1119,17 @@ namespace Dune
               if (mask[1].size() > edgeSize(1))
               {
                 // swap vertex values and tangential derivatives
-                for (int r=0;r<3*baseRangeDimension;++r)
-                  std::swap(mask[0][r], mask[0][3*baseRangeDimension+r]);
+                for (int r=0;r<3*basisSets_.vectorDofs(0);++r)
+                  std::swap(mask[0][r], mask[0][3*basisSets_.vectorDofs(0)+r]);
                 // swap normal derivatives at vertices
-                for (int r=0;r<2*baseRangeDimension;++r)
-                  std::swap(mask[1][r], mask[1][2*baseRangeDimension+r]);
+                for (int r=0;r<2*basisSets_.vectorDofs(0);++r)
+                  std::swap(mask[1][r], mask[1][2*basisSets_.vectorDofs(0)+r]);
               }
               else
               {
                 // swap vertex values
                 for (int r=0;r<EdgeShapeFunctionSet::RangeType::dimension;++r)
-                  std::swap(mask[0][r], mask[0][baseRangeDimension+r]);
+                  std::swap(mask[0][r], mask[0][basisSets_.vectorDofs(0)+r]);
               }
             }
           }
@@ -1151,7 +1145,7 @@ namespace Dune
       template <int dim>
       std::size_t order2size(unsigned int deriv) const
       {
-        return basisSets_.template order2size<dim>(deriv) * baseRangeDimension;
+        return basisSets_.template order2size<dim>(deriv) * basisSets_.vectorDofs(dim);
       }
 
       void getSizesAndOffsets(int poly,
@@ -1378,22 +1372,22 @@ namespace Dune
               const int vtxk = indexSet_.localIndex( element, vertexNumber, dimension );
               assert(vtxk>=0); // intersection is 'outside' so vertices should be as well
               vertex(poly,vertexNumber,i*vertexSize,1);
-              for (int r=0;r<baseRangeDimension;++r)
+              for (int r=0;r<basisSets_.vectorDofs(0);++r)
                 mask[0].push_back(vtxk*vertexSize+r);
               if (order2size<0>(1)>0)
               {
-                assert(vertexSize==3*baseRangeDimension);
-                for (int r=0;r<baseRangeDimension;++r)
-                  mask[0].push_back(vtxk*vertexSize+baseRangeDimension+r);
-                for (int r=0;r<baseRangeDimension;++r)
-                  mask[0].push_back(vtxk*vertexSize+2*baseRangeDimension+r);
-                for (int r=0;r<baseRangeDimension;++r)
-                  mask[1].push_back(vtxk*vertexSize+baseRangeDimension+r);
-                for (int r=0;r<baseRangeDimension;++r)
-                  mask[1].push_back(vtxk*vertexSize+2*baseRangeDimension+r);
+                assert(vertexSize==3*basisSets_.vectorDofs(0));
+                for (int r=0;r<basisSets_.vectorDofs(0);++r)
+                  mask[0].push_back(vtxk*vertexSize+basisSets_.vectorDofs(0)+r);
+                for (int r=0;r<basisSets_.vectorDofs(0);++r)
+                  mask[0].push_back(vtxk*vertexSize+2*basisSets_.vectorDofs(0)+r);
+                for (int r=0;r<basisSets_.vectorDofs(0);++r)
+                  mask[1].push_back(vtxk*vertexSize+basisSets_.vectorDofs(0)+r);
+                for (int r=0;r<basisSets_.vectorDofs(0);++r)
+                  mask[1].push_back(vtxk*vertexSize+2*basisSets_.vectorDofs(0)+r);
               }
               else
-                assert(vertexSize==baseRangeDimension);
+                assert(vertexSize==basisSets_.vectorDofs(0));
             }
           }
           if (order2size<1>(0)>0 ||
