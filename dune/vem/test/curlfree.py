@@ -22,20 +22,15 @@ def curlfree(space, exact):
     b = dot( -grad(div(exact)) + exact, v) * dx
     dbc = [dune.ufl.DirichletBC(space, exact, i+1) for i in range(4)]
 
-    # df = space.interpolate(exact,name="solution")
+    df = space.interpolate(exact,name="solution")
     scheme = dune.vem.vemScheme(
                   [a==b, *dbc], space,
-                #   solver="cg",
-                #   solver=(pip"suitesparse","umfpack"),
+                  solver="cg",
+                #   solver=("suitesparse","umfpack"),
                   parameters=parameters,
                   gradStabilization=0,
                   massStabilization=mass)
-    # info = scheme.solve(target=df)
-    # jacobian = linearOperator(scheme)
-    # rhs = discreteFunction(space,name="rhs")
-    # scheme(df,rhs)
-    # rhs.as_numpy[:] *= -1
-    # df.as_numpy[:] = spsolve(jacobian.as_numpy, rhs.as_numpy[:])
+    info = scheme.solve(target=df)
 
     edf = exact-df
     err = [inner(edf,edf),

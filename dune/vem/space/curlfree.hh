@@ -366,6 +366,11 @@ namespace Dune
         else
           return 0;
       }
+      int vectorDofs(int dim) const
+      {
+        // in all cases scalar dofs in curl free space
+        return 1;
+      }
 
       private:
       std::array< std::pair< int, unsigned int >, dimDomain+1 > calcDofsPerCodim (unsigned int order) const
@@ -415,7 +420,6 @@ namespace Dune
       static const int dimRange = FunctionSpaceType::RangeType::dimension;
       static const int codimension = 0;
       static const bool vectorSpace = true;
-      static const int baseRangeDimension = 1; // dimRange;
 
       typedef typename GridPartType::template Codim<0>::EntityType EntityType;
 
