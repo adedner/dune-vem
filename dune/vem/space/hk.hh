@@ -758,8 +758,13 @@ namespace Dune
         auto vertex = [&] (int poly,auto i,int k,int numDofs)
         {
           k /= baseBlockSize;
-          mask[k] = 1;
-          ++k;
+          // mask[k] = 1;
+          // ++k;
+          // basisSets_.BBBasisFunctionSetType::RangeType::dimension
+          for (int r=0; r<2; ++r)
+            mask[k+r] = 1;
+          k += 2;
+
           if (order2size<0>(1)>0)
           {
               mask[k]   = 2;
@@ -775,7 +780,7 @@ namespace Dune
           for (std::size_t alpha=0;alpha<basisSets_.numEdgeTestShapeFunctions()/baseBlockSize;++alpha)
           {
             // if (alpha < basisSets_.template order2size<1>(0)*2)
-            if (alpha < basisSets_.template order2size<1>(0))
+            if (alpha < basisSets_.template order2size<1>(0)*2)
             {
               mask[k] = 1;
               ++k;
