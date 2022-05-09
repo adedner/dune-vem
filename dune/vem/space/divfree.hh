@@ -315,7 +315,7 @@ namespace Dune
       , useOnb_(useOnb)
       , numValueShapeFunctions_( sizeONB<0>(onbSFS_.order()-1) )
       , numGradShapeFunctions_ (
-+          (onbSFS_.size()-1)*BBBasisFunctionSetType::RangeType::dimension )
+          (onbSFS_.size()-1)*BBBasisFunctionSetType::RangeType::dimension )
       , numHessShapeFunctions_ ( 0 )
       , numInnerShapeFunctions_( order==2 ? 0 :
                                  sizeONB<0>(order-3)/BBBasisFunctionSetType::RangeType::dimension )
