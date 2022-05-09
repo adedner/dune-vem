@@ -758,12 +758,19 @@ namespace Dune
         auto vertex = [&] (int poly,auto i,int k,int numDofs)
         {
           k /= baseBlockSize;
-          // mask[k] = 1;
-          // ++k;
-          // basisSets_.BBBasisFunctionSetType::RangeType::dimension
-          for (int r=0; r<2; ++r)
+          assert(basisSets_.vectorDofs(0) / baseBlockSize == 1);
+          // assert(RangeType::dimension / Traits::LocalBlockIndices::size() == 1);
+          // for (int r=0; r<BasisSetsType::ShapeFunctionSet::RangeType::dimension /
+          // Traits::LocalBlockIndices::size(); ++r)
+          //   mask[k+r] = 1;
+          // k += BasisSetsType::ShapeFunctionSet::RangeType::dimension /
+          // Traits::LocalBlockIndices::size();
+          for (int r=0; r<basisSets_.vectorDofs(0) / baseBlockSize; ++r)
+          {
+            // std::cout << "r " << r << std::endl;
             mask[k+r] = 1;
-          k += 2;
+          }
+          k += basisSets_.vectorDofs(0) / baseBlockSize;
 
           if (order2size<0>(1)>0)
           {
@@ -779,8 +786,11 @@ namespace Dune
 #endif
           for (std::size_t alpha=0;alpha<basisSets_.numEdgeTestShapeFunctions()/baseBlockSize;++alpha)
           {
+            assert(basisSets_.vectorDofs(1) / baseBlockSize == 1);
             // if (alpha < basisSets_.template order2size<1>(0)*2)
-            if (alpha < basisSets_.template order2size<1>(0)*2)
+            // if (alpha < basisSets_.template order2size<1>(0)*RangeType::dimension /
+          // Traits::LocalBlockIndices::size())
+            if (alpha < (basisSets_.template order2size<1>(0))*(basisSets_.vectorDofs(1) / baseBlockSize))
             {
               mask[k] = 1;
               ++k;
