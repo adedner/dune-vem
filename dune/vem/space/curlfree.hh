@@ -96,11 +96,6 @@ namespace Dune
           return *this;
         }
 
-        template <int codim>
-        int vectordofs() const
-        {
-          return 1;
-        }
         // Note: needed for the finalizing projection
         //       Could make this 'protected' and make the CurlFreeVemSpace 'friend'
         template< class Point, class Functor >
