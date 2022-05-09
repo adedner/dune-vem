@@ -425,16 +425,6 @@ namespace Dune
              const Agglomeration &agglomeration,
              const IntersectionType &intersection, bool twist) const
       {
-        int flip = 1;
-        auto normal = intersection.centerUnitOuterNormal();
-        assert( abs(normal[0] + std::sqrt(2.)*normal[1]) > 1e-5 );
-        if (intersection.neighbor())
-        {
-          // !!! FIXME: if (indexSet_.index(intersection.inside()) > indexSet_.index(intersection.outside()))
-          if (normal[0] + std::sqrt(2.)*normal[1] < 0)
-              flip = -1;
-        }
-        // std::cout << "fip=" << flip << " " << twist << std::endl;
         return EdgeShapeFunctionSetType(intersection, edgeSFS_, 0, numEdgeTestShapeFunctions_);
       }
       std::size_t size( std::size_t orderSFS ) const
