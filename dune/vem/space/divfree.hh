@@ -107,15 +107,6 @@ namespace Dune
           return *this;
         }
 
-        template <int codim>
-        int vectordofs() const
-        {
-          if (codim == 0)
-            return 1;
-          if (codim == 1 || codim == 2)
-            return dimRange;
-        }
-
         template< class Point, class Functor >
         void scalarEach ( const Point &x, Functor functor ) const
         {
@@ -453,6 +444,15 @@ namespace Dune
         else
           return 0;
       }
+      int vectorDofs(int dim) const
+      {
+        // return 1 for scalar dofs (inner moments) or dimRange for vector dofs (vertex and edge)
+        // BBBasisFunctionSetType::FunctionSpaceType::RangeType::dimension = dimRange
+        if (dim == 2)
+          return 1;
+        if (dim == 0 || dim == 1)
+          return BBBasisFunctionSetType::FunctionSpaceType::RangeType::dimension;
+      }
 
       private:
       Std::vector<int> edgeDegrees() const
@@ -540,7 +540,7 @@ namespace Dune
       static const int dimDomain = FunctionSpaceType::DomainType::dimension;
       static const int dimRange = FunctionSpaceType::RangeType::dimension;
       static const bool vectorSpace = true;
-      static const int baseRangeDimension = dimRange;
+      // static const int baseRangeDimension = dimRange;
 
       typedef typename GridPartType::template Codim<codimension>::EntityType EntityType;
 
