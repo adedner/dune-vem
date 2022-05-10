@@ -1,5 +1,5 @@
 set( SCRIPTS varyingcoeff  curlfree     hk     divfree
-             hk_laplace     perturbation )
+             hk_laplace    perturbation uzawa )
 add_python_targets(testscripts ${SCRIPTS})
 
 foreach( script ${SCRIPTS} )
