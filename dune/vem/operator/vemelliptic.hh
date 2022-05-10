@@ -44,7 +44,7 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model>
     typedef typename GridPartType::IntersectionIteratorType IntersectionIteratorType;
     typedef typename IntersectionIteratorType::Intersection IntersectionType;
     //
-    typedef Dune::Fem::ElementQuadrature<GridPartType, 0> QuadratureType;
+    typedef Dune::Fem::CachingQuadrature<GridPartType, 0> QuadratureType;
     typedef Dune::Fem::ElementQuadrature<GridPartType, 1> FaceQuadratureType;
     //
   public:

@@ -179,6 +179,10 @@ namespace Dune
       {
         return const_cast<AgglomerationType&>(agglomeration()).boundingBoxes();
       }
+      bool twist( std::size_t i ) const
+      {
+        return edgeTwist_[ i ];
+      }
       bool twist( const typename GridPart::IntersectionType &intersection ) const
       {
         return edgeTwist_[ subIndex( intersection.inside(), intersection.indexInInside(), dimension-1 ) ];
