@@ -20,27 +20,29 @@ def divfree(space, exact):
     a = (inner(grad(u),grad(v)) + dot(u,v) ) * dx
 
     b = dot( -div(grad(exact)) + exact, v) * dx
-    dbc = [dune.ufl.DirichletBC(space, [0,0], i+1) for i in range(4)]
+    dbc = [dune.ufl.DirichletBC(space, exact, i+1) for i in range(4)]
 
     df = space.interpolate(exact,name="solution")
-    # scheme = dune.vem.vemScheme(
-    #               [a==b, *dbc], space,
-    #             #   solver=("suitesparse","umfpack"),
-    #               parameters=parameters,
-    #               gradStabilization=0,
-    #               massStabilization=mass)
-    # info = scheme.solve(target=df)
+    scheme = dune.vem.vemScheme(
+                  [a==b, *dbc], space,
+                #   solver=("suitesparse","umfpack"),
+                  parameters=parameters,
+                  gradStabilization=1,
+                  massStabilization=mass)
+    info = scheme.solve(target=df)
 
     edf = exact-df
-    err = [inner(edf,edf)]
+    err = [inner(edf,edf),
+           inner(grad(edf),grad(edf))]
 
     return err
 
 def runTestDivFree(order):
     x = SpatialCoordinate(triangle)
 
-    exact = as_vector([-x[1]+x[0]**2*x[1],
-                            x[0]-x[1]**2*x[0]])
+    p = (order+1)//2
+    exact = as_vector([-x[1]+x[0]**(p+1)*x[1]**p,
+                        x[0]-x[1]**(p+1)*x[0]**p])
 
     spaceConstructor = lambda grid, r: dune.vem.divFreeSpace( grid,
                                                               order=order )

@@ -428,7 +428,7 @@ namespace Dune
       typedef VemAgglomerationIndexSet <GridPartType> IndexSetType;
       typedef AgglomerationDofMapper <GridPartType, IndexSetType> BlockMapperType;
 
-      // replace vectorSpace with basisFunctionSet::RangeType::dimension == dimRange
+      // replace vectorSpace with BasisSetsType::ShapeFunctionSetType::RangeType::dimension == dimRange
       static const int baseBlockSize = vectorSpace ? LocalBlockIndices::size() : 1;
 
       template<class DiscreteFunction, class Operation = Fem::DFCommunicationOperation::Copy>
@@ -521,7 +521,8 @@ namespace Dune
             assert(intersection.conforming());
 
             const typename BaseType::BasisSetsType::EdgeShapeFunctionSetType edgeShapeFunctionSet
-                  = BaseType::basisSets_.edgeBasisFunctionSet(BaseType::agglomeration(), intersection);
+                  = BaseType::basisSets_.edgeBasisFunctionSet(BaseType::agglomeration(),
+                               intersection, BaseType::blockMapper().indexSet().twist(intersection) );
 
             Std::vector<Std::vector<unsigned int>> mask(2,Std::vector<unsigned int>(0)); // contains indices with Phi_mask[i] is attached to given edge
             edgePhiVector[0] = 0;
