@@ -571,7 +571,6 @@ namespace Dune
       static const int codimension = 0;
       static const int dimDomain = FunctionSpace::DomainType::dimension;
       static const int dimRange = FunctionSpace::RangeType::dimension;
-      // static const int baseRangeDimension = vectorSpace ? dimRange : 1;
 
       typedef typename GridPartType::template Codim<codimension>::EntityType EntityType;
       typedef FunctionSpace FunctionSpaceType;
@@ -587,9 +586,6 @@ namespace Dune
       typedef Hybrid::IndexRange<int, dimRange> LocalBlockIndices;
       typedef VemAgglomerationIndexSet <GridPartType> IndexSetType;
       typedef AgglomerationDofMapper <GridPartType, IndexSetType> BlockMapperType;
-
-      // replace vectorSpace with BasisSetsType::ShapeFunctionSetType::RangeType::dimension == dimRange
-      static const int baseBlockSize = vectorSpace ? LocalBlockIndices::size() : 1;
 
       template<class DiscreteFunction, class Operation = Fem::DFCommunicationOperation::Copy>
       struct CommDataHandle {
@@ -718,7 +714,7 @@ namespace Dune
       static constexpr int blockSize = Traits::vectorSpace?
                                        Traits::LocalBlockIndices::size() : 1;
       static const int dimension = IndexSetType::dimension;
-      static const int baseBlockSize = Traits::baseBlockSize;
+      static const int baseBlockSize = (BasisSetsType::ShapeFunctionSetType::RangeType::dimension == RangeType::dimension) ? Traits::LocalBlockIndices::size() : 1;
     private:
       typedef Dune::Fem::ElementQuadrature<GridPartType,0> InnerQuadratureType;
       typedef Dune::Fem::ElementQuadrature<GridPartType,1> EdgeQuadratureType;

@@ -428,9 +428,6 @@ namespace Dune
       typedef VemAgglomerationIndexSet <GridPartType> IndexSetType;
       typedef AgglomerationDofMapper <GridPartType, IndexSetType> BlockMapperType;
 
-      // replace vectorSpace with BasisSetsType::ShapeFunctionSetType::RangeType::dimension == dimRange
-      static const int baseBlockSize = vectorSpace ? LocalBlockIndices::size() : 1;
-
       template<class DiscreteFunction, class Operation = Fem::DFCommunicationOperation::Copy>
       struct CommDataHandle {
           typedef Operation OperationType;
