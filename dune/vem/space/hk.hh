@@ -714,7 +714,8 @@ namespace Dune
       static constexpr int blockSize = Traits::vectorSpace?
                                        Traits::LocalBlockIndices::size() : 1;
       static const int dimension = IndexSetType::dimension;
-      static const int baseBlockSize = (BasisSetsType::ShapeFunctionSetType::RangeType::dimension == RangeType::dimension) ? Traits::LocalBlockIndices::size() : 1;
+      static const int baseBlockSize = Traits::vectorSpace ? Traits::LocalBlockIndices::size() : 1;
+      // static const int baseBlockSize = (BasisSetsType::ShapeFunctionSetType::RangeType::dimension == RangeType::dimension) ? Traits::LocalBlockIndices::size() : 1;
     private:
       typedef Dune::Fem::ElementQuadrature<GridPartType,0> InnerQuadratureType;
       typedef Dune::Fem::ElementQuadrature<GridPartType,1> EdgeQuadratureType;
