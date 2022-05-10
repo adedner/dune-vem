@@ -469,6 +469,7 @@ namespace Dune
 #if 0
         // std::cout << "checkpoint setupRHS constraints matrix done" << std::endl;
         {
+            std::cout << "Basis interpolation\n";
             for (std::size_t alpha=0;alpha<D.size();++alpha)
             {
               for (std::size_t beta=0;beta<D[alpha].size();++beta)
@@ -584,7 +585,8 @@ namespace Dune
             assert(intersection.conforming());
 
             const typename BasisSetsType::EdgeShapeFunctionSetType edgeShapeFunctionSet
-                  = basisSets_.edgeBasisFunctionSet(agglomeration(), intersection);
+                  = basisSets_.edgeBasisFunctionSet(agglomeration(),
+                  intersection, blockMapper().indexSet().twist(intersection));
 
             Std::vector<Std::vector<unsigned int>>
               mask(2,Std::vector<unsigned int>(0)); // contains indices with Phi_mask[i] is attached to given edge

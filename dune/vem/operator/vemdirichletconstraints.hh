@@ -72,12 +72,12 @@ namespace Dune {
       return false; // can't be reached
     }
 
-#if 0
     template < class DiscreteFunctionType >
     void operator ()( const DiscreteFunctionType& u, DiscreteFunctionType& w ) const
     {
       BaseType::operator()(u,w);
     }
+#if 0
     template < class DiscreteFunctionType >
     void operator ()( const typename DiscreteFunctionType::RangeType& value, DiscreteFunctionType& w ) const
     {
@@ -88,8 +88,36 @@ namespace Dune {
     template < class DiscreteFunctionType >
     void operator ()( const typename DiscreteFunctionType::RangeType& value, DiscreteFunctionType& w ) const
     {
-      this->operator()(w);
+
+      BaseType::updateDirichletDofs();
+      if( BaseType::hasDirichletDofs_ )
+        for( const EntityType &entity : space_ )
+        {
+          auto wLocal = w.localFunction( entity );
+          // get number of Lagrange Points
+          const int localBlocks = space_.blockMapper().numDofs( entity );
+
+          // map local to global BlockDofs
+          std::vector< std::size_t > globalBlockDofs( localBlocks );
+          space_.blockMapper().map( entity, globalBlockDofs );
+          std::vector< double > valuesModel( localBlocks*localBlockSize );
+          Vem::Std::vector< char > mask( localBlocks );
+          space_.interpolation()( entity, mask );
+
+          int localDof = 0;
+          for( int localBlock = 0; localBlock < localBlocks; ++localBlock )
+          {
+            // store result to dof vector
+            int global = globalBlockDofs[ localBlock ];
+            for( int l = 0; l < localBlockSize; ++l, ++localDof )
+            {
+              if( dirichletBlocks_[ global ][ l ] && applyConstraint(mask[ localBlock ]))
+                wLocal[ localDof ] = 0;
+            }
+          }
+        }
     }
+
     template < class DiscreteFunctionType >
     void operator ()( DiscreteFunctionType& w ) const
     {
@@ -173,7 +201,6 @@ namespace Dune {
       space_.interpolation()( entity, mask );
 
       int localDof = 0;
-
       for( int localBlock = 0; localBlock < localBlocks; ++localBlock )
       {
         // store result to dof vector
