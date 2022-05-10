@@ -286,7 +286,8 @@ namespace Dune
       }
       template <class Agglomeration>
       EdgeShapeFunctionSetType edgeBasisFunctionSet(
-             const Agglomeration &agglomeration, const IntersectionType &intersection) const
+             const Agglomeration &agglomeration, const IntersectionType
+             &intersection, bool twist) const
       {
         int flip = 1;
         auto normal = intersection.centerUnitOuterNormal();
