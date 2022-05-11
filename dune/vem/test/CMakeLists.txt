@@ -1,5 +1,6 @@
 set( SCRIPTS varyingcoeff  curlfree     hk     divfree
-             hk_laplace    perturbation uzawa )
+             hk_laplace    perturbation uzawa
+             threadedgenerator )
 add_python_targets(testscripts ${SCRIPTS})
 
 foreach( script ${SCRIPTS} )

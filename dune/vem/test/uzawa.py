@@ -4,10 +4,15 @@
 # # Saddle Point Solver (using Scipy)
 # %%
 import matplotlib
+
 matplotlib.rc( 'image', cmap='jet' )
 from matplotlib import pyplot
 import numpy
 from scipy.sparse import linalg
+
+# this will be available in dune.common soon
+# from dune.generator.threadedgenerator import ThreadedGenerator
+from threadedgenerator import ThreadedGenerator
 from dune.grid import cartesianDomain
 from dune.alugrid import aluCubeGrid
 from ufl import SpatialCoordinate, CellVolume, TrialFunction, TestFunction,\
@@ -19,8 +24,8 @@ from dune.fem.function import integrate, discreteFunction
 from dune.fem.operator import linear as linearOperator
 
 import dune.vem
-from dune.fem.operator import galerkin as galerkinOperator
 from dune.vem import vemScheme as vemScheme
+from dune.fem.operator import galerkin as galerkinOperator
 from dune.fem.scheme import galerkin as galerkinScheme
 
 def plot(target):
@@ -74,32 +79,51 @@ class Uzawa:
         massModel   = p*q * dx
         preconModel = inner(grad(p),grad(q)) * dx
 
+        generator = ThreadedGenerator(4)
         if not lagrange:
-            self.mainOp = vemScheme( ( mainModel==0, *dbc_u ),
+            generator.add( vemScheme, ( mainModel==0, *dbc_u ),
                                             gradStabilization=as_vector([self.mu*2,self.mu*2]),
                                             massStabilization=as_vector([self.nu,self.nu])
-                                        )
+                         )
         else:
-            self.mainOp = galerkinScheme( ( mainModel==0, *dbc_u ) )
-        gradOp    = galerkinOperator( gradModel, spcP,spcU)
-        divOp     = galerkinOperator( divModel, spcU,spcP)
-        massOp    = galerkinOperator( massModel, spcP)
+            generator.add( galerkinScheme, ( mainModel==0, *dbc_u ) )
 
-        self.A    = linearOperator(self.mainOp).as_numpy
-        self.Ainv = lambda rhs: linalg.spsolve(self.A,rhs)
-        self.G    = linearOperator(gradOp).as_numpy
-        self.D    = linearOperator(divOp).as_numpy
-        self.M    = linearOperator(massOp).as_numpy
-        self.Minv = lambda rhs: linalg.spsolve(self.M,rhs)
-
-        if precondition and self.mainOp.model.nu > 0:
+        # gradOp    = galerkinOperator( gradModel, spcP,spcU)
+        # divOp     = galerkinOperator( divModel, spcU,spcP)
+        # massOp    = galerkinOperator( massModel, spcP)
+        # self.A    = linearOperator(self.mainOp).as_numpy
+        # self.G    = linearOperator(gradOp).as_numpy
+        # self.D    = linearOperator(divOp).as_numpy
+        # self.M    = linearOperator(massOp).as_numpy
+        generator.add(galerkinOperator, gradModel, spcP,spcU)
+        generator.add(galerkinOperator, divModel, spcU,spcP)
+        generator.add(galerkinOperator, massModel, spcP)
+        if precondition and tau is not None:
             if not lagrange:
                 preconModel = dgLaplace(10, p,q, spcP, 0, 1)
-                preconOp    = galerkinOperator( preconModel, spcP)
+                generator.add(galerkinOperator, preconModel, spcP)
             else:
                 preconModel = inner(grad(p),grad(q)) * dx
-                preconOp    = galerkinOperator( (preconModel,DirichletBC(spcP,[0])), spcP)
-            self.P    = linearOperator(preconOp).as_numpy
+                generator.add(galerkinOperator, (preconModel,DirichletBC(spcP,[0])), spcP)
+        self.mainOp, gradOp, divOp, massOp, preconOp = generator.execute()
+
+        generator.add(linearOperator,self.mainOp)
+        generator.add(linearOperator,gradOp)
+        generator.add(linearOperator,divOp)
+        generator.add(linearOperator,massOp)
+        if preconOp:
+            generator.add(linearOperator,preconOp)
+        else:
+            generator.add(None)
+        self.A, self.G, self.D, self.M, self.P = generator.execute()
+        self.A, self.G, self.D, self.M = \
+          self.A.as_numpy, self.G.as_numpy, self.D.as_numpy, self.M.as_numpy
+
+        self.Ainv = lambda rhs: linalg.spsolve(self.A,rhs)
+        self.Minv = lambda rhs: linalg.spsolve(self.M,rhs)
+
+        if self.P:
+            self.P = self.P.as_numpy
             self.Pinv = lambda rhs: linalg.spsolve(self.P,rhs)
         else:
             self.Pinv = None
@@ -171,13 +195,25 @@ class Uzawa:
         info["uzawa.outer.iterations"] = m
         return info
 
-def main(L=0):
+def main(level = 0):
+    generator = ThreadedGenerator(4)
+    Lx = 3
+    Ly = 1
+    N = 2**(level)
     muValue = 0.01
     tauValue = 1e-3
     order = 3
-    grid = dune.vem.polyGrid(cartesianDomain([0,0],[3,1],[30*2**L,10*2**L]),cubes=False)
-    spcU = dune.vem.divFreeSpace( grid, order=order)
-    spcP = dune.fem.space.finiteVolume( grid )
+    # grid = dune.vem.polyGrid(cartesianDomain([0,0],[3,1],[30*N,10*N]),cubes=False)
+    grid = dune.vem.polyGrid(
+          dune.vem.voronoiCells([[0,0],[Lx,Ly]], 50*N*N, lloyd=200, fileName="voronoiseeds", load=True)
+        #   cartesianDomain([0.,0.],[Lx,Ly],[N,N]), cubes=False
+        #   cartesianDomain([0.,0.],[Lx,Ly],[2*N,2*N]), cubes=True
+       )
+
+    generator.add(dune.vem.divFreeSpace, grid, order=order)
+    generator.add(dune.vem.bbdgSpace, grid)
+    generator.add(dune.vem.vemSpace, grid, order=order, testSpaces=[-1,order-1,order-2])
+    spcU, spcP, spcPsmooth = generator.execute()
 
     x       = SpatialCoordinate(spcU)
     exact_u = as_vector( [x[1] * (1.-x[1]), 0] ) # dy u_x = 1-2y, -dy^2 u_x = 2
@@ -192,32 +228,28 @@ def main(L=0):
     exact_uh = dune.fem.function.uflFunction(grid, order=2, name="exact_uh", ufl=exact_u)
     uzawa = Uzawa(grid, spcU, spcP, dbc, f,
                   muValue, tauValue, u_h_n=exact_uh,
-                  tolerance=1e-14, precondition=True, verbose=False)
+                  tolerance=1e-12, precondition=True, verbose=False)
     uzawa.solve([velocity,pressure])
 
-    average_p = Constant( pressure.integrate(), "aver_p" )
-
-    C0NCtestSpaces = [-1,order-1,order-2]
-    spcP = dune.vem.vemSpace( grid, order=order, testSpaces=C0NCtestSpaces )
-    p,q = TrialFunction(spcP), TestFunction(spcP)
+    p,q = TrialFunction(spcPsmooth), TestFunction(spcPsmooth)
     scheme = vemScheme( [ ( inner(grad(p),grad(q)) -
                             div( dot(velocity, nabla_grad(velocity)) - f)*q ) * dx == 0,
-                          DirichletBC(spcP,exact_p) ],
+                        DirichletBC(spcPsmooth,exact_p) ],
                         gradStabilization=1, massStabilization=None,
                         parameters={"newton.linear.tolerance":1e-14}
                       )
-    pressure = spcP.interpolate(0,name="pRecon")
+    pressure = spcPsmooth.interpolate(0,name="pRecon")
     scheme.solve(pressure)
+    average_p = Constant( pressure.integrate(), "aver_p" )
 
     edf = as_vector( [v1-v2 for v1,v2 in zip(velocity,exact_u)] +
                      [(pressure-average_p)-exact_p] )
     err = [ e*e for e in edf ]
     errors  = [ numpy.sqrt(e) for e in integrate(grid, err, order=8) ]
 
-    # print(errors)
+    # print(errors, average_p.value)
     # plot([velocity,pressure])
     return errors
-
 
 if __name__ == "__main__":
     err1 = main(0)
