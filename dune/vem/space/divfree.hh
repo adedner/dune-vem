@@ -45,8 +45,8 @@ namespace Dune
       typedef GridPart GridPartType;
       static constexpr bool vectorSpace = true;
       static constexpr int dimDomain = GridPartType::dimension;
-      static constexpr bool valReduced = false;   // true: only project values into k-1 polynomials
-      static constexpr bool jacReduced = false;   // true: only use grad phi_ for gradient basisfunctions
+      static constexpr bool valReduced = false;  // true: only project values into k-1 polynomials
+      static constexpr bool jacReduced = false;  // true: only use grad phi_ for gradient basisfunctions
       typedef typename GridPart::template Codim<0>::EntityType EntityType;
       typedef typename GridPart::IntersectionType IntersectionType;
 

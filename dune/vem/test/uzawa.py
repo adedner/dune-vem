@@ -171,11 +171,10 @@ class Uzawa:
         info["uzawa.outer.iterations"] = m
         return info
 
-def main():
+def main(L=0):
     muValue = 0.01
     tauValue = 1e-3
     order = 3
-    L = 0
     grid = dune.vem.polyGrid(cartesianDomain([0,0],[3,1],[30*2**L,10*2**L]),cubes=False)
     spcU = dune.vem.divFreeSpace( grid, order=order)
     spcP = dune.fem.space.finiteVolume( grid )
@@ -184,17 +183,15 @@ def main():
     exact_u = as_vector( [x[1] * (1.-x[1]), 0] ) # dy u_x = 1-2y, -dy^2 u_x = 2
     exact_p = (-2*x[0] + 3)*muValue              # dx p   = -2mu
     f       = as_vector( [0,]*grid.dimension )
-    f      += exact_u/tauValue
 
     # discrete functions
     velocity = spcU.interpolate(spcU.dimRange*[0], name="velocity")
     pressure = spcP.interpolate(0, name="pressure")
-    # velocity.interpolate(exact_u)
-    # pressure.interpolate(exact_p)
 
     dbc = [ DirichletBC(velocity.space,exact_u,None) ]
+    exact_uh = dune.fem.function.uflFunction(grid, order=2, name="exact_uh", ufl=exact_u)
     uzawa = Uzawa(grid, spcU, spcP, dbc, f,
-                  muValue, tauValue,
+                  muValue, tauValue, u_h_n=exact_uh,
                   tolerance=1e-14, precondition=True, verbose=False)
     uzawa.solve([velocity,pressure])
 
@@ -203,25 +200,27 @@ def main():
     C0NCtestSpaces = [-1,order-1,order-2]
     spcP = dune.vem.vemSpace( grid, order=order, testSpaces=C0NCtestSpaces )
     p,q = TrialFunction(spcP), TestFunction(spcP)
-    # solve laplace(p) = div(f) - Du : Du
-    scheme = vemScheme( [ (inner(grad(p),grad(q)) -
-                           # inner(grad(velocity),grad(velocity))*q +
-                           div( dot(velocity, nabla_grad(velocity)) )*q +
-                           div(f)*q) * dx == 0, DirichletBC(spcP,exact_p) ],
+    scheme = vemScheme( [ ( inner(grad(p),grad(q)) -
+                            div( dot(velocity, nabla_grad(velocity)) - f)*q ) * dx == 0,
+                          DirichletBC(spcP,exact_p) ],
                         gradStabilization=1, massStabilization=None,
                         parameters={"newton.linear.tolerance":1e-14}
                       )
     pressure = spcP.interpolate(0,name="pRecon")
     scheme.solve(pressure)
 
-    # plot([velocity,pressure])
-
     edf = as_vector( [v1-v2 for v1,v2 in zip(velocity,exact_u)] +
                      [(pressure-average_p)-exact_p] )
     err = [ e*e for e in edf ]
     errors  = [ numpy.sqrt(e) for e in integrate(grid, err, order=8) ]
 
-    assert all( [ e<1e-9 for e in errors ] )
+    # print(errors)
+    # plot([velocity,pressure])
+    return errors
+
 
 if __name__ == "__main__":
-    main()
+    err1 = main(0)
+    err2 = main(1)
+    assert all( [ e<1e-9 for e in err1 ] )
+    assert all( [ e<1e-9 for e in err2 ] )
