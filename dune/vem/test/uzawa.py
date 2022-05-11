@@ -11,8 +11,7 @@ import numpy
 from scipy.sparse import linalg
 
 # this will be available in dune.common soon
-# from dune.generator.threadedgenerator import ThreadedGenerator
-from threadedgenerator import ThreadedGenerator
+from concurrent.futures import ThreadPoolExecutor
 from dune.grid import cartesianDomain
 from dune.alugrid import aluCubeGrid
 from ufl import SpatialCoordinate, CellVolume, TrialFunction, TestFunction,\
@@ -79,51 +78,45 @@ class Uzawa:
         massModel   = p*q * dx
         preconModel = inner(grad(p),grad(q)) * dx
 
-        generator = ThreadedGenerator(4)
-        if not lagrange:
-            generator.add( vemScheme, ( mainModel==0, *dbc_u ),
-                                            gradStabilization=as_vector([self.mu*2,self.mu*2]),
-                                            massStabilization=as_vector([self.nu,self.nu])
-                         )
-        else:
-            generator.add( galerkinScheme, ( mainModel==0, *dbc_u ) )
-
-        # gradOp    = galerkinOperator( gradModel, spcP,spcU)
-        # divOp     = galerkinOperator( divModel, spcU,spcP)
-        # massOp    = galerkinOperator( massModel, spcP)
-        # self.A    = linearOperator(self.mainOp).as_numpy
-        # self.G    = linearOperator(gradOp).as_numpy
-        # self.D    = linearOperator(divOp).as_numpy
-        # self.M    = linearOperator(massOp).as_numpy
-        generator.add(galerkinOperator, gradModel, spcP,spcU)
-        generator.add(galerkinOperator, divModel, spcU,spcP)
-        generator.add(galerkinOperator, massModel, spcP)
-        if precondition and tau is not None:
+        with ThreadPoolExecutor(max_workers=8) as executor:
             if not lagrange:
-                preconModel = dgLaplace(10, p,q, spcP, 0, 1)
-                generator.add(galerkinOperator, preconModel, spcP)
+                mainOpF = executor.submit( vemScheme, ( mainModel==0, *dbc_u ),
+                                              gradStabilization=as_vector([self.mu*2,self.mu*2]),
+                                              massStabilization=as_vector([self.nu,self.nu])
+                                         )
             else:
-                preconModel = inner(grad(p),grad(q)) * dx
-                generator.add(galerkinOperator, (preconModel,DirichletBC(spcP,[0])), spcP)
-        self.mainOp, gradOp, divOp, massOp, preconOp = generator.execute()
+                mainOpF = executor.submit( galerkinScheme, ( mainModel==0, *dbc_u ) )
+            gradOpF = executor.submit(galerkinOperator, gradModel, spcP,spcU)
+            divOpF  = executor.submit(galerkinOperator, divModel, spcU,spcP)
+            massOpF = executor.submit(galerkinOperator, massModel, spcP)
+            if precondition and tau is not None:
+                if not lagrange:
+                    preconModel = dgLaplace(10, p,q, spcP, 0, 1)
+                    preconOpF = executor.submit(galerkinOperator, preconModel, spcP)
+                else:
+                    preconModel = inner(grad(p),grad(q)) * dx
+                    preconOpF = executor.submit(galerkinOperator, (preconModel,DirichletBC(spcP,[0])), spcP)
+        self.mainOp, gradOp, divOp, massOp, preconOp = \
+          mainOpF.result(), gradOpF.result(), divOpF.result(), massOpF.result(), preconOpF.result()
 
-        generator.add(linearOperator,self.mainOp)
-        generator.add(linearOperator,gradOp)
-        generator.add(linearOperator,divOp)
-        generator.add(linearOperator,massOp)
-        if preconOp:
-            generator.add(linearOperator,preconOp)
-        else:
-            generator.add(None)
-        self.A, self.G, self.D, self.M, self.P = generator.execute()
-        self.A, self.G, self.D, self.M = \
-          self.A.as_numpy, self.G.as_numpy, self.D.as_numpy, self.M.as_numpy
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            AF = executor.submit(linearOperator,self.mainOp)
+            GF = executor.submit(linearOperator,gradOp)
+            DF = executor.submit(linearOperator,divOp)
+            MF = executor.submit(linearOperator,massOp)
+            if preconOp:
+                PF = executor.submit(linearOperator,preconOp)
+            else:
+                PF = None
+        self.A, self.G, self.D, self.M = (
+          AF.result().as_numpy, GF.result().as_numpy,
+          DF.result().as_numpy, MF.result().as_numpy )
 
         self.Ainv = lambda rhs: linalg.spsolve(self.A,rhs)
         self.Minv = lambda rhs: linalg.spsolve(self.M,rhs)
 
-        if self.P:
-            self.P = self.P.as_numpy
+        if PF:
+            self.P = PF.result().as_numpy
             self.Pinv = lambda rhs: linalg.spsolve(self.P,rhs)
         else:
             self.Pinv = None
@@ -196,7 +189,6 @@ class Uzawa:
         return info
 
 def main(level = 0):
-    generator = ThreadedGenerator(4)
     Lx = 3
     Ly = 1
     N = 2**(level)
@@ -210,10 +202,11 @@ def main(level = 0):
         #   cartesianDomain([0.,0.],[Lx,Ly],[2*N,2*N]), cubes=True
        )
 
-    generator.add(dune.vem.divFreeSpace, grid, order=order)
-    generator.add(dune.vem.bbdgSpace, grid)
-    generator.add(dune.vem.vemSpace, grid, order=order, testSpaces=[-1,order-1,order-2])
-    spcU, spcP, spcPsmooth = generator.execute()
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        spcUF = executor.submit(dune.vem.divFreeSpace, grid, order=order)
+        spcPF = executor.submit(dune.vem.bbdgSpace, grid)
+        spcPsmoothF = executor.submit(dune.vem.vemSpace, grid, order=order, testSpaces=[-1,order-1,order-2])
+    spcU, spcP, spcPsmooth = spcUF.result(), spcPF.result(), spcPsmoothF.result()
 
     x       = SpatialCoordinate(spcU)
     exact_u = as_vector( [x[1] * (1.-x[1]), 0] ) # dy u_x = 1-2y, -dy^2 u_x = 2
