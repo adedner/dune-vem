@@ -9,9 +9,9 @@ matplotlib.rc( 'image', cmap='jet' )
 from matplotlib import pyplot
 import numpy
 from scipy.sparse import linalg
+from concurrent.futures import ThreadPoolExecutor
 
 # this will be available in dune.common soon
-from concurrent.futures import ThreadPoolExecutor
 from dune.grid import cartesianDomain
 from dune.alugrid import aluCubeGrid
 from ufl import SpatialCoordinate, CellVolume, TrialFunction, TestFunction,\

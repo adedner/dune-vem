@@ -17,9 +17,9 @@ def divfree(space, exact):
     u = TrialFunction(space)
     v = TestFunction(space)
 
-    a = (inner(grad(u),grad(v)) + dot(u,v) ) * dx
+    a = (inner(grad(u),grad(v)) + mass*dot(u,v) ) * dx
 
-    b = dot( -div(grad(exact)) + exact, v) * dx
+    b = dot( -div(grad(exact))  + mass*exact, v) * dx
     dbc = [dune.ufl.DirichletBC(space, exact, i+1) for i in range(4)]
 
     df = space.interpolate(exact,name="solution")
