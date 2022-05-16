@@ -974,7 +974,7 @@ namespace Dune
           entry[0] += EdgeShapeFunctionSet::RangeType::dimension;
           if (order2size<0>(1)>0)
           {
-            edgeShapeFunctionSet.refJacobianEach( x, [ & ] ( std::size_t alpha, auto dphi ) {
+            edgeShapeFunctionSet.jacobianEach( x, [ & ] ( std::size_t alpha, auto dphi ) {
               assert( entry[0] < localDofVectorMatrix[0].size() );
               assert( dphi[0].dimension == 1 );
               // note: edge sfs in reference coordinate so apply scaling 1/|S|
