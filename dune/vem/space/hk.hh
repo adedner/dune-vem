@@ -335,6 +335,17 @@ namespace Dune
           });
         }
         template< class Point, class Functor >
+        void refJacobianEach ( const Point &x, Functor functor ) const
+        {
+          JacobianRangeType jac;
+          const auto &geo = intersection_.geometry();
+          const auto &jit = geo.jacobianInverseTransposed(x);
+          sfs_.jacobianEach(x, [&](std::size_t alpha, EdgeJacobianRangeType dphi)
+          {
+            functor(alpha,dphi);
+          });
+        }
+        template< class Point, class Functor >
         void evaluateTestEach ( const Point &x, Functor functor ) const
         {
           sfs_.evaluateEach(x, [&](std::size_t alpha, RangeType phi)
@@ -825,7 +836,7 @@ namespace Dune
           if (order2size<0>(1)>0)
             basisFunctionSet.jacobianEach( x, [ & ] ( std::size_t alpha, typename BasisFunctionSet::JacobianRangeType dphi ) {
               assert( dphi[0].dimension == 2 );
-              if (alpha < localDofMatrix[k+1].size())
+              if (alpha < localDofMatrix[k].size())
               {
                 for (int r=0;r<dphi.rows;++r)
                 {
@@ -953,8 +964,6 @@ namespace Dune
         // on intersectionn
         auto vertex = [&] (int poly,int i,int k,int numDofs)
         { //!TS add derivatives at vertex (probably only normal component - is the mask then correct?)
-          // std::cout << "vertex:" << poly << "," << i << "," << k << "," << numDofs
-          //           << " | " << entry[0] << std::endl;
           const auto &x = edgeGeo.local( refElement.position( i, dimension ) );
           edgeShapeFunctionSet.evaluateEach( x, [ &localDofVectorMatrix, &entry ] ( std::size_t alpha, typename EdgeShapeFunctionSet::RangeType phi ) {
               assert( entry[0] < localDofVectorMatrix[0].size() );
@@ -965,7 +974,7 @@ namespace Dune
           entry[0] += EdgeShapeFunctionSet::RangeType::dimension;
           if (order2size<0>(1)>0)
           {
-            edgeShapeFunctionSet.jacobianEach( x, [ & ] ( std::size_t alpha, typename EdgeShapeFunctionSet::JacobianRangeType dphi ) {
+            edgeShapeFunctionSet.refJacobianEach( x, [ & ] ( std::size_t alpha, auto dphi ) {
               assert( entry[0] < localDofVectorMatrix[0].size() );
               assert( dphi[0].dimension == 1 );
               // note: edge sfs in reference coordinate so apply scaling 1/|S|
@@ -987,8 +996,6 @@ namespace Dune
         };
         auto edge = [&] (int poly,auto intersection,int k,int numDofs)
         { //!TS add normal derivatives
-          // std::cout << "edge:" << poly << "," << k << "," << numDofs
-          //           << " | " << entry[0] << std::endl;
           EdgeQuadratureType edgeQuad( gridPart(),
                 intersection, 2*polOrder_, EdgeQuadratureType::INSIDE );
           for (unsigned int qp=0;qp<edgeQuad.nop();++qp)
@@ -1000,9 +1007,6 @@ namespace Dune
             edgeShapeFunctionSet.evaluateEach( x, [ & ] ( std::size_t beta, typename EdgeShapeFunctionSet::RangeType value ) {
                 edgeBFS.evaluateTestEach( xx,
                   [&](std::size_t alpha, typename EdgeShapeFunctionSet::RangeType phi ) {
-                    /* std::cout << "alpha=" << alpha << " row=" << entry[0]+alpha << " | "
-                              << value << "*" << phi << "=" << value*phi
-                              << std::endl; */
                     //!TS add alpha<...
                     if (alpha < order2size<1>(0) && beta < edgeSize(0))
                     {
@@ -1027,8 +1031,6 @@ namespace Dune
 
         applyOnIntersection(intersection,vertex,edge,mask);
 
-        // std::cout << "final entry=" << entry[0] << std::endl;
-
         assert( entry[0] == localDofVectorMatrix[0].size() );
         assert( entry[1] == localDofVectorMatrix[1].size() );
 
@@ -1043,7 +1045,7 @@ namespace Dune
           }
           catch (const FMatrixError&)
           {
-            std::cout << "localDofVectorMatrix.invert() failed!\n";
+            std::cout << "localDofVectorMatrix[0].invert() failed!\n";
             for (std::size_t alpha=0;alpha<localDofVectorMatrix[0].size();++alpha)
             {
               for (std::size_t beta=0;beta<localDofVectorMatrix[0][alpha].size();++beta)
@@ -1084,7 +1086,22 @@ namespace Dune
         }
         if (localDofVectorMatrix[1].size() > 0)
         {
-          localDofVectorMatrix[1].invert();
+          try
+          {
+            localDofVectorMatrix[1].invert();
+          }
+          catch (const FMatrixError&)
+          {
+            std::cout << "localDofVectorMatrix[1].invert() failed!\n";
+            for (std::size_t alpha=0;alpha<localDofVectorMatrix[1].size();++alpha)
+            {
+              for (std::size_t beta=0;beta<localDofVectorMatrix[1][alpha].size();++beta)
+                std::cout << localDofVectorMatrix[1][alpha][beta] << " ";
+              std::cout << std::endl;
+            }
+            assert(0);
+            throw FMatrixError();
+          }
           if (mask[1].size() > edgeSize(1))
           {
             assert(mask[1].size() == edgeSize(1)+2);

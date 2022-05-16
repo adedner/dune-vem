@@ -590,8 +590,11 @@ namespace Dune
 
             Std::vector<Std::vector<unsigned int>>
               mask(2,Std::vector<unsigned int>(0)); // contains indices with Phi_mask[i] is attached to given edge
-            edgePhiVector[0] = 0;
-            edgePhiVector[1] = 0;
+            // calling the interpolation can resize the edge vector to add the 'normal' derivative vertex dof so we need to resize again
+            edgePhiVector[0].resize(basisSets_.edgeSize(0), basisSets_.edgeSize(0), 0);
+            edgePhiVector[1].resize(basisSets_.edgeSize(1), basisSets_.edgeSize(1), 0);
+            // edgePhiVector[0] = 0;
+            // edgePhiVector[1] = 0;
 
             interpolation_(intersection, edgeShapeFunctionSet, edgePhiVector, mask);
 
