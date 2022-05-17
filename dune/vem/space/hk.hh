@@ -324,19 +324,6 @@ namespace Dune
         template< class Point, class Functor >
         void jacobianEach ( const Point &x, Functor functor ) const
         {
-          JacobianRangeType jac;
-          const auto &geo = intersection_.geometry();
-          const auto &jit = geo.jacobianInverseTransposed(x);
-          sfs_.jacobianEach(x, [&](std::size_t alpha, EdgeJacobianRangeType dphi)
-          {
-            for (std::size_t r=0;r<dimRange;++r)
-              jit.mv(dphi[r],jac[r]);
-            functor(alpha,jac);
-          });
-        }
-        template< class Point, class Functor >
-        void refJacobianEach ( const Point &x, Functor functor ) const
-        {
           sfs_.jacobianEach(x, [&](std::size_t alpha, EdgeJacobianRangeType dphi)
           {
             functor(alpha,dphi);
@@ -837,8 +824,8 @@ namespace Dune
               {
                 for (int r=0;r<dphi.rows;++r)
                 {
-                  localDofMatrix[ k+2*r ][ alpha ]   = dphi[r][ 0 ] * indexSet_.vertexDiameter(element, i);
-                  localDofMatrix[ k+2*r+1 ][ alpha ] = dphi[r][ 1 ] * indexSet_.vertexDiameter(element, i);
+                  localDofMatrix[ k+2*r ][ alpha ]   = dphi[r][ 0 ]; // * indexSet_.vertexDiameter(element, i);
+                  localDofMatrix[ k+2*r+1 ][ alpha ] = dphi[r][ 1 ]; // * indexSet_.vertexDiameter(element, i);
                 }
               }
             } );
@@ -971,21 +958,22 @@ namespace Dune
           entry[0] += EdgeShapeFunctionSet::RangeType::dimension;
           if (order2size<0>(1)>0)
           {
-            edgeShapeFunctionSet.refJacobianEach( x, [ & ] ( std::size_t alpha, auto dphi ) {
+            edgeShapeFunctionSet.jacobianEach( x, [ & ] ( std::size_t alpha, auto dphi ) {
               assert( entry[0] < localDofVectorMatrix[0].size() );
               assert( dphi[0].dimension == 1 );
               // note: edge sfs in reference coordinate so apply scaling 1/|S|
               if (alpha < localDofVectorMatrix[0][entry[0]].size())
                 for (int r=0;r<dphi.rows;++r)
-                  localDofVectorMatrix[ 0 ][ entry[0]+r ][ alpha ] = dphi[r][0] / intersection.geometry().volume()
-                                                                   * indexSet_.vertexDiameter(element, i);
+                  localDofVectorMatrix[ 0 ][ entry[0]+r ][ alpha ] = dphi[r][0]
+                                               / intersection.geometry().volume();
+                                               // * indexSet_.vertexDiameter(element,i);
             } );
             edgeShapeFunctionSet.evaluateEach( x, [ & ] ( std::size_t alpha, typename EdgeShapeFunctionSet::RangeType phi ) {
               assert( entry[1] < localDofVectorMatrix[1].size() );
               if (alpha < localDofVectorMatrix[1][entry[1]].size())
                 for (int r=0;r<phi.dimension;++r)
-                  localDofVectorMatrix[ 1 ][ entry[1]+r ][ alpha ] = phi[r]*flipNormal
-                                                                 * indexSet_.vertexDiameter(element, i);
+                  localDofVectorMatrix[ 1 ][ entry[1]+r ][ alpha ] = phi[r]*flipNormal;
+                                               //  * indexSet_.vertexDiameter(element,i);
             } );
             entry[0] += EdgeShapeFunctionSet::RangeType::dimension;
             entry[1] += EdgeShapeFunctionSet::RangeType::dimension;
@@ -1260,8 +1248,8 @@ namespace Dune
             localFunction.jacobian( x, dvalue );
             for (int r=0;r<value.dimension;++r)
             {
-              localDofVector[ k+2*r ]   = dvalue[ r ][ 0 ] * indexSet_.vertexDiameter(element, i);
-              localDofVector[ k+2*r+1 ] = dvalue[ r ][ 1 ] * indexSet_.vertexDiameter(element, i);
+              localDofVector[ k+2*r ]   = dvalue[ r ][ 0 ]; // * indexSet_.vertexDiameter(element, i);
+              localDofVector[ k+2*r+1 ] = dvalue[ r ][ 1 ]; // * indexSet_.vertexDiameter(element, i);
             }
           }
         };

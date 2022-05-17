@@ -155,7 +155,6 @@ namespace Dune
       double elementDiameter( std::size_t index ) const { return boundingBox(index).diameter(); }
       double elementDiameter( const ElementType &element ) const
       {
-        return 1.;
         return elementDiameter( index( element ) );
       }
       double vertexDiameter( std::size_t index ) const { return vertexDiameters_[index]; }

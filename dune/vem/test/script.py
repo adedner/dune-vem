@@ -34,7 +34,7 @@ def runTest(exact, spaceConstructor, get_df):
         # set up grid for testing
         N = 2**(level)
         grid = dune.vem.polyGrid(
-          dune.vem.voronoiCells([[0,0],[Lx,Ly]], 50*N*N, lloyd=200, fileName="voronoiseeds", load=True)
+          dune.vem.voronoiCells([[0,0],[Lx,Ly]], 20*N*N, lloyd=200, fileName="voronoiseeds", load=True)
         #   cartesianDomain([0.,0.],[Lx,Ly],[N,N]), cubes=False
         #   cartesianDomain([0.,0.],[Lx,Ly],[2*N,2*N]), cubes=True
         )
@@ -72,5 +72,7 @@ def calculateEOC(results,length):
 def checkEOC(eoc, expected_eoc):
     i = 0
     for k in expected_eoc:
-        assert(0.8*k <= eoc[i] <= 1.2*k), "eoc out of expected range"
+        assert(0.8*k <= eoc[i], "eoc out of expected range")
+        if eoc[i] > 1.2*k:
+            print("WARNING: the eoc seems too large (",eoc[i],"expected",k)
         i += 1

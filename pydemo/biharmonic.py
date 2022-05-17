@@ -16,7 +16,7 @@ from ufl import *
 import dune.ufl
 
 maxLevel     = 4
-order        = 4
+order        = 3
 epsilon      = 1
 laplaceCoeff = 1
 mu           = 1
@@ -54,7 +54,7 @@ parameters = {"newton.linear.tolerance": 1e-12,
 uflSpace = dune.ufl.Space(2, dimRange=1)
 x = SpatialCoordinate(uflSpace)
 exact = as_vector( [sin(2*pi*x[0])**2*sin(2*pi*x[1])**2] )
-# exact = as_vector( [x[0]**1] )
+# exact = as_vector( [x[0]**3] )
 
 # next the bilinear form
 # Note: for function which continuous derivatives we have
@@ -71,7 +71,7 @@ laplace = lambda w: div(grad(w))
 H = lambda w: grad(grad(w))
 u = TrialFunction(uflSpace)
 v = TestFunction(uflSpace)
-if True:
+if False:
     a = ( epsilon*inner(H(u[0]),H(v[0])) +\
           laplaceCoeff*inner(grad(u),grad(v)) +\
           mu*inner(u,v)
@@ -115,12 +115,9 @@ def compute(grid, space, schemeName):
     info = {"linear_iterations":1}
     if False:
         df.interpolate(exact)
-        # df.clear()
-        # i = 0 # i = 9
-        # df.as_numpy[i + 0] = 1
-        df.plot(level=3)
-        uflFunction(grid,name="grad",order=1,ufl=grad(df[0])[0]).plot(level=3)
-        uflFunction(grid,name="grad",order=1,ufl=grad(df[0])[1]).plot(level=3)
+        # df.plot(level=3)
+        # uflFunction(grid,name="grad",order=1,ufl=grad(df[0])[0]).plot(level=3)
+        # uflFunction(grid,name="grad",order=1,ufl=grad(df[0])[1]).plot(level=3)
     else:
         scheme = create.scheme(schemeName, [a==b, *dbc], space,
                             # solver="cg",

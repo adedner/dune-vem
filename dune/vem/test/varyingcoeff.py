@@ -101,7 +101,7 @@ def main():
             checkEOC(eoc, expected_eoc)
 
             print("order: ", order+1)
-            C1COnftestSpaces = [ [0,0], [order-3,order-2], [order-3] ]
+            C1ConftestSpaces = [ [0,0], [order-3,order-2], [order-3] ]
             print("C1 non conforming test spaces: ", C1ConftestSpaces)
 
             eoc, expected_eoc = runTestVaryingcoeff( C1ConftestSpaces, order+1 )

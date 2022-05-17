@@ -583,6 +583,7 @@ namespace Dune
             if (!intersection.boundary() && (agglomeration().index(intersection.outside()) == agglomerate))
               continue;
             assert(intersection.conforming());
+            const auto &geo = intersection.geometry();
 
             const typename BasisSetsType::EdgeShapeFunctionSetType edgeShapeFunctionSet
                   = basisSets_.edgeBasisFunctionSet(agglomeration(),
@@ -600,8 +601,8 @@ namespace Dune
 
             auto normal = intersection.centerUnitOuterNormal();
             typename Dune::FieldMatrix<DomainFieldType,dimDomain,dimDomain> factorTN, factorNN;
-            DomainType tau = intersection.geometry().corner(1);
-            tau -= intersection.geometry().corner(0);
+            DomainType tau = geo.corner(1);
+            tau -= geo.corner(0);
             double h = tau.two_norm();
             tau /= h;
             for (std::size_t i = 0; i < factorTN.rows; ++i)
@@ -618,6 +619,7 @@ namespace Dune
               auto x = quadrature.localPoint(qp);
               auto y = intersection.geometryInInside().global(x);
               const DomainFieldType weight = intersection.geometry().integrationElement(x) * quadrature.weight(qp);
+              const auto &jit = geo.jacobianInverseTransposed(x);
               shapeFunctionSet.jacobianEach(y, [&](std::size_t alpha, JacobianRangeType phi)
               {
                   // evaluate each here for edge shape fns
@@ -656,7 +658,10 @@ namespace Dune
                   if ( basisSets_.edgeSize(1) > 0 )
                   {
                     // jacobian each here for edge shape fns
-                    edgeShapeFunctionSet.jacobianEach(x, [&](std::size_t beta, JacobianRangeType dpsi) {
+                    edgeShapeFunctionSet.jacobianEach(x, [&](std::size_t beta, auto dhatpsi) {
+                        JacobianRangeType dpsi;
+                        for (std::size_t r=0;r<dimRange;++r)
+                          jit.mv(dhatpsi[r], dpsi[r]);
                         if (beta < edgePhiVector[0].size())
                         {
                           // note: the edgeShapeFunctionSet is defined over
