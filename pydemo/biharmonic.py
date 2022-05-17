@@ -5,7 +5,7 @@ import math
 from dune import create
 from dune.grid import cartesianDomain, gridFunction
 from dune.fem.plotting import plotPointData as plot
-from dune.fem.function import integrate, discreteFunction
+from dune.fem.function import integrate, discreteFunction, uflFunction
 from dune.fem import parameter
 from dune.vem import voronoiCells
 from dune.fem.operator import linear as linearOperator
@@ -16,8 +16,8 @@ from ufl import *
 import dune.ufl
 
 maxLevel     = 4
-order        = 3
-epsilon      = 0
+order        = 4
+epsilon      = 1
 laplaceCoeff = 1
 mu           = 1
 
@@ -30,6 +30,7 @@ dune.fem.parameter.append({"fem.verboserank": 0})
 # <codecell>
 # Note: suboptimal laplace error for bubble (space is reduced to polorder=3 but could be 4 = ts+2
 methods = [ ### "[space,scheme,spaceKwrags]"
+        ["vem","vem",{"order":order, "testSpaces":[ [0,0],[order-4,order-3], [order-4] ] }, "C1-conforming"],
         # ["vem","vem",{"order":order, "testSpaces":[ [0],  [order-3,order-2], [order-4] ] }, "C1-non-conforming"],
         # ["vem","vem",{"order":order, "testSpaces":[ [0],  [order-2,order-2], [order-2] ] }, "C1C0-conforming"],
         # ["vem","vem",{"order":order, "testSpaces":[ [0],  [order-3,order-2], [order-3] ] }, "C1mod-conforming"],
@@ -43,7 +44,7 @@ parameters = {"newton.linear.tolerance": 1e-12,
               "newton.linear.preconditioning.method": "jacobi",
               "penalty": 40,  # for the bbdg scheme
               "newton.linear.verbose": False,
-              "newton.verbose": True
+              "newton.verbose": False
               }
 
 # <markdowncell>
@@ -53,7 +54,7 @@ parameters = {"newton.linear.tolerance": 1e-12,
 uflSpace = dune.ufl.Space(2, dimRange=1)
 x = SpatialCoordinate(uflSpace)
 exact = as_vector( [sin(2*pi*x[0])**2*sin(2*pi*x[1])**2] )
-# exact = as_vector( [x[0]**3] )
+# exact = as_vector( [x[0]**1] )
 
 # next the bilinear form
 # Note: for function which continuous derivatives we have
@@ -70,19 +71,35 @@ laplace = lambda w: div(grad(w))
 H = lambda w: grad(grad(w))
 u = TrialFunction(uflSpace)
 v = TestFunction(uflSpace)
-a = ( epsilon*inner(H(u[0]),H(v[0])) +\
-      laplaceCoeff*inner(grad(u),grad(v)) +\
-      mu*inner(u,v)
-    ) * dx
+if True:
+    a = ( epsilon*inner(H(u[0]),H(v[0])) +\
+          laplaceCoeff*inner(grad(u),grad(v)) +\
+          mu*inner(u,v)
+        ) * dx
+    # finally the right hand side and the boundary conditions
+    b = ( epsilon*laplace(laplace(exact[0])) -\
+          laplaceCoeff*laplace(exact[0]) +\
+          mu*exact[0] ) * v[0] * dx
+    biLaplaceCoeff = epsilon
+    diffCoeff      = laplaceCoeff
+    massCoeff      = mu
+else:
+    kappa = 1./(1+dot(x,x))
+    beta  = exp(-x[0]*x[1])
+    gamma = sin(dot(x,x))**2
+    a = ( kappa*inner(H(u[0]),H(v[0])) +\
+          beta*inner(grad(u),grad(v)) +\
+          gamma*inner(u,v)
+        ) * dx
+    q = sum([ H(kappa*H(exact[0])[i,j])[i,j] for i in range(2) for j in range(2) ])
+    b = ( q -\
+          laplaceCoeff*div(beta*grad(exact[0])) +\
+          mu*gamma*exact[0] ) * v[0] * dx
+    biLaplaceCoeff = kappa
+    diffCoeff      = laplaceCoeff*beta
+    massCoeff      = mu*gamma
 
-# finally the right hand side and the boundary conditions
-b = ( epsilon*laplace(laplace(exact[0])) -\
-      laplaceCoeff*laplace(exact[0]) +\
-      mu*exact[0] ) * v[0] * dx
 dbc = [dune.ufl.DirichletBC(uflSpace, [0], i+1) for i in range(4)]
-biLaplaceCoeff = epsilon
-diffCoeff      = laplaceCoeff
-massCoeff      = mu
 
 # <markdowncell>
 # Now we define a grid build up of voronoi cells around $50$ random points
@@ -96,12 +113,18 @@ def compute(grid, space, schemeName):
     df = discreteFunction(space, name="solution") # space.interpolate([0],name="solution")
     # df.plot(level=3)
     info = {"linear_iterations":1}
-    if True:
+    if False:
         df.interpolate(exact)
+        # df.clear()
+        # i = 0 # i = 9
+        # df.as_numpy[i + 0] = 1
+        df.plot(level=3)
+        uflFunction(grid,name="grad",order=1,ufl=grad(df[0])[0]).plot(level=3)
+        uflFunction(grid,name="grad",order=1,ufl=grad(df[0])[1]).plot(level=3)
     else:
         scheme = create.scheme(schemeName, [a==b, *dbc], space,
                             # solver="cg",
-                            # solver=("suitesparse","umfpack"),
+                            solver=("suitesparse","umfpack"),
                             hessStabilization=biLaplaceCoeff,
                             gradStabilization=diffCoeff,
                             massStabilization=massCoeff,
@@ -127,14 +150,13 @@ def compute(grid, space, schemeName):
 # figPos = 100*len(methods)+10*maxLevel+1
 results = []
 for level in range(maxLevel):
-    # constructor = cartesianDomain([0,0],[1,1],[4*2**level,4*2**level])
+    constructor = cartesianDomain([0,0],[1,1],[2*2**level,2*2**level])
     # polyGrid = create.grid("agglomerate", constructor, cubes=False )
-    constructor = cartesianDomain([0,0],[1,1],[4,4])
-    # polyGrid = create.grid("agglomerate", voronoiCells(constructor,16*2**level*2**level,"voronoiseeds",
-    #            load=True,show=False,lloyd=5), convex=True )
+    polyGrid = create.grid("agglomerate", voronoiCells(constructor,4*2**level*2**level,"voronoiseeds",
+               load=True,show=False,lloyd=5), convex=True )
 
-    N = 10*3*2**level+1 # needs to be of the form 6*i+1
-    polyGrid = hexaGrid(N, 1, 1)
+    # N = 10*3*2**level+1 # needs to be of the form 6*i+1
+    # polyGrid = hexaGrid(N, 1, 1)
 
     res = []
     for i,m in enumerate(methods):

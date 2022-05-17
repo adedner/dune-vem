@@ -155,12 +155,13 @@ namespace Dune
       double elementDiameter( std::size_t index ) const { return boundingBox(index).diameter(); }
       double elementDiameter( const ElementType &element ) const
       {
+        return 1.;
         return elementDiameter( index( element ) );
       }
       double vertexDiameter( std::size_t index ) const { return vertexDiameters_[index]; }
       double vertexDiameter( const ElementType &element, std::size_t index ) const
       {
-        return vertexDiameter( localIndex(element,index,dimension) );
+        return vertexDiameter( globalIndex(element,index,dimension).first );
       }
       std::pair<double,double> diameters() const { return {minDiameter_,maxDiameter_}; }
       const BoundingBox<GridPart>& boundingBox( std::size_t index ) const

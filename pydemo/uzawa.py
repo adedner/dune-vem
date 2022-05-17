@@ -7,7 +7,7 @@ import matplotlib
 matplotlib.rc( 'image', cmap='jet' )
 from matplotlib import pyplot
 import numpy
-from scipy.sparse import bmat, linalg
+from scipy.sparse import linalg
 from dune.grid import cartesianDomain
 from dune.alugrid import aluCubeGrid
 from ufl import SpatialCoordinate, CellVolume, TrialFunction, TestFunction,\
@@ -18,9 +18,15 @@ import dune.fem
 from dune.fem.operator import linear as linearOperator
 
 import dune.vem
-# from dune.vem import vemOperator as galerkinOperator
 from dune.fem.operator import galerkin as galerkinOperator
-from dune.vem import vemScheme as galerkinScheme
+from dune.vem import vemScheme as vemScheme
+from dune.fem.scheme import galerkin as galerkinScheme
+
+def plot(target):
+    fig = pyplot.figure(figsize=(10,10))
+    target[0].plot(colorbar="vertical", figure=(fig, 211))
+    target[1].plot(colorbar="vertical", figure=(fig, 212))
+    pyplot.show()
 
 def dgLaplace(beta, p,q, spc, p_bnd, dD):
     n             = FacetNormal(spc)
@@ -37,8 +43,9 @@ def dgLaplace(beta, p,q, spc, p_bnd, dD):
     return aInternal + diffSkeleton
 class Uzawa:
     def __init__(self, grid, spcU, spcP, dbc_u, forcing,
-                 mu, tau, u_h_n=None,
-                 tolerance=1e-9, precondition=True, verbose=False):
+                 mu, tau, u_h_n=None, explicit=False,
+                 tolerance=1e-9, precondition=True, verbose=False,
+                 lagrange=False):
         self.dimension = grid.dimension
         self.verbose = verbose
         self.tolerance2 = tolerance**2
@@ -53,36 +60,51 @@ class Uzawa:
         v = TestFunction(spcU)
         p = TrialFunction(spcP)
         q = TestFunction(spcP)
-        def epsilon(u):
-            return sym(nabla_grad(u))
+        forcing = dot(forcing,v)
         if u_h_n is not None:
-            forcing += self.nu*u_h_n
-            forcing -= dot(u_h_n, nabla_grad(u))/2
-            forcing -= dot(u, nabla_grad(u_h_n))/2
-        mainModel   = ( self.nu*dot(u,v) - dot(forcing,v) + 2*self.mu*inner(epsilon(u), epsilon(v)) ) * dx
+            forcing += dot(self.nu*u_h_n,v)
+            b = lambda u1,u2,phi: dot( dot(u1, nabla_grad(u2)), phi)
+            symb = lambda u1,u2,phi: ( b(u1,u2,phi) - b(u1,phi,u2) ) / 2
+            if explicit:
+                forcing -= b( u_h_n, u_h_n, v )
+            else:
+                # forcing -= b(u_h_n, u, v)
+                # forcing -= b(u,u_h_n,v)
+                # ustable forcing -= symb(u_h_n, u, v)
+                # default
+                forcing -= ( b(u_h_n, u, v) + b(u,u_h_n,v) ) / 2
+                # unstable at outflow forcing -= ( symb(u_h_n, u, v) + symb(u,u_h_n,v) ) / 2
+        epsilon = lambda u: sym(nabla_grad(u))
+        mainModel   = ( self.nu*dot(u,v) - forcing + 2*self.mu*inner(epsilon(u), epsilon(v)) ) * dx
         gradModel   = -p*div(v) * dx
         divModel    = -div(u)*q * dx
         massModel   = p*q * dx
         preconModel = inner(grad(p),grad(q)) * dx
 
-        self.mainOp = galerkinScheme( ( mainModel==0, *dbc_u ),
-                                        gradStabilization=as_vector([self.mu*2,self.mu*2]),
-                                        massStabilization=as_vector([self.nu,self.nu])
-                                    )
+        if not lagrange:
+            self.mainOp = vemScheme( ( mainModel==0, *dbc_u ),
+                                       gradStabilization=as_vector([self.mu*2,self.mu*2]),
+                                       massStabilization=as_vector([self.nu,self.nu])
+                                     )
+        else:
+            self.mainOp = galerkinScheme( ( mainModel==0, *dbc_u ) )
         gradOp    = galerkinOperator( gradModel, spcP,spcU)
         divOp     = galerkinOperator( divModel, spcU,spcP)
         massOp    = galerkinOperator( massModel, spcP)
 
-        self.A    = linearOperator(self.mainOp).as_numpy
-        self.Ainv = lambda rhs: linalg.spsolve(self.A,rhs)
+        self.mainLinOp = linearOperator(self.mainOp)
         self.G    = linearOperator(gradOp).as_numpy
         self.D    = linearOperator(divOp).as_numpy
         self.M    = linearOperator(massOp).as_numpy
         self.Minv = lambda rhs: linalg.spsolve(self.M,rhs)
 
         if precondition and self.mainOp.model.nu > 0:
-            preconModel = dgLaplace(10, p,q, spcP, 0, 1)
-            preconOp    = galerkinOperator( preconModel, spcP)
+            if not lagrange:
+                preconModel = dgLaplace(10, p,q, spcP, 0, 1)
+                preconOp    = galerkinOperator( preconModel, spcP)
+            else:
+                preconModel = inner(grad(p),grad(q)) * dx
+                preconOp    = galerkinOperator( (preconModel,DirichletBC(spcP,0)), spcP)
             self.P    = linearOperator(preconOp).as_numpy
             self.Pinv = lambda rhs: linalg.spsolve(self.P,rhs)
         else:
@@ -98,12 +120,14 @@ class Uzawa:
         self.xi     = numpy.copy(self.rhs_u)
 
     def solve(self,target):
-        info = {"uzawa.outer.iterations":0,
-                "uzawa.converged":False}
-        self.A    = linearOperator(self.mainOp).as_numpy
-        self.Ainv = lambda rhs: linalg.spsolve(self.A,rhs)
         velocity = target[0]
         pressure = target[1]
+        info = {"uzawa.outer.iterations":0,
+                "uzawa.converged":False}
+        # problem is linear but coefficients depend on previous time step so need to reassemble
+        self.mainOp.jacobian(velocity, self.mainLinOp)
+        A = self.mainLinOp.as_numpy
+        Ainv = lambda rhs: linalg.spsolve(A,rhs)
         sol_u = velocity.as_numpy
         sol_p = pressure.as_numpy
         # right hand side for Shur complement problem
@@ -113,7 +137,7 @@ class Uzawa:
         self.xi[:]  = self.G*sol_p
         self.rhs_u -= self.xi
         self.mainOp.setConstraints(self.rhsVelo)
-        sol_u[:]      = self.Ainv(self.rhs_u[:])
+        sol_u[:]      = Ainv(self.rhs_u[:])
         self.rhs_p[:] = self.D*sol_u
         self.r[:]     = self.Minv(self.rhs_p[:])
         if self.Pinv:
@@ -130,7 +154,7 @@ class Uzawa:
             self.xi.fill(0)
             self.rhs_u[:] = self.G*self.d
             self.mainOp.setConstraints([0,]*self.dimension, self.rhsVelo)
-            self.xi[:] = self.Ainv(self.rhs_u[:])
+            self.xi[:] = Ainv(self.rhs_u[:])
             self.rhs_p[:] = self.D*self.xi
             rho = delta / numpy.dot(self.d,self.rhs_p)
             sol_p += rho*self.d
@@ -156,14 +180,18 @@ class Uzawa:
         return info
 
 def main():
-    muValue = 0.1
+    useVem   = False
+    muValue  = 0.1
     tauValue = 1e-2
-    order = 4
-    grid = dune.vem.polyGrid(cartesianDomain([0,0],[3,1],[30,10]),cubes=True)
-    spcU = dune.vem.divFreeSpace( grid, order=order)
-    # spcP = dune.vem.bbdgSpace( grid, order=0)
-    spcP = dune.fem.space.finiteVolume( grid )
-    # spcP = dune.fem.space.lagrange( grid, order=1 )
+    order    = 2
+    grid = dune.vem.polyGrid(cartesianDomain([0,0],[3,1],[30*4,10*4]),cubes=False)
+    if useVem:
+        spcU = dune.vem.divFreeSpace( grid, order=order)
+        spcP = dune.fem.space.finiteVolume( grid )
+        # spcP = dune.fem.space.lagrange( grid, order=1 )
+    else:
+        spcU = dune.fem.space.lagrange( grid, order=order, dimRange=2 )
+        spcP = dune.fem.space.lagrange( grid, order=order-1 )
 
     x       = SpatialCoordinate(spcU)
     exact_u = as_vector( [x[1] * (1.-x[1]), 0] ) # dy u_x = 1-2y, -dy^2 u_x = 2
@@ -177,8 +205,9 @@ def main():
 
     dbc = [ DirichletBC(velocity.space,exact_u,None) ]
     uzawa = Uzawa(grid, spcU, spcP, dbc, f,
-                  muValue, tauValue,
-                  tolerance=1e-9, precondition=True, verbose=True)
+                  muValue, tauValue, u_h_n=None,
+                  tolerance=1e-9, precondition=True, verbose=True, # tolerance 2e-5 (TH p=2)
+                  lagrange=not useVem )
     uzawa.solve([velocity,pressure])
     print("Retry")
     uzawa.solve([velocity,pressure])

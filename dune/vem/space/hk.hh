@@ -337,9 +337,6 @@ namespace Dune
         template< class Point, class Functor >
         void refJacobianEach ( const Point &x, Functor functor ) const
         {
-          JacobianRangeType jac;
-          const auto &geo = intersection_.geometry();
-          const auto &jit = geo.jacobianInverseTransposed(x);
           sfs_.jacobianEach(x, [&](std::size_t alpha, EdgeJacobianRangeType dphi)
           {
             functor(alpha,dphi);
@@ -974,7 +971,7 @@ namespace Dune
           entry[0] += EdgeShapeFunctionSet::RangeType::dimension;
           if (order2size<0>(1)>0)
           {
-            edgeShapeFunctionSet.jacobianEach( x, [ & ] ( std::size_t alpha, auto dphi ) {
+            edgeShapeFunctionSet.refJacobianEach( x, [ & ] ( std::size_t alpha, auto dphi ) {
               assert( entry[0] < localDofVectorMatrix[0].size() );
               assert( dphi[0].dimension == 1 );
               // note: edge sfs in reference coordinate so apply scaling 1/|S|
@@ -1037,6 +1034,7 @@ namespace Dune
         //////////////////////////////////////////////////////////////////////////////////
         auto tau = intersection.geometry().corner(1);
         tau -= intersection.geometry().corner(0);
+        tau /= tau.two_norm();
         if (localDofVectorMatrix[0].size() > 0)
         {
           try
@@ -1057,31 +1055,31 @@ namespace Dune
           }
 
           if (mask[1].size() > edgeSize(1))
-          { // need to take tangential derivatives at vertices into account
+          { // need to distribute tangential derivative at vertices to the
+            // two basis functions corresponding to dx and dy: need
+            // (dx,dy).tau = (phi_1,phi_2).tau = A_1
+            // and (dx,dy).n = 0 so take (phi_1,phi_2) = A_1 tau
+            // Same for (phi_4,phi_5) using A_3
             assert(mask[0].size() == edgeSize(0)+2);
             auto A = localDofVectorMatrix[0];
             localDofVectorMatrix[0].resize(edgeSize(0), mask[0].size(), 0);
-            // vertex basis functions (values)
+            // move vertex basis functions (values) to generate gap for derivative basis function
             for (std::size_t j=0;j<edgeSize(0);++j)
             {
               localDofVectorMatrix[0][j][0] = A[j][0];
               localDofVectorMatrix[0][j][3] = A[j][2];
-            }
-            // vertex basis functions (tangential derivatives)
-            // TODO: add baseRangeDimension
-            for (std::size_t j=0;j<edgeSize(0);++j)
-            {
+
               localDofVectorMatrix[0][j][1] = A[j][1]*tau[0];
               localDofVectorMatrix[0][j][2] = A[j][1]*tau[1];
               localDofVectorMatrix[0][j][4] = A[j][3]*tau[0];
               localDofVectorMatrix[0][j][5] = A[j][3]*tau[1];
-            }
-            for (std::size_t i=6;i<mask[0].size();++i)
-              for (std::size_t j=0;j<edgeSize(0);++j)
+
+              for (std::size_t i=6;i<mask[0].size();++i)
               {
                 assert( i-2 < A[j].size() );
                 localDofVectorMatrix[0][j][i] = A[j][i-2];
               }
+            }
           }
         }
         if (localDofVectorMatrix[1].size() > 0)
@@ -1254,7 +1252,6 @@ namespace Dune
         { //!TS vertex derivatives
           const auto &x = refElement.position( i, dimension );
           localFunction.evaluate( x, value );
-          //! SubDofWrapper does not have size assert( k < localDofVector.size() );
           for (int r=0;r<value.dimension;++r)
             localDofVector[ k+r ] = value[ r ];
           k += value.dimension;

@@ -90,13 +90,21 @@ def runTestVaryingcoeff(testSpaces, order):
       return eoc, expected_eoc
 
 def main():
-      orders = [2,4]
+      orders = [2,3]
       for order in orders:
             print("order: ", order)
             C1NCtestSpaces = [ [0], [order-3,order-2], [order-4] ]
             print("C1 non conforming test spaces: ", C1NCtestSpaces)
 
             eoc, expected_eoc = runTestVaryingcoeff( C1NCtestSpaces, order )
+
+            checkEOC(eoc, expected_eoc)
+
+            print("order: ", order+1)
+            C1COnftestSpaces = [ [0,0], [order-3,order-2], [order-3] ]
+            print("C1 non conforming test spaces: ", C1ConftestSpaces)
+
+            eoc, expected_eoc = runTestVaryingcoeff( C1ConftestSpaces, order+1 )
 
             checkEOC(eoc, expected_eoc)
 

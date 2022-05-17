@@ -228,7 +228,8 @@ namespace Dune
           const SizeType subIndex = indexSet().subIndex( element, subAgglomerate, info.codim );
           SizeType index = info.offset + SizeType( info.numDofs ) * subIndex;
 
-          if( false ) // (info.codim == 1) && (indexSet().twist(subIndex) == 1) )
+          if( false )
+          // if ( (info.codim == 1) && (indexSet().twist(subIndex) == 1) )
           {
             const SizeType begin = index;
             for( index += info.numDofs; index > begin; )
@@ -258,7 +259,8 @@ namespace Dune
         return;
 
       SizeType index = info.offset + SizeType( info.numDofs ) * result.first;
-      if( false ) // (Entity::codimension == 1) && (indexSet().twist(result.first)) )
+      if( false )
+      // if ( (Entity::codimension == 1) && (indexSet().twist(result.first)) )
       {
         for( unsigned int i = info.numDofs; i > 0; )
           f( --i, index++ );
