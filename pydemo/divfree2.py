@@ -21,7 +21,7 @@ parameters = {"newton.linear.tolerance": 1e-8,
 order, Lx,Ly = 3,  3,1
 # order, Lx,Ly = 5,  1,1.1
 mass = dune.ufl.Constant(1, "mu")
-D = dune.ufl.Constant(1, "mu")
+D = dune.ufl.Constant(1, "D")
 
 x = SpatialCoordinate(triangle)
 def model(space):
@@ -44,9 +44,8 @@ def model(space):
 
     a = (D*inner(grad(u),grad(v)) + mass*dot(u,v) ) * dx
 
-    # b = dot( -D*div(grad(exact)) + mass*exact, v) * dx
-    b = dot( mass*exact, v) * dx
-    dbc = [dune.ufl.DirichletBC(space, [0,0], i+1) for i in range(4)]
+    b = dot( -D*div(grad(exact)) + mass*exact, v) * dx
+    dbc = [dune.ufl.DirichletBC(space, exact, i+1) for i in range(4)]
     return a,b,dbc,exact
 
 oldErrors = []
@@ -55,8 +54,8 @@ for i in range(0,6):
     errors = []
     N = 2**i # 2**(i+1)
     polyGrid = dune.vem.polyGrid(
-          # dune.vem.voronoiCells([[0,0],[Lx,Ly]], 10*N*N, lloyd=200, fileName="test", load=True)
-          cartesianDomain([0.,0.],[3,1],[3*N,2*N]), cubes=False
+          dune.vem.voronoiCells([[0,0],[Lx,Ly]], 10*N*N, lloyd=200, fileName="test", load=True)
+          # cartesianDomain([0.,0.],[3,1],[3*N,2*N]), cubes=False
           # cartesianDomain([0.,0.],[3,1],[3*N,3*N]), cubes=True
       )
 
@@ -68,7 +67,7 @@ for i in range(0,6):
     space = dune.vem.divFreeSpace( polyGrid, order=order)
     a,b,dbc,exact = model(space)
     dfI = space.interpolate(exact,name="interpol")
-    if True:
+    if False:
         df = space.interpolate(exact,name="solution")
         df.plot()
     else:

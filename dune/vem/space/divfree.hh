@@ -143,6 +143,7 @@ namespace Dune
           int test = 0;
           RangeType y = sfs_.position( x );
           sfs_.bbox().gradientTransform(y, true);
+          y *= std::sqrt( sfs_.bbox().volume() );
           assert( y.two_norm() < 1.5 );
           sfs_.evaluateEach(x, [&](std::size_t alpha, ScalarRangeType phi)
           {
@@ -279,6 +280,7 @@ namespace Dune
         {
           RangeType y = sfs_.position( x );
           sfs_.bbox().gradientTransform(y, true);
+          y *= std::sqrt( sfs_.bbox().volume() );
           assert( y.two_norm() < 1.5 );
           sfs_.evaluateEach(x, [&](std::size_t alpha, ScalarRangeType phi)
           {
@@ -364,8 +366,9 @@ namespace Dune
       typedef ShapeFunctionSet ShapeFunctionSetType;
       typedef EdgeShapeFunctionSet EdgeShapeFunctionSetType;
 
-      DivFreeVEMBasisSets( const int order, bool useOnb )
+      DivFreeVEMBasisSets( const int order, bool useOnb, bool conforming )
       : innerOrder_( order )
+      , conforming_( conforming )
       , onbSFS_(Dune::GeometryType(Dune::GeometryType::cube, dimDomain),
           valReduced? order-1:order+1
         )
@@ -385,7 +388,7 @@ namespace Dune
           numInnerShapeFunctions_:
           sizeONB<0>(order-1)/BBBasisFunctionSetType::RangeType::dimension
         )
-      , numEdgeTestShapeFunctions_( sizeONB<1>(order-2) )
+      , numEdgeTestShapeFunctions_( (conforming_)? sizeONB<1>(order-2):sizeONB<1>(order-1) )
       {
         auto degrees = edgeDegrees();
         std::cout << "dofsPerCodim:" << dofsPerCodim_[0].second << " "
@@ -395,6 +398,7 @@ namespace Dune
                   << numGradShapeFunctions_ << ","
                   << numHessShapeFunctions_ << ","
                   << numInnerShapeFunctions_ << "]"
+                  << constraintSize() << "]"
                   << "   edge: ["
                   << edgeSize(0) << "," << edgeSize(1) << ","
                   << numEdgeTestShapeFunctions_ << "]"
@@ -442,15 +446,28 @@ namespace Dune
       }
       std::size_t constraintSize() const
       {
-        return numInnerShapeFunctions_ + onbSFS_.size()-1;
-        return numInnerShapeFunctions_; // add for div in P_0 constraints: + onbSFS_.size()-1;
-        return sizeONB<0>(innerOrder_-2);
+        if (conforming_)
+        {
+          return numInnerShapeFunctions_ + onbSFS_.size()-1;
+        }
+        else
+        {
+          // innerOrder_ fails (P^3 solution not exactly interpolated with innerOrder_==3
+          return numInnerShapeFunctions_ +
+                 sizeONB<0>(innerOrder_-1) / BBBasisFunctionSetType::RangeType::dimension
+                 -1;
+        }
       }
       std::size_t vertexSize(int deriv) const
       {
         // vertex values in div free space
-        if (deriv==0)
-          return pow(dimDomain,deriv);
+        if (conforming_)
+        {
+          if (deriv==0)
+            return pow(dimDomain,deriv);
+          else
+            return 0;
+        }
         else
           return 0;
       }
@@ -461,14 +478,16 @@ namespace Dune
       std::size_t edgeValueMoments() const
       {
         // returns order of edge moments up to P_k where k is the entry in dof tuple
-        return innerOrder_-2;
+        if (conforming_)
+          return innerOrder_-2;
+        else
+          return innerOrder_-1;
+          // return innerOrder_;
       }
       std::size_t edgeSize(int deriv) const
       {
         auto degrees = edgeDegrees();
         return degrees[deriv] < 0 ? 0 : sizeONB<1>( degrees[deriv] );
-        /* Dune::Fem::OrthonormalShapeFunctions<1>::size( degrees[deriv] )
-           * BBBasisFunctionSetType::RangeType::dimension; */
       }
 
       ////////////////////////////
@@ -486,14 +505,34 @@ namespace Dune
       std::size_t order2size(unsigned int deriv) const
       {
         if (dim == 0 && deriv == 0) // vertex size
-          return pow(dimDomain,deriv);
+        {
+          if (conforming_)
+            return pow(dimDomain,deriv);
+          else
+            return 0;
+        }
         if (dim == 1 && deriv == 0)
         {
-          // assert(  == edgeSize(deriv) );
-          if (innerOrder_-2<0)
-            return 0;
+          if (conforming_)
+          {
+            if (innerOrder_-2<0)
+              return 0;
+            else
+              return Dune::Fem::OrthonormalShapeFunctions<1>::size(innerOrder_-2);
+          }
           else
-            return Dune::Fem::OrthonormalShapeFunctions<1>::size(innerOrder_-2);
+          {
+            if (innerOrder_-1<0)
+              return 0;
+            else
+              return Dune::Fem::OrthonormalShapeFunctions<1>::size(innerOrder_-1);
+          /*
+            if (innerOrder_<0)
+              return 0;
+            else
+              return Dune::Fem::OrthonormalShapeFunctions<1>::size(innerOrder_);
+           */
+          }
         }
         if (dim == 2 && deriv == 0 && innerOrder_ >=3)
           return Dune::Fem::OrthonormalShapeFunctions<2>::size(innerOrder_-3);
@@ -513,28 +552,15 @@ namespace Dune
       private:
       Std::vector<int> edgeDegrees() const
       {
-        // std::array<std::vector<int>,dimDomain+1> testSpaces;
-
-        // testSpaces[0].resize(2,-1);
-        // testSpaces[1].resize(2,-1);
-        // testSpaces[2].resize(2,-1);
-
-        // testSpaces[0][0] = 0;
-        // testSpaces[1][0] = order-2;
-        // testSpaces[2][0] = order-2;
-
-        // assert( testSpaces_[2].size()<2 );
-
         Std::vector<int> degrees(2, -1);
-        degrees[0] += 2;
-        degrees[0] += std::max(0,innerOrder_-1);
-
-        // for (std::size_t i=0;i<testSpaces_[0].size();++i)
-        //   degrees[i] += 2*(testSpaces_[0][i]+1);
-        // if (testSpaces_[0].size()>1 && testSpaces_[0][1]>-1) // add tangential derivatives
-        //   degrees[0] += 2;
-        // for (std::size_t i=0;i<testSpaces_[1].size();++i)
-        //   degrees[i] += std::max(0,testSpaces_[1][i]+1);
+        if (conforming_)
+        {
+          degrees[0] += 2;
+          degrees[0] += std::max(0,innerOrder_-1);
+        }
+        else
+          degrees[0] = innerOrder_-1;
+          // degrees[0] = innerOrder_;
         return degrees;
       }
       std::size_t maxEdgeDegree() const
@@ -568,6 +594,7 @@ namespace Dune
       // we can only construct the underlying monomial basis in the ctor
       const int innerOrder_;
       const bool useOnb_;
+      const bool conforming_;
       std::array< std::pair< int, unsigned int >, dimDomain+1 > dofsPerCodim_;
       const ONBShapeFunctionSetType onbSFS_;
       const ScalarEdgeShapeFunctionSetType edgeSFS_;
@@ -635,10 +662,11 @@ namespace Dune
       typedef typename FunctionSpaceType::DomainFieldType DomainFieldType;
       DivFreeVEMSpace(AgglomerationType &agglomeration,
           const unsigned int polOrder,
+          const bool conforming,
           int basisChoice,
           bool edgeInterpolation)
       : BaseType(agglomeration,polOrder,
-                 typename TraitsType::BasisSetsType(polOrder, basisChoice),
+                 typename TraitsType::BasisSetsType(polOrder, basisChoice, conforming),
                  basisChoice,edgeInterpolation)
       {
         // TODO: move this to the default and add a method to the baisisSets to
@@ -745,12 +773,14 @@ namespace Dune
                       RHSconstraintsMatrix[mask[0][s]][alpha] += weight * edgePhiVector[0][beta][s] * psi*normal * m;
                   });
                 }
+                /*
                 else
                 {
                   std::cout << "shouldn't get here!\n";
                   std::cout << "should have " << alpha << "<" << RHSconstraintsMatrix[0].size() << std::endl;
                   abort();
                 }
+                */
               });
             } // quadrature loop
           } // loop over intersections

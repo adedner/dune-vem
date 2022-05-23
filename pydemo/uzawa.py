@@ -180,15 +180,14 @@ class Uzawa:
         return info
 
 def main():
-    useVem   = False
+    useVem   = True
     muValue  = 0.1
     tauValue = 1e-2
     order    = 2
     grid = dune.vem.polyGrid(cartesianDomain([0,0],[3,1],[30*4,10*4]),cubes=False)
     if useVem:
-        spcU = dune.vem.divFreeSpace( grid, order=order)
-        spcP = dune.fem.space.finiteVolume( grid )
-        # spcP = dune.fem.space.lagrange( grid, order=1 )
+        spcU = dune.vem.divFreeSpace( grid, order=order, conforming=True)
+        spcP = dune.vem.bbdgSpace( grid, order=0 )
     else:
         spcU = dune.fem.space.lagrange( grid, order=order, dimRange=2 )
         spcP = dune.fem.space.lagrange( grid, order=order-1 )

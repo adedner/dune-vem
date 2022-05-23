@@ -351,7 +351,7 @@ def curlFreeSpace(view, order=1,
 
 #########################################################
 
-def divFreeSpace(view, order=1,
+def divFreeSpace(view, order=1, conforming=True,
              field="double", storage="numpy",
              basisChoice=2, edgeInterpolation=False, rotatedBB=True):
     """create a virtual element space over an agglomerated grid
@@ -385,7 +385,7 @@ def divFreeSpace(view, order=1,
     constructor = Constructor(
                    ['pybind11::handle gridView',
                     'const pybind11::object agglomerate',
-                    'unsigned int order',
+                    'unsigned int order', 'bool conforming',
                     'int basisChoice','bool edgeInterpolation','bool rotatedBB'],
                    ['typedef Dune::Vem::Agglomeration<' + gridPartName + '> AggloType;',
                     'AggloType *agglo = nullptr;',
@@ -414,10 +414,10 @@ def divFreeSpace(view, order=1,
                     '  (void) pybind11::weakref(gridView, aggloCleanup).release();',
                     '  // std::cout << "new agglo\\n";',
                     '}',
-                    'auto obj = new DuneType(*agglo, order, basisChoice, edgeInterpolation );',
+                    'auto obj = new DuneType(*agglo, order, conforming, basisChoice, edgeInterpolation );',
                     'return obj;'],
                    ['"gridView"_a', '"agglomerate"_a',
-                    '"order"_a',
+                    '"order"_a', '"conforming"_a',
                     '"basisChoice"_a', '"edgeInterpolation"_a','"rotatedBB"_a',
                     'pybind11::keep_alive< 1, 2 >()'] )
     diameterMethod = Method('diameters',
@@ -427,7 +427,7 @@ def divFreeSpace(view, order=1,
 
     spc = module(field, includes, typeName, constructor, diameterMethod, updateMethod,
                 storage=storage,
-                ctorArgs=[view, agglomerate, order, basisChoice, edgeInterpolation, rotatedBB])
+                ctorArgs=[view, agglomerate, order, conforming, basisChoice, edgeInterpolation, rotatedBB])
     addStorage(spc, storage)
     return spc.as_ufl()
 

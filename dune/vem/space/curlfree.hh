@@ -249,15 +249,18 @@ namespace Dune
 
       CurlFreeVEMBasisSets( const int order, bool useOnb)
       : innerOrder_( order )
-      , onbSFS_( Dune::GeometryType(Dune::GeometryType::cube, dimDomain), order+1 )
-      , edgeSFS_( Dune::GeometryType(Dune::GeometryType::cube,dimDomain-1), order)
+      , orders_({order,-1,order})
+      , onbSFS_( Dune::GeometryType(Dune::GeometryType::cube, dimDomain), order+1 ) // value space: Gorth_{k_3}+grad P_{k+1}
+      , edgeSFS_( Dune::GeometryType(Dune::GeometryType::cube,dimDomain-1), order)  // order=orders_[0]
       , dofsPerCodim_( calcDofsPerCodim(order) )
       , useOnb_(useOnb)
-      , numValueShapeFunctions_( sizeONB<0>(order+1)-1 )
-      , numGradShapeFunctions_ ( sizeONB<0>(order) )
-      , numHessShapeFunctions_ ( 0 ) // not implemented - needs third/forth derivatives
-      , numInnerShapeFunctions_( sizeONB<0>(innerOrder_)-1 )
-      , numEdgeTestShapeFunctions_( edgeSFS_.size() )
+      , numValueShapeFunctions_( sizeONB<0>(order+1)-1 +                            // grad P_{k+1}
+                                 0 )                                                // Gorth_{k_3}
+      , numGradShapeFunctions_ ( sizeONB<0>(order) )                                // ?????
+      , numHessShapeFunctions_ ( 0 )                                                // not implemented - needs third/forth derivatives
+      , numInnerShapeFunctions_( sizeONB<0>(innerOrder_)-1 +                        // grad P_{k}
+                                 0 )                                                // Gorth_{k_3}
+      , numEdgeTestShapeFunctions_( edgeSFS_.size() )                               // order=orders[0]
       {
         std::cout << "[" << numValueShapeFunctions_ << ","
                   << numGradShapeFunctions_ << ","
@@ -388,6 +391,7 @@ namespace Dune
       // note: the actual shape function set depends on the entity so
       // we can only construct the underlying monomial basis in the ctor
       const int innerOrder_;
+      std::array<int, 3> orders_;
       const ONBShapeFunctionSetType onbSFS_;
       const ScalarEdgeShapeFunctionSetType edgeSFS_;
       const std::array< std::pair< int, unsigned int >, dimDomain+1 > dofsPerCodim_;
