@@ -249,13 +249,15 @@ namespace Dune
 
       CurlFreeVEMBasisSets( const int order, bool useOnb)
       : innerOrder_( order )
-      , orders_({order,-1,order})
-      , onbSFS_( Dune::GeometryType(Dune::GeometryType::cube, dimDomain), order+1 ) // value space: Gorth_{k_3}+grad P_{k+1}
-      , edgeSFS_( Dune::GeometryType(Dune::GeometryType::cube,dimDomain-1), order)  // order=orders_[0]
+      , parameters_({order,-1,order}) // edge,orth,grad (k4,k2,k3)
+      , onbSFS_( Dune::GeometryType(Dune::GeometryType::cube, dimDomain),
+                 std::max(parameters_[2]+1,parameters_[1]) ) // value space: Gorth_{p2}+grad P_{k+1}
+      , edgeSFS_( Dune::GeometryType(Dune::GeometryType::cube,dimDomain-1),
+                  parameters_[0])
       , dofsPerCodim_( calcDofsPerCodim(order) )
       , useOnb_(useOnb)
-      , numValueShapeFunctions_( sizeONB<0>(order+1)-1 +                            // grad P_{k+1}
-                                 0 )                                                // Gorth_{k_3}
+      , numValueShapeFunctions_( sizeONB<0>(parameters_[2]+1) - 1 +                            // grad P_{k+1}
+                                 0 ) // sizeONB<0>(parameters_[1]) )                                                // Gorth_{k_3}
       , numGradShapeFunctions_ ( sizeONB<0>(order) )                                // ?????
       , numHessShapeFunctions_ ( 0 )                                                // not implemented - needs third/forth derivatives
       , numInnerShapeFunctions_( sizeONB<0>(innerOrder_)-1 +                        // grad P_{k}
@@ -391,7 +393,7 @@ namespace Dune
       // note: the actual shape function set depends on the entity so
       // we can only construct the underlying monomial basis in the ctor
       const int innerOrder_;
-      std::array<int, 3> orders_;
+      std::array<int, 3> parameters_;
       const ONBShapeFunctionSetType onbSFS_;
       const ScalarEdgeShapeFunctionSetType edgeSFS_;
       const std::array< std::pair< int, unsigned int >, dimDomain+1 > dofsPerCodim_;

@@ -92,6 +92,9 @@ def bbdgSpace(view, order=1, scalar=False, dimRange=None, field="double",
                     'pybind11::keep_alive< 1, 2 >()'] )
 
 
+    # is defined on the index set which is not used for the dg space
+    # diameterMethod = Method('diameters',
+    #    '''[]( DuneType &self ) { return self.blockMapper().indexSet().diameters(); }''' )
     updateMethod = Method('update',
        '''[]( DuneType &self ) { self.update(); }''' )
 
