@@ -760,10 +760,10 @@ namespace Dune
           // get the bounding box monomials and apply all dofs to them
           auto shapeFunctionSet = basisSets_.basisFunctionSet(agglomeration(), element);
           auto vemBasisFunction = scalarBasisFunctionSet(element);
-#if 0 // ???
+#if 0 // TODO needed to provide hessians for H^1 spaces
           // compute the phi.n boundary terms for the hessian projection in
           // the case that there are no dofs for the normal gradient on the edge
-          if (interpolation.edgeSize(1) == 0)
+          if ( basisSets_.edgeSize(1) == 0 )
           {
             // GENERAL: more efficient to avoid this by using
             //          parital_n Pi^0 and compute that in the above intersection loop?
@@ -784,7 +784,7 @@ namespace Dune
                 auto x = quadrature.localPoint(qp);
                 auto y = intersection.geometryInInside().global(x);
                 const DomainFieldType weight = intersection.geometry().integrationElement(x) * quadrature.weight(qp);
-                hessShapeFunctionSet.evaluateEach(y, [&](std::size_t alpha, auto phi) {
+                shapeFunctionSet.hessianEach(y, [&](std::size_t alpha, auto phi) {
                     phi *= weight;
                     vemBasisFunction.axpy(y, phi, normal, P[alpha]);
                 });
