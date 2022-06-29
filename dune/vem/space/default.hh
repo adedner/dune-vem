@@ -380,7 +380,7 @@ namespace Dune
         {
           const ElementType &element = gridPart().entity(entitySeed);
           const auto geometry = element.geometry();
-          Quadrature0Type quadrature(element, 2 * polOrder);
+          Quadrature0Type quadrature(element, 3 * polOrder);
 
           // get the bounding box monomials and apply all dofs to them
           // GENERAL: these are the same as used as test function in 'interpolation'
@@ -613,7 +613,7 @@ namespace Dune
               }
 
             // now compute int_e Phi_mask[i] m_alpha
-            Quadrature1Type quadrature(gridPart(), intersection, 2 * polOrder, Quadrature1Type::INSIDE);
+            Quadrature1Type quadrature(gridPart(), intersection, 3 * polOrder, Quadrature1Type::INSIDE);
             for (std::size_t qp = 0; qp < quadrature.nop(); ++qp)
             {
               auto x = quadrature.localPoint(qp);
@@ -633,6 +633,7 @@ namespace Dune
                     edgeShapeFunctionSet.evaluateEach(x, [&](std::size_t beta,
                           typename BasisSetsType::EdgeShapeFunctionSetType::RangeType psi)
                     {
+                      auto normal = intersection.unitOuterNormal(x);
                       if (beta < edgePhiVector[0].size())
                         for (std::size_t s=0; s<mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
                           for (std::size_t i=0;i<dimRange;++i)
@@ -706,7 +707,7 @@ namespace Dune
           } // loop over intersections
 
           // Compute element part for the gradient projection
-          Quadrature0Type quadrature(element, 2 * polOrder);
+          Quadrature0Type quadrature(element, 3 * polOrder);
           for (std::size_t qp = 0; qp < quadrature.nop(); ++qp)
           {
             const DomainFieldType weight =
@@ -796,7 +797,7 @@ namespace Dune
           // Compute element part for the hessian projection
           // GENERAL: could use the value projection here by using additional integration by parts
           //          i.e., Pi^0 D^2 m
-          Quadrature0Type quadrature(element, 2 * polOrder);
+          Quadrature0Type quadrature(element, 3 * polOrder);
           for (std::size_t qp = 0; qp < quadrature.nop(); ++qp)
           {
             const DomainFieldType weight = geometry.integrationElement(quadrature.point(qp)) * quadrature.weight(qp);
