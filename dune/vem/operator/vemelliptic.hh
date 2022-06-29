@@ -7,6 +7,9 @@
 #include <dune/fem/operator/common/operator.hh>
 #include <dune/fem/operator/common/stencil.hh>
 #include <dune/fem/quadrature/cachingquadrature.hh>
+#include <dune/fem/function/localfunction/const.hh>
+#include <dune/fem/function/common/localcontribution.hh>
+#include <dune/fem/common/bindguard.hh>
 
 #include <dune/fem/operator/common/differentiableoperator.hh>
 #include <dune/fem/io/parameter.hh>
@@ -28,11 +31,12 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model>
     typedef Model                  DirichletModelType;
     //
     typedef typename DomainDiscreteFunctionType::DiscreteFunctionSpaceType DomainDiscreteFunctionSpaceType;
-    typedef typename DomainDiscreteFunctionType::LocalFunctionType DomainLocalFunctionType;
+    typedef Dune::Fem::ConstLocalFunction< DomainDiscreteFunction > DomainLocalFunctionType;
     typedef typename DomainLocalFunctionType::RangeType DomainRangeType;
     typedef typename DomainLocalFunctionType::JacobianRangeType DomainJacobianRangeType;
     typedef typename RangeDiscreteFunctionType::DiscreteFunctionSpaceType RangeDiscreteFunctionSpaceType;
-    typedef typename RangeDiscreteFunctionType::LocalFunctionType RangeLocalFunctionType;
+    typedef Dune::Fem::AddLocalContribution< RangeDiscreteFunctionType > RangeLocalContributionType;
+    typedef RangeLocalContributionType  RangeLocalFunctionType;
     typedef typename RangeLocalFunctionType::RangeType RangeRangeType;
     typedef typename RangeLocalFunctionType::JacobianRangeType RangeJacobianRangeType;
     // the following types must be identical for domain and range
@@ -90,6 +94,8 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model>
     { return dSpace_; }
     const RangeDiscreteFunctionSpaceType& rangeSpace() const
     { return rSpace_; }
+    void setQuadratureOrders(unsigned int interior, unsigned int surface)
+    { baseOperator_.setQuadratureOrders(interior,surface); }
 
   private:
     const DomainDiscreteFunctionSpaceType &dSpace_;
@@ -186,6 +192,8 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model>
   std::vector<RangeRangeType> VectorOfAveragedDiffusionCoefficients (dfSpace.agglomeration().size(), RangeRangeType(0));
   const auto &agIndexSet = dfSpace.blockMapper().indexSet();
 
+  DomainLocalFunctionType uLocal( u );
+
   // iterate over grid
   const GridPartType &gridPart = w.gridPart();
   for (const auto &entity : Dune::elements( gridPart, Dune::Partitions::interiorBorder ) )
@@ -197,8 +205,7 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model>
     const int numVertices = agIndexSet.numPolyVertices(entity, GridPartType::dimension);
 
     // get local representation of the discrete functions
-    const DomainLocalFunctionType uLocal = u.localFunction(entity);
-    RangeLocalFunctionType wLocal = w.localFunction(entity);
+    auto uGuard = Dune::Fem::bindGuard( uLocal, entity );
 
     auto& refElement = Dune::ReferenceElements<double, 2>::general( entity.type());
 
@@ -236,12 +243,16 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model>
     }
   }
 
+  RangeLocalContributionType wLocal( w );
+
   // assemble the stablisation matrix
   std::vector<bool> stabilization(dfSpace.agglomeration().size(), false);
   for (const auto &entity : Dune::elements( gridPart, Dune::Partitions::interiorBorder))
   {
-    RangeLocalFunctionType wLocal = w.localFunction(entity);
-    const DomainLocalFunctionType uLocal = u.localFunction(entity);
+    auto wGuard = Dune::Fem::bindGuard( wLocal, entity );
+    wLocal.clear();
+
+    auto uGuard = Dune::Fem::bindGuard( uLocal, entity );
     const std::size_t agglomerate = dfSpace.agglomeration().index( entity);
     if (!stabilization[dfSpace.agglomeration().index(entity)])
     {
@@ -304,11 +315,14 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
 
   // std::cout << "   in assembly: start element loop time=  " << timer.elapsed() << std::endl;
 
+  DomainLocalFunctionType uLocal( u );
+
   for (const auto &entity : Dune::elements(gridPart, Dune::Partitions::interiorBorder))
   {
     const GeometryType &geometry = entity.geometry();
     model().init(entity);
-    const DomainLocalFunctionType uLocal = u.localFunction(entity);
+
+    auto uGuard = Dune::Fem::bindGuard( uLocal, entity );
 
     const unsigned int agglomerate = agglomeration.index(entity); // the polygon we are integrating
     const auto &bbox = agIndexSet.boundingBox( agglomerate );
@@ -354,6 +368,9 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
 
   // std::cout << "   in assembly: finished element loop time=  " << timer.elapsed() << std::endl;
 
+  typedef Dune::Fem::TemporaryLocalMatrix< DomainDiscreteFunctionSpaceType,
+                                           RangeDiscreteFunctionSpaceType > TemporaryLocalMatrixType;
+  TemporaryLocalMatrixType jLocal( domainSpace, rangeSpace );
 
   for (const auto &seed : stabilization)
   {
@@ -361,9 +378,11 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
     const std::size_t agglomerate = agglomeration.index( entity );
 
     const auto &stabMatrix = rangeSpace.stabilization(entity);
-    LocalMatrixType jLocal = jOp.localMatrix(entity, entity);
+    jLocal.init( entity, entity );
+    jLocal.clear();
+
     //??? const int nE = agIndexSet.numPolyVertices(entity, GridPartType::dimension);
-    const DomainLocalFunctionType uLocal = u.localFunction(entity);
+    auto uGuard = Dune::Fem::bindGuard( uLocal, entity );
     std::size_t bs = 1;
     if ( stabMatrix.cols()*domainBlockSize == uLocal.size() )
       bs = domainBlockSize;
@@ -384,6 +403,8 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
                      VectorOfAveragedDiffusionCoefficients[agglomerate][0] * stabMatrix[r][c] +
                      VectorOfAveragedLinearlisedDiffusionCoefficients[agglomerate][0] * add ); // FIX ME: make coeff depend on range * dimension
         }
+
+    jOp.addLocalMatrix( entity, entity, jLocal );
 #if 0
     for (std::size_t r = 0; r < stabMatrix.rows(); ++r)
     {
