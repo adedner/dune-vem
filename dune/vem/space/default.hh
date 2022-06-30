@@ -620,6 +620,7 @@ namespace Dune
               auto y = intersection.geometryInInside().global(x);
               const DomainFieldType weight = intersection.geometry().integrationElement(x) * quadrature.weight(qp);
               const auto &jit = geo.jacobianInverseTransposed(x);
+              auto normal = intersection.unitOuterNormal(x);
               shapeFunctionSet.jacobianEach(y, [&](std::size_t alpha, JacobianRangeType phi)
               {
                   // evaluate each here for edge shape fns
@@ -633,7 +634,6 @@ namespace Dune
                     edgeShapeFunctionSet.evaluateEach(x, [&](std::size_t beta,
                           typename BasisSetsType::EdgeShapeFunctionSetType::RangeType psi)
                     {
-                      auto normal = intersection.unitOuterNormal(x);
                       if (beta < edgePhiVector[0].size())
                         for (std::size_t s=0; s<mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
                           for (std::size_t i=0;i<dimRange;++i)
