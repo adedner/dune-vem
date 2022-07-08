@@ -1,8 +1,6 @@
 #ifndef DUNE_VEM_SPACE_BASISFUNCTIONSET_HH
 #define DUNE_VEM_SPACE_BASISFUNCTIONSET_HH
 
-#define NEWGRADPROJECTION
-
 #include <cassert>
 #include <cstddef>
 
