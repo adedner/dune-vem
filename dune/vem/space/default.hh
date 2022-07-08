@@ -1,6 +1,8 @@
 #ifndef DUNE_VEM_SPACE_DEFAULT_HH
 #define DUNE_VEM_SPACE_DEFAULT_HH
 
+#define NEWGRADPROJECTION
+
 #include <cassert>
 #include <utility>
 
@@ -317,6 +319,7 @@ namespace Dune
       DynamicMatrix<DomainFieldType> R;
       DynamicMatrix<DomainFieldType> P;
       std::vector<RangeType> phi0Values;
+      std::vector<JacobianRangeType> phi0Jacs;
       std::vector<JacobianRangeType> psi1Values;
 
       // start iteration over all polygons
@@ -336,6 +339,7 @@ namespace Dune
         */
 
         phi0Values.resize(numDofs);
+        phi0Jacs.resize(numDofs);
         psi1Values.resize(numDofs);
 
         const int numEdges = agIndexSet_.subAgglomerates(agglomerate, IndexSetType::dimension - 1);
@@ -611,16 +615,18 @@ namespace Dune
                 factorTN[i][j] = 0.5 * (normal[i] * tau[j] + normal[j] * tau[i]);
                 factorNN[i][j] = 0.5 * (normal[i] * normal[j] + normal[j] * normal[i]);
               }
-
             // now compute int_e Phi_mask[i] m_alpha
             Quadrature1Type quadrature(gridPart(), intersection, 3 * polOrder, Quadrature1Type::INSIDE);
+            // Quadrature1Type quadrature(gridPart(), intersection, 12, Quadrature1Type::INSIDE);
             for (std::size_t qp = 0; qp < quadrature.nop(); ++qp)
             {
               auto x = quadrature.localPoint(qp);
               auto y = intersection.geometryInInside().global(x);
-              const DomainFieldType weight = intersection.geometry().integrationElement(x) * quadrature.weight(qp);
+              // const DomainFieldType weight = intersection.geometry().integrationElement(x) * quadrature.weight(qp);
+              const DomainFieldType weight = quadrature.weight(qp);
               const auto &jit = geo.jacobianInverseTransposed(x);
-              auto normal = intersection.unitOuterNormal(x);
+              // auto normal = intersection.unitOuterNormal(x);
+              auto normal = intersection.integrationOuterNormal(x);
               shapeFunctionSet.jacobianEach(y, [&](std::size_t alpha, JacobianRangeType phi)
               {
                   // evaluate each here for edge shape fns
@@ -652,6 +658,15 @@ namespace Dune
                         for (std::size_t j=0;j<dimDomain;++j)
                           R[alpha][s] += weight * phi0Values[s][i] * phi[i][j] * normal[j];
                   }
+                  #ifdef NEWGRADPROJECTION
+                  {
+                    vemBasisFunction.evaluateAll(y, phi0Values);
+                    for (std::size_t s=0;s<numDofs;++s)
+                      for (std::size_t i=0;i<dimRange;++i)
+                        for (std::size_t j=0;j<dimDomain;++j)
+                          R[alpha][s] -= weight * phi0Values[s][i] * phi[i][j] * normal[j];
+                  }
+                  #endif
               });
               shapeFunctionSet.hessianEach(y, [&](std::size_t alpha, HessianRangeType phi)
               {
@@ -708,10 +723,23 @@ namespace Dune
 
           // Compute element part for the gradient projection
           Quadrature0Type quadrature(element, 3 * polOrder);
+          // Quadrature0Type quadrature(element, 12);
           for (std::size_t qp = 0; qp < quadrature.nop(); ++qp)
           {
             const DomainFieldType weight =
                     geometry.integrationElement(quadrature.point(qp)) * quadrature.weight(qp);
+            #ifdef NEWGRADPROJECTION
+            vemBasisFunction.jacValAll(quadrature[qp], phi0Jacs);
+            shapeFunctionSet.jacobianEach(quadrature[qp], [&](std::size_t alpha, JacobianRangeType phi)
+            {
+              assert(alpha>=0 && alpha<R.size());
+              assert(R[alpha].size() == numDofs);
+              for (std::size_t s=0; s<numDofs; ++s)
+                for (std::size_t i=0;i<dimRange;++i)
+                  for (std::size_t j=0;j<dimDomain;++j)
+                    R[alpha][s] += weight * phi0Jacs[s][i][j] * phi[i][j];
+            });
+            #else
             vemBasisFunction.evaluateAll(quadrature[qp], phi0Values);
             shapeFunctionSet.divJacobianEach(quadrature[qp], [&](std::size_t alpha, RangeType divGradPhi)
             {
@@ -720,6 +748,7 @@ namespace Dune
                 for (std::size_t s=0; s<numDofs; ++s)
                   R[alpha][s] -= weight * phi0Values[s] * divGradPhi;
             });
+            #endif
           } // quadrature loop
         } // loop over triangles in agglomerate
 

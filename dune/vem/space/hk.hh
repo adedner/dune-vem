@@ -113,6 +113,11 @@ namespace Dune
         }
 
         template< class Point, class Functor >
+        void jacValEach ( const Point &x, Functor functor ) const
+        {
+          sfs_.jacobianEach(x, functor);
+        }
+        template< class Point, class Functor >
         void evaluateEach ( const Point &x, Functor functor ) const
         {
           sfs_.evaluateEach(x, functor);
