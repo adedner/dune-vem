@@ -1,6 +1,8 @@
 #ifndef DUNE_VEM_SPACE_DEFAULT_HH
 #define DUNE_VEM_SPACE_DEFAULT_HH
 
+#define NEWGRADPROJECTION
+
 #include <cassert>
 #include <utility>
 

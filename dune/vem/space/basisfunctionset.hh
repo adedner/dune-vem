@@ -1,6 +1,8 @@
 #ifndef DUNE_VEM_SPACE_BASISFUNCTIONSET_HH
 #define DUNE_VEM_SPACE_BASISFUNCTIONSET_HH
 
+#define NEWGRADPROJECTION
+
 #include <cassert>
 #include <cstddef>
 
@@ -162,6 +164,19 @@ namespace Dune
               values[ j ].axpy( valueProjection()[ alpha ][ j ], dphi_alpha );
           } );
       }
+
+#ifdef NEWGRADPROJECTION
+      template< class Point, class Values > const
+      void jacValAll ( const Point &x, Values &values ) const
+      {
+        assert( values.size() >= size() );
+        std::fill( values.begin(), values.end(), JacobianRangeType( 0 ) );
+        shapeFunctionSet_.jacValEach( position(x), [ this, &values ] ( std::size_t alpha, JacobianRangeType dphi_alpha ) {
+            for( std::size_t j = 0; j < size(); ++j )
+              values[ j ].axpy( valueProjection()[ alpha ][ j ], dphi_alpha );
+          } );
+      }
+#endif
 
       template< class Point, class Values >
       void evaluateAll ( const Point &x, Values &values ) const
