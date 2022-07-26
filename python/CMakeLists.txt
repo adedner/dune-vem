@@ -1,8 +1,8 @@
 add_subdirectory(dune)
 
+# dune_python_configure_bindings(
 dune_python_install_package(
   PATH "."
-  CMAKE_METADATA_FILE dune/vem/metadata.cmake
   CMAKE_METADATA_FLAGS DUNE_OPTS_FILE
 )
 if(POLICY CMP0087)
