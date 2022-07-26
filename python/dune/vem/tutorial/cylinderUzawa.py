@@ -1,4 +1,11 @@
-import pygmsh
+try:
+    import pygmsh
+except ImportError:
+    print("This example needs the 'pygmsh' package.")
+    print("    pip install pygmsh")
+    import sys
+    sys.exit(77) # make ctest mark test as skipped
+
 import dune.fem, dune.vem
 from uzawa import Uzawa # saddle point solver
 from dune.ufl import Constant, DirichletBC
