@@ -18,12 +18,10 @@
 #include <dune/fem/space/common/capabilities.hh>
 
 #include <dune/vem/space/indexset.hh>
-#include <dune/vem/agglomeration/dofmapper.hh>
 #include <dune/vem/misc/compatibility.hh>
 #include <dune/vem/misc/pseudoinverse.hh>
 #include <dune/vem/misc/leastSquares.hh>
 #include <dune/vem/misc/matrixWrappers.hh>
-#include <dune/vem/space/basisfunctionset.hh>
 #include <dune/vem/space/interpolate.hh>
 
 #include <dune/vem/misc/vector.hh>
@@ -47,7 +45,7 @@ namespace Dune
       typedef Agglomeration<GridPartType> AgglomerationType;
 
       typedef typename Traits::IndexSetType IndexSetType;
-      typedef typename Traits::template InterpolationType<Traits> AgglomerationInterpolationType;
+      typedef typename Traits::InterpolationType AgglomerationInterpolationType;
       typedef typename Traits::BasisSetsType BasisSetsType;
 
     public:
@@ -104,7 +102,7 @@ namespace Dune
         edgeInterpolation_(edgeInterpolation),
         agIndexSet_(agglomeration),
         blockMapper_(agIndexSet_, basisSets_.dofsPerCodim()),
-        interpolation_(blockMapper().indexSet(), basisSets_, polOrder, basisChoice != 3),
+        interpolation_(new AgglomerationInterpolationType(blockMapper().indexSet(), basisSets_, polOrder, basisChoice != 3)),
         counter_(0),
         useThreads_(Fem::MPIManager::numThreads()),
         valueProjections_(new Vector<
@@ -165,7 +163,8 @@ namespace Dune
         assert(agglomerate<hessianProjections().size());
         return typename Traits::ScalarBasisFunctionSetType(entity, agglomerate,
                         valueProjections_, jacobianProjections_, hessianProjections_,
-                        basisSets_.basisFunctionSet(agglomeration(), entity)
+                        basisSets_.basisFunctionSet(agglomeration(), entity),
+                        interpolation_
                );
       }
       const BasisFunctionSetType basisFunctionSet(const EntityType &entity) const
@@ -205,9 +204,9 @@ namespace Dune
         return InterpolationType(blockMapper().indexSet(), basisSets_, entity);
       }
 
-      AgglomerationInterpolationType interpolation() const
+      const AgglomerationInterpolationType& interpolation() const
       {
-        return interpolation_;
+        return *interpolation_;
       }
 
     protected:
@@ -239,7 +238,7 @@ namespace Dune
       bool edgeInterpolation_;
       IndexSetType agIndexSet_;
       mutable BlockMapperType blockMapper_;
-      AgglomerationInterpolationType interpolation_;
+      std::shared_ptr<AgglomerationInterpolationType> interpolation_;
       std::size_t counter_;
       int useThreads_;
       std::shared_ptr<Vector<typename Traits::ScalarBasisFunctionSetType::ValueProjection>> valueProjections_;
@@ -386,7 +385,7 @@ namespace Dune
           // GENERAL: these are the same as used as test function in 'interpolation'
           const auto &shapeFunctionSet = basisSets_.basisFunctionSet(agglomeration(), element);
 
-          interpolation_.interpolateBasis(element, shapeFunctionSet.valueBasisSet(), D);
+          interpolation().interpolateBasis(element, shapeFunctionSet.valueBasisSet(), D);
           // std::cout << "checkpoint inerpolate basis" << std::endl;
           // compute mass matrices
           for (std::size_t qp = 0; qp < quadrature.nop(); ++qp)
@@ -594,10 +593,8 @@ namespace Dune
             // calling the interpolation can resize the edge vector to add the 'normal' derivative vertex dof so we need to resize again
             edgePhiVector[0].resize(basisSets_.edgeSize(0), basisSets_.edgeSize(0), 0);
             edgePhiVector[1].resize(basisSets_.edgeSize(1), basisSets_.edgeSize(1), 0);
-            // edgePhiVector[0] = 0;
-            // edgePhiVector[1] = 0;
 
-            interpolation_(intersection, edgeShapeFunctionSet, edgePhiVector, mask);
+            interpolation()(intersection, edgeShapeFunctionSet, edgePhiVector, mask);
 
             auto normal = intersection.centerUnitOuterNormal();
             typename Dune::FieldMatrix<DomainFieldType,dimDomain,dimDomain> factorTN, factorNN;

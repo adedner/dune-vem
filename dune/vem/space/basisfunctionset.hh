@@ -28,10 +28,10 @@ namespace Dune
     // -------------------
 
     // TODO: add template arguments for ValueProjection and JacobianProjection
-    template< class Entity, class ShapeFunctionSet >
+    template< class Entity, class ShapeFunctionSet, class InterpolationType >
     class VEMBasisFunctionSet
     {
-      typedef VEMBasisFunctionSet< Entity, ShapeFunctionSet > ThisType;
+      typedef VEMBasisFunctionSet< Entity, ShapeFunctionSet, InterpolationType > ThisType;
 
     public:
       typedef Entity EntityType;
@@ -70,11 +70,13 @@ namespace Dune
                             std::shared_ptr<Vector<ValueProjection>> valueProjections,
                             std::shared_ptr<Vector<JacobianProjection>> jacobianProjections,
                             std::shared_ptr<Vector<HessianProjection>> hessianProjections,
-                            ShapeFunctionSet shapeFunctionSet
+                            ShapeFunctionSet shapeFunctionSet,
+                            std::shared_ptr<InterpolationType> interpolation
                           )
         : entity_( &entity ), //polygon
           agglomerate_(agglomerate),
           shapeFunctionSet_( std::move( shapeFunctionSet ) ),
+          interpolation_(interpolation),
           valueProjections_( valueProjections ),
           jacobianProjections_( jacobianProjections ),
           hessianProjections_( hessianProjections ),
@@ -108,8 +110,8 @@ namespace Dune
           } );
       }
 
-      template< class Point, class Values > const
-      void evaluateAll ( const Point &x, Values &values ) const
+      template< class F, int d, class Values > const
+      void evaluateAll ( const Dune::FieldVector<F,d> &x, Values &values ) const
       {
         assert( values.size() >= size() );
         std::fill( values.begin(), values.end(), RangeType( 0 ) );
@@ -117,6 +119,36 @@ namespace Dune
             for( std::size_t j = 0; j < size(); ++j )
               values[ j ].axpy( valueProjection()[ alpha ][ j ], phi_alpha );
           } );
+      }
+      template< class Point, class Values > const
+      void evaluateAll ( const Point &x, Values &values ) const
+      {
+        assert( values.size() >= size() );
+        std::fill( values.begin(), values.end(), RangeType( 0 ) );
+        if constexpr ( Point::QuadratureType::codimension == 1)
+        {
+          Std::vector < Dune::DynamicMatrix<double> > localDofVectorMatrix(2);
+          Std::vector<Std::vector<unsigned int>> mask(2,Std::vector<unsigned int>(0));
+          auto locx = x.localPosition();
+          auto normal = x.quadrature().intersection().unitOuterNormal(locx);
+          auto edgeSF = (*interpolation_)(x.quadrature().intersection(), localDofVectorMatrix, mask);
+          edgeSF.evaluateEach(locx, [&](std::size_t beta, RangeType psi)
+          {
+            if (beta < localDofVectorMatrix[0].size())
+              for (std::size_t s=0; s<mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
+              {
+                std::size_t alpha = mask[0][s];
+                values[alpha].axpy( localDofVectorMatrix[0][beta][s], psi );
+              }
+          });
+        }
+        else
+        {
+          shapeFunctionSet_.evaluateEach( position(x), [ this, &values ] ( std::size_t alpha, RangeType phi_alpha ) {
+              for( std::size_t j = 0; j < size(); ++j )
+                values[ j ].axpy( valueProjection()[ alpha ][ j ], phi_alpha );
+            } );
+        }
       }
 
       template< class Quadrature, class DofVector, class Jacobians >
@@ -250,6 +282,7 @@ namespace Dune
       const EntityType *entity_ = nullptr;
       std::size_t agglomerate_;
       ShapeFunctionSet shapeFunctionSet_;
+      std::shared_ptr<InterpolationType> interpolation_;
       std::shared_ptr<Vector<ValueProjection>> valueProjections_;
       std::shared_ptr<Vector<JacobianProjection>> jacobianProjections_;
       std::shared_ptr<Vector<HessianProjection>> hessianProjections_;

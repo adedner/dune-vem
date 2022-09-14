@@ -5,6 +5,7 @@ set(HEADERS
   divfree.hh
   indexset.hh
   interpolate.hh
+  interpolation.hh
   hk.hh
   test.hh
 )

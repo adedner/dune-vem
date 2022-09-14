@@ -18,8 +18,8 @@
 
 #include <dune/vem/agglomeration/basisfunctionset.hh>
 #include <dune/vem/misc/vector.hh>
+#include <dune/vem/space/interpolation.hh>
 #include <dune/vem/space/default.hh>
-#include <dune/vem/space/hk.hh>
 
 namespace Dune
 {
@@ -623,39 +623,23 @@ namespace Dune
       static const int dimDomain = FunctionSpaceType::DomainType::dimension;
       static const int dimRange = FunctionSpaceType::RangeType::dimension;
       static const bool vectorSpace = true;
+      typedef Hybrid::IndexRange<int, 1> LocalBlockIndices;
       // static const int baseRangeDimension = dimRange;
 
       typedef typename GridPartType::template Codim<codimension>::EntityType EntityType;
 
-      // vem basis function sets
-      typedef VEMBasisFunctionSet <EntityType, typename BasisSetsType::ShapeFunctionSetType> ScalarBasisFunctionSetType;
-      typedef std::conditional_t< vectorSpace,
-              ScalarBasisFunctionSetType,
-              Fem::VectorialBasisFunctionSet<ScalarBasisFunctionSetType, typename FunctionSpaceType::RangeType>
-              > BasisFunctionSetType;
 
       // types for the mapper
-      typedef Hybrid::IndexRange<int, 1> LocalBlockIndices;
       typedef VemAgglomerationIndexSet <GridPartType> IndexSetType;
-      typedef AgglomerationDofMapper <GridPartType, IndexSetType> BlockMapperType;
-
-      template<class DiscreteFunction, class Operation = Fem::DFCommunicationOperation::Copy>
-      struct CommDataHandle {
-          typedef Operation OperationType;
-          typedef Fem::DefaultCommunicationHandler <DiscreteFunction, Operation> Type;
-      };
-
-      template <class T>
-      using InterpolationType = AgglomerationVEMInterpolation<T>;
     };
 
     // DivFreeVEMSpace
     // ---------------------
     template<class GridPart>
-    struct DivFreeVEMSpace
-    : public DefaultAgglomerationVEMSpace< DivFreeVEMSpaceTraits<GridPart> >
+    struct DivFreeVEMSpace : public DefaultAgglomerationVEMSpace<
+          AgglomerationVEMSpaceTraits<DivFreeVEMSpaceTraits<GridPart>> >
     {
-      typedef DivFreeVEMSpaceTraits<GridPart> TraitsType;
+      typedef AgglomerationVEMSpaceTraits<DivFreeVEMSpaceTraits<GridPart>> TraitsType;
       typedef DefaultAgglomerationVEMSpace<TraitsType> BaseType;
       typedef typename BaseType::AgglomerationType AgglomerationType;
       typedef typename BaseType::BasisSetsType::ShapeFunctionSetType::FunctionSpaceType FunctionSpaceType;
@@ -748,7 +732,7 @@ namespace Dune
             edgePhiVector[0] = 0;
             edgePhiVector[1] = 0;
 
-            BaseType::interpolation_(intersection, edgeShapeFunctionSet, edgePhiVector, mask);
+            BaseType::interpolation()(intersection, edgeShapeFunctionSet, edgePhiVector, mask);
 
             auto normal = intersection.centerUnitOuterNormal();
 
