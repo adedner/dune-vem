@@ -547,6 +547,11 @@ namespace Dune
           return 1;
         if (dim == 0 || dim == 1)
           return BBBasisFunctionSetType::FunctionSpaceType::RangeType::dimension;
+        else // shouldn't get here
+        {
+          assert(false);
+          return -1;
+        }
       }
 
       private:

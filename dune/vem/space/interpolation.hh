@@ -28,9 +28,9 @@ namespace Dune
     // Internal Forward Declarations
     // -----------------------------
 
-    class AgglomerationVEMSpace;
     template< class Traits >
     class AgglomerationVEMInterpolation;
+
     template<class BaseTraits>
     struct AgglomerationVEMSpaceTraits
     : public BaseTraits
