@@ -38,7 +38,7 @@ def mixed(polyGrid, order):
     return df,sig,diams
 
 for order in [0,1,2]:
-    for i in range(2,4):
+    for i in range(2,3):
         cells = dune.vem.voronoiCells([[0,0],[Lx,Ly]],2**(2*i+1),
                             lloyd=100, fileName="test", load=True)
         polyGrid = dune.vem.polyGrid(cells)
