@@ -337,7 +337,6 @@ namespace Dune
         phi0Values.resize(numDofs);
         psi1Values.resize(numDofs);
 
-        const int numEdges = agIndexSet_.subAgglomerates(agglomerate, IndexSetType::dimension - 1);
         const DomainFieldType H0 = blockMapper_.indexSet().volume(agglomerate);
 
         //////////////////////////////////////////////////////////////////////////////

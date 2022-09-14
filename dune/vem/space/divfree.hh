@@ -29,7 +29,7 @@ namespace Dune
     // -----------------------------
 
     template<class GridPart>
-    class DivFreeVEMSpace;
+    struct DivFreeVEMSpace;
 
     template<class GridPart>
     struct IsAgglomerationVEMSpace<DivFreeVEMSpace<GridPart> >
@@ -621,7 +621,7 @@ namespace Dune
       typedef Dune::Fem::FunctionSpace<double,double,dimension,dimension> FunctionSpaceType;
 
       typedef DivFreeVEMBasisSets<FunctionSpaceType,GridPart> BasisSetsType;
-      friend class DivFreeVEMSpace<GridPart>;
+      friend struct DivFreeVEMSpace<GridPart>;
       typedef DivFreeVEMSpace<GridPart> DiscreteFunctionSpaceType;
 
       static const int codimension = 0;

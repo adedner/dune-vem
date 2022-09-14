@@ -31,7 +31,7 @@ namespace Dune
     template<class FunctionSpace, class GridPart,
              bool vectorSpace, bool reduced>
              // bool vectorSpace = false, bool reduced = false>
-    class AgglomerationVEMSpace;
+    struct AgglomerationVEMSpace;
 
     // IsAgglomerationVEMSpace
     // -----------------------
@@ -555,7 +555,7 @@ namespace Dune
       typedef AgglomerationVEMBasisSets<FunctionSpace,GridPart,vectorspace,reduced> BasisSetsType;
 
       static const bool vectorSpace = vectorspace;
-      friend class AgglomerationVEMSpace<FunctionSpace, GridPart, vectorSpace, reduced>;
+      friend struct AgglomerationVEMSpace<FunctionSpace, GridPart, vectorSpace, reduced>;
 
       typedef AgglomerationVEMSpace<FunctionSpace, GridPart, vectorSpace, reduced> DiscreteFunctionSpaceType;
 
@@ -571,6 +571,7 @@ namespace Dune
       typedef VemAgglomerationIndexSet <GridPartType> IndexSetType;
       typedef FunctionSpace FunctionSpaceType;
     };
+
     // AgglomerationVEMSpace
     // ---------------------
     template<class FunctionSpace, class GridPart,
@@ -609,7 +610,7 @@ namespace Dune
 
         static constexpr int dimRange = TraitsType::dimRange;
         static constexpr int blockSize = TraitsType::vectorSpace ? dimRange : 1;
-        const std::size_t numShapeFunctions = BaseType::basisSets_.size(0);
+        // const std::size_t numShapeFunctions = BaseType::basisSets_.size(0);
         const std::size_t numDofs = BaseType::blockMapper().numDofs(agglomerate) * blockSize;
         const std::size_t numConstraintShapeFunctions = BaseType::basisSets_.constraintSize();
         const std::size_t numInnerShapeFunctions = BaseType::basisSets_.innerSize();

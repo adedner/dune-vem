@@ -193,7 +193,7 @@ namespace Dune
         shapeFunctionSet_.hessianEach( position(x), [this, &dofs, &hessian ] ( std::size_t alpha, HessianRangeType d2phi_alpha ) {
             const auto &hessianProjectionAlpha = hessianProjection()[alpha];
             for( std::size_t j = 0; j < size(); ++j )
-              hessian.axpy( hessianProjection()[ alpha ][ j ]*dofs[ j ], d2phi_alpha );
+              hessian.axpy( hessianProjectionAlpha[ j ]*dofs[ j ], d2phi_alpha );
         } );
       }
 
@@ -205,7 +205,7 @@ namespace Dune
         shapeFunctionSet_.hessianEach( position(x), [ this, &hessians ] ( std::size_t alpha, HessianRangeType d2phi_alpha ) {
             const auto &hessianProjectionAlpha = hessianProjection()[alpha];
             for( std::size_t j = 0; j < size(); ++j )
-              hessians[ j ].axpy( hessianProjection()[ alpha ][ j ], d2phi_alpha );
+              hessians[ j ].axpy( hessianProjectionAlpha[ j ], d2phi_alpha );
         } );
       }
 
