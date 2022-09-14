@@ -41,7 +41,7 @@ def voronoiCells(constructor, towers, fileName=None, load=False, lloyd=False, sh
     bounding_box = numpy.array(
             [lowerleft[0],upperright[0],lowerleft[1],upperright[1]] )
 
-    if isinstance(towers,int):
+    if isinstance(towers,(int,numpy.integer)):
         if fileName:
             fileName = fileName + str(towers) + '.pickle'
             if not load or not os.path.exists(fileName):
