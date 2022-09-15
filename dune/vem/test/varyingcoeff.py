@@ -28,7 +28,6 @@ def varyingcoeff(space, exact):
     v = TestFunction(space)
     x = SpatialCoordinate(space)
 
-    # epsilon      = 1
     laplaceCoeff = 1
     mu           = 1
 
@@ -71,7 +70,7 @@ def varyingcoeff(space, exact):
 
 def runTestVaryingcoeff(testSpaces, order):
       x = SpatialCoordinate(triangle)
-      exact = as_vector( dimR*[sin(2*pi*x[0])**2*sin(2*pi*x[1])**2] )
+      exact = as_vector( dimR*[sin(pi*x[0])**2*sin(pi*x[1])**2] )
       spaceConstructor = lambda grid, r: dune.vem.vemSpace( grid,
                                                             order=order,
                                                             dimRange=r,

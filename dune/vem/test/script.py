@@ -33,8 +33,9 @@ def runTest(exact, spaceConstructor, get_df):
         ln, lm, Lx, Ly = getParameters()
         # set up grid for testing
         N = 2**(level)
+        # 23*N*N works, 19*N*N fails
         grid = dune.vem.polyGrid(
-          dune.vem.voronoiCells([[0,0],[Lx,Ly]], 13*N*N, lloyd=150, fileName="voronoiseeds", load=True)
+          dune.vem.voronoiCells([[0,0],[Lx,Ly]], 23*N*N, lloyd=250, fileName="voronoiseeds", load=True)
         #   cartesianDomain([0.,0.],[Lx,Ly],[N,N]), cubes=False
         #   cartesianDomain([0.,0.],[Lx,Ly],[2*N,2*N]), cubes=True
         )
