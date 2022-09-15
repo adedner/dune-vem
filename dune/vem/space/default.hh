@@ -113,7 +113,7 @@ namespace Dune
             typename Traits::ScalarBasisFunctionSetType::HessianProjection>()),
         stabilizations_(new Vector<Stabilization>())
       {
-        std::cout << "using " << useThreads_ << " threads\n";
+        // std::cout << "using " << useThreads_ << " threads\n";
       }
       DefaultAgglomerationVEMSpace(const DefaultAgglomerationVEMSpace&) = delete;
       DefaultAgglomerationVEMSpace& operator=(const DefaultAgglomerationVEMSpace&) = delete;
@@ -274,16 +274,17 @@ namespace Dune
 
       double maxStab = 0;
 
+      /*
       std::cout << "pol order / dimDomain / dimRange: "
                 << polOrder << " / "
                 << dimDomain << " / "
                 << dimRange << std::endl;
-
       std::cout << "num val / grad / hess / constr shapefunctions: "
                 << numShapeFunctions << " / "
                 << numGradShapeFunctions << " / "
                 << numHessShapeFunctions << " / "
                 << numConstraintShapeFunctions << std::endl;
+      */
 
       // set up matrices used for constructing gradient, value, and edge projections
       // Note: the code is set up with the assumption that the dofs suffice to compute the edge projection
@@ -309,8 +310,7 @@ namespace Dune
       edgePhiVector[0].resize(basisSets_.edgeSize(0), basisSets_.edgeSize(0), 0);
       edgePhiVector[1].resize(basisSets_.edgeSize(1), basisSets_.edgeSize(1), 0);
 
-      std::cout << "edgePhiVector:" << basisSets_.edgeSize(0) << "," <<  basisSets_.edgeSize(1)
-                << std::endl;
+      // std::cout << "edgePhiVector:" << basisSets_.edgeSize(0) << "," <<  basisSets_.edgeSize(1) << std::endl;
 
       // matrix for rhs of gradient and hessian projections
       DynamicMatrix<DomainFieldType> R;
@@ -848,7 +848,7 @@ namespace Dune
             maxStab = std::max(maxStab, abs(stabilization[i][j]) );
           }
       } // end iteration over polygons
-      std::cout << "max stabilization factor: " << maxStab << std::endl;
+      // std::cout << "max stabilization factor: " << maxStab << std::endl;
     } // end build projections
 
     // IsAgglomerationVEMSpace

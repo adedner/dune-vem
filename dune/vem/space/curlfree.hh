@@ -264,6 +264,7 @@ namespace Dune
                                  0 )                                                // Gorth_{k_3}
       , numEdgeTestShapeFunctions_( edgeSFS_.size() )                               // order=orders[0]
       {
+        /*
         std::cout << "[" << numValueShapeFunctions_ << ","
                   << numGradShapeFunctions_ << ","
                   << numHessShapeFunctions_ << ","
@@ -273,6 +274,7 @@ namespace Dune
         std::cout << "dofs per codim: "
                   << dofsPerCodim_[0].second << " " << dofsPerCodim_[1].second << " " << dofsPerCodim_[2].second
                   << std::endl;
+        */
       }
 
       const std::array< std::pair< int, unsigned int >, dimDomain+1 > &dofsPerCodim() const

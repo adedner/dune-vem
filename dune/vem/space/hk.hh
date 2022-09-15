@@ -370,6 +370,7 @@ namespace Dune
                  *std::max_element( testSpaces_[1].begin(), testSpaces_[1].end()) ) )
       {
         auto degrees = edgeDegrees();
+        /*
         std::cout << "[" << numValueShapeFunctions_ << ","
                   << numGradShapeFunctions_ << ","
                   << numHessShapeFunctions_ << ","
@@ -380,6 +381,7 @@ namespace Dune
                   << " " << degrees[0] << " " << degrees[1]
                   << " max size of edge set: " << edgeSFS_.size()
                   << std::endl;
+        */
       }
 
       const std::array< std::pair< int, unsigned int >, dimDomain+1 > &dofsPerCodim() const

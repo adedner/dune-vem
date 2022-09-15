@@ -391,6 +391,7 @@ namespace Dune
       , numEdgeTestShapeFunctions_( (conforming_)? sizeONB<1>(order-2):sizeONB<1>(order-1) )
       {
         auto degrees = edgeDegrees();
+        /*
         std::cout << "dofsPerCodim:" << dofsPerCodim_[0].second << " "
                                      << dofsPerCodim_[1].second << " "
                                      << dofsPerCodim_[2].second << std::endl;
@@ -409,6 +410,7 @@ namespace Dune
         std::cout << "dofs per codim: "
                   << dofsPerCodim_[0].second << " " << dofsPerCodim_[1].second << " " << dofsPerCodim_[2].second
                   << std::endl;
+        */
       }
 
       const std::array< std::pair< int, unsigned int >, dimDomain+1 > &dofsPerCodim() const
@@ -584,11 +586,11 @@ namespace Dune
       std::array< std::pair< int, unsigned int >, dimDomain+1 > calcDofsPerCodim (unsigned int order) const
       {
         auto vSize = order2size<0>(0) * BBBasisFunctionSetType::RangeType::dimension;
-        std::cout << "vSize: " << vSize << std::endl;
+        // std::cout << "vSize: " << vSize << std::endl;
         auto eSize = order2size<1>(0) * BBBasisFunctionSetType::RangeType::dimension;
-        std::cout << "eSize: " << eSize << std::endl;
+        // std::cout << "eSize: " << eSize << std::endl;
         auto iSize = order2size<2>(0);
-        std::cout << "iSize: " << iSize << std::endl;
+        // std::cout << "iSize: " << iSize << std::endl;
         return std::array< std::pair< int, unsigned int >, dimDomain+1 >
                { std::make_pair( dimDomain,   vSize ),
                  std::make_pair( dimDomain-1, eSize ),
