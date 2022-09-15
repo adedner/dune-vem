@@ -12,7 +12,7 @@ def hk(space, exact):
     massCoeff = 1+sin(dot(x,x))
     diffCoeff = 1-0.9*cos(dot(x,x))
     assert(dimR == exact.ufl_shape[0]), "dim range not compatible"
-#     dimR = exact.ufl_shape[0]
+#    dimR = exact.ufl_shape[0]
     u = TrialFunction(space)
     v = TestFunction(space)
 

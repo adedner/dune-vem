@@ -72,7 +72,7 @@ def calculateEOC(results,length):
 def checkEOC(eoc, expected_eoc):
     i = 0
     for k in expected_eoc:
-        assert(0.8*k <= eoc[i], "eoc out of expected range")
+        assert(0.8*k <= eoc[i]), "eoc out of expected range"
         if eoc[i] > 1.2*k:
             print("WARNING: the eoc seems too large (",eoc[i],"expected",k)
         i += 1

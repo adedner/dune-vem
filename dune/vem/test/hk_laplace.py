@@ -22,20 +22,20 @@ parameters = {"newton.linear.tolerance": 1e-12,
               }
 
 def hk(space, exact):
-    laplace = lambda w: div(grad(w))
-    H = lambda w: grad(grad(w))
-    u = TrialFunction(space)
-    v = TestFunction(space)
+    u      = TrialFunction(space)
+    v      = TestFunction(space)
+    normal = FacetNormal(space)
 
-    diffCoeff = 1
-    massCoeff = 1
+    diffCoeff = 0.1
+    massCoeff = 2
 
     a = (diffCoeff*inner(grad(u),grad(v)) + massCoeff*dot(u,v) ) * dx
     b = sum( [ ( -div(diffCoeff*grad(exact[i])) + massCoeff*exact[i] ) * v[i]
-             for i in range(dimR) ] ) * dx
-    dbc = [dune.ufl.DirichletBC(space, exact, i+1) for i in range(4)]
+             for i in range(dimR) ] ) * dx +\
+        sum( [ diffCoeff*( dot(grad(exact[i]),normal) ) * v[i]
+             for i in range(dimR) ] ) * ds
 
-    scheme = dune.vem.vemScheme([a==b, *dbc], space,
+    scheme = dune.vem.vemScheme([a==b], space,
                             solver="cg",
                             gradStabilization=diffCoeff,
                             massStabilization=massCoeff,
@@ -51,33 +51,33 @@ def hk(space, exact):
     return err
 
 def runTesthk(testSpaces, order, vectorSpace, reduced):
-      x = SpatialCoordinate(triangle)
-      exact = as_vector( dimR*[x[0]*x[1] * cos(pi*x[0]*x[1])] )
-      spaceConstructor = lambda grid, r: dune.vem.vemSpace( grid,
-                                                            order=order,
-                                                            dimRange=r,
-                                                            testSpaces=testSpaces,
-                                                            vectorSpace=vectorSpace,
-                                                            reduced=reduced)
+    x = SpatialCoordinate(triangle)
+    exact = as_vector( dimR*[x[0]**dimR*x[1] * cos(pi*x[0]*x[1]**dimR)] )
+    spaceConstructor = lambda grid, r: dune.vem.vemSpace( grid,
+                                                          order=order,
+                                                          dimRange=r,
+                                                          testSpaces=testSpaces,
+                                                          vectorSpace=vectorSpace,
+                                                          reduced=reduced)
 
-      expected_eoc = [order+1, order]
-      if (interpolate()):
-            eoc = runTest(exact, spaceConstructor, interpolate_secondorder)
-      else:
-            eoc = runTest(exact, spaceConstructor, hk)
+    expected_eoc = [order+1, order]
+    if (interpolate()):
+        eoc = runTest(exact, spaceConstructor, interpolate_secondorder)
+    else:
+        eoc = runTest(exact, spaceConstructor, hk)
 
-      return eoc, expected_eoc
+    return eoc, expected_eoc
 
 def main():
-      orders = [1,3]
-      for order in orders:
-            print("order: ", order)
-            # C0 conforming VEM
-            C0testSpaces = [0,order-2,order-2]
-            print("C0 conforming test spaces: ", C0testSpaces)
+    orders = [1,3]
+    for order in orders:
+        print("order: ", order)
+        # C0 conforming VEM
+        C0testSpaces = [0,order-2,order-2]
+        print("C0 conforming test spaces: ", C0testSpaces)
 
-            # vectorSpace=False, reduced=True
-            eoc, expected_eoc = runTesthk( C0testSpaces, order, vectorSpace=False, reduced=True )
-            checkEOC(eoc, expected_eoc)
+        # vectorSpace=False, reduced=True
+        eoc, expected_eoc = runTesthk( C0testSpaces, order, vectorSpace=False, reduced=True )
+        checkEOC(eoc, expected_eoc)
 
 main()
