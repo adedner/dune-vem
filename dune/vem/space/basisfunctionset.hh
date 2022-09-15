@@ -100,27 +100,56 @@ namespace Dune
           evaluateAll( quadrature[ qp ], dofs, values[ qp ] );
       }
 
-      template< class Point, class DofVector >
-      void evaluateAll ( const Point &x, const DofVector &dofs, RangeType &value ) const
+      template< class F, int d, class DofVector >
+      void evaluateAll ( const Dune::FieldVector<F,d> &x, const DofVector &dofs, RangeType &value ) const
       {
         value = RangeType( 0 );
-        shapeFunctionSet_.evaluateEach( position( x ), [ this, &dofs, &value ] ( std::size_t alpha, RangeType phi_alpha ) {
+        shapeFunctionSet_.evaluateEach( x, [ this, &dofs, &value ] ( std::size_t alpha, RangeType phi_alpha ) {
             for( std::size_t j = 0; j < size(); ++j )
               value.axpy( valueProjection()[ alpha ][ j ]*dofs[ j ], phi_alpha );
           } );
       }
+      template< class Point, class DofVector >
+      void evaluateAll ( const Point &x, const DofVector &dofs, RangeType &value ) const
+      {
+        value = RangeType( 0 );
+        if constexpr ( Point::QuadratureType::codimension == 1)
+        {
+          Std::vector < Dune::DynamicMatrix<double> > localDofVectorMatrix(2);
+          Std::vector<Std::vector<unsigned int>> mask(2,Std::vector<unsigned int>(0));
+          auto locx = x.localPosition();
+          auto normal = x.quadrature().intersection().unitOuterNormal(locx);
+          auto edgeSF = (*interpolation_)(x.quadrature().intersection(), localDofVectorMatrix, mask);
+          edgeSF.evaluateEach(locx, [&](std::size_t beta, RangeType psi)
+          {
+            if (beta < localDofVectorMatrix[0].size())
+              for (std::size_t s=0; s<mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
+              {
+                std::size_t j = mask[0][s];
+                value.axpy( localDofVectorMatrix[0][beta][s] * dofs[ j ], psi );
+              }
+          });
+        }
+        else
+        {
+          shapeFunctionSet_.evaluateEach( x, [ this, &dofs, &value ] ( std::size_t alpha, RangeType phi_alpha ) {
+              for( std::size_t j = 0; j < size(); ++j )
+                value.axpy( valueProjection()[ alpha ][ j ]*dofs[ j ], phi_alpha );
+            } );
+        }
+      }
 
-      template< class F, int d, class Values > const
+      template< class F, int d, class Values >
       void evaluateAll ( const Dune::FieldVector<F,d> &x, Values &values ) const
       {
         assert( values.size() >= size() );
         std::fill( values.begin(), values.end(), RangeType( 0 ) );
-        shapeFunctionSet_.evaluateEach( position(x), [ this, &values ] ( std::size_t alpha, RangeType phi_alpha ) {
+        shapeFunctionSet_.evaluateEach( x, [ this, &values ] ( std::size_t alpha, RangeType phi_alpha ) {
             for( std::size_t j = 0; j < size(); ++j )
               values[ j ].axpy( valueProjection()[ alpha ][ j ], phi_alpha );
           } );
       }
-      template< class Point, class Values > const
+      template< class Point, class Values >
       void evaluateAll ( const Point &x, Values &values ) const
       {
         assert( values.size() >= size() );
@@ -144,7 +173,7 @@ namespace Dune
         }
         else
         {
-          shapeFunctionSet_.evaluateEach( position(x), [ this, &values ] ( std::size_t alpha, RangeType phi_alpha ) {
+          shapeFunctionSet_.evaluateEach( x, [ this, &values ] ( std::size_t alpha, RangeType phi_alpha ) {
               for( std::size_t j = 0; j < size(); ++j )
                 values[ j ].axpy( valueProjection()[ alpha ][ j ], phi_alpha );
             } );
@@ -158,18 +187,39 @@ namespace Dune
         for( std::size_t qp = 0; qp < nop; ++qp )
           jacobianAll( quadrature[ qp ], dofs, jacobians[ qp ] );
       }
+      template< class F, int d, class DofVector >
+      void jacobianAll ( const Dune::FieldVector<F,d> &x, const DofVector &dofs, JacobianRangeType &jacobian ) const
+      {
+        jacobian = JacobianRangeType( 0 );
+        shapeFunctionSet_.jacobianEach( x, [ this, &dofs, &jacobian ] ( std::size_t alpha, JacobianRangeType dphi_alpha ) {
+            for( std::size_t j = 0; j < size(); ++j )
+              jacobian.axpy( jacobianProjection()[ alpha ][ j ]*dofs[ j ], dphi_alpha );
+          } );
+      }
       template< class Point, class DofVector >
       void jacobianAll ( const Point &x, const DofVector &dofs, JacobianRangeType &jacobian ) const
       {
+        assert( Point::QuadratureType::codimension == 0 );
         jacobian = JacobianRangeType( 0 );
         shapeFunctionSet_.jacobianEach( position( x ), [ this, &dofs, &jacobian ] ( std::size_t alpha, JacobianRangeType dphi_alpha ) {
             for( std::size_t j = 0; j < size(); ++j )
               jacobian.axpy( jacobianProjection()[ alpha ][ j ]*dofs[ j ], dphi_alpha );
           } );
       }
-      template< class Point, class Jacobians > const
+      template< class F, int d, class Jacobians >
+      void jacobianAll ( const Dune::FieldVector<F,d> &x, Jacobians &jacobians ) const
+      {
+        assert( jacobians.size() >= size() );
+        std::fill( jacobians.begin(), jacobians.end(), JacobianRangeType( 0 ) );
+        shapeFunctionSet_.jacobianEach( position(x), [ this, &jacobians ] ( std::size_t alpha, JacobianRangeType dphi_alpha ) {
+            for( std::size_t j = 0; j < size(); ++j )
+              jacobians[ j ].axpy( jacobianProjection()[ alpha ][ j ], dphi_alpha );
+          } );
+      }
+      template< class Point, class Jacobians >
       void jacobianAll ( const Point &x, Jacobians &jacobians ) const
       {
+        assert( Point::QuadratureType::codimension == 0 );
         assert( jacobians.size() >= size() );
         std::fill( jacobians.begin(), jacobians.end(), JacobianRangeType( 0 ) );
         shapeFunctionSet_.jacobianEach( position(x), [ this, &jacobians ] ( std::size_t alpha, JacobianRangeType dphi_alpha ) {
@@ -196,8 +246,7 @@ namespace Dune
               hessian.axpy( hessianProjectionAlpha[ j ]*dofs[ j ], d2phi_alpha );
         } );
       }
-
-      template< class Point, class Hessians > const
+      template< class Point, class Hessians >
       void hessianAll ( const Point &x, Hessians &hessians ) const
       {
         assert( hessians.size() >= size() );
