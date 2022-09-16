@@ -21,19 +21,23 @@ parameters = {"newton.linear.tolerance": 1e-12,
               "newton.verbose": True
               }
 
+x = SpatialCoordinate(triangle)
+
 def hk(space, exact):
     u      = TrialFunction(space)
     v      = TestFunction(space)
     normal = FacetNormal(space)
 
-    diffCoeff = 0.1
-    massCoeff = 2
+    diffCoeff = (0.1+dot(x,x))
+    massCoeff = (2+dot(x,x))
 
     a = (diffCoeff*inner(grad(u),grad(v)) + massCoeff*dot(u,v) ) * dx
     b = sum( [ ( -div(diffCoeff*grad(exact[i])) + massCoeff*exact[i] ) * v[i]
              for i in range(dimR) ] ) * dx +\
         sum( [ diffCoeff*( dot(grad(exact[i]),normal) ) * v[i]
              for i in range(dimR) ] ) * ds
+    a += dot(u,v) * ds
+    b += dot(exact,v) * ds
 
     scheme = dune.vem.vemScheme([a==b], space,
                             solver="cg",
@@ -51,7 +55,6 @@ def hk(space, exact):
     return err
 
 def runTesthk(testSpaces, order, vectorSpace, reduced):
-    x = SpatialCoordinate(triangle)
     exact = as_vector( dimR*[x[0]**dimR*x[1] * cos(pi*x[0]*x[1]**dimR)] )
     spaceConstructor = lambda grid, r: dune.vem.vemSpace( grid,
                                                           order=order,

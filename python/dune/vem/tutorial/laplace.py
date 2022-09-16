@@ -37,10 +37,10 @@ def mixed(polyGrid, order):
     mixedSolver.solve(target = [df,sig])
     return df,sig,diams
 
-for order in [0,1,2]:
+for order in [0,1]:
     for i in range(2,3):
         cells = dune.vem.voronoiCells([[0,0],[Lx,Ly]],2**(2*i+1),
-                            lloyd=100, fileName="test", load=True)
+                                      lloyd=250, fileName="test", load=True)
         polyGrid = dune.vem.polyGrid(cells)
         iset = polyGrid.indexSet
         @dune.fem.function.gridFunction(polyGrid, name="cells", order=0)
@@ -48,7 +48,7 @@ for order in [0,1,2]:
             return polyGrid.hierarchicalGrid.agglomerate(iset.index(en))
         fig = plt.figure(figsize=(15,15))
         dune.fem.plotting.plotPointData(polygons,figure=fig,
-                              linewidth=2,colorbar=None)
+                                        linewidth=2,colorbar=None)
         fig.savefig(f"laplace_{i}.png", dpi=300)
 
         dfP,diam = primal(polyGrid,order+1)

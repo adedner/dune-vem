@@ -7,6 +7,7 @@ from interpolate import interpolate_secondorder
 parameters = {"newton.linear.tolerance": 1e-8,
               "newton.tolerance": 5e-6,
               "newton.lineSearch": "simple",
+              "newton.linear.preconditioner": "ssor",
               "newton.linear.verbose": False,
               "newton.verbose": True
               }
@@ -55,7 +56,7 @@ def runTestDivFree(order):
     return eoc, expected_eoc
 
 def main():
-    orders = [2,4]
+    orders = [2,3]
     for order in orders:
         print("order: ", order)
 
