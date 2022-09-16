@@ -6,9 +6,10 @@ import dune.fem
 dune.fem.threading.use = 8   # enable multithreading
 conforming = True            # either conforming and non-conforming
 order = 4                    # ... space of order 4
-N     = 50                  # number of Voronoi cells
+N     = 50                   # number of Voronoi cells
 tau   = Constant(5e-6,"dt")  # time step size
-saveTimes = [7e-4,4e-4,1e-4]
+saveTimes  = [1e-4] # add other times for longer simulations, e.g.,
+# saveTimes += [4e-4,7e-4]
 
 # moments for conforming and non-conforming C^1 spaces
 if conforming:
