@@ -90,17 +90,17 @@ namespace Dune
       // 1: use onb for inner moments but not for computing projections
       // 2: use onb for both the inner moments and computation of projection
       // 3: don't use onb at all
-      DefaultAgglomerationVEMSpace(AgglomerationType &agglomeration,
+      DefaultAgglomerationVEMSpace(AgglomerationType &agglom,
           const unsigned int polOrder,
           const typename Traits::BasisSetsType &basisSets,
           int basisChoice,
           bool edgeInterpolation)
-      : BaseType(agglomeration.gridPart()),
+      : BaseType(agglom.gridPart()),
         polOrder_(polOrder),
         basisSets_(basisSets),
         basisChoice_(basisChoice),
         edgeInterpolation_(edgeInterpolation),
-        agIndexSet_(agglomeration),
+        agIndexSet_(agglom),
         blockMapper_(agIndexSet_, basisSets_.dofsPerCodim()),
         interpolation_(new AgglomerationInterpolationType(blockMapper().indexSet(), basisSets_, polOrder, basisChoice != 3)),
         counter_(0),
@@ -113,6 +113,8 @@ namespace Dune
             typename Traits::ScalarBasisFunctionSetType::HessianProjection>()),
         stabilizations_(new Vector<Stabilization>())
       {
+        if (basisChoice != 3) // !!!!! get order information from BasisSets
+          agglomeration().onbBasis(basisSets_.maxOrder());
         // std::cout << "using " << useThreads_ << " threads\n";
       }
       DefaultAgglomerationVEMSpace(const DefaultAgglomerationVEMSpace&) = delete;
@@ -391,7 +393,8 @@ namespace Dune
           {
             const DomainFieldType weight =
                     geometry.integrationElement(quadrature.point(qp)) * quadrature.weight(qp);
-#if 1
+#if 1 // the following is only for the C^1 spaces (especially lowest order on triangles)
+      // needs to be moved into the derived H^k class
             if (basisSets_.edgeSize(1)>0)
             {
               shapeFunctionSet.evaluateEach(quadrature[qp], [&](std::size_t alpha, RangeType phi)

@@ -347,22 +347,23 @@ namespace Dune
       typedef ShapeFunctionSet ShapeFunctionSetType;
       typedef EdgeShapeFunctionSet EdgeShapeFunctionSetType;
 
-      AgglomerationVEMBasisSets( const int order,
+      AgglomerationVEMBasisSets( const std::size_t order,
                                  const TestSpacesType &testSpaces,
                                  int basisChoice )
       // use order2size
       : testSpaces_(testSpaces)
       , useOnb_(basisChoice == 2)
       , dofsPerCodim_(calcDofsPerCodim())
-      , onbSFS_(Dune::GeometryType(Dune::GeometryType::cube, dimDomain), order)
+      , maxOrder_( std::max(order, maxEdgeDegree()) )
+      , onbSFS_(Dune::GeometryType(Dune::GeometryType::cube, dimDomain), maxOrder_)
       , edgeSFS_( Dune::GeometryType(Dune::GeometryType::cube,dimDomain-1), maxEdgeDegree() )
-      , numValueShapeFunctions_( onbSFS_.size()*BBBasisFunctionSetType::RangeType::dimension)
+      , numValueShapeFunctions_( onbSFS_.size()*BBBasisFunctionSetType::RangeType::dimension )
       , numGradShapeFunctions_ (
-          !reduced? std::min( numValueShapeFunctions_, sizeONB<0>(std::max(0, order - 1)) )
+          !reduced? std::min( numValueShapeFunctions_, sizeONB<0>(maxOrder_ - 1) )
           : numValueShapeFunctions_-1*BBBasisFunctionSetType::RangeType::dimension
         )
       , numHessShapeFunctions_ (
-          !reduced? std::min( numValueShapeFunctions_, sizeONB<0>(std::max(0, order - 2)) )
+          !reduced? std::min( numValueShapeFunctions_, sizeONB<0>(maxOrder_ - 2) )
           : 0 // numValueShapeFunctions_-3*BBBasisFunctionSetType::RangeType::dimension
         )
       , numInnerShapeFunctions_( testSpaces[2][0]<0? 0 : sizeONB<0>(testSpaces[2][0]) )
@@ -370,8 +371,8 @@ namespace Dune
                  *std::max_element( testSpaces_[1].begin(), testSpaces_[1].end()) ) )
       {
         auto degrees = edgeDegrees();
-        /*
-        std::cout << "[" << numValueShapeFunctions_ << ","
+        std::cout << "order=" << order << " using " << maxOrder_ << ": "
+                  << "[" << numValueShapeFunctions_ << ","
                   << numGradShapeFunctions_ << ","
                   << numHessShapeFunctions_ << ","
                   << constraintSize() << ","
@@ -382,7 +383,11 @@ namespace Dune
                   << " " << degrees[0] << " " << degrees[1]
                   << " max size of edge set: " << edgeSFS_.size()
                   << std::endl;
-        */
+      }
+
+      const std::size_t maxOrder() const
+      {
+        return maxOrder_;
       }
 
       const std::array< std::pair< int, unsigned int >, dimDomain+1 > &dofsPerCodim() const
@@ -544,6 +549,7 @@ namespace Dune
       const TestSpacesType testSpaces_;
       const bool useOnb_;
       std::array< std::pair< int, unsigned int >, dimDomain+1 > dofsPerCodim_;
+      const std::size_t maxOrder_;
       const ONBShapeFunctionSetType onbSFS_;
       const ScalarEdgeShapeFunctionSetType edgeSFS_;
       const std::size_t numValueShapeFunctions_;
@@ -602,8 +608,6 @@ namespace Dune
                  typename TraitsType::BasisSetsType(polOrder, testSpaces, basisChoice),
                  basisChoice,edgeInterpolation)
       {
-        if (basisChoice != 3) // !!!!! get order information from BasisSets
-          BaseType::agglomeration().onbBasis(polOrder);
         BaseType::update(true);
       }
 

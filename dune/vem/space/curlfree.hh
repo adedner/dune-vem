@@ -277,6 +277,11 @@ namespace Dune
         */
       }
 
+      const std::size_t maxOrder() const
+      {
+        return onbSFS_.order();
+      }
+
       const std::array< std::pair< int, unsigned int >, dimDomain+1 > &dofsPerCodim() const
       {
         return dofsPerCodim_;
@@ -453,8 +458,7 @@ namespace Dune
                  typename TraitsType::BasisSetsType(polOrder, basisChoice==2),
                  basisChoice, false)
       {
-        if (basisChoice != 3) // !!!!! get order information from BasisSets
-          BaseType::agglomeration().onbBasis(polOrder+1);
+        assert( BaseType::basisSets_.maxOrder() == polOrder+1 );
         BaseType::update(true);
       }
 
