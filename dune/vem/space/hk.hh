@@ -374,6 +374,7 @@ namespace Dune
         std::cout << "[" << numValueShapeFunctions_ << ","
                   << numGradShapeFunctions_ << ","
                   << numHessShapeFunctions_ << ","
+                  << constraintSize() << ","
                   << numInnerShapeFunctions_ << "]"
                   << "   edge: ["
                   << edgeSize(0) << "," << edgeSize(1) << ","
@@ -429,7 +430,10 @@ namespace Dune
       }
       int constraintSize() const
       {
-        return numInnerShapeFunctions_;
+        if (edgeSize(1)>0)
+          return numInnerShapeFunctions_+1;
+        else
+          return numInnerShapeFunctions_;
       }
       int vertexSize(int deriv) const
       {
@@ -511,10 +515,11 @@ namespace Dune
       }
 
       template <int codim>
-      static std::size_t sizeONB(std::size_t order)
+      static std::size_t sizeONB(int order)
       {
-        return Dune::Fem::OrthonormalShapeFunctions<dimDomain - codim> :: size(order) *
-               BBBasisFunctionSetType::RangeType::dimension;
+        if (order<0) return 0;
+        else return Dune::Fem::OrthonormalShapeFunctions<dimDomain - codim> :: size(order) *
+                    BBBasisFunctionSetType::RangeType::dimension;
       }
 
       std::array< std::pair< int, unsigned int >, dimDomain+1 > calcDofsPerCodim () const
@@ -616,9 +621,10 @@ namespace Dune
         const std::size_t numDofs = BaseType::blockMapper().numDofs(agglomerate) * blockSize;
         const std::size_t numConstraintShapeFunctions = BaseType::basisSets_.constraintSize();
         const std::size_t numInnerShapeFunctions = BaseType::basisSets_.innerSize();
+        int polOrder = BaseType::order();
 
         assert( numDofs == RHSconstraintsMatrix.rows() );
-        assert( numInnerShapeFunctions == RHSconstraintsMatrix.cols() );
+        assert( numConstraintShapeFunctions == RHSconstraintsMatrix.cols() );
         assert( numInnerShapeFunctions <= numConstraintShapeFunctions );
         if (numConstraintShapeFunctions == 0) return;
 
@@ -636,6 +642,71 @@ namespace Dune
               RHSconstraintsMatrix[ beta ][ alpha ] = volume;
           }
         }
+
+        if (BaseType::basisSets_.edgeSize(1)==0)
+        {
+          assert( RHSconstraintsMatrix[0].size() == numInnerShapeFunctions );
+          return;
+        }
+#if 1
+        std::size_t alpha = numConstraintShapeFunctions-1;
+        assert( alpha+1 == RHSconstraintsMatrix[0].size() );
+        // matrices for edge projections
+        Std::vector<Dune::DynamicMatrix<double> > edgePhiVector(2);
+
+        for (const typename BaseType::ElementSeedType &entitySeed : entitySeeds[agglomerate])
+        {
+          const typename BaseType::ElementType &element = BaseType::gridPart().entity(entitySeed);
+          const auto geometry = element.geometry();
+
+          const auto &shapeFunctionSet = BaseType::basisSets_.basisFunctionSet(BaseType::agglomeration(), element);
+
+          // compute the boundary terms for the value projection
+          for (const auto &intersection : intersections(BaseType::gridPart(), element))
+          {
+            // ignore edges inside the given polygon
+            if (!intersection.boundary() && (BaseType::agglomeration().index(intersection.outside()) == agglomerate))
+              continue;
+            assert(intersection.conforming());
+
+            double flipNormal = 1.;
+            if (intersection.neighbor()) // we need to check the orientation of the normal
+              if ( BaseType::indexSet().index(intersection.inside()) >
+                   BaseType::indexSet().index(intersection.outside()) )
+                flipNormal = -1;
+
+            const typename BaseType::BasisSetsType::EdgeShapeFunctionSetType edgeShapeFunctionSet
+                  = BaseType::basisSets_.edgeBasisFunctionSet(BaseType::agglomeration(),
+                               intersection, BaseType::blockMapper().indexSet().twist(intersection) );
+
+            Std::vector<Std::vector<unsigned int>> mask(2,Std::vector<unsigned int>(0)); // contains indices with Phi_mask[i] is attached to given edge
+            edgePhiVector[0].resize(BaseType::basisSets_.edgeSize(0),
+                                    BaseType::basisSets_.edgeSize(0), 0);
+            edgePhiVector[1].resize(BaseType::basisSets_.edgeSize(1),
+                                    BaseType::basisSets_.edgeSize(1), 0);
+
+            BaseType::interpolation()(intersection, edgeShapeFunctionSet, edgePhiVector, mask);
+
+            // now compute int_e Phi^e m_alpha
+            typename BaseType::Quadrature1Type quadrature(BaseType::gridPart(), intersection, 2 * polOrder + 1, BaseType::Quadrature1Type::INSIDE);
+            for (std::size_t qp = 0; qp < quadrature.nop(); ++qp)
+            {
+              auto x = quadrature.localPoint(qp);
+              auto y = intersection.geometryInInside().global(x);
+              const DomainFieldType weight = intersection.geometry().integrationElement(x) * quadrature.weight(qp);
+              edgeShapeFunctionSet.evaluateEach(x, [&](std::size_t beta,
+                        typename BaseType::BasisSetsType::EdgeShapeFunctionSetType::RangeType psi)
+              {
+                if (beta < edgePhiVector[1].size())
+                  for (std::size_t s=0; s<mask[1].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
+                    RHSconstraintsMatrix[mask[1][s]][alpha] += weight *
+                                         edgePhiVector[1][beta][s] * psi;
+                                         // * flipNormal;
+              });
+            } // quadrature loop
+          } // loop over intersections
+        } // loop over triangles in agglomerate
+#endif
       }
     };
 

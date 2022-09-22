@@ -391,6 +391,29 @@ namespace Dune
           {
             const DomainFieldType weight =
                     geometry.integrationElement(quadrature.point(qp)) * quadrature.weight(qp);
+#if 1
+            if (basisSets_.edgeSize(1)>0)
+            {
+              shapeFunctionSet.evaluateEach(quadrature[qp], [&](std::size_t alpha, RangeType phi)
+              {
+                shapeFunctionSet.evaluateEach(quadrature[qp], [&](std::size_t beta, RangeType psi)
+                {
+                  if (alpha < numConstraintShapeFunctions-1)
+                  {
+                    constraintValueProj[alpha][beta] += phi * psi * weight;
+                  }
+                });
+              });
+              std::size_t alpha = constraintValueProj.size()-1;
+              const auto &vbs = shapeFunctionSet.valueBasisSet();
+              vbs.hessianEach(quadrature[qp], [&](std::size_t beta, HessianRangeType psi)
+              {
+                double laplace = psi[0][0][0] + psi[0][1][1];
+                constraintValueProj[alpha][beta] += laplace * weight;
+              });
+            }
+            else
+#endif
             shapeFunctionSet.evaluateEach(quadrature[qp], [&](std::size_t alpha, RangeType phi)
             {
               shapeFunctionSet.evaluateEach(quadrature[qp], [&](std::size_t beta, RangeType psi)
@@ -455,7 +478,7 @@ namespace Dune
             std::cout << "M_" << beta << " = ";
             for (std::size_t alpha = 0; alpha < numShapeFunctions; ++alpha)
             {
-              std::cout << constraintValueProj[alpha][beta] << " ";
+              std::cout << constraintValueProj[beta][alpha] << " ";
             }
             std::cout << std::endl;
           }
@@ -464,6 +487,17 @@ namespace Dune
         // set up matrix RHSconstraintsMatrix
         setupConstraintRHS(entitySeeds, agglomerate, RHSconstraintsMatrix, H0);
 
+#if 0
+        {
+            std::cout << "Constraint RHS:\n";
+            for (std::size_t alpha=0; alpha < numDofs; ++alpha )
+            {
+              for (std::size_t beta=0; beta < numConstraintShapeFunctions; ++beta )
+                std::cout << RHSconstraintsMatrix[alpha][beta] << ", ";
+              std::cout << std::endl;
+            }
+        }
+#endif
 #if 0
         // std::cout << "checkpoint setupRHS constraints matrix done" << std::endl;
         {
