@@ -27,7 +27,7 @@ def getParameters():
     ln, lm, Lx, Ly = 1,0, 1,1
     return ln, lm, Lx, Ly
 
-def runTest(exact, spaceConstructor, get_df):
+def runTest(exact, spaceConstructor, get_df, N0=23):
     results = []
     for level in range(1,maxLevel):
         ln, lm, Lx, Ly = getParameters()
@@ -35,7 +35,7 @@ def runTest(exact, spaceConstructor, get_df):
         N = 2**(level)
         # 23*N*N works, 19*N*N fails
         grid = dune.vem.polyGrid(
-          dune.vem.voronoiCells([[0,0],[Lx,Ly]], 23*N*N, lloyd=250, fileName="voronoiseeds", load=True)
+          dune.vem.voronoiCells([[0,0],[Lx,Ly]], N0*N*N, lloyd=250, fileName="voronoiseeds", load=True)
         #   cartesianDomain([0.,0.],[Lx,Ly],[N,N]), cubes=False
         #   cartesianDomain([0.,0.],[Lx,Ly],[2*N,2*N]), cubes=True
         )
@@ -71,9 +71,15 @@ def calculateEOC(results,length):
     return eoc
 
 def checkEOC(eoc, expected_eoc):
+    ret = 0
     i = 0
     for k in expected_eoc:
-        assert(0.8*k <= eoc[i]), "eoc out of expected range"
+        # assert(0.8*k <= eoc[i]), "eoc out of expected range"
+        if 0.8*k > eoc[i]:
+            print(f"ERROR: {0.8*k} > {eoc[i]}")
+            ret += 1
         if eoc[i] > 1.2*k:
             print("WARNING: the eoc seems too large (",eoc[i],"expected",k)
+            ret += 1
         i += 1
+    return ret

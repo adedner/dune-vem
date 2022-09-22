@@ -371,6 +371,7 @@ namespace Dune
                  *std::max_element( testSpaces_[1].begin(), testSpaces_[1].end()) ) )
       {
         auto degrees = edgeDegrees();
+        /*
         std::cout << "order=" << order << " using " << maxOrder_ << ": "
                   << "[" << numValueShapeFunctions_ << ","
                   << numGradShapeFunctions_ << ","
@@ -383,6 +384,7 @@ namespace Dune
                   << " " << degrees[0] << " " << degrees[1]
                   << " max size of edge set: " << edgeSFS_.size()
                   << std::endl;
+        */
       }
 
       const std::size_t maxOrder() const
