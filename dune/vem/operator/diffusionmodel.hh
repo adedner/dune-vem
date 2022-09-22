@@ -356,9 +356,9 @@ namespace Dune
       typedef typename EntityType::Geometry::LocalCoordinate LocalCoordinateType;
 
       typedef FemPy::CachingPoint< GridPart, LocalCoordinateType, 0 > InteriorCachingPointType;
-      typedef FemPy::ElementPoint< LocalCoordinateType, 0 > InteriorElementPointType;
+      typedef FemPy::ElementPoint< GridPart, LocalCoordinateType, 0 > InteriorElementPointType;
       typedef FemPy::CachingPoint< GridPart, LocalCoordinateType, 1 > SurfaceCachingPointType;
-      typedef FemPy::ElementPoint< LocalCoordinateType, 1 > SurfaceElementPointType;
+      typedef FemPy::ElementPoint< GridPart, LocalCoordinateType, 1 > SurfaceElementPointType;
 
       template< class QP >
       static Fem::QuadraturePointWrapper< QP > asQP ( const QP &qp )
