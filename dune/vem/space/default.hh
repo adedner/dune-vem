@@ -90,17 +90,17 @@ namespace Dune
       // 1: use onb for inner moments but not for computing projections
       // 2: use onb for both the inner moments and computation of projection
       // 3: don't use onb at all
-      DefaultAgglomerationVEMSpace(AgglomerationType &agglomeration,
+      DefaultAgglomerationVEMSpace(AgglomerationType &agglom,
           const unsigned int polOrder,
           const typename Traits::BasisSetsType &basisSets,
           int basisChoice,
           bool edgeInterpolation)
-      : BaseType(agglomeration.gridPart()),
+      : BaseType(agglom.gridPart()),
         polOrder_(polOrder),
         basisSets_(basisSets),
         basisChoice_(basisChoice),
         edgeInterpolation_(edgeInterpolation),
-        agIndexSet_(agglomeration),
+        agIndexSet_(agglom),
         blockMapper_(agIndexSet_, basisSets_.dofsPerCodim()),
         interpolation_(new AgglomerationInterpolationType(blockMapper().indexSet(), basisSets_, polOrder, basisChoice != 3)),
         counter_(0),
@@ -113,6 +113,8 @@ namespace Dune
             typename Traits::ScalarBasisFunctionSetType::HessianProjection>()),
         stabilizations_(new Vector<Stabilization>())
       {
+        if (basisChoice != 3) // !!!!! get order information from BasisSets
+          agglomeration().onbBasis(basisSets_.maxOrder());
         // std::cout << "using " << useThreads_ << " threads\n";
       }
       DefaultAgglomerationVEMSpace(const DefaultAgglomerationVEMSpace&) = delete;
@@ -391,6 +393,30 @@ namespace Dune
           {
             const DomainFieldType weight =
                     geometry.integrationElement(quadrature.point(qp)) * quadrature.weight(qp);
+#if 1 // the following is only for the C^1 spaces (especially lowest order on triangles)
+      // needs to be moved into the derived H^k class
+            if (basisSets_.edgeSize(1)>0)
+            {
+              shapeFunctionSet.evaluateEach(quadrature[qp], [&](std::size_t alpha, RangeType phi)
+              {
+                shapeFunctionSet.evaluateEach(quadrature[qp], [&](std::size_t beta, RangeType psi)
+                {
+                  if (alpha < numConstraintShapeFunctions-1)
+                  {
+                    constraintValueProj[alpha][beta] += phi * psi * weight;
+                  }
+                });
+              });
+              std::size_t alpha = constraintValueProj.size()-1;
+              const auto &vbs = shapeFunctionSet.valueBasisSet();
+              vbs.hessianEach(quadrature[qp], [&](std::size_t beta, HessianRangeType psi)
+              {
+                double laplace = psi[0][0][0] + psi[0][1][1];
+                constraintValueProj[alpha][beta] += laplace * weight;
+              });
+            }
+            else
+#endif
             shapeFunctionSet.evaluateEach(quadrature[qp], [&](std::size_t alpha, RangeType phi)
             {
               shapeFunctionSet.evaluateEach(quadrature[qp], [&](std::size_t beta, RangeType psi)
@@ -455,7 +481,7 @@ namespace Dune
             std::cout << "M_" << beta << " = ";
             for (std::size_t alpha = 0; alpha < numShapeFunctions; ++alpha)
             {
-              std::cout << constraintValueProj[alpha][beta] << " ";
+              std::cout << constraintValueProj[beta][alpha] << " ";
             }
             std::cout << std::endl;
           }
@@ -464,6 +490,17 @@ namespace Dune
         // set up matrix RHSconstraintsMatrix
         setupConstraintRHS(entitySeeds, agglomerate, RHSconstraintsMatrix, H0);
 
+#if 0
+        {
+            std::cout << "Constraint RHS:\n";
+            for (std::size_t alpha=0; alpha < numDofs; ++alpha )
+            {
+              for (std::size_t beta=0; beta < numConstraintShapeFunctions; ++beta )
+                std::cout << RHSconstraintsMatrix[alpha][beta] << ", ";
+              std::cout << std::endl;
+            }
+        }
+#endif
 #if 0
         // std::cout << "checkpoint setupRHS constraints matrix done" << std::endl;
         {
@@ -624,8 +661,8 @@ namespace Dune
                   // existing edge moments - or for H4 space)
                   // !!!!! sfs.degree(alpha) <= basisSets_.edgeOrders()[0]
                   if (alpha < dimDomain*sizeONB<0>(basisSets_.edgeValueMoments())       // have enough edge momentsa
-                      || edgePhiVector[0].size() == dimRange*(polOrder+1)               // interpolation is exact
-                      || edgeInterpolation_)                                 // user want interpolation no matter what
+                      || edgePhiVector[0].size() >= dimRange*(polOrder+1)                    // interpolation is exact enough
+                      || edgeInterpolation_)                                                 // user want interpolation no matter what
                   {
                     edgeShapeFunctionSet.evaluateEach(x, [&](std::size_t beta,
                           typename BasisSetsType::EdgeShapeFunctionSetType::RangeType psi)
@@ -651,52 +688,49 @@ namespace Dune
               });
               shapeFunctionSet.hessianEach(y, [&](std::size_t alpha, HessianRangeType phi)
               {
-                  // compute the phi.tau boundary terms for the hessian projection using d/ds Pi^e
-                  if ( basisSets_.edgeSize(1) > 0 )
-                  {
-                    // jacobian each here for edge shape fns
-                    edgeShapeFunctionSet.jacobianEach(x, [&](std::size_t beta, auto dhatpsi) {
-                        JacobianRangeType dpsi;
-                        for (std::size_t r=0;r<dimRange;++r)
-                          jit.mv(dhatpsi[r], dpsi[r]);
-                        if (beta < edgePhiVector[0].size())
+                // compute the phi.tau boundary terms for the hessian projection using d/ds Pi^e
+                if ( 1 ) // basisSets_.edgeSize(1) > 0 ) // can always use the edge projection?
+                {
+                  // jacobian each here for edge shape fns
+                  edgeShapeFunctionSet.jacobianEach(x, [&](std::size_t beta, auto dhatpsi) {
+                      // note: the edgeShapeFunctionSet is defined over
+                      // the reference element of the edge so the jit has to be applied here
+                      JacobianRangeType dpsi;
+                      for (std::size_t r=0;r<dimRange;++r)
+                        jit.mv(dhatpsi[r], dpsi[r]);
+                      if (beta < edgePhiVector[0].size())
+                      {
+                        double gradPsiDottau;
+
+                        // GENERAL: this assumed that the Pi_0 part of Pi^e is not needed?
+                        for (std::size_t r = 0; r < dimRange; ++r)
                         {
-                          // note: the edgeShapeFunctionSet is defined over
-                          // the reference element of the edge so the jit has
-                          // to be applied here
-
-                          double gradPsiDottau;
-
-                          // GENERAL: this assumed that the Pi_0 part of Pi^e is not needed?
-                          for (std::size_t r = 0; r < dimRange; ++r)
-                          {
-                            gradPsiDottau = dpsi[r] * tau;
-                            for (std::size_t s = 0; s < mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
-                              for (std::size_t i = 0; i < dimDomain; ++i)
-                                for (std::size_t j = 0; j < dimDomain; ++j)
-                                  P[alpha][mask[0][s]] += weight * edgePhiVector[0][beta][s] * gradPsiDottau * phi[r][i][j] * factorTN[i][j];
-                          }
+                          gradPsiDottau = dpsi[r] * tau;
+                          for (std::size_t s = 0; s < mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
+                            for (std::size_t i = 0; i < dimDomain; ++i)
+                              for (std::size_t j = 0; j < dimDomain; ++j)
+                                P[alpha][mask[0][s]] += weight * edgePhiVector[0][beta][s] * gradPsiDottau * phi[r][i][j] * factorTN[i][j];
                         }
-                    });
-                  } // alpha < numHessSF
+                      }
+                  });
+                } // alpha < numHessSF
 
-                  // compute the phi.n boundary terms for the hessian projection in
-                  // the case that there are dofs for the normal gradient on the edge
-                  // int_e Pi^1_e u m  n x n
-                  if ( basisSets_.edgeSize(1) > 0 )
-                  {
-                    edgeShapeFunctionSet.evaluateEach(x, [&](std::size_t beta, typename EdgeTestSpace::RangeType psi) {
-                      if (beta < edgePhiVector[1].size())
-                        // GENERAL: could use Pi_0 here as suggested in varying coeff paper
-                        //         avoid having to use the gradient projection later for the hessian projection
-                        for (std::size_t s = 0; s < mask[1].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
-                          for (std::size_t r=0; r < dimRange; ++r)
-                            for (std::size_t i=0; i < dimDomain; ++i)
-                              for (std::size_t j=0; j < dimDomain; ++j)
-                                P[alpha][mask[1][s]] += weight * edgePhiVector[1][beta][s] * psi[r] * phi[r][i][j] * factorNN[i][j];
-                                // axpy(edgePhiVector[1][beta][s] * psi*phi * weight, factorNN);
-                    });
-                  } // alpha < numHessSF and can compute normal derivative
+                // compute the phi.n boundary terms for the hessian projection in
+                // the case that there are dofs for the normal gradient on the edge
+                // int_e Pi^1_e u m  n x n
+                if ( basisSets_.edgeSize(1) > 0 )
+                {
+                  edgeShapeFunctionSet.evaluateEach(x, [&](std::size_t beta, typename EdgeTestSpace::RangeType psi) {
+                    if (beta < edgePhiVector[1].size())
+                      // GENERAL: could use Pi_0 here as suggested in varying coeff paper
+                      //         avoid having to use the gradient projection later for the hessian projection
+                      for (std::size_t s = 0; s < mask[1].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
+                        for (std::size_t r=0; r < dimRange; ++r)
+                          for (std::size_t i=0; i < dimDomain; ++i)
+                            for (std::size_t j=0; j < dimDomain; ++j)
+                              P[alpha][mask[1][s]] += weight * edgePhiVector[1][beta][s] * psi[r] * phi[r][i][j] * factorNN[i][j];
+                  });
+                } // alpha < numHessSF and can compute normal derivative
               });
             } // quadrature loop
             // store the masks for each edge

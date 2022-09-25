@@ -103,6 +103,7 @@ namespace Dune
       template< class F, int d, class DofVector >
       void evaluateAll ( const Dune::FieldVector<F,d> &x, const DofVector &dofs, RangeType &value ) const
       {
+        // needed for plotting for example: assert(0);
         value = RangeType( 0 );
         shapeFunctionSet_.evaluateEach( x, [ this, &dofs, &value ] ( std::size_t alpha, RangeType phi_alpha ) {
             for( std::size_t j = 0; j < size(); ++j )
@@ -142,6 +143,7 @@ namespace Dune
       template< class F, int d, class Values >
       void evaluateAll ( const Dune::FieldVector<F,d> &x, Values &values ) const
       {
+        // needed for plotting for example: assert(0);
         assert( values.size() >= size() );
         std::fill( values.begin(), values.end(), RangeType( 0 ) );
         shapeFunctionSet_.evaluateEach( x, [ this, &values ] ( std::size_t alpha, RangeType phi_alpha ) {
@@ -173,6 +175,7 @@ namespace Dune
         }
         else
         {
+          // std::cout << "B: using value projection\n";
           shapeFunctionSet_.evaluateEach( x, [ this, &values ] ( std::size_t alpha, RangeType phi_alpha ) {
               for( std::size_t j = 0; j < size(); ++j )
                 values[ j ].axpy( valueProjection()[ alpha ][ j ], phi_alpha );
