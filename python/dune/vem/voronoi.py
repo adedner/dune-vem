@@ -42,7 +42,29 @@ def voronoiCells(constructor, towers, fileName=None, load=False, lloyd=False, sh
             [lowerleft[0],upperright[0],lowerleft[1],upperright[1]] )
 
     if isinstance(towers,(int,numpy.integer)):
-        if fileName:
+        # new mechanism only uses `load` to store the file name (or set to None/False)
+        if isinstance(load, str):
+            assert fileName is None, "new load mechanism uses `load` parameter as file name. Do not use the `fileName` at the same time"
+            load = load + str(towers) + '.pickle'
+            if os.path.exists(load):
+                with open(load, 'rb') as f:
+                    ret = pickle.load(f)
+                # make sure old pickle files still work:
+                try:
+                    v = ret["vertices"]
+                    return ret
+                except IndexError:
+                    towers = ret
+            else:
+                towers = numpy.array(
+                        [ p*(upperright-lowerleft) + lowerleft
+                            for p in numpy.random.rand(towers, 2) ])
+        elif fileName:
+            print("""
+Deprecation warning: calling `voronoiCells` with the `fileName ` parameter is deprecated.
+The file name should now be provided using the `load` parameter, i.e., instead of
+`load=True,fileName="voronoi"` use `load="voronoi".
+""")
             fileName = fileName + str(towers) + '.pickle'
             if not load or not os.path.exists(fileName):
                 # print("generating new seeds for voronoi grid")
@@ -114,18 +136,16 @@ def voronoiCells(constructor, towers, fileName=None, load=False, lloyd=False, sh
         if region != [] and flag:
             regions.append(region)
 
+    assert isinstance(lloyd,int)
     if lloyd > 0:
-        dist = 0
         seeds = []
         for i,r in enumerate(regions):
-            # old = seeds[i].copy()
-            # new = centroid(vor.vertices[r])
-            # dist = max(dist,numpy.linalg.norm(new-old))
             seeds.append(centroid(vor.vertices[r]))
-        if type(lloyd) == int:
-            return voronoiCells(constructor, seeds, fileName=None, load=False, lloyd=lloyd-1, show=show)
-        elif dist > lloyd:
-            return voronoiCells(constructor, towers, fileName=None, load=False, lloyd=lloyd, show=show)
+        ret = voronoiCells(constructor, seeds, fileName=None, load=False, lloyd=lloyd-1, show=show)
+        if isinstance(load, str):
+            with open(load, 'wb') as f:
+                pickle.dump(ret, f)
+        return ret
 
     lowerleft  = numpy.array(constructor[0])
     upperright = numpy.array(constructor[1])
