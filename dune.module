@@ -1,10 +1,10 @@
 Module: dune-vem
-Version: 2.9-git
+Version: 2.10-git
 Author: Andreas Dedner
 Maintainer: a.s.dedner@warwick.ac.uk
 Description: Implementation of a number of virtual element spaces and bilinear forms
 URL: https://gitlab.dune-project.org/dune-fem/dune-vem
-Depends: dune-fem (>= 2.9) dune-alugrid (>= 2.9)
+Depends: dune-fem (>= 2.10) dune-alugrid (>= 2.10)
 Suggests:
 Python-Requires: matplotlib triangle scipy sortedcontainers
 Whitespace-Hook: Yes
