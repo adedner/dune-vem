@@ -371,7 +371,6 @@ namespace Dune
                  *std::max_element( testSpaces_[1].begin(), testSpaces_[1].end()) ) )
       {
         auto degrees = edgeDegrees();
-        /*
         std::cout << "order=" << order << " using " << maxOrder_ << ": "
                   << "[" << numValueShapeFunctions_ << ","
                   << numGradShapeFunctions_ << ","
@@ -384,7 +383,6 @@ namespace Dune
                   << " " << degrees[0] << " " << degrees[1]
                   << " max size of edge set: " << edgeSFS_.size()
                   << std::endl;
-        */
       }
 
       const std::size_t maxOrder() const
@@ -437,10 +435,14 @@ namespace Dune
       }
       int constraintSize() const
       {
+      #if 0 // extraConstraint
         if (edgeSize(1)>0)
           return numInnerShapeFunctions_+1;
         else
-          return numInnerShapeFunctions_;
+          return numInnerShapeFunctions_+1;
+      #else
+        return numInnerShapeFunctions_;
+      #endif
       }
       int vertexSize(int deriv) const
       {
@@ -649,12 +651,12 @@ namespace Dune
           }
         }
 
-        if (BaseType::basisSets_.edgeSize(1)==0)
+        if (1) // BaseType::basisSets_.edgeSize(1)==0)
         {
           assert( RHSconstraintsMatrix[0].size() == numInnerShapeFunctions );
           return;
         }
-#if 1
+#if 1 // extraConstraint(s)
         std::size_t alpha = numConstraintShapeFunctions-1;
         assert( alpha+1 == RHSconstraintsMatrix[0].size() );
         // matrices for edge projections
@@ -700,14 +702,28 @@ namespace Dune
               auto x = quadrature.localPoint(qp);
               auto y = intersection.geometryInInside().global(x);
               const DomainFieldType weight = intersection.geometry().integrationElement(x) * quadrature.weight(qp);
+              auto normal = intersection.unitOuterNormal(x);
               edgeShapeFunctionSet.evaluateEach(x, [&](std::size_t beta,
                         typename BaseType::BasisSetsType::EdgeShapeFunctionSetType::RangeType psi)
               {
+              #if 1 // hessian constraint
                 if (beta < edgePhiVector[1].size())
                   for (std::size_t s=0; s<mask[1].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
                     RHSconstraintsMatrix[mask[1][s]][alpha] += weight *
                                          edgePhiVector[1][beta][s] * psi;
-                                         // * flipNormal;
+              #else // gradient constraints
+                if (beta < edgePhiVector[0].size())
+                  for (std::size_t s=0; s<mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
+                  {
+                    assert( mask[0][s] < RHSconstraintsMatrix.size() );
+                    RHSconstraintsMatrix[mask[0][s]][alpha-1] += weight *
+                                         normal[0] *
+                                         edgePhiVector[0][beta][s] * psi[0];
+                    RHSconstraintsMatrix[mask[0][s]][alpha]   += weight *
+                                         normal[1] *
+                                         edgePhiVector[0][beta][s] * psi[0];
+                  }
+              #endif
               });
             } // quadrature loop
           } // loop over intersections

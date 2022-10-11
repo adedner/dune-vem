@@ -96,7 +96,7 @@ namespace Dune
           int basisChoice,
           bool edgeInterpolation)
       : BaseType(agglom.gridPart()),
-        polOrder_(polOrder),
+        polOrder_(basisSets.maxOrder()),
         basisSets_(basisSets),
         basisChoice_(basisChoice),
         edgeInterpolation_(edgeInterpolation),
@@ -393,7 +393,9 @@ namespace Dune
           {
             const DomainFieldType weight =
                     geometry.integrationElement(quadrature.point(qp)) * quadrature.weight(qp);
-#if 1 // the following is only for the C^1 spaces (especially lowest order on triangles)
+#if 0 // extraConstraint
+#if 0 // laplace constraint
+      // the following is only for the C^1 spaces (especially lowest order on triangles)
       // needs to be moved into the derived H^k class
             if (basisSets_.edgeSize(1)>0)
             {
@@ -415,8 +417,34 @@ namespace Dune
                 constraintValueProj[alpha][beta] += laplace * weight;
               });
             }
-            else
+#else // gradient constraints
+            if (1) // basisSets_.edgeSize(1)>0)
+            {
+              shapeFunctionSet.evaluateEach(quadrature[qp], [&](std::size_t alpha, RangeType phi)
+              {
+                shapeFunctionSet.evaluateEach(quadrature[qp], [&](std::size_t beta, RangeType psi)
+                {
+                  if (alpha < numConstraintShapeFunctions-2)
+                  {
+                    constraintValueProj[alpha][beta] += phi * psi * weight;
+                  }
+                });
+              });
+              std::size_t alpha = constraintValueProj.size()-1;
+              const auto &vbs = shapeFunctionSet.valueBasisSet();
+              vbs.jacobianEach(quadrature[qp], [&](std::size_t beta, JacobianRangeType dpsi)
+              {
+                assert( alpha >= 0);
+                assert( alpha < constraintValueProj.size() );
+                assert( beta  < constraintValueProj[alpha].size() );
+                constraintValueProj[alpha-1][beta] += dpsi[0][0] * weight;
+                constraintValueProj[alpha][beta]   += dpsi[0][1] * weight;
+              });
+            }
 #endif
+            // else
+#endif
+#if 1
             shapeFunctionSet.evaluateEach(quadrature[qp], [&](std::size_t alpha, RangeType phi)
             {
               shapeFunctionSet.evaluateEach(quadrature[qp], [&](std::size_t beta, RangeType psi)
@@ -427,6 +455,7 @@ namespace Dune
                 }
               });
             });
+#endif
             if (numGradShapeFunctions>0)
               shapeFunctionSet.jacobianEach(quadrature[qp], [&](std::size_t alpha, JacobianRangeType phi) {
                 shapeFunctionSet.jacobianEach(quadrature[qp], [&](std::size_t beta, JacobianRangeType psi) {
@@ -478,7 +507,7 @@ namespace Dune
         {
           for (std::size_t beta = 0; beta < numConstraintShapeFunctions; ++beta )
           {
-            std::cout << "M_" << beta << " = ";
+            std::cout << "CMatrix_" << beta << " = ";
             for (std::size_t alpha = 0; alpha < numShapeFunctions; ++alpha)
             {
               std::cout << constraintValueProj[beta][alpha] << " ";

@@ -440,10 +440,12 @@ def divFreeSpace(view, order=1, conforming=True,
 # from dune.fem.model import elliptic
 from dune.fem.model import integrands
 from dune.vem.patch import transform
+from dune.fem.model import warnNewCartesianIds
 
 def vemModel(view, equation, space,
         hessStabilization=None,gradStabilization=None, massStabilization=None,
         *args, **kwargs):
+    warnNewCartesianIds(view,*args)
     return integrands(view, equation,
                       modelPatch=transform(space,hessStabilization,gradStabilization,massStabilization),
                       includes=["dune/vem/py/integrands.hh"],
@@ -785,10 +787,19 @@ def polyAgglomerate(constructor,cubes=False,convex=None):
     return grid
 
 def polyGrid(constructor,cubes=False, convex=None,**kwargs):
+    from dune.alugrid import ALUGridEnvVar
+    verbosity = ALUGridEnvVar('ALUGRID_VERBOSITY_LEVEL', 0)
     if isinstance(constructor,dict) and constructor.get("polygons",None) is not None:
         grid = polyAgglomerate(constructor,cubes,convex)
     else:
         grid = trivialAgglomerate(constructor, cubes, **kwargs)
+    # in case of a carteisan domain store if old or new boundary ids was used
+    # this can be removed in later version - it is only used in dune-fem
+    # to give a warning that the boundary ids for the cartesian domains have changed
+    try:
+        grid.hierarchicalGrid._cartesianConstructionWithIds = constructor.boundaryWasSet
+    except AttributeError:
+        pass
     return grid
 
 import weakref
