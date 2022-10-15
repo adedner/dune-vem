@@ -302,7 +302,6 @@ namespace Dune
       DynamicMatrix<DomainFieldType> D;
       // constraint matrix for value projection
       DynamicMatrix<DomainFieldType> constraintValueProj;
-      constraintValueProj.resize(numConstraintShapeFunctions, numShapeFunctions, 0);
       // right hand sides and solvers for CLS for value projection (b: ls, d: constraints)
       Dune::DynamicVector<DomainFieldType> b;
       DynamicMatrix<DomainFieldType> RHSconstraintsMatrix;
@@ -359,11 +358,14 @@ namespace Dune
           hessianProjection[alpha].resize(numDofs, DomainFieldType(0));
 
         // value projection CLS
+        std::size_t numConstraints = (numDofs >= numShapeFunctions)? // LS is large enough
+                          numConstraintShapeFunctions : numShapeFunctions-numDofs;
+        // std::cout << "numConstraints " << numConstraints << std::endl;
         constraintValueProj = 0;
         D.resize(numDofs, numShapeFunctions, 0);
-        RHSconstraintsMatrix.resize(numDofs, numConstraintShapeFunctions, 0);
+        RHSconstraintsMatrix.resize(numDofs, numConstraints, 0);
+        constraintValueProj.resize(numConstraints, numShapeFunctions, 0);
 
-        // std::cout << "numConstraintShapeFunctions " << numConstraintShapeFunctions << std::endl;
         b.resize(numDofs, 0);
 
         // rhs structures for gradient/hessian projection
@@ -393,58 +395,6 @@ namespace Dune
           {
             const DomainFieldType weight =
                     geometry.integrationElement(quadrature.point(qp)) * quadrature.weight(qp);
-#if 0 // extraConstraint
-#if 0 // laplace constraint
-      // the following is only for the C^1 spaces (especially lowest order on triangles)
-      // needs to be moved into the derived H^k class
-            if (basisSets_.edgeSize(1)>0)
-            {
-              shapeFunctionSet.evaluateEach(quadrature[qp], [&](std::size_t alpha, RangeType phi)
-              {
-                shapeFunctionSet.evaluateEach(quadrature[qp], [&](std::size_t beta, RangeType psi)
-                {
-                  if (alpha < numConstraintShapeFunctions-1)
-                  {
-                    constraintValueProj[alpha][beta] += phi * psi * weight;
-                  }
-                });
-              });
-              std::size_t alpha = constraintValueProj.size()-1;
-              const auto &vbs = shapeFunctionSet.valueBasisSet();
-              vbs.hessianEach(quadrature[qp], [&](std::size_t beta, HessianRangeType psi)
-              {
-                double laplace = psi[0][0][0] + psi[0][1][1];
-                constraintValueProj[alpha][beta] += laplace * weight;
-              });
-            }
-#else // gradient constraints
-            if (1) // basisSets_.edgeSize(1)>0)
-            {
-              shapeFunctionSet.evaluateEach(quadrature[qp], [&](std::size_t alpha, RangeType phi)
-              {
-                shapeFunctionSet.evaluateEach(quadrature[qp], [&](std::size_t beta, RangeType psi)
-                {
-                  if (alpha < numConstraintShapeFunctions-2)
-                  {
-                    constraintValueProj[alpha][beta] += phi * psi * weight;
-                  }
-                });
-              });
-              std::size_t alpha = constraintValueProj.size()-1;
-              const auto &vbs = shapeFunctionSet.valueBasisSet();
-              vbs.jacobianEach(quadrature[qp], [&](std::size_t beta, JacobianRangeType dpsi)
-              {
-                assert( alpha >= 0);
-                assert( alpha < constraintValueProj.size() );
-                assert( beta  < constraintValueProj[alpha].size() );
-                constraintValueProj[alpha-1][beta] += dpsi[0][0] * weight;
-                constraintValueProj[alpha][beta]   += dpsi[0][1] * weight;
-              });
-            }
-#endif
-            // else
-#endif
-#if 1
             shapeFunctionSet.evaluateEach(quadrature[qp], [&](std::size_t alpha, RangeType phi)
             {
               shapeFunctionSet.evaluateEach(quadrature[qp], [&](std::size_t beta, RangeType psi)
@@ -455,7 +405,20 @@ namespace Dune
                 }
               });
             });
-#endif
+            // the following is only for the C^1 spaces (especially lowest order on triangles)
+            // adding a constraint on the average of the laplace
+            if (basisSets_.edgeSize(1)>0 && numConstraints == numConstraintShapeFunctions+1)
+            {
+              std::size_t alpha = constraintValueProj.size()-1;
+              const auto &vbs = shapeFunctionSet.valueBasisSet();
+              vbs.hessianEach(quadrature[qp], [&](std::size_t beta, HessianRangeType psi)
+              {
+                double laplace = psi[0][0][0] + psi[0][1][1];
+                constraintValueProj[alpha][beta] += laplace * weight;
+              });
+            }
+            else assert(numConstraints == numConstraintShapeFunctions); // no other case covered yet
+
             if (numGradShapeFunctions>0)
               shapeFunctionSet.jacobianEach(quadrature[qp], [&](std::size_t alpha, JacobianRangeType phi) {
                 shapeFunctionSet.jacobianEach(quadrature[qp], [&](std::size_t beta, JacobianRangeType psi) {
@@ -505,7 +468,7 @@ namespace Dune
         // std::cout << "checkpoint constructed constraint value proj matrix " << std::endl;
 #if 0
         {
-          for (std::size_t beta = 0; beta < numConstraintShapeFunctions; ++beta )
+          for (std::size_t beta = 0; beta < numConstraints; ++beta )
           {
             std::cout << "CMatrix_" << beta << " = ";
             for (std::size_t alpha = 0; alpha < numShapeFunctions; ++alpha)
@@ -524,7 +487,7 @@ namespace Dune
             std::cout << "Constraint RHS:\n";
             for (std::size_t alpha=0; alpha < numDofs; ++alpha )
             {
-              for (std::size_t beta=0; beta < numConstraintShapeFunctions; ++beta )
+              for (std::size_t beta=0; beta < numConstraints; ++beta )
                 std::cout << RHSconstraintsMatrix[alpha][beta] << ", ";
               std::cout << std::endl;
             }
@@ -543,7 +506,7 @@ namespace Dune
         }
 #endif
 
-        if (numConstraintShapeFunctions < numShapeFunctions)
+        if (numConstraints < numShapeFunctions)
         { // need to use a CLS approach
           // std::cout << "CLS" << std::endl;
           auto leastSquaresMinimizer = LeastSquares(D, constraintValueProj);

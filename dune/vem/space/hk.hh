@@ -359,17 +359,18 @@ namespace Dune
       , edgeSFS_( Dune::GeometryType(Dune::GeometryType::cube,dimDomain-1), maxEdgeDegree() )
       , numValueShapeFunctions_( onbSFS_.size()*BBBasisFunctionSetType::RangeType::dimension )
       , numGradShapeFunctions_ (
-          !reduced? std::min( numValueShapeFunctions_, sizeONB<0>(maxOrder_ - 1) )
+          !reduced? std::min( numValueShapeFunctions_, sizeONB<0>(maxOrder_-1 ) )
           : numValueShapeFunctions_-1*BBBasisFunctionSetType::RangeType::dimension
         )
       , numHessShapeFunctions_ (
-          !reduced? std::min( numValueShapeFunctions_, sizeONB<0>(maxOrder_ - 2) )
+          !reduced? std::min( numValueShapeFunctions_, sizeONB<0>(maxOrder_-2) )
           : 0 // numValueShapeFunctions_-3*BBBasisFunctionSetType::RangeType::dimension
         )
       , numInnerShapeFunctions_( testSpaces[2][0]<0? 0 : sizeONB<0>(testSpaces[2][0]) )
       , numEdgeTestShapeFunctions_( sizeONB<1>(
                  *std::max_element( testSpaces_[1].begin(), testSpaces_[1].end()) ) )
       {
+      /*
         auto degrees = edgeDegrees();
         std::cout << "order=" << order << " using " << maxOrder_ << ": "
                   << "[" << numValueShapeFunctions_ << ","
@@ -383,6 +384,7 @@ namespace Dune
                   << " " << degrees[0] << " " << degrees[1]
                   << " max size of edge set: " << edgeSFS_.size()
                   << std::endl;
+      */
       }
 
       const std::size_t maxOrder() const
@@ -435,14 +437,7 @@ namespace Dune
       }
       int constraintSize() const
       {
-      #if 0 // extraConstraint
-        if (edgeSize(1)>0)
-          return numInnerShapeFunctions_+1;
-        else
-          return numInnerShapeFunctions_+1;
-      #else
         return numInnerShapeFunctions_;
-      #endif
       }
       int vertexSize(int deriv) const
       {
@@ -629,12 +624,13 @@ namespace Dune
         const std::size_t numDofs = BaseType::blockMapper().numDofs(agglomerate) * blockSize;
         const std::size_t numConstraintShapeFunctions = BaseType::basisSets_.constraintSize();
         const std::size_t numInnerShapeFunctions = BaseType::basisSets_.innerSize();
+        const std::size_t numConstraints = RHSconstraintsMatrix.cols();
         int polOrder = BaseType::order();
 
         assert( numDofs == RHSconstraintsMatrix.rows() );
-        assert( numConstraintShapeFunctions == RHSconstraintsMatrix.cols() );
+        assert( numConstraintShapeFunctions <= numConstraints );
         assert( numInnerShapeFunctions <= numConstraintShapeFunctions );
-        if (numConstraintShapeFunctions == 0) return;
+        if (numConstraints == 0) return;
 
         // first fill in entries relating to inner dofs (alpha < inner shape functions)
         for ( int beta=0; beta<numDofs; ++beta)
@@ -651,14 +647,14 @@ namespace Dune
           }
         }
 
-        if (1) // BaseType::basisSets_.edgeSize(1)==0)
-        {
-          assert( RHSconstraintsMatrix[0].size() == numInnerShapeFunctions );
+        if (RHSconstraintsMatrix[0].size() == numInnerShapeFunctions )
           return;
-        }
-#if 1 // extraConstraint(s)
-        std::size_t alpha = numConstraintShapeFunctions-1;
-        assert( alpha+1 == RHSconstraintsMatrix[0].size() );
+
+        // only case covered is triangles with C^1-conf space of order 2 with extra constraint
+        assert(BaseType::basisSets_.edgeSize(1)>0 && numConstraints == numConstraintShapeFunctions+1);
+        std::size_t alpha = numConstraints-1;
+        numConstraintShapeFunctions-1;
+        assert( alpha == numConstraintShapeFunctions );
         // matrices for edge projections
         Std::vector<Dune::DynamicMatrix<double> > edgePhiVector(2);
 
@@ -706,29 +702,14 @@ namespace Dune
               edgeShapeFunctionSet.evaluateEach(x, [&](std::size_t beta,
                         typename BaseType::BasisSetsType::EdgeShapeFunctionSetType::RangeType psi)
               {
-              #if 1 // hessian constraint
                 if (beta < edgePhiVector[1].size())
                   for (std::size_t s=0; s<mask[1].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
                     RHSconstraintsMatrix[mask[1][s]][alpha] += weight *
                                          edgePhiVector[1][beta][s] * psi;
-              #else // gradient constraints
-                if (beta < edgePhiVector[0].size())
-                  for (std::size_t s=0; s<mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
-                  {
-                    assert( mask[0][s] < RHSconstraintsMatrix.size() );
-                    RHSconstraintsMatrix[mask[0][s]][alpha-1] += weight *
-                                         normal[0] *
-                                         edgePhiVector[0][beta][s] * psi[0];
-                    RHSconstraintsMatrix[mask[0][s]][alpha]   += weight *
-                                         normal[1] *
-                                         edgePhiVector[0][beta][s] * psi[0];
-                  }
-              #endif
               });
             } // quadrature loop
           } // loop over intersections
         } // loop over triangles in agglomerate
-#endif
       }
     };
 
