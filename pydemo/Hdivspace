@@ -1,0 +1,34 @@
+H(div) paper: G_{k-2} = grad P_{k-1}   Gorth_{k} orthogonal in P_k
+
+                                                   H(div)             curlfree       divfree?
+# k_0: rot v in P_{k_0}                       ->   k_0 = k-1          k_0 = -1       k_0 = k-1
+# k_1: div v in P_{k_1}}                      ->   k_1 = k-1          k_1 = k        k_1 = 0
+k_2: dof = v.grad P_{k_2}                     ->   k_2 = k-1          k_2 = k        k_2 = -1
+k_3: dof = v.Gorth_{k_3}                      ->   k_3 = k            k_3 = -1       k_3 = k
+k_4: dof = v.n P_{k_4}(e)                     ->   k_4 = k            k_4 = k        k_4 = k
+     -> v.n in P_{k_4}
+
+Q: is k_1=k_2 always so that div v in P_{k-1} is computable?
+   is k_0=k_3-1?
+
+Theorem: computable L^2 projection into
+    Gorth_{k_3}+grad P_{k+1}                  ->   into [P_k]^2       into grad P_{k+1}
+Proof:
+H(div): for p = qorth + grad phi so v.p = v.qorth + v.grad phi
+        1.) For first term use dofs (qorth in Gorth_{k_3})
+        2.) For second term:
+            - for phi in P_{k_2} use dofs.
+            - for phi in P_{k+1}\P_{k_2} use that div v in P_{k_2} (k_2=k_1) and basis orthogonal so that
+              v.grad phi = - div v phi + sum_e int_e v.n phi = sum_e int_e Pi^e.n phi
+        So computable.
+
+Constraints need to be
+        1. all element dofs 
+        2. v.grad phi = sum_e int_e Pi^e.n phi for all phi in P_{k_4}\P_{k_2}
+
+So remaining degrees are: k_2, k_3, k_4 and 'value space' is Gorth_{k_3}+grad P_{k+1}. 
+           k_4,k_3,k_2
+Curl-free: {k, -1,k}         value space: grad P_{k+1}
+H(div):    {k,  k,k-1}       value space: [P_k]^2
+
+Question: Does the Div free space make sense?

@@ -4,10 +4,14 @@
 # # Saddle Point Solver (using Scipy)
 # %%
 import matplotlib
+
 matplotlib.rc( 'image', cmap='jet' )
 from matplotlib import pyplot
 import numpy
 from scipy.sparse import linalg
+from concurrent.futures import ThreadPoolExecutor
+
+# this will be available in dune.common soon
 from dune.grid import cartesianDomain
 from dune.alugrid import aluCubeGrid
 from ufl import SpatialCoordinate, CellVolume, TrialFunction, TestFunction,\
@@ -15,11 +19,12 @@ from ufl import SpatialCoordinate, CellVolume, TrialFunction, TestFunction,\
                 FacetNormal, ds, dS, avg, jump, CellVolume, FacetArea
 from dune.ufl import Constant, DirichletBC
 import dune.fem
+from dune.fem.function import integrate, discreteFunction
 from dune.fem.operator import linear as linearOperator
 
 import dune.vem
-from dune.fem.operator import galerkin as galerkinOperator
 from dune.vem import vemScheme as vemScheme
+from dune.fem.operator import galerkin as galerkinOperator
 from dune.fem.scheme import galerkin as galerkinScheme
 
 def plot(target):
@@ -60,52 +65,58 @@ class Uzawa:
         v = TestFunction(spcU)
         p = TrialFunction(spcP)
         q = TestFunction(spcP)
-        forcing = dot(forcing,v)
         if u_h_n is not None:
-            forcing += dot(self.nu*u_h_n,v)
-            b = lambda u1,u2,phi: dot( dot(u1, nabla_grad(u2)), phi)
-            symb = lambda u1,u2,phi: ( b(u1,u2,phi) - b(u1,phi,u2) ) / 2
+            forcing += self.nu*u_h_n
             if explicit:
-                forcing -= b( u_h_n, u_h_n, v )
+                forcing -= dot(u_h_n, nabla_grad(u_h_n))
             else:
-                # forcing -= b(u_h_n, u, v)
-                # forcing -= b(u,u_h_n,v)
-                # ustable forcing -= symb(u_h_n, u, v)
-                # default
-                forcing -= ( b(u_h_n, u, v) + b(u,u_h_n,v) ) / 2
-                # unstable at outflow forcing -= ( symb(u_h_n, u, v) + symb(u,u_h_n,v) ) / 2
+                forcing -= ( dot(u_h_n, nabla_grad(u)) + dot(u, nabla_grad(u_h_n)) ) / 2
         epsilon = lambda u: sym(nabla_grad(u))
-        mainModel   = ( self.nu*dot(u,v) - forcing + 2*self.mu*inner(epsilon(u), epsilon(v)) ) * dx
+        mainModel   = ( self.nu*dot(u,v) - dot(forcing,v) + 2*self.mu*inner(epsilon(u), epsilon(v)) ) * dx
         gradModel   = -p*div(v) * dx
         divModel    = -div(u)*q * dx
         massModel   = p*q * dx
         preconModel = inner(grad(p),grad(q)) * dx
 
-        if not lagrange:
-            self.mainOp = vemScheme( ( mainModel==0, *dbc_u ),
-                                       gradStabilization=as_vector([self.mu*2,self.mu*2]),
-                                       massStabilization=as_vector([self.nu,self.nu])
-                                     )
-        else:
-            self.mainOp = galerkinScheme( ( mainModel==0, *dbc_u ) )
-        gradOp    = galerkinOperator( gradModel, spcP,spcU)
-        divOp     = galerkinOperator( divModel, spcU,spcP)
-        massOp    = galerkinOperator( massModel, spcP)
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            if not lagrange:
+                mainOpF = executor.submit( vemScheme, ( mainModel==0, *dbc_u ),
+                                              gradStabilization=as_vector([self.mu*2,self.mu*2]),
+                                              massStabilization=as_vector([self.nu,self.nu])
+                                         )
+            else:
+                mainOpF = executor.submit( galerkinScheme, ( mainModel==0, *dbc_u ) )
+            gradOpF = executor.submit(galerkinOperator, gradModel, spcP,spcU)
+            divOpF  = executor.submit(galerkinOperator, divModel, spcU,spcP)
+            massOpF = executor.submit(galerkinOperator, massModel, spcP)
+            if precondition and tau is not None:
+                if not lagrange:
+                    preconModel = dgLaplace(10, p,q, spcP, 0, 1)
+                    preconOpF = executor.submit(galerkinOperator, preconModel, spcP)
+                else:
+                    preconModel = inner(grad(p),grad(q)) * dx
+                    preconOpF = executor.submit(galerkinOperator, (preconModel,DirichletBC(spcP,[0])), spcP)
+        self.mainOp, gradOp, divOp, massOp, preconOp = \
+          mainOpF.result(), gradOpF.result(), divOpF.result(), massOpF.result(), preconOpF.result()
 
-        self.mainLinOp = linearOperator(self.mainOp)
-        self.G    = linearOperator(gradOp).as_numpy
-        self.D    = linearOperator(divOp).as_numpy
-        self.M    = linearOperator(massOp).as_numpy
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            AF = executor.submit(linearOperator,self.mainOp)
+            GF = executor.submit(linearOperator,gradOp)
+            DF = executor.submit(linearOperator,divOp)
+            MF = executor.submit(linearOperator,massOp)
+            if preconOp:
+                PF = executor.submit(linearOperator,preconOp)
+            else:
+                PF = None
+        self.A, self.G, self.D, self.M = (
+          AF.result().as_numpy, GF.result().as_numpy,
+          DF.result().as_numpy, MF.result().as_numpy )
+
+        self.Ainv = lambda rhs: linalg.spsolve(self.A,rhs)
         self.Minv = lambda rhs: linalg.spsolve(self.M,rhs)
 
-        if precondition and self.mainOp.model.nu > 0:
-            if not lagrange:
-                preconModel = dgLaplace(10, p,q, spcP, 0, 1)
-                preconOp    = galerkinOperator( preconModel, spcP)
-            else:
-                preconModel = inner(grad(p),grad(q)) * dx
-                preconOp    = galerkinOperator( (preconModel,DirichletBC(spcP,0)), spcP)
-            self.P    = linearOperator(preconOp).as_numpy
+        if PF:
+            self.P = PF.result().as_numpy
             self.Pinv = lambda rhs: linalg.spsolve(self.P,rhs)
         else:
             self.Pinv = None
@@ -120,14 +131,12 @@ class Uzawa:
         self.xi     = numpy.copy(self.rhs_u)
 
     def solve(self,target):
-        velocity = target[0]
-        pressure = target[1]
         info = {"uzawa.outer.iterations":0,
                 "uzawa.converged":False}
-        # problem is linear but coefficients depend on previous time step so need to reassemble
-        self.mainOp.jacobian(velocity, self.mainLinOp)
-        A = self.mainLinOp.as_numpy
-        Ainv = lambda rhs: linalg.spsolve(A,rhs)
+        self.A    = linearOperator(self.mainOp).as_numpy
+        self.Ainv = lambda rhs: linalg.spsolve(self.A,rhs)
+        velocity = target[0]
+        pressure = target[1]
         sol_u = velocity.as_numpy
         sol_p = pressure.as_numpy
         # right hand side for Shur complement problem
@@ -137,7 +146,7 @@ class Uzawa:
         self.xi[:]  = self.G*sol_p
         self.rhs_u -= self.xi
         self.mainOp.setConstraints(self.rhsVelo)
-        sol_u[:]      = Ainv(self.rhs_u[:])
+        sol_u[:]      = self.Ainv(self.rhs_u[:])
         self.rhs_p[:] = self.D*sol_u
         self.r[:]     = self.Minv(self.rhs_p[:])
         if self.Pinv:
@@ -154,7 +163,7 @@ class Uzawa:
             self.xi.fill(0)
             self.rhs_u[:] = self.G*self.d
             self.mainOp.setConstraints([0,]*self.dimension, self.rhsVelo)
-            self.xi[:] = Ainv(self.rhs_u[:])
+            self.xi[:] = self.Ainv(self.rhs_u[:])
             self.rhs_p[:] = self.D*self.xi
             rho = delta / numpy.dot(self.d,self.rhs_p)
             sol_p += rho*self.d
@@ -179,46 +188,64 @@ class Uzawa:
         info["uzawa.outer.iterations"] = m
         return info
 
-def main():
-    useVem   = True
-    muValue  = 0.1
-    tauValue = 1e-2
-    order    = 2
-    grid = dune.vem.polyGrid(cartesianDomain([0,0],[3,1],[30*4,10*4]),cubes=False)
-    if useVem:
-        spcU = dune.vem.divFreeSpace( grid, order=order, conforming=True)
-        spcP = dune.vem.bbdgSpace( grid, order=0 )
-    else:
-        spcU = dune.fem.space.lagrange( grid, order=order, dimRange=2 )
-        spcP = dune.fem.space.lagrange( grid, order=order-1 )
+def main(level = 0):
+    Lx = 3
+    Ly = 1
+    N = 2**(level)
+    muValue = 0.01
+    tauValue = 1e-3
+    order = 3
+    # grid = dune.vem.polyGrid(cartesianDomain([0,0],[3,1],[30*N,10*N]),cubes=False)
+    grid = dune.vem.polyGrid(
+          dune.vem.voronoiCells([[0,0],[Lx,Ly]], 50*N*N, lloyd=200, fileName="voronoiseeds", load=True)
+        #   cartesianDomain([0.,0.],[Lx,Ly],[N,N]), cubes=False
+        #   cartesianDomain([0.,0.],[Lx,Ly],[2*N,2*N]), cubes=True
+       )
+
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        spcUF = executor.submit(dune.vem.divFreeSpace, grid, order=order)
+        spcPF = executor.submit(dune.vem.bbdgSpace, grid)
+        spcPsmoothF = executor.submit(dune.vem.vemSpace, grid, order=order, testSpaces=[-1,order-1,order-2])
+    spcU, spcP, spcPsmooth = spcUF.result(), spcPF.result(), spcPsmoothF.result()
 
     x       = SpatialCoordinate(spcU)
     exact_u = as_vector( [x[1] * (1.-x[1]), 0] ) # dy u_x = 1-2y, -dy^2 u_x = 2
-    exact_p = (-2*x[0] + 2)*muValue              # dx p   = -2mu
+    exact_p = (-2*x[0] + 3)*muValue              # dx p   = -2mu
     f       = as_vector( [0,]*grid.dimension )
-    f      += exact_u/tauValue
 
     # discrete functions
     velocity = spcU.interpolate(spcU.dimRange*[0], name="velocity")
     pressure = spcP.interpolate(0, name="pressure")
 
     dbc = [ DirichletBC(velocity.space,exact_u,None) ]
+    exact_uh = dune.fem.function.uflFunction(grid, order=2, name="exact_uh", ufl=exact_u)
     uzawa = Uzawa(grid, spcU, spcP, dbc, f,
-                  muValue, tauValue, u_h_n=None,
-                  tolerance=1e-9, precondition=True, verbose=True, # tolerance 2e-5 (TH p=2)
-                  lagrange=not useVem )
-    uzawa.solve([velocity,pressure])
-    print("Retry")
+                  muValue, tauValue, u_h_n=exact_uh,
+                  tolerance=1e-12, precondition=True, verbose=False)
     uzawa.solve([velocity,pressure])
 
-    fig = pyplot.figure(figsize=(10,10))
-    velocity.plot(colorbar="vertical", figure=(fig, 211))
-    pressure.plot(colorbar="vertical", figure=(fig, 212))
-    pyplot.show()
-    fig = pyplot.figure(figsize=(10,10))
-    dune.fem.plotting.plotPointData(grad(velocity[0])[0], grid=grid,colorbar="vertical", figure=(fig, 211))
-    dune.fem.plotting.plotPointData(grad(velocity[0])[1], grid=grid,colorbar="vertical", figure=(fig, 212))
-    pyplot.show()
+    p,q = TrialFunction(spcPsmooth), TestFunction(spcPsmooth)
+    scheme = vemScheme( [ ( inner(grad(p),grad(q)) -
+                            div( dot(velocity, nabla_grad(velocity)) - f)*q ) * dx == 0,
+                        DirichletBC(spcPsmooth,exact_p) ],
+                        gradStabilization=1, massStabilization=None,
+                        parameters={"newton.linear.tolerance":1e-14}
+                      )
+    pressure = spcPsmooth.interpolate(0,name="pRecon")
+    scheme.solve(pressure)
+    average_p = Constant( pressure.integrate(), "aver_p" )
+
+    edf = as_vector( [v1-v2 for v1,v2 in zip(velocity,exact_u)] +
+                     [(pressure-average_p)-exact_p] )
+    err = [ e*e for e in edf ]
+    errors  = [ numpy.sqrt(e) for e in integrate(grid, err, order=8) ]
+
+    # print(errors, average_p.value)
+    # plot([velocity,pressure])
+    return errors
 
 if __name__ == "__main__":
-    main()
+    err1 = main(0)
+    err2 = main(1)
+    assert all( [ e<1e-9 for e in err1 ] )
+    assert all( [ e<1e-9 for e in err2 ] )

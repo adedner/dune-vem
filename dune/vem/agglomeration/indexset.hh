@@ -160,7 +160,7 @@ namespace Dune
       double vertexDiameter( std::size_t index ) const { return vertexDiameters_[index]; }
       double vertexDiameter( const ElementType &element, std::size_t index ) const
       {
-        return vertexDiameter( localIndex(element,index,dimension) );
+        return vertexDiameter( globalIndex(element,index,dimension).first );
       }
       std::pair<double,double> diameters() const { return {minDiameter_,maxDiameter_}; }
       const BoundingBox<GridPart>& boundingBox( std::size_t index ) const
@@ -179,6 +179,15 @@ namespace Dune
       {
         return const_cast<AgglomerationType&>(agglomeration()).boundingBoxes();
       }
+      bool twist( std::size_t i ) const
+      {
+        return edgeTwist_[ i ];
+      }
+      bool twist( const typename GridPart::IntersectionType &intersection ) const
+      {
+        return edgeTwist_[ subIndex( intersection.inside(), intersection.indexInInside(), dimension-1 ) ];
+      }
+
 
       void update();
     private:
@@ -194,6 +203,7 @@ namespace Dune
       Std::vector< double > vertexDiameters_;
       double minDiameter_, maxDiameter_;
       std::size_t counter_;
+      std::vector< bool > edgeTwist_;
     };
 
 
@@ -446,6 +456,26 @@ namespace Dune
 
       maxDiameter_ = *std::max_element(vertexDiameters_.begin(),vertexDiameters_.end());
       minDiameter_ = *std::min_element(vertexDiameters_.begin(),vertexDiameters_.end());
+
+      // store edge twists
+      if( dimension > 1 )
+      {
+        const auto &idSet = agglomeration_.gridPart().grid().globalIdSet();
+
+        edgeTwist_.resize( size( dimension-1 ) );
+        for( const auto element : elements( agglomeration_.gridPart(), Partitions::interiorBorder ) )
+        {
+          const auto &refElement = ReferenceElements< typename GridPart::ctype, dimension >::general( element.type() );
+
+          const int numEdges = refElement.size( dimension-1 );
+          for( int i = 0; i < numEdges; ++i )
+          {
+            const auto left = idSet.subId( Dune::Fem::gridEntity(element), refElement.subEntity( i, dimension-1, 0, dimension ), dimension );
+            const auto right = idSet.subId( Dune::Fem::gridEntity(element), refElement.subEntity( i, dimension-1, 1, dimension ), dimension );
+            edgeTwist_[ subIndex( element, i, dimension-1 ) ] = (right < left);
+          }
+        }
+      }
     }
   } // namespace Vem
 

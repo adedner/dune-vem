@@ -48,6 +48,7 @@ namespace Dune
       typedef typename FunctionSpaceType::HessianRangeType HessianRangeType;
 
       static constexpr int dimDomain = DomainType::dimension;
+      static_assert(RangeType::dimension==1);
 
       typedef typename ReferenceElements< typename DomainType::field_type, dimDomain >::ReferenceElement ReferenceElementType;
 
@@ -315,12 +316,12 @@ namespace Dune
           functor(beta,transformation_( hess_[beta] ));
       }
 
-    private:
       template< class Point >
       DomainType position ( const Point &x ) const
       {
         return bbox().transform( entity().geometry().global( Fem::coordinate( x ) ) );
       }
+    private:
       // make basis orthogonal
       // k = 0
       // for i < N
@@ -370,6 +371,7 @@ namespace Dune
         for (std::size_t beta=0;beta<size();++beta)
           shapeFunctionSet_.hessianEach( y, f);
         // onb( values ); // Note: failing axpy on FV<FM> due to missing // double*FM
+        if (!useOnb_) return;
         std::size_t k = 0;
         for (std::size_t i=0;i<values.size();++i,++k)
         {

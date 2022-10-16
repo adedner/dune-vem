@@ -1,3 +1,4 @@
+add_subdirectory(tutorial)
 add_python_targets(vem
   __init__
   __main__

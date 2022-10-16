@@ -1,0 +1,33 @@
+---
+variables:
+  GLOBAL_CMAKE_FLAGS: ' -DCMAKE_DISABLE_FIND_PACKAGE_Alberta=TRUE -DALLOW_CXXFLAGS_OVERWRITE=ON -DDUNE_GRID_GRIDTYPE_SELECTOR=ON'
+  DUNECI_CMAKE_FLAGS: '$GLOBAL_CMAKE_FLAGS'
+  DUNE_LOG_LEVEL:     DEBUG
+
+before_script:
+  - export TORTURE_TESTS=off
+  - source /duneci/bin/duneci-init-job
+  - duneci-install-module https://gitlab.dune-project.org/core/dune-common.git
+  - duneci-install-module https://gitlab.dune-project.org/core/dune-geometry.git
+  - duneci-install-module https://gitlab.dune-project.org/core/dune-grid.git
+  - duneci-install-module https://gitlab.dune-project.org/core/dune-istl.git
+  - duneci-install-module https://gitlab.dune-project.org/core/dune-localfunctions.git
+  - duneci-install-module https://gitlab.dune-project.org/extensions/dune-alugrid.git
+  - duneci-install-module https://gitlab.dune-project.org/dune-fem/dune-fem.git
+
+debian-11-gcc-10-17:
+  image: registry.dune-project.org/docker/ci/debian:11
+  script:
+    - duneci-standard-test
+  variables:
+    DUNECI_TOOLCHAIN:  gcc-10-17
+  tags: [duneci]
+
+ubuntu-20.04-clang-10-17:
+  image: registry.dune-project.org/docker/ci/ubuntu:20.04
+  script:
+    - duneci-standard-test
+  variables:
+    # bug in CI clang-10-17 and clang-10-20 are mixed up
+    DUNECI_TOOLCHAIN: clang-10-20
+  tags: [duneci]

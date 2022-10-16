@@ -229,8 +229,8 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model>
         // local coordinate of the vertex
         DomainType localPoint = geometry.local(globalPoint);
 
-        DomainRangeType vu;
-        uLocal.evaluate(localPoint, vu);
+        DomainRangeType vu(0);
+        // uLocal.evaluate(localPoint, vu);
 
         double bbH2 = pow(bbox.volume()/bbox.diameter(),2);
         // std::cout << "vemelliptic:" << pow(bbox.diameter(),2) << " " << bbox.volume() << std::endl;
@@ -348,8 +348,8 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
         DomainType globalPoint = geometry.corner(j);
         // local coordinate of the vertex
         DomainType localPoint = geometry.local(globalPoint);
-        DomainRangeType vu;
-        uLocal.evaluate(localPoint, vu);
+        DomainRangeType vu(0);
+        // uLocal.evaluate(localPoint, vu);
 
         double bbH2 = pow(bbox.volume()/bbox.diameter(),2);
         // std::cout << "vemelliptic:" << pow(bbox.diameter(),2) << " " << bbox.volume() << std::endl;

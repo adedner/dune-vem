@@ -92,6 +92,9 @@ def bbdgSpace(view, order=1, scalar=False, dimRange=None, field="double",
                     'pybind11::keep_alive< 1, 2 >()'] )
 
 
+    # is defined on the index set which is not used for the dg space
+    # diameterMethod = Method('diameters',
+    #    '''[]( DuneType &self ) { return self.blockMapper().indexSet().diameters(); }''' )
     updateMethod = Method('update',
        '''[]( DuneType &self ) { self.update(); }''' )
 
@@ -116,7 +119,8 @@ def vemSpace(view, order=1, testSpaces=None, scalar=False,
              dimRange=None, conforming=True, field="double",
              storage="numpy",
              basisChoice=2, rotatedBB=True,
-             edgeInterpolation=False, vectorSpace=False):
+             edgeInterpolation=False,
+             vectorSpace=False, reduced=False):
     """create a virtual element space over an agglomerated grid
 
     Args:
@@ -175,7 +179,10 @@ def vemSpace(view, order=1, testSpaces=None, scalar=False,
     gridPartName = "Dune::FemPy::GridPart< " + view.cppTypeName + " >"
     typeName = "Dune::Vem::AgglomerationVEMSpace< " +\
       "Dune::Fem::FunctionSpace< double, " + field + ", " + str(dimw) + ", " + str(dimRange) + " >, " +\
-      gridPartName + (", true " if vectorSpace else ", false ") + " >"
+      gridPartName +\
+      (", true " if vectorSpace else ", false ") +\
+      (", true " if reduced else ", false ") +\
+      " >"
     constructor = Constructor(
                    ['pybind11::handle gridView',
                     'const pybind11::object agglomerate',
@@ -263,15 +270,182 @@ def space(view, order=1, dimRange=None,
                         conforming=False, basisChoice=basisChoice)
     raise AttributeError("wrong version string provided:",version)
 
+###############################
+
+def curlFreeSpace(view, order=1,
+             field="double", storage="numpy",
+             basisChoice=2, rotatedBB=True):
+    """create a virtual element space over an agglomerated grid
+
+    Args:
+        view: the underlying grid view
+        order: polynomial order of the finite element functions
+        field: field of the range space
+        storage: underlying linear algebra backend
+
+    Returns:
+        Space: the constructed Space
+    """
+
+    from dune.fem.space import module, addStorage
+
+    if order < 0:
+        raise KeyError(\
+            "Parameter error in DiscontinuousGalerkinSpace with "+
+            "order=" + str(order) + ": " +\
+            "order has to be greater or equal to 0")
+
+    agglomerate = view.hierarchicalGrid.agglomerate
+
+    includes = [ "dune/fem/gridpart/common/gridpart.hh", "dune/vem/space/curlfree.hh" ] + view.cppIncludes
+    dimw = view.dimWorld
+    viewType = view.cppTypeName
+
+    gridPartName = "Dune::FemPy::GridPart< " + view.cppTypeName + " >"
+    typeName = "Dune::Vem::CurlFreeVEMSpace< " + gridPartName + " >"
+    constructor = Constructor(
+                   ['pybind11::handle gridView',
+                    'const pybind11::object agglomerate',
+                    'unsigned int order',
+                    'int basisChoice','bool rotatedBB'],
+                   ['typedef Dune::Vem::Agglomeration<' + gridPartName + '> AggloType;',
+                    'AggloType *agglo = nullptr;',
+                    '// check storage',
+                    'pybind11::function retrieve = pybind11::module::import("dune.vem.vem").attr("retrieveAgglo_");',
+                    'pybind11::function insert   = pybind11::module::import("dune.vem.vem").attr("insertAgglo_");',
+                    'pybind11::function remove   = pybind11::module::import("dune.vem.vem").attr("removeAgglo_");',
+                    'pybind11::handle aggloExists = retrieve(gridView);',
+                    'if (! pybind11::isinstance<pybind11::none>(aggloExists) ) {',
+                    '  // std::cout << "retrieve agglo\\n";',
+                    '  agglo = static_cast<AggloType*>(aggloExists.cast<void*>());',
+                    '}',
+                    'else {',
+                    '  agglo = new AggloType(',
+                    '           Dune::FemPy::gridPart<' + viewType + '>(gridView),rotatedBB,',
+                    '      [agglomerate](const auto& idx)',
+                    '      { return agglomerate(idx).template cast<unsigned int>(); } );',
+                    '  insert(gridView,(void*)agglo);',
+                    '  pybind11::cpp_function aggloCleanup(',
+                    '        [agglo,remove](pybind11::handle weakref) {',
+                    '        // std::cout << "remove agglo\\n";',
+                    '        remove((void*)agglo);',
+                    '        delete agglo;',
+                    '        weakref.dec_ref();',
+                    '    });',
+                    '  (void) pybind11::weakref(gridView, aggloCleanup).release();',
+                    '  // std::cout << "new agglo\\n";',
+                    '}',
+                    'auto obj = new DuneType(*agglo, order, basisChoice );',
+                    'return obj;'],
+                   ['"gridView"_a', '"agglomerate"_a',
+                    '"order"_a',
+                    '"basisChoice"_a', '"rotatedBB"_a',
+                    'pybind11::keep_alive< 1, 2 >()'] )
+    diameterMethod = Method('diameters',
+       '''[]( DuneType &self ) { return self.blockMapper().indexSet().diameters(); }''' )
+    updateMethod = Method('update',
+       '''[]( DuneType &self ) { self.update(); }''' )
+
+    spc = module(field, includes, typeName, constructor, diameterMethod, updateMethod,
+                storage=storage,
+                ctorArgs=[view, agglomerate, order, basisChoice, rotatedBB])
+    addStorage(spc, storage)
+    return spc.as_ufl()
+
+#########################################################
+
+def divFreeSpace(view, order=1, conforming=True,
+             field="double", storage="numpy",
+             basisChoice=2, edgeInterpolation=False, rotatedBB=True):
+    """create a virtual element space over an agglomerated grid
+
+    Args:
+        view: the underlying grid view
+        order: polynomial order of the finite element functions
+        field: field of the range space
+        storage: underlying linear algebra backend
+
+    Returns:
+        Space: the constructed Space
+    """
+
+    from dune.fem.space import module, addStorage
+
+    if order < 0:
+        raise KeyError(\
+            "Parameter error in DiscontinuousGalerkinSpace with "+
+            "order=" + str(order) + ": " +\
+            "order has to be greater or equal to 0")
+
+    agglomerate = view.hierarchicalGrid.agglomerate
+
+    includes = [ "dune/fem/gridpart/common/gridpart.hh", "dune/vem/space/divfree.hh" ] + view.cppIncludes
+    dimw = view.dimWorld
+    viewType = view.cppTypeName
+
+    gridPartName = "Dune::FemPy::GridPart< " + view.cppTypeName + " >"
+    typeName = "Dune::Vem::DivFreeVEMSpace< " + gridPartName + " >"
+    constructor = Constructor(
+                   ['pybind11::handle gridView',
+                    'const pybind11::object agglomerate',
+                    'unsigned int order', 'bool conforming',
+                    'int basisChoice','bool edgeInterpolation','bool rotatedBB'],
+                   ['typedef Dune::Vem::Agglomeration<' + gridPartName + '> AggloType;',
+                    'AggloType *agglo = nullptr;',
+                    '// check storage',
+                    'pybind11::function retrieve = pybind11::module::import("dune.vem.vem").attr("retrieveAgglo_");',
+                    'pybind11::function insert   = pybind11::module::import("dune.vem.vem").attr("insertAgglo_");',
+                    'pybind11::function remove   = pybind11::module::import("dune.vem.vem").attr("removeAgglo_");',
+                    'pybind11::handle aggloExists = retrieve(gridView);',
+                    'if (! pybind11::isinstance<pybind11::none>(aggloExists) ) {',
+                    '  // std::cout << "retrieve agglo\\n";',
+                    '  agglo = static_cast<AggloType*>(aggloExists.cast<void*>());',
+                    '}',
+                    'else {',
+                    '  agglo = new AggloType(',
+                    '           Dune::FemPy::gridPart<' + viewType + '>(gridView),rotatedBB,',
+                    '      [agglomerate](const auto& idx)',
+                    '      { return agglomerate(idx).template cast<unsigned int>(); } );',
+                    '  insert(gridView,(void*)agglo);',
+                    '  pybind11::cpp_function aggloCleanup(',
+                    '        [agglo,remove](pybind11::handle weakref) {',
+                    '        // std::cout << "remove agglo\\n";',
+                    '        remove((void*)agglo);',
+                    '        delete agglo;',
+                    '        weakref.dec_ref();',
+                    '    });',
+                    '  (void) pybind11::weakref(gridView, aggloCleanup).release();',
+                    '  // std::cout << "new agglo\\n";',
+                    '}',
+                    'auto obj = new DuneType(*agglo, order, conforming, basisChoice, edgeInterpolation );',
+                    'return obj;'],
+                   ['"gridView"_a', '"agglomerate"_a',
+                    '"order"_a', '"conforming"_a',
+                    '"basisChoice"_a', '"edgeInterpolation"_a','"rotatedBB"_a',
+                    'pybind11::keep_alive< 1, 2 >()'] )
+    diameterMethod = Method('diameters',
+       '''[]( DuneType &self ) { return self.blockMapper().indexSet().diameters(); }''' )
+    updateMethod = Method('update',
+       '''[]( DuneType &self ) { self.update(); }''' )
+
+    spc = module(field, includes, typeName, constructor, diameterMethod, updateMethod,
+                storage=storage,
+                ctorArgs=[view, agglomerate, order, conforming, basisChoice, edgeInterpolation, rotatedBB])
+    addStorage(spc, storage)
+    return spc.as_ufl()
+
+#########################################################
 #########################################################
 
 # from dune.fem.model import elliptic
 from dune.fem.model import integrands
 from dune.vem.patch import transform
+from dune.fem.model import warnNewCartesianIds
 
 def vemModel(view, equation, space,
         hessStabilization=None,gradStabilization=None, massStabilization=None,
         *args, **kwargs):
+    warnNewCartesianIds(view,*args)
     return integrands(view, equation,
                       modelPatch=transform(space,hessStabilization,gradStabilization,massStabilization),
                       includes=["dune/vem/py/integrands.hh"],
@@ -537,7 +711,11 @@ from dune.vem.voronoi import triangulated_voronoi
 from scipy.spatial import Voronoi, voronoi_plot_2d, cKDTree, Delaunay
 import numpy
 
-import triangle
+try:
+    import triangle
+except ImportError:
+    triangle = None
+
 from sortedcontainers import SortedDict
 import matplotlib.pyplot as plt
 class PolyAgglomerate:
@@ -555,6 +733,13 @@ class PolyAgglomerate:
     def roundBary(a):
         return tuple(round(aa,8) for aa in a)
     def construct(cubes,convex,vertices,polygons):
+        if not triangle and not convex:
+            raise ValueError("""
+a grid with non convex polygons requires the 'triangle' package.
+Run 'pip install triangle' and try again.
+Note that 'convex=False' is the default - if all your polygons are convex
+change the parameter to 'True' which will also speedup the grid construction.
+""")
         index = SortedDict()
         if cubes:
             for i,poly in enumerate(polygons):
@@ -602,10 +787,19 @@ def polyAgglomerate(constructor,cubes=False,convex=None):
     return grid
 
 def polyGrid(constructor,cubes=False, convex=None,**kwargs):
+    from dune.alugrid import ALUGridEnvVar
+    verbosity = ALUGridEnvVar('ALUGRID_VERBOSITY_LEVEL', 0)
     if isinstance(constructor,dict) and constructor.get("polygons",None) is not None:
         grid = polyAgglomerate(constructor,cubes,convex)
     else:
         grid = trivialAgglomerate(constructor, cubes, **kwargs)
+    # in case of a carteisan domain store if old or new boundary ids was used
+    # this can be removed in later version - it is only used in dune-fem
+    # to give a warning that the boundary ids for the cartesian domains have changed
+    try:
+        grid.hierarchicalGrid._cartesianConstructionWithIds = constructor.boundaryWasSet
+    except AttributeError:
+        pass
     return grid
 
 import weakref
