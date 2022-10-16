@@ -1,2 +1,12 @@
+# ignore all build folders
+/build*/
+# ignore backup files
 *~
 *.swp
+# ignore image files
+*.vtu
+*.png
+# ignore files generated during python setup.py sdist
+MANIFEST
+_skbuild/
+dist

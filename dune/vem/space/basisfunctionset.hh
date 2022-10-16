@@ -28,10 +28,10 @@ namespace Dune
     // -------------------
 
     // TODO: add template arguments for ValueProjection and JacobianProjection
-    template< class Entity, class ShapeFunctionSet >
+    template< class Entity, class ShapeFunctionSet, class InterpolationType >
     class VEMBasisFunctionSet
     {
-      typedef VEMBasisFunctionSet< Entity, ShapeFunctionSet > ThisType;
+      typedef VEMBasisFunctionSet< Entity, ShapeFunctionSet, InterpolationType > ThisType;
 
     public:
       typedef Entity EntityType;
@@ -58,8 +58,8 @@ namespace Dune
       const auto& jacobianProjection() const { return (*jacobianProjections_)[agglomerate_]; }
       const auto& hessianProjection() const { return (*hessianProjections_)[agglomerate_]; }
       typedef Std::vector< Std::vector< DomainFieldType > > ValueProjection;
-      typedef Std::vector< Std::vector< DomainType > > JacobianProjection;
-      typedef Std::vector< Std::vector< HessianMatrixType > > HessianProjection;
+      typedef Std::vector< Std::vector< DomainFieldType > > JacobianProjection;
+      typedef Std::vector< Std::vector< DomainFieldType > > HessianProjection;
       template <class T>
       using Vector = Std::vector<T>;
 
@@ -70,11 +70,14 @@ namespace Dune
                             std::shared_ptr<Vector<ValueProjection>> valueProjections,
                             std::shared_ptr<Vector<JacobianProjection>> jacobianProjections,
                             std::shared_ptr<Vector<HessianProjection>> hessianProjections,
-                            ShapeFunctionSet shapeFunctionSet = ShapeFunctionSet() )
+                            ShapeFunctionSet shapeFunctionSet,
+                            std::shared_ptr<InterpolationType> interpolation
+                          )
         : entity_( &entity ), //polygon
           agglomerate_(agglomerate),
           shapeFunctionSet_( std::move( shapeFunctionSet ) ),
-          valueProjections_( valueProjections),
+          interpolation_(interpolation),
+          valueProjections_( valueProjections ),
           jacobianProjections_( jacobianProjections ),
           hessianProjections_( hessianProjections ),
           size_( valueProjection()[0].size() )
@@ -97,35 +100,89 @@ namespace Dune
           evaluateAll( quadrature[ qp ], dofs, values[ qp ] );
       }
 
-      template< class Point, class DofVector >
-      void evaluateAll ( const Point &x, const DofVector &dofs, RangeType &value ) const
+      template< class F, int d, class DofVector >
+      void evaluateAll ( const Dune::FieldVector<F,d> &x, const DofVector &dofs, RangeType &value ) const
       {
+        // needed for plotting for example: assert(0);
         value = RangeType( 0 );
-        shapeFunctionSet_.evaluateEach( position( x ), [ this, &dofs, &value ] ( std::size_t alpha, RangeType phi_alpha ) {
+        shapeFunctionSet_.evaluateEach( x, [ this, &dofs, &value ] ( std::size_t alpha, RangeType phi_alpha ) {
             for( std::size_t j = 0; j < size(); ++j )
               value.axpy( valueProjection()[ alpha ][ j ]*dofs[ j ], phi_alpha );
           } );
       }
-
-      template< class Point, class Values > const
-      void evaluateAll ( const Point &x, Values &values ) const
+      template< class Point, class DofVector >
+      void evaluateAll ( const Point &x, const DofVector &dofs, RangeType &value ) const
       {
+        value = RangeType( 0 );
+        if constexpr ( Point::QuadratureType::codimension == 1)
+        {
+          Std::vector < Dune::DynamicMatrix<double> > localDofVectorMatrix(2);
+          Std::vector<Std::vector<unsigned int>> mask(2,Std::vector<unsigned int>(0));
+          auto locx = x.localPosition();
+          auto normal = x.quadrature().intersection().unitOuterNormal(locx);
+          auto edgeSF = (*interpolation_)(x.quadrature().intersection(), localDofVectorMatrix, mask);
+          edgeSF.evaluateEach(locx, [&](std::size_t beta, RangeType psi)
+          {
+            if (beta < localDofVectorMatrix[0].size())
+              for (std::size_t s=0; s<mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
+              {
+                std::size_t j = mask[0][s];
+                value.axpy( localDofVectorMatrix[0][beta][s] * dofs[ j ], psi );
+              }
+          });
+        }
+        else
+        {
+          shapeFunctionSet_.evaluateEach( x, [ this, &dofs, &value ] ( std::size_t alpha, RangeType phi_alpha ) {
+              for( std::size_t j = 0; j < size(); ++j )
+                value.axpy( valueProjection()[ alpha ][ j ]*dofs[ j ], phi_alpha );
+            } );
+        }
+      }
+
+      template< class F, int d, class Values >
+      void evaluateAll ( const Dune::FieldVector<F,d> &x, Values &values ) const
+      {
+        // needed for plotting for example: assert(0);
         assert( values.size() >= size() );
         std::fill( values.begin(), values.end(), RangeType( 0 ) );
-        shapeFunctionSet_.evaluateEach( position(x), [ this, &values ] ( std::size_t alpha, RangeType phi_alpha ) {
+        shapeFunctionSet_.evaluateEach( x, [ this, &values ] ( std::size_t alpha, RangeType phi_alpha ) {
             for( std::size_t j = 0; j < size(); ++j )
               values[ j ].axpy( valueProjection()[ alpha ][ j ], phi_alpha );
           } );
       }
-
-      // TODO: use lower order shape function set for Jacobian?
-      static void axpyJac(const DomainFieldType lam, const DomainType &dom, const RangeType &ran,
-                          JacobianRangeType &ret)
+      template< class Point, class Values >
+      void evaluateAll ( const Point &x, Values &values ) const
       {
-        for (int r=0;r<RangeType::dimension;++r)
-          for (int d=0;d<DomainType::dimension;++d)
-            ret[r][d] += lam*dom[d]*ran[r];
+        assert( values.size() >= size() );
+        std::fill( values.begin(), values.end(), RangeType( 0 ) );
+        if constexpr ( Point::QuadratureType::codimension == 1)
+        {
+          Std::vector < Dune::DynamicMatrix<double> > localDofVectorMatrix(2);
+          Std::vector<Std::vector<unsigned int>> mask(2,Std::vector<unsigned int>(0));
+          auto locx = x.localPosition();
+          auto normal = x.quadrature().intersection().unitOuterNormal(locx);
+          auto edgeSF = (*interpolation_)(x.quadrature().intersection(), localDofVectorMatrix, mask);
+          edgeSF.evaluateEach(locx, [&](std::size_t beta, RangeType psi)
+          {
+            if (beta < localDofVectorMatrix[0].size())
+              for (std::size_t s=0; s<mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
+              {
+                std::size_t alpha = mask[0][s];
+                values[alpha].axpy( localDofVectorMatrix[0][beta][s], psi );
+              }
+          });
+        }
+        else
+        {
+          // std::cout << "B: using value projection\n";
+          shapeFunctionSet_.evaluateEach( x, [ this, &values ] ( std::size_t alpha, RangeType phi_alpha ) {
+              for( std::size_t j = 0; j < size(); ++j )
+                values[ j ].axpy( valueProjection()[ alpha ][ j ], phi_alpha );
+            } );
+        }
       }
+
       template< class Quadrature, class DofVector, class Jacobians >
       void jacobianAll ( const Quadrature &quadrature, const DofVector &dofs, Jacobians &jacobians ) const
       {
@@ -133,36 +190,160 @@ namespace Dune
         for( std::size_t qp = 0; qp < nop; ++qp )
           jacobianAll( quadrature[ qp ], dofs, jacobians[ qp ] );
       }
+      template< class F, int d, class DofVector >
+      void jacobianAll ( const Dune::FieldVector<F,d> &x, const DofVector &dofs, JacobianRangeType &jacobian ) const
+      {
+        jacobian = JacobianRangeType( 0 );
+        shapeFunctionSet_.jacobianEach( x, [ this, &dofs, &jacobian ] ( std::size_t alpha, JacobianRangeType dphi_alpha ) {
+            for( std::size_t j = 0; j < size(); ++j )
+              jacobian.axpy( jacobianProjection()[ alpha ][ j ]*dofs[ j ], dphi_alpha );
+          } );
+      }
       template< class Point, class DofVector >
       void jacobianAll ( const Point &x, const DofVector &dofs, JacobianRangeType &jacobian ) const
       {
         jacobian = JacobianRangeType( 0 );
-        shapeFunctionSet_.evaluateEach( position( x ), [ this, &dofs, &jacobian ] ( std::size_t alpha, RangeType phi_alpha ) {
-            const auto &jacobianProjectionAlpha = jacobianProjection()[alpha];
+        if constexpr ( Point::QuadratureType::codimension == 1)
+        {
+          Std::vector< Dune::DynamicMatrix<double> > localDofVectorMatrix(2);
+          Std::vector< Std::vector<unsigned int> > mask(2,Std::vector<unsigned int>(0));
+          auto locx = x.localPosition();
+          DomainType normal = x.quadrature().intersection().unitOuterNormal(locx);
+          const auto &jit = x.quadrature().intersection().geometry().jacobianInverseTransposed(locx);
+
+          auto edgeSF = (*interpolation_)(x.quadrature().intersection(), localDofVectorMatrix, mask);
+
+          // first step: take normal derivative if available
+          if (localDofVectorMatrix[1].size() > 0)
+            edgeSF.evaluateEach(locx, [&](std::size_t beta, RangeType psi)
+            {
+              if (beta < localDofVectorMatrix[1].size())
+              {
+                JacobianRangeType dpsi(0);
+                for (std::size_t r=0;r<dimRange;++r)
+                  dpsi[r].axpy(psi[r],normal);
+                for (std::size_t s=0; s<mask[1].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
+                {
+                  std::size_t j = mask[1][s];
+                  jacobian.axpy( localDofVectorMatrix[1][beta][s]*dofs[j], dpsi );
+                }
+              }
+            });
+          else
+            shapeFunctionSet_.jacobianEach( x, [ & ] ( std::size_t alpha, JacobianRangeType dphi_alpha ) {
+                JacobianRangeType dpsi(0);
+                for (std::size_t r=0;r<dimRange;++r)
+                  dpsi[r].axpy(dphi_alpha[r]*normal,normal);
+                for( std::size_t j = 0; j < size(); ++j )
+                  jacobian.axpy( jacobianProjection()[ alpha ][ j ]*dofs[ j ], dpsi );
+              } );
+          // second step: tangential derivatives
+          edgeSF.jacobianEach(locx, [&](std::size_t beta, auto dhatpsi)
+          {
+            if (beta < localDofVectorMatrix[0].size())
+            {
+              // note: edge sfs in reference coordinate so apply scaling 1/|S|
+              JacobianRangeType dpsi;
+              for (std::size_t r=0;r<dimRange;++r)
+              {
+                jit.mv(dhatpsi[r], dpsi[r]);
+                assert( std::abs(dpsi[r]*normal) < 1e-10 );
+              }
+              for (std::size_t s=0; s<mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
+              {
+                std::size_t j = mask[0][s];
+                jacobian.axpy( localDofVectorMatrix[0][beta][s]*dofs[ j ], dpsi );
+              }
+            }
+          });
+        }
+        else
+        {
+          shapeFunctionSet_.jacobianEach( x, [ this, &dofs, &jacobian ] ( std::size_t alpha, JacobianRangeType dphi_alpha ) {
+              for( std::size_t j = 0; j < size(); ++j )
+                jacobian.axpy( jacobianProjection()[ alpha ][ j ]*dofs[ j ], dphi_alpha );
+            } );
+        }
+      }
+      template< class F, int d, class Jacobians >
+      void jacobianAll ( const Dune::FieldVector<F,d> &x, Jacobians &jacobians ) const
+      {
+        assert( jacobians.size() >= size() );
+        std::fill( jacobians.begin(), jacobians.end(), JacobianRangeType( 0 ) );
+        shapeFunctionSet_.jacobianEach( x, [ this, &jacobians ] ( std::size_t alpha, JacobianRangeType dphi_alpha ) {
             for( std::size_t j = 0; j < size(); ++j )
-              axpyJac( dofs[j], jacobianProjectionAlpha[j], phi_alpha, jacobian );
+              jacobians[ j ].axpy( jacobianProjection()[ alpha ][ j ], dphi_alpha );
           } );
       }
-      template< class Point, class Jacobians > const
+      template< class Point, class Jacobians >
       void jacobianAll ( const Point &x, Jacobians &jacobians ) const
       {
         assert( jacobians.size() >= size() );
         std::fill( jacobians.begin(), jacobians.end(), JacobianRangeType( 0 ) );
-        shapeFunctionSet_.evaluateEach( position(x), [ this, &jacobians ] ( std::size_t alpha, RangeType phi_alpha ) {
-            const auto &jacobianProjectionAlpha = jacobianProjection()[alpha];
-            for( std::size_t j = 0; j < size(); ++j )
-              axpyJac( 1, jacobianProjectionAlpha[j], phi_alpha, jacobians[j] );
-        } );
+        if constexpr ( Point::QuadratureType::codimension == 1)
+        {
+          Std::vector< Dune::DynamicMatrix<double> > localDofVectorMatrix(2);
+          Std::vector< Std::vector<unsigned int> > mask(2,Std::vector<unsigned int>(0));
+          auto locx = x.localPosition();
+          DomainType normal = x.quadrature().intersection().unitOuterNormal(locx);
+          const auto &jit = x.quadrature().intersection().geometry().jacobianInverseTransposed(locx);
+
+          auto edgeSF = (*interpolation_)(x.quadrature().intersection(), localDofVectorMatrix, mask);
+
+          // first step: take normal derivative if available
+          if (localDofVectorMatrix[1].size() > 0)
+            edgeSF.evaluateEach(locx, [&](std::size_t beta, RangeType psi)
+            {
+              if (beta < localDofVectorMatrix[1].size())
+              {
+                JacobianRangeType dpsi(0);
+                for (std::size_t r=0;r<dimRange;++r)
+                  dpsi[r].axpy(psi[r],normal);
+                for (std::size_t s=0; s<mask[1].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
+                {
+                  std::size_t alpha = mask[1][s];
+                  jacobians[alpha].axpy( localDofVectorMatrix[1][beta][s], dpsi );
+                }
+              }
+            });
+          else
+            shapeFunctionSet_.jacobianEach( x, [ & ] ( std::size_t alpha, JacobianRangeType dphi_alpha ) {
+                JacobianRangeType dpsi(0);
+                for (std::size_t r=0;r<dimRange;++r)
+                  dpsi[r].axpy(dphi_alpha[r]*normal,normal);
+                for( std::size_t j = 0; j < size(); ++j )
+                  jacobians[ j ].axpy( jacobianProjection()[ alpha ][ j ], dpsi );
+              } );
+          // second step: tangential derivatives
+          edgeSF.jacobianEach(locx, [&](std::size_t beta, auto dhatpsi)
+          {
+            if (beta < localDofVectorMatrix[0].size())
+            {
+              // note: edge sfs in reference coordinate so apply jit - also
+              // transforms to tangential derivative
+              JacobianRangeType dpsi;
+              for (std::size_t r=0;r<dimRange;++r)
+              {
+                jit.mv(dhatpsi[r], dpsi[r]);
+                assert( std::abs(dpsi[r]*normal) < 1e-10 );
+              }
+              for (std::size_t s=0; s<mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
+              {
+                std::size_t alpha = mask[0][s];
+                jacobians[alpha].axpy( localDofVectorMatrix[0][beta][s], dpsi );
+              }
+            }
+          });
+        }
+        else
+        {
+          shapeFunctionSet_.jacobianEach( x, [ this, &jacobians ] ( std::size_t alpha, JacobianRangeType dphi_alpha ) {
+              for( std::size_t j = 0; j < size(); ++j )
+                jacobians[ j ].axpy( jacobianProjection()[ alpha ][ j ], dphi_alpha );
+            } );
+        }
       }
 
-      static void axpyHes(const DomainFieldType lam, const HessianMatrixType &dom, const RangeType &ran,
-                          HessianRangeType &ret)
-      {
-        for (int r=0;r<RangeType::dimension;++r)
-          for (int dx=0;dx<DomainType::dimension;++dx)
-            for (int dy=0;dy<DomainType::dimension;++dy)
-              ret[r][dx][dy] += lam*dom[dx][dy]*ran[r];
-      }
       template< class Quadrature, class DofVector, class Hessians >
       void hessianAll ( const Quadrature &quadrature, const DofVector &dofs, Hessians &hessians ) const
       {
@@ -175,37 +356,25 @@ namespace Dune
       void hessianAll ( const Point &x, const DofVector &dofs, HessianRangeType &hessian ) const
       {
         hessian = HessianRangeType( 0 );
-        shapeFunctionSet_.evaluateEach( position(x), [this, &dofs, &hessian ] ( std::size_t alpha, RangeType phi_alpha ) {
+        shapeFunctionSet_.hessianEach( x, [this, &dofs, &hessian ] ( std::size_t alpha, HessianRangeType d2phi_alpha ) {
             const auto &hessianProjectionAlpha = hessianProjection()[alpha];
             for( std::size_t j = 0; j < size(); ++j )
-              axpyHes( dofs[j], hessianProjectionAlpha[j], phi_alpha, hessian );
+              hessian.axpy( hessianProjectionAlpha[ j ]*dofs[ j ], d2phi_alpha );
         } );
       }
-
-      template< class Point, class Hessians > const
+      template< class Point, class Hessians >
       void hessianAll ( const Point &x, Hessians &hessians ) const
       {
         assert( hessians.size() >= size() );
         std::fill( hessians.begin(), hessians.end(), HessianRangeType( 0 ) );
-        shapeFunctionSet_.evaluateEach( position(x), [ this, &hessians ] ( std::size_t alpha, RangeType phi_alpha ) {
+        shapeFunctionSet_.hessianEach( x, [ this, &hessians ] ( std::size_t alpha, HessianRangeType d2phi_alpha ) {
             const auto &hessianProjectionAlpha = hessianProjection()[alpha];
             for( std::size_t j = 0; j < size(); ++j )
-              axpyHes( 1, hessianProjectionAlpha[j], phi_alpha, hessians[j] );
+              hessians[ j ].axpy( hessianProjectionAlpha[ j ], d2phi_alpha );
         } );
       }
 
       const EntityType &entity () const { assert( entity_ ); return *entity_; }
-
-#if 0
-      template< class Point, class Factor >
-      void axpy ( const Point &x, const Factor &factor, DynamicVector<DomainType> &dofs ) const
-      {
-        shapeFunctionSet_.evaluateEach( position( x ), [ this, &factor, &dofs ] ( std::size_t alpha, RangeType phi_alpha ) {
-            for( std::size_t j = 0; j < size(); ++j )
-              dofs[ j ].axpy( valueProjection()[ alpha ][ j ], factor*phi_alpha );
-          } );
-      }
-#endif
 
       /********************************************/
 
@@ -268,63 +437,6 @@ namespace Dune
               dofs[i] += hessians[i][r][d]*hessianFactor[r][d];
       }
 
-      /********************************************/
-
-      template< class Point >
-      void axpy ( const Point &x, const JacobianRangeType &factor, DynamicVector<DomainType> &dofs ) const
-      {
-        shapeFunctionSet_.evaluateEach( position( x ), [ this, &factor, &dofs ] ( std::size_t alpha, RangeType phi_alpha ) {
-            for( std::size_t j = 0; j < size(); ++j )
-            {
-              DomainType f;
-              factor.mtv(phi_alpha,f);
-              dofs[ j ].axpy( valueProjection()[ alpha ][ j ], f );
-            }
-          } );
-      }
-      template< class Point >
-      void axpy ( const Point &x, const RangeType &f1, const DomainType &f2, DynamicVector<DomainType> &dofs ) const
-      {
-        shapeFunctionSet_.evaluateEach( position( x ), [ this, &f1, &f2, &dofs ] ( std::size_t alpha, RangeType phi_alpha ) {
-            for( std::size_t j = 0; j < size(); ++j )
-              dofs[ j ].axpy( valueProjection()[ alpha ][ j ], f2*(phi_alpha*f1) );
-          } );
-      }
-
-      template< class Point >
-      void axpy ( const Point &x, const JacobianRangeType &factor, DynamicVector<HessianMatrixType> &dofs ) const
-      {
-        shapeFunctionSet_.evaluateEach( position( x ), [ this, &factor, &dofs ] ( std::size_t alpha, RangeType phi_alpha ) {
-            for( std::size_t j = 0; j < size(); ++j )
-              for ( std::size_t l = 0; l < dimDomain; ++l )
-                for ( std::size_t k = 0; k < dimDomain; ++k )
-                {
-                  DomainType f;
-                  factor.mtv(phi_alpha,f);
-                  dofs[ j ][l][k] +=
-                      0.5*( jacobianProjection()[ alpha ][ j ][ k ]*f[l] +
-                            jacobianProjection()[ alpha ][ j ][ l ]*f[k] );
-                }
-          } );
-      }
-      template< class Point >
-      void axpy ( const Point &x, const RangeType &factor, const DomainType &normal, DynamicVector<HessianMatrixType> &dofs ) const
-      {
-        shapeFunctionSet_.evaluateEach( position( x ), [ this, &factor, &dofs, &normal ] ( std::size_t alpha, RangeType phi_alpha ) {
-            for( std::size_t j = 0; j < size(); ++j )
-            {
-              DomainFieldType Gn = 0;
-              for ( std::size_t n = 0; n < dimDomain; ++n )
-                Gn += jacobianProjection()[ alpha ][ j ][ n ]*normal[n];
-              Gn *= phi_alpha*factor;
-              for ( std::size_t l = 0; l < dimDomain; ++l )
-                for ( std::size_t k = 0; k < dimDomain; ++k )
-                    dofs[ j ][l][k] += Gn * 0.5*(normal[k]*normal[l] + normal[l]*normal[k] );
-            }
-          } );
-      }
-
-
     private:
       template< class Point >
       DomainType position ( const Point &x ) const
@@ -335,6 +447,7 @@ namespace Dune
       const EntityType *entity_ = nullptr;
       std::size_t agglomerate_;
       ShapeFunctionSet shapeFunctionSet_;
+      std::shared_ptr<InterpolationType> interpolation_;
       std::shared_ptr<Vector<ValueProjection>> valueProjections_;
       std::shared_ptr<Vector<JacobianProjection>> jacobianProjections_;
       std::shared_ptr<Vector<HessianProjection>> hessianProjections_;

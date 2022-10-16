@@ -136,7 +136,6 @@ namespace Dune
       SizeType size_;
       std::vector< SubEntityInfo > subEntityInfo_;
       std::array< int, dimension+1 > codimIndex_;
-      std::vector< bool > edgeTwist_;
     };
 
 
@@ -229,7 +228,8 @@ namespace Dune
           const SizeType subIndex = indexSet().subIndex( element, subAgglomerate, info.codim );
           SizeType index = info.offset + SizeType( info.numDofs ) * subIndex;
 
-          if( (info.codim == 1) && (edgeTwist_[ subIndex ] == 1) )
+          if( false )
+          // if ( (info.codim == 1) && (indexSet().twist(subIndex) == 1) )
           {
             const SizeType begin = index;
             for( index += info.numDofs; index > begin; )
@@ -259,7 +259,8 @@ namespace Dune
         return;
 
       SizeType index = info.offset + SizeType( info.numDofs ) * result.first;
-      if( (Entity::codimension == 1) && (edgeTwist_[ result.first ]) )
+      if( false )
+      // if ( (Entity::codimension == 1) && (indexSet().twist(result.first)) )
       {
         for( unsigned int i = info.numDofs; i > 0; )
           f( --i, index++ );
@@ -284,24 +285,6 @@ namespace Dune
         maxNumDofs_ += SizeType( info.numDofs ) * SizeType( indexSet().maxSubAgglomerates( info.codim ) );
       }
 
-      if( dimension > 1 )
-      {
-        const auto &idSet = agglomeration().gridPart().grid().globalIdSet();
-
-        edgeTwist_.resize( indexSet().size( dimension-1 ) );
-        for( const auto element : elements( agglomeration().gridPart(), Partitions::interiorBorder ) )
-        {
-          const auto &refElement = ReferenceElements< typename GridPart::ctype, dimension >::general( element.type() );
-
-          const int numEdges = refElement.size( dimension-1 );
-          for( int i = 0; i < numEdges; ++i )
-          {
-            const auto left = idSet.subId( Dune::Fem::gridEntity(element), refElement.subEntity( i, dimension-1, 0, dimension ), dimension );
-            const auto right = idSet.subId( Dune::Fem::gridEntity(element), refElement.subEntity( i, dimension-1, 1, dimension ), dimension );
-            edgeTwist_[ indexSet().subIndex( element, i, dimension-1 ) ] = (right < left);
-          }
-        }
-      }
     }
 
   } // namespace Fem

@@ -42,42 +42,20 @@ def dgLaplace(beta, p,q, spc, p_bnd, dD):
         diffSkeleton += beta/hbnd*(p-p_bnd)*dD*q*ds
     return aInternal + diffSkeleton
 class Uzawa:
-    def __init__(self, grid, spcU, spcP, dbc_u, forcing,
-                 mu, tau, u_h_n=None, explicit=False,
+    def __init__(self, grid,
+                 spcU, spcP, dbc_u,
+                 mainModel, gradModel, divModel,
+                 mu, nu,
                  tolerance=1e-9, precondition=True, verbose=False,
                  lagrange=False):
         self.dimension = grid.dimension
         self.verbose = verbose
         self.tolerance2 = tolerance**2
         self.dbc_u = dbc_u
-        self.mu = Constant(mu, "mu")
-        if tau is not None:
-            assert tau>0
-            self.nu  = Constant(1/tau, "nu")
-        else:
-            self.nu  = Constant(0, "nu")
-        u = TrialFunction(spcU)
-        v = TestFunction(spcU)
+        self.mu = mu
+        self.nu = nu
         p = TrialFunction(spcP)
         q = TestFunction(spcP)
-        forcing = dot(forcing,v)
-        if u_h_n is not None:
-            forcing += dot(self.nu*u_h_n,v)
-            b = lambda u1,u2,phi: dot( dot(u1, nabla_grad(u2)), phi)
-            symb = lambda u1,u2,phi: ( b(u1,u2,phi) - b(u1,phi,u2) ) / 2
-            if explicit:
-                forcing -= b( u_h_n, u_h_n, v )
-            else:
-                # forcing -= b(u_h_n, u, v)
-                # forcing -= b(u,u_h_n,v)
-                # ustable forcing -= symb(u_h_n, u, v)
-                # default
-                forcing -= ( b(u_h_n, u, v) + b(u,u_h_n,v) ) / 2
-                # unstable at outflow forcing -= ( symb(u_h_n, u, v) + symb(u,u_h_n,v) ) / 2
-        epsilon = lambda u: sym(nabla_grad(u))
-        mainModel   = ( self.nu*dot(u,v) - forcing + 2*self.mu*inner(epsilon(u), epsilon(v)) ) * dx
-        gradModel   = -p*div(v) * dx
-        divModel    = -div(u)*q * dx
         massModel   = p*q * dx
         preconModel = inner(grad(p),grad(q)) * dx
 
@@ -99,16 +77,22 @@ class Uzawa:
         self.Minv = lambda rhs: linalg.spsolve(self.M,rhs)
 
         if precondition and self.mainOp.model.nu > 0:
-            if not lagrange:
+            print("adding outer preconditioner",
+                  "using nu=",self.mainOp.model.nu,
+                  "and mu=",self.mainOp.model.mu,flush=True)
+            if True: # not lagrange:
                 preconModel = dgLaplace(10, p,q, spcP, 0, 1)
                 preconOp    = galerkinOperator( preconModel, spcP)
             else:
                 preconModel = inner(grad(p),grad(q)) * dx
                 preconOp    = galerkinOperator( (preconModel,DirichletBC(spcP,0)), spcP)
-            self.P    = linearOperator(preconOp).as_numpy
-            self.Pinv = lambda rhs: linalg.spsolve(self.P,rhs)
+            self.P    = linearOperator(preconOp).as_numpy.tocsc()
+            self.Pinv = linalg.splu(self.P)
         else:
             self.Pinv = None
+            print("No outer preconditioner",
+                  "since nu=",self.mainOp.model.nu,
+                  "and mu=",self.mainOp.model.mu,flush=True)
 
         self.rhsVelo  = spcU.interpolate(spcU.dimRange*[0], name="vel")
         self.rhsPress = spcP.interpolate(0, name="pres")
@@ -126,8 +110,8 @@ class Uzawa:
                 "uzawa.converged":False}
         # problem is linear but coefficients depend on previous time step so need to reassemble
         self.mainOp.jacobian(velocity, self.mainLinOp)
-        A = self.mainLinOp.as_numpy
-        Ainv = lambda rhs: linalg.spsolve(A,rhs)
+        A = self.mainLinOp.as_numpy.tocsc()
+        Ainv = linalg.splu(A)
         sol_u = velocity.as_numpy
         sol_p = pressure.as_numpy
         # right hand side for Shur complement problem
@@ -137,12 +121,12 @@ class Uzawa:
         self.xi[:]  = self.G*sol_p
         self.rhs_u -= self.xi
         self.mainOp.setConstraints(self.rhsVelo)
-        sol_u[:]      = Ainv(self.rhs_u[:])
+        sol_u[:]      = Ainv.solve(self.rhs_u[:])
         self.rhs_p[:] = self.D*sol_u
         self.r[:]     = self.Minv(self.rhs_p[:])
         if self.Pinv:
             self.precon.fill(0)
-            self.precon[:] = self.Pinv(self.rhs_p[:])
+            self.precon[:] = self.Pinv.solve(self.rhs_p[:])
             self.r *= self.mu.value
             self.r += self.nu.value*self.precon
         self.d[:] = self.r[:]
@@ -154,7 +138,7 @@ class Uzawa:
             self.xi.fill(0)
             self.rhs_u[:] = self.G*self.d
             self.mainOp.setConstraints([0,]*self.dimension, self.rhsVelo)
-            self.xi[:] = Ainv(self.rhs_u[:])
+            self.xi[:] = Ainv.solve(self.rhs_u[:])
             self.rhs_p[:] = self.D*self.xi
             rho = delta / numpy.dot(self.d,self.rhs_p)
             sol_p += rho*self.d
@@ -163,7 +147,7 @@ class Uzawa:
             self.r[:] = self.Minv(self.rhs_p[:])
             if self.Pinv:
                 self.precon.fill(0)
-                self.precon[:] = self.Pinv(self.rhs_p[:])
+                self.precon[:] = self.Pinv.solve(self.rhs_p[:])
                 self.r *= self.mu.value
                 self.r += self.nu.value*self.precon
             oldDelta = delta
@@ -178,47 +162,3 @@ class Uzawa:
             self.d += self.r
         info["uzawa.outer.iterations"] = m
         return info
-
-def main():
-    useVem   = True
-    muValue  = 0.1
-    tauValue = 1e-2
-    order    = 2
-    grid = dune.vem.polyGrid(cartesianDomain([0,0],[3,1],[30*4,10*4]),cubes=False)
-    if useVem:
-        spcU = dune.vem.divFreeSpace( grid, order=order, conforming=True)
-        spcP = dune.vem.bbdgSpace( grid, order=0 )
-    else:
-        spcU = dune.fem.space.lagrange( grid, order=order, dimRange=2 )
-        spcP = dune.fem.space.lagrange( grid, order=order-1 )
-
-    x       = SpatialCoordinate(spcU)
-    exact_u = as_vector( [x[1] * (1.-x[1]), 0] ) # dy u_x = 1-2y, -dy^2 u_x = 2
-    exact_p = (-2*x[0] + 2)*muValue              # dx p   = -2mu
-    f       = as_vector( [0,]*grid.dimension )
-    f      += exact_u/tauValue
-
-    # discrete functions
-    velocity = spcU.interpolate(spcU.dimRange*[0], name="velocity")
-    pressure = spcP.interpolate(0, name="pressure")
-
-    dbc = [ DirichletBC(velocity.space,exact_u,None) ]
-    uzawa = Uzawa(grid, spcU, spcP, dbc, f,
-                  muValue, tauValue, u_h_n=None,
-                  tolerance=1e-9, precondition=True, verbose=True, # tolerance 2e-5 (TH p=2)
-                  lagrange=not useVem )
-    uzawa.solve([velocity,pressure])
-    print("Retry")
-    uzawa.solve([velocity,pressure])
-
-    fig = pyplot.figure(figsize=(10,10))
-    velocity.plot(colorbar="vertical", figure=(fig, 211))
-    pressure.plot(colorbar="vertical", figure=(fig, 212))
-    pyplot.show()
-    fig = pyplot.figure(figsize=(10,10))
-    dune.fem.plotting.plotPointData(grad(velocity[0])[0], grid=grid,colorbar="vertical", figure=(fig, 211))
-    dune.fem.plotting.plotPointData(grad(velocity[0])[1], grid=grid,colorbar="vertical", figure=(fig, 212))
-    pyplot.show()
-
-if __name__ == "__main__":
-    main()
