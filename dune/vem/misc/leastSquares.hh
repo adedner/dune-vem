@@ -12,12 +12,12 @@ namespace Dune {
 
     namespace Vem {
 
-        // template <class Matrix = Dune::DynaicMatrix<double, Vector = Dune::DynamicVector<double>>>
         template<class Matrix, class CMatrix>
         class LeastSquares {
         public:
             typedef typename Matrix::size_type Size;
-            typedef typename Matrix::value_type Field;
+            // typedef typename Matrix::value_type Field;
+            typedef long double Field;
 
             LeastSquares(const Matrix &llsMatrix, const CMatrix &constraintMatrix)
                     : llsMatrix_(llsMatrix), constraintMatrix_(constraintMatrix),

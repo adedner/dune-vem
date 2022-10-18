@@ -597,7 +597,7 @@ namespace Dune
       typedef DefaultAgglomerationVEMSpace<TraitsType> BaseType;
       typedef Agglomeration<GridPart> AgglomerationType;
       typedef typename TraitsType::FunctionSpaceType FunctionSpaceType;
-      typedef typename FunctionSpaceType::DomainFieldType DomainFieldType;
+      typedef typename BaseType::DomainFieldType DomainFieldType;
       AgglomerationVEMSpace(AgglomerationType &agglomeration,
           const unsigned int polOrder,
           const typename TraitsType::BasisSetsType::TestSpacesType &testSpaces,
@@ -611,7 +611,8 @@ namespace Dune
       }
 
     protected:
-      virtual void setupConstraintRHS(const Std::vector<Std::vector<typename BaseType::ElementSeedType> > &entitySeeds, unsigned int agglomerate,
+      virtual void setupConstraintRHS(const Std::vector<Std::vector<typename BaseType::ElementSeedType> > &entitySeeds,
+                                    unsigned int agglomerate,
                                     Dune::DynamicMatrix<DomainFieldType> &RHSconstraintsMatrix, double volume) override
       {
         //////////////////////////////////////////////////////////////////////////
@@ -653,7 +654,6 @@ namespace Dune
         // only case covered is triangles with C^1-conf space of order 2 with extra constraint
         assert(BaseType::basisSets_.edgeSize(1)>0 && numConstraints == numConstraintShapeFunctions+1);
         std::size_t alpha = numConstraints-1;
-        numConstraintShapeFunctions-1;
         assert( alpha == numConstraintShapeFunctions );
         // matrices for edge projections
         Std::vector<Dune::DynamicMatrix<double> > edgePhiVector(2);

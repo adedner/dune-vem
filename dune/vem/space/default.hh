@@ -54,7 +54,8 @@ namespace Dune
 
       typedef typename BaseType::EntityType EntityType;
       typedef typename BasisSetsType::EdgeShapeFunctionSetType EdgeShapeFunctionSetType;
-      typedef typename BasisFunctionSetType::DomainFieldType DomainFieldType;
+      // typedef typename BasisFunctionSetType::DomainFieldType DomainFieldType;
+      typedef long double DomainFieldType;
       typedef typename BasisFunctionSetType::DomainType DomainType;
 
       typedef typename BasisFunctionSetType::RangeType RangeType;
@@ -102,7 +103,8 @@ namespace Dune
         edgeInterpolation_(edgeInterpolation),
         agIndexSet_(agglom),
         blockMapper_(agIndexSet_, basisSets_.dofsPerCodim()),
-        interpolation_(new AgglomerationInterpolationType(blockMapper().indexSet(), basisSets_, polOrder, basisChoice != 3)),
+        interpolation_(new
+        AgglomerationInterpolationType(blockMapper().indexSet(), basisSets_, polOrder_, basisChoice != 3)),
         counter_(0),
         useThreads_(Fem::MPIManager::numThreads()),
         valueProjections_(new Vector<
@@ -307,7 +309,7 @@ namespace Dune
       DynamicMatrix<DomainFieldType> RHSconstraintsMatrix;
 
       // matrices for edge projections
-      Std::vector<Dune::DynamicMatrix<double> > edgePhiVector(2);
+      Std::vector<Dune::DynamicMatrix<DomainFieldType> > edgePhiVector(2);
       edgePhiVector[0].resize(basisSets_.edgeSize(0), basisSets_.edgeSize(0), 0);
       edgePhiVector[1].resize(basisSets_.edgeSize(1), basisSets_.edgeSize(1), 0);
 
@@ -508,7 +510,7 @@ namespace Dune
 
         if (numConstraints < numShapeFunctions)
         { // need to use a CLS approach
-          // std::cout << "CLS" << std::endl;
+          // std::cout << "CLS" << " " << numConstraints << " " << numShapeFunctions << std::endl;
           auto leastSquaresMinimizer = LeastSquares(D, constraintValueProj);
           for ( std::size_t beta = 0; beta < numDofs; ++beta )
           {

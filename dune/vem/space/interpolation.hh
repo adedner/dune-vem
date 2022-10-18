@@ -324,9 +324,10 @@ namespace Dune
       // the gradient projection matrix
       // Note: for a vector valued space this fills in the full 'baseRangeDimension' mask and localDofs
       // We do not need the edge bfs actually since we can obtain it from // the basis set.
+      template <class F>
       const typename BasisSetsType::EdgeShapeFunctionSetType
       operator() (const IntersectionType &intersection,
-                       Std::vector < Dune::DynamicMatrix<double> > &localDofVectorMatrix,
+                       Std::vector < Dune::DynamicMatrix<F> > &localDofVectorMatrix,
                        Std::vector<Std::vector<unsigned int>> &mask) const
       {
         localDofVectorMatrix[0].resize(basisSets_.edgeSize(0), basisSets_.edgeSize(0), 0);
@@ -338,9 +339,10 @@ namespace Dune
         (*this)(intersection,edgeShapeFunctionSet,localDofVectorMatrix,mask);
         return edgeShapeFunctionSet;
       }
-      template< class EdgeShapeFunctionSet >
+      template< class EdgeShapeFunctionSet, class F >
       void operator() (const IntersectionType &intersection,
-                       const EdgeShapeFunctionSet &edgeShapeFunctionSet, Std::vector < Dune::DynamicMatrix<double> > &localDofVectorMatrix,
+                       const EdgeShapeFunctionSet &edgeShapeFunctionSet,
+                       Std::vector < Dune::DynamicMatrix<F> > &localDofVectorMatrix,
                        Std::vector<Std::vector<unsigned int>> &mask) const
       {
         for (std::size_t i=0;i<mask.size();++i)

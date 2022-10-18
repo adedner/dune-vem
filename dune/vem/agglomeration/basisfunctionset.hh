@@ -483,8 +483,8 @@ namespace Dune
         //     b_i -= r_k b_j {Remove the projection of b_i onto b_j
         //   r_k = ( b_i, b_i )
         //   b_i /= r_k
-        auto l2Integral = [&](std::size_t i, std::size_t j) -> double {
-          double ret = 0;
+        auto l2Integral = [&](std::size_t i, std::size_t j) -> /*long*/ double {
+          /*long*/ double ret = 0;
           for (std::size_t l = 0; l<weights.size(); ++l)
             ret += values[i][l]*values[j][l]*weights[l];
           return ret / bbox.volume();
