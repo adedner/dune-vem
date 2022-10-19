@@ -244,7 +244,7 @@ namespace Dune
       mutable BlockMapperType blockMapper_;
       std::shared_ptr<AgglomerationInterpolationType> interpolation_;
       std::size_t counter_;
-      int useThreads_;
+      std::size_t useThreads_;
       std::shared_ptr<Vector<typename Traits::ScalarBasisFunctionSetType::ValueProjection>> valueProjections_;
       std::shared_ptr<Vector<typename Traits::ScalarBasisFunctionSetType::JacobianProjection>> jacobianProjections_;
       std::shared_ptr<Vector<typename Traits::ScalarBasisFunctionSetType::HessianProjection>> hessianProjections_;
@@ -264,7 +264,6 @@ namespace Dune
       // this is scalar space in the case that vectorial extension is used
       typedef typename BasisSetsType::ShapeFunctionSetType::FunctionSpaceType FunctionSpaceType;
       typedef typename FunctionSpaceType::DomainType DomainType;
-      typedef typename FunctionSpaceType::RangeFieldType RangeFieldType;
       typedef typename FunctionSpaceType::RangeType RangeType;
       typedef typename FunctionSpaceType::JacobianRangeType JacobianRangeType;
       typedef typename FunctionSpaceType::HessianRangeType HessianRangeType;
@@ -598,7 +597,6 @@ namespace Dune
         {
           const ElementType &element = gridPart().entity(entitySeed);
           const auto geometry = element.geometry();
-          const auto &refElement = ReferenceElements<typename GridPartType::ctype, GridPartType::dimension>::general( element.type());
 
           // get the bounding box monomials and apply all dofs to them
           const auto &shapeFunctionSet = basisSets_.basisFunctionSet(agglomeration(), element);

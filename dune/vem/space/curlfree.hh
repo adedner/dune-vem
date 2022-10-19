@@ -404,12 +404,12 @@ namespace Dune
       const ONBShapeFunctionSetType onbSFS_;
       const ScalarEdgeShapeFunctionSetType edgeSFS_;
       const std::array< std::pair< int, unsigned int >, dimDomain+1 > dofsPerCodim_;
+      const bool useOnb_;
       const std::size_t numValueShapeFunctions_;
       const std::size_t numGradShapeFunctions_;
       const std::size_t numHessShapeFunctions_;
       const std::size_t numInnerShapeFunctions_;
       const std::size_t numEdgeTestShapeFunctions_;
-      const bool useOnb_;
     };
 
 
@@ -450,7 +450,7 @@ namespace Dune
       typedef DefaultAgglomerationVEMSpace< TraitsType > BaseType;
       typedef typename BaseType::AgglomerationType AgglomerationType;
       typedef typename BaseType::BasisSetsType::ShapeFunctionSetType::FunctionSpaceType FunctionSpaceType;
-      typedef typename FunctionSpaceType::DomainFieldType DomainFieldType;
+      typedef typename BaseType::DomainFieldType DomainFieldType;
       CurlFreeVEMSpace(AgglomerationType &agglomeration,
           const unsigned int polOrder,
           int basisChoice)
@@ -470,12 +470,9 @@ namespace Dune
         /// Fix RHS constraints for value projection /////////////////////////////
         //////////////////////////////////////////////////////////////////////////
 
-        typedef typename BaseType::BasisSetsType::EdgeShapeFunctionSetType EdgeTestSpace;
         typedef typename FunctionSpaceType::DomainType DomainType;
         typedef typename FunctionSpaceType::RangeFieldType RangeFieldType;
         typedef typename FunctionSpaceType::RangeType RangeType;
-        typedef typename FunctionSpaceType::JacobianRangeType JacobianRangeType;
-        typedef typename FunctionSpaceType::HessianRangeType HessianRangeType;
         static constexpr int blockSize = BaseType::localBlockSize;
         const std::size_t dimDomain = DomainType::dimension;
         const std::size_t dimRange = RangeType::dimension;

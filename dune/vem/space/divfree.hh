@@ -655,7 +655,7 @@ namespace Dune
       typedef DefaultAgglomerationVEMSpace<TraitsType> BaseType;
       typedef typename BaseType::AgglomerationType AgglomerationType;
       typedef typename BaseType::BasisSetsType::ShapeFunctionSetType::FunctionSpaceType FunctionSpaceType;
-      typedef typename FunctionSpaceType::DomainFieldType DomainFieldType;
+      typedef typename BaseType::DomainFieldType DomainFieldType;
       DivFreeVEMSpace(AgglomerationType &agglomeration,
           const unsigned int polOrder,
           const bool conforming,

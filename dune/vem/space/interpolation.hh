@@ -297,7 +297,7 @@ namespace Dune
         {
           // ???? assert(numDofs == basisSets_.innerSize());
           InnerQuadratureType innerQuad( element, 3*polOrder_ );
-          for (int qp=0;qp<innerQuad.nop();++qp)
+          for (std::size_t qp=0;qp<innerQuad.nop();++qp)
           {
             auto y = innerQuad.point(qp);
             double weight = innerQuad.weight(qp) *
@@ -800,7 +800,7 @@ namespace Dune
           std::size_t i = 0;
           if (basisSets_.vertexSize(0) > 0) //!TS
           {
-            for( ; i < refElement.size( edgeNumber, dimension-1, dimension ); ++i )
+            for( ; i < (std::size_t)refElement.size( edgeNumber, dimension-1, dimension ); ++i )
             {
               int vertexNumber = refElement.subEntity( edgeNumber, dimension-1, i, dimension);
               const int vtxk = indexSet_.localIndex( element, vertexNumber, dimension );
