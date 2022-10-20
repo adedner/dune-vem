@@ -432,11 +432,11 @@ namespace Dune
 
       // return; // no ONB
 
-      Std::vector<RangeType> val;
-      Std::vector< Std::vector<RangeType> > values;
       Std::vector<DomainFieldType> weights;
-      values.resize( shapeFunctionSet.size() );
+      Std::vector<RangeType> val;
       val.resize( shapeFunctionSet.size() );
+      Std::vector< Std::vector<RangeType> > values;
+      values.resize( shapeFunctionSet.size() );
 
       // compute onb factors
       // want to iterate over each polygon separately - so collect all
@@ -453,7 +453,7 @@ namespace Dune
 
         // first collect all weights and basis function evaluation needed
         // to compute mass matrix over this polygon
-        Quadrature0Type quadrature( element , 2*polOrder+2 );
+        Quadrature0Type quadrature( element , 2*polOrder );
         const std::size_t nop = quadrature.nop();
         for (std::size_t i=0;i<values.size(); ++i)
           values[i].resize( nop * entitySeeds[agglomerate].size() );
@@ -465,7 +465,7 @@ namespace Dune
           const auto geometry = element.geometry();
           BBBasisFunctionSetType basisFunctionSet( element, agglomerate,
             boundingBoxes, false, shapeFunctionSet );
-          Quadrature0Type quadrature( element, 2*polOrder+2 );
+          Quadrature0Type quadrature( element, 2*polOrder );
           for( std::size_t qp = 0; qp < nop; ++qp, ++e )
           {
             weights[e] = geometry.integrationElement( quadrature.point( qp ) ) * quadrature.weight( qp );
@@ -483,11 +483,11 @@ namespace Dune
         //     b_i -= r_k b_j {Remove the projection of b_i onto b_j
         //   r_k = ( b_i, b_i )
         //   b_i /= r_k
-        auto l2Integral = [&](std::size_t i, std::size_t j) -> long double {
-          long double ret = 0;
+        auto l2Integral = [&](std::size_t i, std::size_t j) -> /*long*/ double {
+          /*long*/ double ret = 0;
           for (std::size_t l = 0; l<weights.size(); ++l)
             ret += values[i][l]*values[j][l]*weights[l];
-          return ret / bbox.volume();
+          return ret; // / bbox.volume();
         };
         std::size_t k = 0;
         for (std::size_t i=0;i<values.size();++i,++k)

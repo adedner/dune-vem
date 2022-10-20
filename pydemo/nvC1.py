@@ -177,6 +177,7 @@ def errors(n):
         lam = (1+d22)/2 + ufl.sqrt( (1+d22)**2/4 - d22+d12**2 )
         a  = -ufl.inner(A,H(u-exact)) * v * ufl.dx
         a += beta/hbnd*lam * (u-exact) * v * ufl.ds
+        a += beta*hbnd*lam * ufl.dot(ufl.grad(u-exact),tau) * ufl.dot(ufl.grad(v),tau) * ufl.ds
 
         # possibly of interest for the non-conforming spaces but does not work at the moment
         # a += beta/hint * ufl.jump(u) * ufl.jump(v) * ufl.dS
