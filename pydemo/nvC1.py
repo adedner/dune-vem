@@ -1,5 +1,6 @@
 import math
 import argparse
+import random
 
 import dune.fem
 import dune.fem.plotting
@@ -20,11 +21,11 @@ parser.add_argument('-m', type=str, required=True,
                           choices=["C1c","C1nc","C1C0"],
                           help="method (C1c,C1nc,C1C0)")
 parser.add_argument('-M', type=str, required=True,
-                          choices=["cube","simplex","voronoi"],
-                          help="mesh (cube,simplex,voronoi)")
+                          choices=["cube","simplex","voronoi","randomcube"],
+                          help="mesh (cube,simplex,voronoi,randomcube)")
 parser.add_argument('-p', type=str, required=True,
-                          choices=["interpolation","poisson","nonvariational","bilaplace"],
-                          help="pde (interpolation,poisson,nonvariational,bilaplace)")
+                          choices=["interpolation","poisson","bilaplace","nonvariational","forthorder"],
+                          help="pde (interpolation,poisson,bilaplace,nonvariational,forthorder)")
 parser.add_argument('-u', type=str, required=True,
                           choices=["u1","u2","u3"],
                           help="solution (u1,u2,u3)")
@@ -69,11 +70,43 @@ def bilaplace(w):
 def errors(n):
     if gridtype == "voronoi":
         domain = dune.vem.voronoiCells([[0,0],[1,1]], 9*n*n, lloyd=100, load="voronoi")
+        cubes = False
+    elif gridtype == "randomcube":
+        N = 12*n
+        h = 1/N
+        domain = {"vertices":[], "cubes":[]}
+        for i in range(N+1):
+            for j in range(N+1):
+                if i>0 and i<N:
+                    ri = (random.random()-0.5)/10
+                else:
+                    ri = 0
+                if j>0 and j<N:
+                    rj = (random.random()-0.5)/10
+                else:
+                    rj = 0
+                # no random perturbation
+                # ri,rj = 0,0
+
+                x,y = (j+rj)*h, (i+ri)*h
+
+                # rotate:
+                # c,s = np.cos(30*np.pi/180), np.sin(30*np.pi/180)
+                # x,y = c*x-s*y, s*x+c*y
+
+                domain["vertices"] += [ [x,y] ]
+        for i in range(N):
+            for j in range(N):
+                domain["cubes"] += [ [ i   *(N+1)+j, i   *(N+1)+j+1,
+                                      (i+1)*(N+1)+j,(i+1)*(N+1)+j+1] ]
+        cubes = True
     else:
         domain = dune.grid.cartesianDomain([0, 0], [1, 1], [12*n, 12*n])
-    grid = dune.vem.polyGrid(domain, cubes=(gridtype=="cube") )
+        cubes = gridtype=="cube"
+    grid = dune.vem.polyGrid(domain, cubes=cubes )
     if gridtype == "simplex" and useCrissCross:
         grid.hierarchicalGrid.globalRefine(1)
+    # grid.plot()
     """
     indexSet = grid.indexSet
     @dune.grid.gridFunction(grid, name="cells", order=1)
@@ -99,9 +132,12 @@ def errors(n):
     x = ufl.SpatialCoordinate(space)
 
     if solution_name == "u1":
-        exact = ufl.sin(ufl.pi * x[0]) ** 2 * ufl.sin(ufl.pi * x[1]) ** 2
+        exact = ufl.sin(ufl.pi * x[0])**2 * ufl.sin(ufl.pi * x[1])**2
     elif solution_name == "u2":
-        exact = ufl.sin(ufl.pi * x[0]) ** 2 + ufl.sin(ufl.pi * x[1]) ** 2
+        # exact = ufl.sin(ufl.pi * x[0]) ** 2 + ufl.sin(ufl.pi * x[1]) ** 2
+        # exact = x[0]*x[1]**2 + (x[0]-0.3)**3
+        exact  = ufl.sin(2.7*ufl.pi*x[0])*ufl.cos(2.2*ufl.pi*x[1])
+        exact = ( (1-x[0])*x[0]*(1-x[1])*x[1] )**2
     elif solution_name == "u3":
         exact = ufl.sin(2.7*ufl.pi*x[0])*ufl.cos(2.2*ufl.pi*x[1])
     exact = dune.fem.function.uflFunction(grid, name="exact", order=space.order, ufl=exact )
@@ -117,16 +153,16 @@ def errors(n):
 
     solution = dune.fem.function.discreteFunction(space, name="solution")
     solution.interpolate(exact)
-    interMax = max(solution.as_numpy)
-    # print("interpolation:", interMax)
 
     if pde == "bilaplace":
         a = ufl.inner(H(u), H(v)) * ufl.dx
-        b = ufl.inner(H(exact), H(v)) * ufl.dx
-        # b = bilaplace(exact) * v * ufl.dx
+        b = bilaplace(exact) * v * ufl.dx
+        a += beta/hbnd/hbnd * (u-exact) * v * ufl.ds
+        a += beta/hbnd * ufl.dot(ufl.grad(u-exact),normal) *\
+                         ufl.dot(ufl.grad(v),normal) * ufl.ds
 
         scheme = dune.vem.vemScheme(
-            [a == b, dbc],
+            [a == b],
             space,
             solver=("suitesparse","umfpack"),
             parameters={"newton.linear.verbose":False,
@@ -135,12 +171,12 @@ def errors(n):
                         "newton.linear.tolerance":1e-12,
                         "newton.maxiterations":10},
             hessStabilization=1,
-            boundary="full",
+            # boundary="full",
         )
         scheme.solve(target=solution)
     elif pde == "poisson":
         a  = ufl.inner(ufl.grad(u), ufl.grad(v)) * ufl.dx
-        b  = -laplace(exact) * v * ufl.dx # +\
+        b  = -laplace(exact) * v * ufl.dx
         a -= ufl.dot(ufl.grad(u),normal) * v * ufl.ds +\
              ufl.dot(ufl.grad(v),normal) * (u-exact) * ufl.ds
         a += beta/hbnd * (u-exact) * v * ufl.ds
@@ -161,7 +197,7 @@ def errors(n):
         scheme = dune.fem.scheme.galerkin( a == b, solver=("suitesparse","umfpack") )
         """
         scheme.solve(target=solution)
-    elif pde == "nonvariational":
+    elif pde == "nonvariational" or pde == "forthorder":
         if problemA == "id":
             d11=d22 = 1
             d12 = 0
@@ -174,20 +210,30 @@ def errors(n):
              d22 = 2
              d12 = (x[0]*x[1])**(2./3.)
         A = ufl.as_matrix([ [d11,d12], [d12,d22] ])
-        lam = (1+d22)/2 + ufl.sqrt( (1+d22)**2/4 - d22+d12**2 )
-        a  = -ufl.inner(A,H(u-exact)) * v * ufl.dx
-        a += beta/hbnd*lam * (u-exact) * v * ufl.ds
-        a += beta*hbnd*lam * ufl.dot(ufl.grad(u-exact),tau) * ufl.dot(ufl.grad(v),tau) * ufl.ds
+        # lam = (1+d22)/2 + ufl.sqrt( (1+d22)**2/4 - d22+d12**2 )
+        lam = ( d11**2 + d22**2 + 2*d12**2 ) / (d11+d22)
+        A /= lam
 
-        # possibly of interest for the non-conforming spaces but does not work at the moment
-        # a += beta/hint * ufl.jump(u) * ufl.jump(v) * ufl.dS
-        # a += beta/hint * inner( ufl.jump(grad(u)), ufl.jump(grad(v)) ) * ufl.dS
+        if pde == "nonvariational":
+            a  = -ufl.inner(A,H(u-exact)) * v * ufl.dx
+            a += beta/hbnd * (u-exact) * v * ufl.ds
+            # a += beta*lam * ufl.dot(ufl.grad(u-exact),tau) * v * ufl.ds
+            # possibly of interest for the non-conforming spaces but does not work at the moment
+            # a += beta/hint * ufl.jump(u) * ufl.jump(v) * ufl.dS
+            # a += beta/hint * inner( ufl.jump(grad(u)), ufl.jump(grad(v)) ) * ufl.dS
+            hS,gS = 0,20   # gs needs to be greater than one for l=4 on simplex grid
+            beta.value = 1 # beta=1 seems to be fine
+        else:
+            a  = ufl.inner(A,H(u-exact)) * laplace(v) * ufl.dx
+            a += beta/hbnd**3 * (u-exact) * v * ufl.ds
+            hS,gS = 1,0
+            beta.value = 1 # beta=1 seems to be fine
 
         scheme = dune.vem.vemScheme(
             [a == 0],
             solver=("suitesparse","umfpack"),
-            hessStabilization=0,
-            gradStabilization=lam,
+            hessStabilization=hS,
+            gradStabilization=gS,
             massStabilization=0,
             parameters={"newton.linear.verbose":False,
                         "newton.verbose":False,
@@ -223,7 +269,7 @@ def errors(n):
     )
     print(n,space.size,"   ",error_l2, error_h1, error_h2)
 
-    return error_l2, error_h1, error_h2, space.size < 100000
+    return error_l2, error_h1, error_h2, space.size < 50000
 
 
 def main():

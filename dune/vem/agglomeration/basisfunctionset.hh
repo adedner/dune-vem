@@ -404,6 +404,7 @@ namespace Dune
 
       typedef BoundingBoxBasisFunctionSet< GridPart, ScalarShapeFunctionSetType > BBBasisFunctionSetType;
       typedef typename BBBasisFunctionSetType::RangeType RangeType;
+      typedef typename BBBasisFunctionSetType::JacobianRangeType JacobianRangeType;
       typedef typename BBBasisFunctionSetType::DomainFieldType DomainFieldType;
 
 #if 1 // FemQuads
@@ -437,6 +438,10 @@ namespace Dune
       val.resize( shapeFunctionSet.size() );
       Std::vector< Std::vector<RangeType> > values;
       values.resize( shapeFunctionSet.size() );
+      Std::vector<JacobianRangeType> jac;
+      jac.resize( shapeFunctionSet.size() );
+      Std::vector< Std::vector<JacobianRangeType> > jacs;
+      jacs.resize( shapeFunctionSet.size() );
 
       // compute onb factors
       // want to iterate over each polygon separately - so collect all
@@ -456,7 +461,10 @@ namespace Dune
         Quadrature0Type quadrature( element , 2*polOrder );
         const std::size_t nop = quadrature.nop();
         for (std::size_t i=0;i<values.size(); ++i)
+        {
           values[i].resize( nop * entitySeeds[agglomerate].size() );
+          jacs[i].resize( nop * entitySeeds[agglomerate].size() );
+        }
         weights.resize( nop * entitySeeds[agglomerate].size() );
         std::size_t e = 0;
         for( const ElementSeedType &entitySeed : entitySeeds[ agglomerate ] )
@@ -470,8 +478,12 @@ namespace Dune
           {
             weights[e] = geometry.integrationElement( quadrature.point( qp ) ) * quadrature.weight( qp );
             basisFunctionSet.evaluateAll(quadrature[qp], val);
+            basisFunctionSet.jacobianAll(quadrature[qp], jac);
             for (unsigned int i=0;i<val.size();++i)
+            {
               values[i][e] = val[i];
+              jacs[i][e] = jac[i];
+            }
           }
         }
 
@@ -486,26 +498,36 @@ namespace Dune
         auto l2Integral = [&](std::size_t i, std::size_t j) -> /*long*/ double {
           /*long*/ double ret = 0;
           for (std::size_t l = 0; l<weights.size(); ++l)
+          {
             ret += values[i][l]*values[j][l]*weights[l];
+            // ret += jacs[i][l][0]*jacs[j][l][0]*weights[l] / bbox.volume();
+          }
           return ret; // / bbox.volume();
         };
         std::size_t k = 0;
         for (std::size_t i=0;i<values.size();++i,++k)
         {
           auto &bi = values[i];
+          auto &ci = jacs[i];
           for (std::size_t j=0;j<i;++j,++k)
           {
             bbox.r(k) = l2Integral(i,j);
             assert( bbox.r(k) == bbox.r(k) );
             for (std::size_t l = 0; l<values[i].size(); ++l)
+            {
               bi[l].axpy(-bbox.r(k), values[j][l]);
+              ci[l].axpy(-bbox.r(k), jacs[j][l]);
+            }
             // std::cout << i << " " << j << " = " << bbox.r(k) << "   ";
           }
           bbox.r(k) = std::sqrt( l2Integral(i,i) );
           assert( bbox.r(k) == bbox.r(k) );
           // std::cout << i << " " << i << " = " << bbox.r(k) << std::endl;
           for (std::size_t l = 0; l<values[i].size(); ++l)
+          {
             bi[l] /= bbox.r(k);
+            ci[l] /= bbox.r(k);
+          }
         }
       }
     }

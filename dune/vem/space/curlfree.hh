@@ -433,10 +433,6 @@ namespace Dune
 
       typedef typename GridPartType::template Codim<0>::EntityType EntityType;
       typedef VemAgglomerationIndexSet <GridPartType> IndexSetType;
-
-      // vem basis function sets
-      // typedef VEMBasisFunctionSet <EntityType, typename BasisSetsType::ShapeFunctionSetType> BasisFunctionSetType;
-      // typedef BasisFunctionSetType ScalarBasisFunctionSetType;
     };
 
     // CurlFreeVEMSpace
@@ -444,10 +440,14 @@ namespace Dune
     template<class GridPart>
     struct CurlFreeVEMSpace
     : public DefaultAgglomerationVEMSpace<
-           AgglomerationVEMSpaceTraits<CurlFreeVEMSpaceTraits<GridPart>> >
+           AgglomerationVEMSpaceTraits<CurlFreeVEMSpaceTraits<GridPart>,
+           double>, long double >
+
     {
-      typedef AgglomerationVEMSpaceTraits<CurlFreeVEMSpaceTraits<GridPart>> TraitsType;
-      typedef DefaultAgglomerationVEMSpace< TraitsType > BaseType;
+      typedef AgglomerationVEMSpaceTraits<CurlFreeVEMSpaceTraits<GridPart>,
+              double> TraitsType;
+      typedef DefaultAgglomerationVEMSpace< TraitsType,
+              long double > BaseType;
       typedef typename BaseType::AgglomerationType AgglomerationType;
       typedef typename BaseType::BasisSetsType::ShapeFunctionSetType::FunctionSpaceType FunctionSpaceType;
       typedef typename BaseType::DomainFieldType DomainFieldType;
@@ -464,7 +464,7 @@ namespace Dune
 
     protected:
       virtual void setupConstraintRHS(const Std::vector<Std::vector<typename BaseType::ElementSeedType> > &entitySeeds, unsigned int agglomerate,
-                                    Dune::DynamicMatrix<DomainFieldType> &RHSconstraintsMatrix, double volume) override
+                                      typename BaseType::ComputeMatrixType &RHSconstraintsMatrix, double volume) override
       {
         //////////////////////////////////////////////////////////////////////////
         /// Fix RHS constraints for value projection /////////////////////////////
@@ -496,7 +496,7 @@ namespace Dune
         }
 
         // matrices for edge projections
-        Std::vector<Dune::DynamicMatrix<double> > edgePhiVector(2);
+        Std::vector<Dune::DynamicMatrix<DomainFieldType> > edgePhiVector(2);
         edgePhiVector[0].resize(BaseType::basisSets_.edgeSize(0), BaseType::basisSets_.edgeSize(0), 0);
         edgePhiVector[1].resize(BaseType::basisSets_.edgeSize(1), BaseType::basisSets_.edgeSize(1), 0);
 

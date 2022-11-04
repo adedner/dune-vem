@@ -31,7 +31,7 @@ namespace Dune
     template< class Traits >
     class AgglomerationVEMInterpolation;
 
-    template<class BaseTraits>
+    template<class BaseTraits, class Field>
     struct AgglomerationVEMSpaceTraits
     : public BaseTraits
     {
@@ -52,7 +52,7 @@ namespace Dune
       };
 
       // vem basis function sets
-      typedef VEMBasisFunctionSet <EntityType, SFSType, InterpolationType > ScalarBasisFunctionSetType;
+      typedef VEMBasisFunctionSet <EntityType, SFSType, InterpolationType, Field> ScalarBasisFunctionSetType;
       typedef std::conditional_t< BaseType::vectorSpace,
               ScalarBasisFunctionSetType,
               Fem::VectorialBasisFunctionSet<ScalarBasisFunctionSetType, RangeType>
@@ -296,7 +296,7 @@ namespace Dune
         auto inner = [&] (int poly,int i,int k,int numDofs)
         {
           // ???? assert(numDofs == basisSets_.innerSize());
-          InnerQuadratureType innerQuad( element, 3*polOrder_ );
+          InnerQuadratureType innerQuad( element, 3*polOrder_);
           for (std::size_t qp=0;qp<innerQuad.nop();++qp)
           {
             auto y = innerQuad.point(qp);
@@ -725,7 +725,7 @@ namespace Dune
         {
           // ??? assert(numDofs == innerShapeFunctionSet.size());
           //! SubVector has no size: assert(k+numDofs == localDofVector.size());
-          InnerQuadratureType innerQuad( element, 3*polOrder_ );
+          InnerQuadratureType innerQuad( element, 3*polOrder_);
           for (unsigned int qp=0;qp<innerQuad.nop();++qp)
           {
             auto y = innerQuad.point(qp);

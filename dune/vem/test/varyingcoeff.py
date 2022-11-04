@@ -78,7 +78,7 @@ def runTestVaryingcoeff(testSpaces, order):
 
       if (order==2):
         if len(testSpaces[0]) == 2: # conforming space seems to have worse L^2 eoc?
-            expected_eoc = [order-1, order, order-1]
+            expected_eoc = [order+1, order, order-1]
         else:
             expected_eoc = [order, order, order-1]
       else:
