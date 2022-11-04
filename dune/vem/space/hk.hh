@@ -29,15 +29,16 @@ namespace Dune
     // -----------------------------
 
     template<class FunctionSpace, class GridPart,
-             bool vectorSpace, bool reduced>
-             // bool vectorSpace = false, bool reduced = false>
+             bool vectorSpace, bool reduced,
+             class StorageField, class ComputeField>
     struct AgglomerationVEMSpace;
 
     // IsAgglomerationVEMSpace
     // -----------------------
 
-    template<class FunctionSpace, class GridPart, bool vectorSpace, bool reduced>
-    struct IsAgglomerationVEMSpace<AgglomerationVEMSpace<FunctionSpace, GridPart, vectorSpace,reduced> >
+    template<class FunctionSpace, class GridPart, bool vectorSpace, bool reduced, class StorageField, class ComputeField >
+    struct IsAgglomerationVEMSpace<AgglomerationVEMSpace<FunctionSpace, GridPart,
+           vectorSpace,reduced,StorageField,ComputeField> >
             : std::integral_constant<bool, true> {
     };
 
@@ -384,7 +385,7 @@ namespace Dune
                   << " " << degrees[0] << " " << degrees[1]
                   << " max size of edge set: " << edgeSFS_.size()
                   << std::endl;
-      */
+          */
       }
 
       const std::size_t maxOrder() const
@@ -561,15 +562,15 @@ namespace Dune
 
 
     template<class FunctionSpace, class GridPart,
-             bool vectorspace, bool reduced>
+             bool vectorspace, bool reduced, class StorageField, class ComputeField>
     struct HkSpaceTraits
     {
       typedef AgglomerationVEMBasisSets<FunctionSpace,GridPart,vectorspace,reduced> BasisSetsType;
 
       static const bool vectorSpace = vectorspace;
-      friend struct AgglomerationVEMSpace<FunctionSpace, GridPart, vectorSpace, reduced>;
+      friend struct AgglomerationVEMSpace<FunctionSpace, GridPart, vectorSpace, reduced, StorageField, ComputeField>;
 
-      typedef AgglomerationVEMSpace<FunctionSpace, GridPart, vectorSpace, reduced> DiscreteFunctionSpaceType;
+      typedef AgglomerationVEMSpace<FunctionSpace, GridPart, vectorSpace, reduced, StorageField, ComputeField> DiscreteFunctionSpaceType;
 
       typedef GridPart GridPartType;
 
@@ -587,17 +588,21 @@ namespace Dune
     // AgglomerationVEMSpace
     // ---------------------
     template<class FunctionSpace, class GridPart,
-             bool vectorSpace, bool reduced>
+             bool vectorSpace, bool reduced,
+             class StorageField, class ComputeField>
     struct AgglomerationVEMSpace
     : public DefaultAgglomerationVEMSpace<
-             AgglomerationVEMSpaceTraits<HkSpaceTraits<FunctionSpace,GridPart,vectorSpace,reduced>>
-             >
+             AgglomerationVEMSpaceTraits<HkSpaceTraits<FunctionSpace,GridPart,vectorSpace,reduced,StorageField,ComputeField>,
+                                         StorageField>,
+             ComputeField>
     {
-      typedef AgglomerationVEMSpaceTraits<HkSpaceTraits<FunctionSpace,GridPart,vectorSpace,reduced>> TraitsType;
-      typedef DefaultAgglomerationVEMSpace<TraitsType> BaseType;
+      typedef AgglomerationVEMSpaceTraits<HkSpaceTraits<FunctionSpace,GridPart,vectorSpace,reduced,StorageField,ComputeField>,
+                                          StorageField> TraitsType;
+      typedef DefaultAgglomerationVEMSpace<TraitsType,
+               ComputeField> BaseType;
       typedef Agglomeration<GridPart> AgglomerationType;
       typedef typename TraitsType::FunctionSpaceType FunctionSpaceType;
-      typedef typename FunctionSpaceType::DomainFieldType DomainFieldType;
+      typedef typename BaseType::DomainFieldType DomainFieldType;
       AgglomerationVEMSpace(AgglomerationType &agglomeration,
           const unsigned int polOrder,
           const typename TraitsType::BasisSetsType::TestSpacesType &testSpaces,
@@ -611,8 +616,10 @@ namespace Dune
       }
 
     protected:
-      virtual void setupConstraintRHS(const Std::vector<Std::vector<typename BaseType::ElementSeedType> > &entitySeeds, unsigned int agglomerate,
-                                    Dune::DynamicMatrix<DomainFieldType> &RHSconstraintsMatrix, double volume) override
+      virtual void setupConstraintRHS(const Std::vector<Std::vector<typename BaseType::ElementSeedType> > &entitySeeds,
+                                      unsigned int agglomerate,
+                                      typename BaseType::ComputeMatrixType &RHSconstraintsMatrix,
+                                      double volume) override
       {
         //////////////////////////////////////////////////////////////////////////
         /// Fix RHS constraints for value projection /////////////////////////////
@@ -653,7 +660,6 @@ namespace Dune
         // only case covered is triangles with C^1-conf space of order 2 with extra constraint
         assert(BaseType::basisSets_.edgeSize(1)>0 && numConstraints == numConstraintShapeFunctions+1);
         std::size_t alpha = numConstraints-1;
-        numConstraintShapeFunctions-1;
         assert( alpha == numConstraintShapeFunctions );
         // matrices for edge projections
         Std::vector<Dune::DynamicMatrix<double> > edgePhiVector(2);
@@ -719,8 +725,8 @@ namespace Dune
   {
     namespace Capabilities
     {
-        template<class FunctionSpace, class GridPart, bool vectorSpace, bool reduced>
-        struct hasInterpolation<Vem::AgglomerationVEMSpace<FunctionSpace, GridPart, vectorSpace, reduced> > {
+        template<class FunctionSpace, class GridPart, bool vectorSpace, bool reduced, class StorageField, class ComputeField>
+        struct hasInterpolation<Vem::AgglomerationVEMSpace<FunctionSpace, GridPart, vectorSpace, reduced, StorageField, ComputeField> > {
             static const bool v = false;
         };
     }

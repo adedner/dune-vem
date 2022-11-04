@@ -46,6 +46,8 @@ namespace Dune
     public:
       typedef Agglomeration< GridPart > AgglomerationType;
 
+      typedef GridPart GridPartType;
+
       typedef typename BaseType::ElementType ElementType;
 
       typedef typename BaseType::SizeType SizeType;

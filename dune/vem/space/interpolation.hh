@@ -31,7 +31,7 @@ namespace Dune
     template< class Traits >
     class AgglomerationVEMInterpolation;
 
-    template<class BaseTraits>
+    template<class BaseTraits, class StorageField>
     struct AgglomerationVEMSpaceTraits
     : public BaseTraits
     {
@@ -52,11 +52,12 @@ namespace Dune
       };
 
       // vem basis function sets
-      typedef VEMBasisFunctionSet <EntityType, SFSType, InterpolationType > ScalarBasisFunctionSetType;
+      typedef VEMBasisFunctionSet <EntityType, SFSType, InterpolationType, StorageField> ScalarBasisFunctionSetType;
       typedef std::conditional_t< BaseType::vectorSpace,
               ScalarBasisFunctionSetType,
               Fem::VectorialBasisFunctionSet<ScalarBasisFunctionSetType, RangeType>
               > BasisFunctionSetType;
+      typedef StorageField StorageFieldType;
     };
 
 
@@ -296,8 +297,8 @@ namespace Dune
         auto inner = [&] (int poly,int i,int k,int numDofs)
         {
           // ???? assert(numDofs == basisSets_.innerSize());
-          InnerQuadratureType innerQuad( element, 3*polOrder_ );
-          for (int qp=0;qp<innerQuad.nop();++qp)
+          InnerQuadratureType innerQuad( element, 3*polOrder_);
+          for (std::size_t qp=0;qp<innerQuad.nop();++qp)
           {
             auto y = innerQuad.point(qp);
             double weight = innerQuad.weight(qp) *
@@ -324,9 +325,10 @@ namespace Dune
       // the gradient projection matrix
       // Note: for a vector valued space this fills in the full 'baseRangeDimension' mask and localDofs
       // We do not need the edge bfs actually since we can obtain it from // the basis set.
+      template <class F>
       const typename BasisSetsType::EdgeShapeFunctionSetType
       operator() (const IntersectionType &intersection,
-                       Std::vector < Dune::DynamicMatrix<double> > &localDofVectorMatrix,
+                       Std::vector < Dune::DynamicMatrix<F> > &localDofVectorMatrix,
                        Std::vector<Std::vector<unsigned int>> &mask) const
       {
         localDofVectorMatrix[0].resize(basisSets_.edgeSize(0), basisSets_.edgeSize(0), 0);
@@ -338,9 +340,10 @@ namespace Dune
         (*this)(intersection,edgeShapeFunctionSet,localDofVectorMatrix,mask);
         return edgeShapeFunctionSet;
       }
-      template< class EdgeShapeFunctionSet >
+      template< class EdgeShapeFunctionSet, class F >
       void operator() (const IntersectionType &intersection,
-                       const EdgeShapeFunctionSet &edgeShapeFunctionSet, Std::vector < Dune::DynamicMatrix<double> > &localDofVectorMatrix,
+                       const EdgeShapeFunctionSet &edgeShapeFunctionSet,
+                       Std::vector < Dune::DynamicMatrix<F> > &localDofVectorMatrix,
                        Std::vector<Std::vector<unsigned int>> &mask) const
       {
         for (std::size_t i=0;i<mask.size();++i)
@@ -723,7 +726,7 @@ namespace Dune
         {
           // ??? assert(numDofs == innerShapeFunctionSet.size());
           //! SubVector has no size: assert(k+numDofs == localDofVector.size());
-          InnerQuadratureType innerQuad( element, 3*polOrder_ );
+          InnerQuadratureType innerQuad( element, 3*polOrder_);
           for (unsigned int qp=0;qp<innerQuad.nop();++qp)
           {
             auto y = innerQuad.point(qp);
@@ -798,7 +801,7 @@ namespace Dune
           std::size_t i = 0;
           if (basisSets_.vertexSize(0) > 0) //!TS
           {
-            for( ; i < refElement.size( edgeNumber, dimension-1, dimension ); ++i )
+            for( ; i < (std::size_t)refElement.size( edgeNumber, dimension-1, dimension ); ++i )
             {
               int vertexNumber = refElement.subEntity( edgeNumber, dimension-1, i, dimension);
               const int vtxk = indexSet_.localIndex( element, vertexNumber, dimension );

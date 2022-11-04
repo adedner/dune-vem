@@ -649,13 +649,16 @@ namespace Dune
     // ---------------------
     template<class GridPart>
     struct DivFreeVEMSpace : public DefaultAgglomerationVEMSpace<
-          AgglomerationVEMSpaceTraits<DivFreeVEMSpaceTraits<GridPart>> >
+          AgglomerationVEMSpaceTraits<DivFreeVEMSpaceTraits<GridPart>,
+            double>, long double >
     {
-      typedef AgglomerationVEMSpaceTraits<DivFreeVEMSpaceTraits<GridPart>> TraitsType;
-      typedef DefaultAgglomerationVEMSpace<TraitsType> BaseType;
+      typedef AgglomerationVEMSpaceTraits<DivFreeVEMSpaceTraits<GridPart>,
+              double> TraitsType;
+      typedef DefaultAgglomerationVEMSpace<TraitsType,
+              long double> BaseType;
       typedef typename BaseType::AgglomerationType AgglomerationType;
       typedef typename BaseType::BasisSetsType::ShapeFunctionSetType::FunctionSpaceType FunctionSpaceType;
-      typedef typename FunctionSpaceType::DomainFieldType DomainFieldType;
+      typedef typename BaseType::DomainFieldType DomainFieldType;
       DivFreeVEMSpace(AgglomerationType &agglomeration,
           const unsigned int polOrder,
           const bool conforming,
@@ -673,7 +676,7 @@ namespace Dune
 
     protected:
       virtual void setupConstraintRHS(const Std::vector<Std::vector<typename BaseType::ElementSeedType> > &entitySeeds, unsigned int agglomerate,
-                                    Dune::DynamicMatrix<DomainFieldType> &RHSconstraintsMatrix, double volume) override
+                                      typename BaseType::ComputeMatrixType &RHSconstraintsMatrix, double volume) override
       {
         //////////////////////////////////////////////////////////////////////////
         /// Fix RHS constraints for value projection /////////////////////////////
