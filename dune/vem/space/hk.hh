@@ -30,15 +30,15 @@ namespace Dune
 
     template<class FunctionSpace, class GridPart,
              bool vectorSpace, bool reduced,
-             class BasisField, class ComputeField>
+             class StorageField, class ComputeField>
     struct AgglomerationVEMSpace;
 
     // IsAgglomerationVEMSpace
     // -----------------------
 
-    template<class FunctionSpace, class GridPart, bool vectorSpace, bool reduced, class BasisField, class ComputeField >
+    template<class FunctionSpace, class GridPart, bool vectorSpace, bool reduced, class StorageField, class ComputeField >
     struct IsAgglomerationVEMSpace<AgglomerationVEMSpace<FunctionSpace, GridPart,
-           vectorSpace,reduced,BasisField,ComputeField> >
+           vectorSpace,reduced,StorageField,ComputeField> >
             : std::integral_constant<bool, true> {
     };
 
@@ -562,15 +562,15 @@ namespace Dune
 
 
     template<class FunctionSpace, class GridPart,
-             bool vectorspace, bool reduced, class BasisField, class ComputeField>
+             bool vectorspace, bool reduced, class StorageField, class ComputeField>
     struct HkSpaceTraits
     {
       typedef AgglomerationVEMBasisSets<FunctionSpace,GridPart,vectorspace,reduced> BasisSetsType;
 
       static const bool vectorSpace = vectorspace;
-      friend struct AgglomerationVEMSpace<FunctionSpace, GridPart, vectorSpace, reduced, BasisField, ComputeField>;
+      friend struct AgglomerationVEMSpace<FunctionSpace, GridPart, vectorSpace, reduced, StorageField, ComputeField>;
 
-      typedef AgglomerationVEMSpace<FunctionSpace, GridPart, vectorSpace, reduced, BasisField, ComputeField> DiscreteFunctionSpaceType;
+      typedef AgglomerationVEMSpace<FunctionSpace, GridPart, vectorSpace, reduced, StorageField, ComputeField> DiscreteFunctionSpaceType;
 
       typedef GridPart GridPartType;
 
@@ -589,15 +589,15 @@ namespace Dune
     // ---------------------
     template<class FunctionSpace, class GridPart,
              bool vectorSpace, bool reduced,
-             class BasisField, class ComputeField>
+             class StorageField, class ComputeField>
     struct AgglomerationVEMSpace
     : public DefaultAgglomerationVEMSpace<
-             AgglomerationVEMSpaceTraits<HkSpaceTraits<FunctionSpace,GridPart,vectorSpace,reduced,BasisField,ComputeField>,
-                                         BasisField>,
+             AgglomerationVEMSpaceTraits<HkSpaceTraits<FunctionSpace,GridPart,vectorSpace,reduced,StorageField,ComputeField>,
+                                         StorageField>,
              ComputeField>
     {
-      typedef AgglomerationVEMSpaceTraits<HkSpaceTraits<FunctionSpace,GridPart,vectorSpace,reduced,BasisField,ComputeField>,
-                                          BasisField> TraitsType;
+      typedef AgglomerationVEMSpaceTraits<HkSpaceTraits<FunctionSpace,GridPart,vectorSpace,reduced,StorageField,ComputeField>,
+                                          StorageField> TraitsType;
       typedef DefaultAgglomerationVEMSpace<TraitsType,
                ComputeField> BaseType;
       typedef Agglomeration<GridPart> AgglomerationType;
@@ -725,8 +725,8 @@ namespace Dune
   {
     namespace Capabilities
     {
-        template<class FunctionSpace, class GridPart, bool vectorSpace, bool reduced, class BasisField, class ComputeField>
-        struct hasInterpolation<Vem::AgglomerationVEMSpace<FunctionSpace, GridPart, vectorSpace, reduced, BasisField, ComputeField> > {
+        template<class FunctionSpace, class GridPart, bool vectorSpace, bool reduced, class StorageField, class ComputeField>
+        struct hasInterpolation<Vem::AgglomerationVEMSpace<FunctionSpace, GridPart, vectorSpace, reduced, StorageField, ComputeField> > {
             static const bool v = false;
         };
     }

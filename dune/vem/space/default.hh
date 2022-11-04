@@ -42,6 +42,7 @@ namespace Dune
     public:
       typedef typename BaseType::Traits Traits;
       typedef typename BaseType::GridPartType GridPartType;
+      typedef typename Traits::StorageFieldType StorageFieldType;
 
       typedef Agglomeration<GridPartType> AgglomerationType;
 
@@ -559,7 +560,7 @@ namespace Dune
               valueProjection[alpha][beta] = 0;
               for (std::size_t i = 0; i < constraintValueProj.cols(); ++i)
               {
-                DomainFieldType a(ComputeFieldType(constraintValueProj[alpha][i] * RHSconstraintsMatrix[beta][i]));
+                StorageFieldType a(ComputeFieldType(constraintValueProj[alpha][i] * RHSconstraintsMatrix[beta][i]));
                 valueProjection[alpha][beta] += a;
               }
             }
@@ -761,7 +762,7 @@ namespace Dune
             jacobianProjection[alpha][i] = 0;
             for (std::size_t beta = 0; beta < numGradShapeFunctions; ++beta)
             {
-              DomainFieldType a = ComputeFieldType(HpGradInv[alpha][beta] * R[beta][i]);
+              StorageFieldType a = ComputeFieldType(HpGradInv[alpha][beta] * R[beta][i]);
               jacobianProjection[alpha][i] += a;
             }
           }
@@ -876,7 +877,7 @@ namespace Dune
           for (std::size_t alpha = 0; alpha < numShapeFunctions; ++alpha)
             for (std::size_t j = 0; j < numDofs; ++j)
             {
-              DomainFieldType a = ComputeFieldType( D[i][alpha] * ComputeFieldType(valueProjection[alpha][j]) );
+              StorageFieldType a = ComputeFieldType( D[i][alpha] * ComputeFieldType(valueProjection[alpha][j]) );
               S[i][j] -= a;
             }
         Stabilization &stabilization = stabilizations()[agglomerate];

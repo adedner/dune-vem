@@ -31,7 +31,7 @@ namespace Dune
     template< class Traits >
     class AgglomerationVEMInterpolation;
 
-    template<class BaseTraits, class Field>
+    template<class BaseTraits, class StorageField>
     struct AgglomerationVEMSpaceTraits
     : public BaseTraits
     {
@@ -52,11 +52,12 @@ namespace Dune
       };
 
       // vem basis function sets
-      typedef VEMBasisFunctionSet <EntityType, SFSType, InterpolationType, Field> ScalarBasisFunctionSetType;
+      typedef VEMBasisFunctionSet <EntityType, SFSType, InterpolationType, StorageField> ScalarBasisFunctionSetType;
       typedef std::conditional_t< BaseType::vectorSpace,
               ScalarBasisFunctionSetType,
               Fem::VectorialBasisFunctionSet<ScalarBasisFunctionSetType, RangeType>
               > BasisFunctionSetType;
+      typedef StorageField StorageFieldType;
     };
 
 

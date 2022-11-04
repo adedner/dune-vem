@@ -30,17 +30,18 @@ namespace Dune
 
     // TODO: add template arguments for ValueProjection and JacobianProjection
     template< class Entity, class ShapeFunctionSet,
-              class InterpolationType, class Field >
+              class InterpolationType, class StorageField >
     class VEMBasisFunctionSet
     {
-      typedef VEMBasisFunctionSet< Entity, ShapeFunctionSet, InterpolationType, Field > ThisType;
+      typedef VEMBasisFunctionSet< Entity, ShapeFunctionSet, InterpolationType, StorageField > ThisType;
 
     public:
       typedef Entity EntityType;
 
       typedef typename ShapeFunctionSet::FunctionSpaceType FunctionSpaceType;
 
-      typedef Field DomainFieldType;
+      typedef StorageField StorageFieldType;
+      typedef double DomainFieldType;
       typedef typename FunctionSpaceType::RangeFieldType RangeFieldType;
       typedef typename FunctionSpaceType::DomainType DomainType;
       typedef typename FunctionSpaceType::RangeType RangeType;
@@ -56,9 +57,9 @@ namespace Dune
       const auto& valueProjection() const { return (*valueProjections_)[agglomerate_]; }
       const auto& jacobianProjection() const { return (*jacobianProjections_)[agglomerate_]; }
       const auto& hessianProjection() const { return (*hessianProjections_)[agglomerate_]; }
-      typedef Std::vector< Std::vector< DomainFieldType > > ValueProjection;
-      typedef Std::vector< Std::vector< DomainFieldType > > JacobianProjection;
-      typedef Std::vector< Std::vector< DomainFieldType > > HessianProjection;
+      typedef Std::vector< Std::vector< StorageFieldType > > ValueProjection;
+      typedef Std::vector< Std::vector< StorageFieldType > > JacobianProjection;
+      typedef Std::vector< Std::vector< StorageFieldType > > HessianProjection;
       template <class T>
       using Vector = Std::vector<T>;
 
