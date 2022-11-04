@@ -41,7 +41,7 @@ def curlfree(space, exact):
 def runTestCurlfree(order):
     x = SpatialCoordinate(triangle)
     ln, lm, Lx, Ly = getParameters()
-    print(ln, lm, Lx, Ly)
+    # print(ln, lm, Lx, Ly)
     exact = -grad( (cos(ln/Lx*pi*x[0])*cos(lm/Ly*pi*x[1])) )
     spaceConstructor = lambda grid, r: dune.vem.curlFreeSpace( grid,
                                                                order=order )

@@ -120,7 +120,8 @@ def vemSpace(view, order=1, testSpaces=None, scalar=False,
              storage="numpy",
              basisChoice=2, rotatedBB=True,
              edgeInterpolation=False,
-             vectorSpace=False, reduced=False):
+             vectorSpace=False, reduced=False,
+             basisField="double", computeField="long double"):
     """create a virtual element space over an agglomerated grid
 
     Args:
@@ -182,6 +183,7 @@ def vemSpace(view, order=1, testSpaces=None, scalar=False,
       gridPartName +\
       (", true " if vectorSpace else ", false ") +\
       (", true " if reduced else ", false ") +\
+      ", " + basisField + ", " + computeField +\
       " >"
     constructor = Constructor(
                    ['pybind11::handle gridView',

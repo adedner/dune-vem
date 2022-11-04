@@ -14,15 +14,15 @@ from ufl import SpatialCoordinate, TrialFunction, TestFunction,\
 
 dune.fem.threading.use = 8
 coarse = True
-order  = 4
-T      = 2.5
+order  = 3
+T      = 0.5 if coarse else 2.5
 tau    = T / 8000
 mu     = 0.001
 
 # use pygmsh to define domain with cylinder
 with pygmsh.occ.Geometry() as geom:
     geom.set_mesh_size_callback( lambda dim, tag, x, y, z, lc:
-        min(0.02+1.5*( (x-0.2)**2+(y-0.2)**2), 0.2 if coarse else 0.04)
+        min(0.02+1.5*( (x-0.2)**2+(y-0.2)**2), 0.25 if coarse else 0.04)
     )
     rectangle = geom.add_rectangle([0, 0, 0], 2.2, 0.41)
     cylinder = geom.add_disk([0.2, 0.2, 0.0], 0.05)
@@ -84,8 +84,8 @@ while time < T:
     u_h_n.assign(u_h)
     info = uzawa.solve([u_h,p_h])
     time += tau
-    print(time, tau, info, flush=True)
     if time > nextSave:
-        print("  *********** saving ********  ")
+        print(time, tau, info, flush=True)
+        # print("  *********** saving ********  ")
         vtk()
         nextSave += saveStep

@@ -40,7 +40,7 @@ def mixed(polyGrid, order):
 for order in [0,1]:
     for i in range(2,3):
         cells = dune.vem.voronoiCells([[0,0],[Lx,Ly]],2**(2*i+1),
-                                      lloyd=250, fileName="test", load=True)
+                                      lloyd=250, load="test")
         polyGrid = dune.vem.polyGrid(cells)
         iset = polyGrid.indexSet
         @dune.fem.function.gridFunction(polyGrid, name="cells", order=0)

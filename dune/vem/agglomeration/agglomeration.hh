@@ -82,7 +82,7 @@ namespace Dune
       }
       void onbBasis(int order)
       {
-        if (order > maxOrder_)
+        if (order > (int)maxOrder_)
         {
           Dune::Vem::onbBasis(*this, order, boundingBoxes());
           maxOrder_ = order;
