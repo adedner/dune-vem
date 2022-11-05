@@ -197,7 +197,7 @@ def main(level = 0):
     order = 3
     # grid = dune.vem.polyGrid(cartesianDomain([0,0],[3,1],[30*N,10*N]),cubes=False)
     grid = dune.vem.polyGrid(
-          dune.vem.voronoiCells([[0,0],[Lx,Ly]], 50*N*N, lloyd=200, fileName="voronoiseeds", load=True)
+          dune.vem.voronoiCells([[0,0],[Lx,Ly]], 50*N*N, lloyd=200, load="voronoiseeds")
         #   cartesianDomain([0.,0.],[Lx,Ly],[N,N]), cubes=False
         #   cartesianDomain([0.,0.],[Lx,Ly],[2*N,2*N]), cubes=True
        )

@@ -404,12 +404,12 @@ namespace Dune
       const ONBShapeFunctionSetType onbSFS_;
       const ScalarEdgeShapeFunctionSetType edgeSFS_;
       const std::array< std::pair< int, unsigned int >, dimDomain+1 > dofsPerCodim_;
+      const bool useOnb_;
       const std::size_t numValueShapeFunctions_;
       const std::size_t numGradShapeFunctions_;
       const std::size_t numHessShapeFunctions_;
       const std::size_t numInnerShapeFunctions_;
       const std::size_t numEdgeTestShapeFunctions_;
-      const bool useOnb_;
     };
 
 
@@ -433,10 +433,6 @@ namespace Dune
 
       typedef typename GridPartType::template Codim<0>::EntityType EntityType;
       typedef VemAgglomerationIndexSet <GridPartType> IndexSetType;
-
-      // vem basis function sets
-      // typedef VEMBasisFunctionSet <EntityType, typename BasisSetsType::ShapeFunctionSetType> BasisFunctionSetType;
-      // typedef BasisFunctionSetType ScalarBasisFunctionSetType;
     };
 
     // CurlFreeVEMSpace
@@ -444,13 +440,17 @@ namespace Dune
     template<class GridPart>
     struct CurlFreeVEMSpace
     : public DefaultAgglomerationVEMSpace<
-           AgglomerationVEMSpaceTraits<CurlFreeVEMSpaceTraits<GridPart>> >
+           AgglomerationVEMSpaceTraits<CurlFreeVEMSpaceTraits<GridPart>,
+           double>, long double >
+
     {
-      typedef AgglomerationVEMSpaceTraits<CurlFreeVEMSpaceTraits<GridPart>> TraitsType;
-      typedef DefaultAgglomerationVEMSpace< TraitsType > BaseType;
+      typedef AgglomerationVEMSpaceTraits<CurlFreeVEMSpaceTraits<GridPart>,
+              double> TraitsType;
+      typedef DefaultAgglomerationVEMSpace< TraitsType,
+              long double > BaseType;
       typedef typename BaseType::AgglomerationType AgglomerationType;
       typedef typename BaseType::BasisSetsType::ShapeFunctionSetType::FunctionSpaceType FunctionSpaceType;
-      typedef typename FunctionSpaceType::DomainFieldType DomainFieldType;
+      typedef typename BaseType::DomainFieldType DomainFieldType;
       CurlFreeVEMSpace(AgglomerationType &agglomeration,
           const unsigned int polOrder,
           int basisChoice)
@@ -464,18 +464,15 @@ namespace Dune
 
     protected:
       virtual void setupConstraintRHS(const Std::vector<Std::vector<typename BaseType::ElementSeedType> > &entitySeeds, unsigned int agglomerate,
-                                    Dune::DynamicMatrix<DomainFieldType> &RHSconstraintsMatrix, double volume) override
+                                      typename BaseType::ComputeMatrixType &RHSconstraintsMatrix, double volume) override
       {
         //////////////////////////////////////////////////////////////////////////
         /// Fix RHS constraints for value projection /////////////////////////////
         //////////////////////////////////////////////////////////////////////////
 
-        typedef typename BaseType::BasisSetsType::EdgeShapeFunctionSetType EdgeTestSpace;
         typedef typename FunctionSpaceType::DomainType DomainType;
         typedef typename FunctionSpaceType::RangeFieldType RangeFieldType;
         typedef typename FunctionSpaceType::RangeType RangeType;
-        typedef typename FunctionSpaceType::JacobianRangeType JacobianRangeType;
-        typedef typename FunctionSpaceType::HessianRangeType HessianRangeType;
         static constexpr int blockSize = BaseType::localBlockSize;
         const std::size_t dimDomain = DomainType::dimension;
         const std::size_t dimRange = RangeType::dimension;
@@ -499,7 +496,7 @@ namespace Dune
         }
 
         // matrices for edge projections
-        Std::vector<Dune::DynamicMatrix<double> > edgePhiVector(2);
+        Std::vector<Dune::DynamicMatrix<DomainFieldType> > edgePhiVector(2);
         edgePhiVector[0].resize(BaseType::basisSets_.edgeSize(0), BaseType::basisSets_.edgeSize(0), 0);
         edgePhiVector[1].resize(BaseType::basisSets_.edgeSize(1), BaseType::basisSets_.edgeSize(1), 0);
 

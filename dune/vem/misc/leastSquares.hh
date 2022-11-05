@@ -12,7 +12,6 @@ namespace Dune {
 
     namespace Vem {
 
-        // template <class Matrix = Dune::DynaicMatrix<double, Vector = Dune::DynamicVector<double>>>
         template<class Matrix, class CMatrix>
         class LeastSquares {
         public:

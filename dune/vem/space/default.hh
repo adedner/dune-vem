@@ -25,22 +25,24 @@
 #include <dune/vem/space/interpolate.hh>
 
 #include <dune/vem/misc/vector.hh>
+#include <dune/common/gmpfield.hh>
 
 namespace Dune
 {
 
   namespace Vem
   {
-    template<class VemTraits>
+    template<class VemTraits, class CField>
     class DefaultAgglomerationVEMSpace
     : public Fem::DiscreteFunctionSpaceDefault< VemTraits >
     {
-      typedef DefaultAgglomerationVEMSpace< VemTraits > ThisType;
+      typedef DefaultAgglomerationVEMSpace< VemTraits, CField > ThisType;
       typedef Fem::DiscreteFunctionSpaceDefault< VemTraits > BaseType;
 
     public:
       typedef typename BaseType::Traits Traits;
       typedef typename BaseType::GridPartType GridPartType;
+      typedef typename Traits::StorageFieldType StorageFieldType;
 
       typedef Agglomeration<GridPartType> AgglomerationType;
 
@@ -69,7 +71,10 @@ namespace Dune
       typedef Dune::Fem::ElementQuadrature<GridPartType, 0> Quadrature0Type;
       typedef Dune::Fem::ElementQuadrature<GridPartType, 1> Quadrature1Type;
 
-      typedef DynamicMatrix<typename BasisFunctionSetType::DomainFieldType> Stabilization;
+      typedef DynamicMatrix<DomainFieldType> Stabilization;
+      typedef CField ComputeFieldType;
+      typedef DynamicMatrix<CField> ComputeMatrixType;
+      typedef DynamicVector<CField> ComputeVectorType;
 
       using BaseType::gridPart;
 
@@ -102,7 +107,8 @@ namespace Dune
         edgeInterpolation_(edgeInterpolation),
         agIndexSet_(agglom),
         blockMapper_(agIndexSet_, basisSets_.dofsPerCodim()),
-        interpolation_(new AgglomerationInterpolationType(blockMapper().indexSet(), basisSets_, polOrder, basisChoice != 3)),
+        interpolation_(new
+        AgglomerationInterpolationType(blockMapper().indexSet(), basisSets_, polOrder_, basisChoice != 3)),
         counter_(0),
         useThreads_(Fem::MPIManager::numThreads()),
         valueProjections_(new Vector<
@@ -228,7 +234,8 @@ namespace Dune
 
       virtual void finalize(const Std::vector<Std::vector<ElementSeedType> > &entitySeeds, unsigned int agglomerate)
       {}
-      virtual void setupConstraintRHS(const Std::vector<Std::vector<ElementSeedType> > &entitySeeds, unsigned int agglomerate, DynamicMatrix<DomainFieldType> &RHSconstraintsMatrix, double volume)
+      virtual void setupConstraintRHS(const
+      Std::vector<Std::vector<ElementSeedType> > &entitySeeds, unsigned int agglomerate, ComputeMatrixType &RHSconstraintsMatrix, double volume)
       {}
       void buildProjections(const Std::vector<Std::vector<ElementSeedType> > &entitySeeds,
                             unsigned int start, unsigned int end);
@@ -242,7 +249,7 @@ namespace Dune
       mutable BlockMapperType blockMapper_;
       std::shared_ptr<AgglomerationInterpolationType> interpolation_;
       std::size_t counter_;
-      int useThreads_;
+      std::size_t useThreads_;
       std::shared_ptr<Vector<typename Traits::ScalarBasisFunctionSetType::ValueProjection>> valueProjections_;
       std::shared_ptr<Vector<typename Traits::ScalarBasisFunctionSetType::JacobianProjection>> jacobianProjections_;
       std::shared_ptr<Vector<typename Traits::ScalarBasisFunctionSetType::HessianProjection>> hessianProjections_;
@@ -252,8 +259,8 @@ namespace Dune
     // Computation of  projections for DefaultAgglomerationVEMSpace
     // ------------------------------------------------------------
 
-    template<class Traits>
-    inline void DefaultAgglomerationVEMSpace<Traits> :: buildProjections(
+    template<class Traits, class CField>
+    inline void DefaultAgglomerationVEMSpace<Traits, CField> :: buildProjections(
           const Std::vector<Std::vector<ElementSeedType> > &entitySeeds,
           unsigned int start, unsigned int end )
     {
@@ -262,7 +269,6 @@ namespace Dune
       // this is scalar space in the case that vectorial extension is used
       typedef typename BasisSetsType::ShapeFunctionSetType::FunctionSpaceType FunctionSpaceType;
       typedef typename FunctionSpaceType::DomainType DomainType;
-      typedef typename FunctionSpaceType::RangeFieldType RangeFieldType;
       typedef typename FunctionSpaceType::RangeType RangeType;
       typedef typename FunctionSpaceType::JacobianRangeType JacobianRangeType;
       typedef typename FunctionSpaceType::HessianRangeType HessianRangeType;
@@ -274,7 +280,7 @@ namespace Dune
       const std::size_t numHessShapeFunctions = basisSets_.size(2);
       const std::size_t numConstraintShapeFunctions = basisSets_.constraintSize();
 
-      double maxStab = 0;
+      DomainFieldType maxStab = 0;
 
       /*
       std::cout << "pol order / dimDomain / dimRange: "
@@ -294,28 +300,27 @@ namespace Dune
 
       // Mass matrices and their inverse: HpGrad, HpHess, HpGradInv, HpHessInv
       // !!! HpGrad/HpHess are not needed after inversion so use HpGradInv/HpHessInv from the start
-      DynamicMatrix<DomainFieldType> HpGrad, HpHess, HpGradInv, HpHessInv;
+      ComputeMatrixType HpGrad, HpHess, HpGradInv, HpHessInv;
       HpGrad.resize(numGradShapeFunctions, numGradShapeFunctions, 0);
       HpHess.resize(numHessShapeFunctions, numHessShapeFunctions, 0);
 
       // interpolation of basis function set used for least squares part of value projection
-      DynamicMatrix<DomainFieldType> D;
+      ComputeMatrixType D;
       // constraint matrix for value projection
-      DynamicMatrix<DomainFieldType> constraintValueProj;
+      ComputeMatrixType constraintValueProj;
       // right hand sides and solvers for CLS for value projection (b: ls, d: constraints)
-      Dune::DynamicVector<DomainFieldType> b;
-      DynamicMatrix<DomainFieldType> RHSconstraintsMatrix;
+      ComputeVectorType b;
+      ComputeMatrixType RHSconstraintsMatrix;
 
       // matrices for edge projections
-      Std::vector<Dune::DynamicMatrix<double> > edgePhiVector(2);
+      Std::vector<ComputeMatrixType> edgePhiVector(2);
       edgePhiVector[0].resize(basisSets_.edgeSize(0), basisSets_.edgeSize(0), 0);
       edgePhiVector[1].resize(basisSets_.edgeSize(1), basisSets_.edgeSize(1), 0);
 
       // std::cout << "edgePhiVector:" << basisSets_.edgeSize(0) << "," <<  basisSets_.edgeSize(1) << std::endl;
 
       // matrix for rhs of gradient and hessian projections
-      DynamicMatrix<DomainFieldType> R;
-      DynamicMatrix<DomainFieldType> P;
+      ComputeMatrixType R,P;
       std::vector<RangeType> phi0Values;
       std::vector<JacobianRangeType> psi1Values;
 
@@ -334,7 +339,6 @@ namespace Dune
                   << blockMapper().numDofs(agglomerate) << " * "
                   << blockSize << std::endl;
         */
-
         phi0Values.resize(numDofs);
         psi1Values.resize(numDofs);
 
@@ -351,15 +355,21 @@ namespace Dune
         jacobianProjection.resize(numGradShapeFunctions);
         hessianProjection.resize(numHessShapeFunctions);
         for (std::size_t alpha = 0; alpha < numShapeFunctions; ++alpha)
-          valueProjection[alpha].resize(numDofs, DomainFieldType(0));
+          valueProjection[alpha].resize(numDofs, ComputeFieldType(0.));
         for (std::size_t alpha = 0; alpha < numGradShapeFunctions; ++alpha)
-          jacobianProjection[alpha].resize(numDofs, DomainFieldType(0));
+          jacobianProjection[alpha].resize(numDofs, ComputeFieldType(0.));
         for (std::size_t alpha = 0; alpha < numHessShapeFunctions; ++alpha)
-          hessianProjection[alpha].resize(numDofs, DomainFieldType(0));
+          hessianProjection[alpha].resize(numDofs, ComputeFieldType(0.));
 
         // value projection CLS
-        std::size_t numConstraints = (numDofs >= numShapeFunctions)? // LS is large enough
-                          numConstraintShapeFunctions : numShapeFunctions-numDofs;
+        // we need to have at least as many constraints as numShapeFunctions-numDofs
+        // std::size_t numConstraints = (numDofs >= numShapeFunctions)? // LS is large enough
+        //                    numConstraintShapeFunctions : numShapeFunctions-numDofs;
+        std::size_t numConstraints = numShapeFunctions >= numDofs
+                                     ? std::max( numConstraintShapeFunctions, numShapeFunctions-numDofs )
+                                     : numConstraintShapeFunctions;
+
+
         // std::cout << "numConstraints " << numConstraints << std::endl;
         constraintValueProj = 0;
         D.resize(numDofs, numShapeFunctions, 0);
@@ -508,7 +518,7 @@ namespace Dune
 
         if (numConstraints < numShapeFunctions)
         { // need to use a CLS approach
-          // std::cout << "CLS" << std::endl;
+          // std::cout << "CLS" << " " << numConstraints << " " << numShapeFunctions << std::endl;
           auto leastSquaresMinimizer = LeastSquares(D, constraintValueProj);
           for ( std::size_t beta = 0; beta < numDofs; ++beta )
           {
@@ -550,7 +560,8 @@ namespace Dune
               valueProjection[alpha][beta] = 0;
               for (std::size_t i = 0; i < constraintValueProj.cols(); ++i)
               {
-                valueProjection[alpha][beta] += constraintValueProj[alpha][i] * RHSconstraintsMatrix[beta][i];
+                StorageFieldType a(ComputeFieldType(constraintValueProj[alpha][i] * RHSconstraintsMatrix[beta][i]));
+                valueProjection[alpha][beta] += a;
               }
             }
           }
@@ -596,7 +607,6 @@ namespace Dune
         {
           const ElementType &element = gridPart().entity(entitySeed);
           const auto geometry = element.geometry();
-          const auto &refElement = ReferenceElements<typename GridPartType::ctype, GridPartType::dimension>::general( element.type());
 
           // get the bounding box monomials and apply all dofs to them
           const auto &shapeFunctionSet = basisSets_.basisFunctionSet(agglomeration(), element);
@@ -751,7 +761,10 @@ namespace Dune
           {
             jacobianProjection[alpha][i] = 0;
             for (std::size_t beta = 0; beta < numGradShapeFunctions; ++beta)
-              jacobianProjection[alpha][i] += HpGradInv[alpha][beta] * R[beta][i];
+            {
+              StorageFieldType a = ComputeFieldType(HpGradInv[alpha][beta] * R[beta][i]);
+              jacobianProjection[alpha][i] += a;
+            }
           }
 
 #if 0
@@ -847,7 +860,7 @@ namespace Dune
           {
             hessianProjection[alpha][i] = 0;
             for (std::size_t beta = 0; beta < numHessShapeFunctions; ++beta)
-              hessianProjection[alpha][i] += HpHessInv[alpha][beta] * P[beta][i];
+              hessianProjection[alpha][i] += ComputeFieldType( HpHessInv[alpha][beta] * P[beta][i] );
           }
         }
 
@@ -863,7 +876,10 @@ namespace Dune
         for (std::size_t i = 0; i < numDofs; ++i)
           for (std::size_t alpha = 0; alpha < numShapeFunctions; ++alpha)
             for (std::size_t j = 0; j < numDofs; ++j)
-              S[i][j] -= D[i][alpha] * valueProjection[alpha][j];
+            {
+              StorageFieldType a = ComputeFieldType( D[i][alpha] * ComputeFieldType(valueProjection[alpha][j]) );
+              S[i][j] -= a;
+            }
         Stabilization &stabilization = stabilizations()[agglomerate];
         stabilization.resize(numDofs, numDofs, 0);
         for (std::size_t i = 0; i < numDofs; ++i)
