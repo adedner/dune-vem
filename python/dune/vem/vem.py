@@ -9,6 +9,8 @@ from dune.generator import Constructor, Method
 import dune.common.checkconfiguration as checkconfiguration
 import dune
 
+
+
 def bbdgSpace(view, order=1, scalar=False, dimRange=None, field="double",
              rotatedBB=True,
              storage="numpy"):
@@ -121,7 +123,9 @@ def vemSpace(view, order=1, testSpaces=None, scalar=False,
              basisChoice=2, rotatedBB=True,
              edgeInterpolation=False,
              vectorSpace=False, reduced=False,
-             basisField="double", computeField="long double"):
+             basisField="double", computeField="long double",
+             gradProjectionWithIByParts=False
+             ):
     """create a virtual element space over an agglomerated grid
 
     Args:
@@ -134,6 +138,10 @@ def vemSpace(view, order=1, testSpaces=None, scalar=False,
     Returns:
         Space: the constructed Space
     """
+    if gradProjectionWithIByParts:
+        useNewGradProjection = ["NEWGRADPROJECTION"]
+    else:
+        useNewGradProjection = []
 
     from dune.fem.space import module, addStorage
     if dimRange is None:
@@ -229,7 +237,16 @@ def vemSpace(view, order=1, testSpaces=None, scalar=False,
     updateMethod = Method('update',
        '''[]( DuneType &self ) { self.update(); }''' )
 
+    from dune.fem.space import _defaultGenerator
+    class NewGenerator:
+        def __init__(self):
+            pass
+        def load(self,*args,**kwargs):
+            kwargs["defines"] = kwargs.get("defines",[]) + useNewGradProjection
+            return _defaultGenerator.load(*args,**kwargs)
+
     spc = module(field, includes, typeName, constructor, diameterMethod, updateMethod,
+                generator = NewGenerator(),
                 scalar=scalar, storage=storage,
                 ctorArgs=[view, agglomerate, order, testSpaces, basisChoice, edgeInterpolation, rotatedBB])
     addStorage(spc, storage)

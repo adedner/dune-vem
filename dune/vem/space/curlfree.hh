@@ -110,6 +110,7 @@ namespace Dune
             }
           });
         }
+
         template< class Point, class Functor >
         void evaluateEach ( const Point &x, Functor functor ) const
         {
@@ -122,6 +123,20 @@ namespace Dune
             }
           });
         }
+        // needed to compute the gradient of the value projection
+        template< class Point, class Functor >
+        void jacValEach ( const Point &x, Functor functor ) const
+        {
+          sfs_.hessianEach(x, [&](std::size_t alpha, ScalarHessianRangeType d2phi)
+          {
+            if (alpha>=1)
+            {
+              // dphi[0] *= scale_;
+              functor(alpha-1, d2phi[0]);
+            }
+          });
+        }
+
         /*
           int Gu : M = int Du : M = - int u . divM + int_e uxn : M
           use M = mI so int Gu : M = int div u m

@@ -264,6 +264,13 @@ namespace Dune
           const Std::vector<Std::vector<ElementSeedType> > &entitySeeds,
           unsigned int start, unsigned int end )
     {
+/*
+#ifdef NEWGRADPROJECTION
+      std::cout << "using modified gradient projection\n";
+#else
+      std::cout << "using original gradient projection\n";
+#endif
+*/
       int polOrder = order();
       typedef typename BasisSetsType::EdgeShapeFunctionSetType EdgeTestSpace;
       // this is scalar space in the case that vectorial extension is used
@@ -322,6 +329,7 @@ namespace Dune
       // matrix for rhs of gradient and hessian projections
       ComputeMatrixType R,P;
       std::vector<RangeType> phi0Values;
+      std::vector<JacobianRangeType> phi0Jacs;
       std::vector<JacobianRangeType> psi1Values;
 
       // start iteration over all polygons
@@ -340,6 +348,7 @@ namespace Dune
                   << blockSize << std::endl;
         */
         phi0Values.resize(numDofs);
+        phi0Jacs.resize(numDofs);
         psi1Values.resize(numDofs);
 
         const DomainFieldType H0 = blockMapper_.indexSet().volume(agglomerate);
@@ -646,7 +655,6 @@ namespace Dune
                 factorTN[i][j] = 0.5 * (normal[i] * tau[j] + normal[j] * tau[i]);
                 factorNN[i][j] = 0.5 * (normal[i] * normal[j] + normal[j] * normal[i]);
               }
-
             // now compute int_e Phi_mask[i] m_alpha
             Quadrature1Type quadrature(gridPart(), intersection, 3 * polOrder, Quadrature1Type::INSIDE);
             for (std::size_t qp = 0; qp < quadrature.nop(); ++qp)
@@ -687,6 +695,15 @@ namespace Dune
                         for (std::size_t j=0;j<dimDomain;++j)
                           R[alpha][s] += weight * phi0Values[s][i] * phi[i][j] * normal[j];
                   }
+                  #ifdef NEWGRADPROJECTION
+                  {
+                    vemBasisFunction.evaluateAll(y, phi0Values);
+                    for (std::size_t s=0;s<numDofs;++s)
+                      for (std::size_t i=0;i<dimRange;++i)
+                        for (std::size_t j=0;j<dimDomain;++j)
+                          R[alpha][s] -= weight * phi0Values[s][i] * phi[i][j] * normal[j];
+                  }
+                  #endif
               });
               shapeFunctionSet.hessianEach(y, [&](std::size_t alpha, HessianRangeType phi)
               {
@@ -744,6 +761,18 @@ namespace Dune
           {
             const DomainFieldType weight =
                     geometry.integrationElement(quadrature.point(qp)) * quadrature.weight(qp);
+            #ifdef NEWGRADPROJECTION
+            vemBasisFunction.jacValAll(quadrature[qp], phi0Jacs);
+            shapeFunctionSet.jacobianEach(quadrature[qp], [&](std::size_t alpha, JacobianRangeType phi)
+            {
+              assert(alpha>=0 && alpha<R.size());
+              assert(R[alpha].size() == numDofs);
+              for (std::size_t s=0; s<numDofs; ++s)
+                for (std::size_t i=0;i<dimRange;++i)
+                  for (std::size_t j=0;j<dimDomain;++j)
+                    R[alpha][s] += weight * phi0Jacs[s][i][j] * phi[i][j];
+            });
+            #else
             vemBasisFunction.evaluateAll(quadrature[qp], phi0Values);
             shapeFunctionSet.divJacobianEach(quadrature[qp], [&](std::size_t alpha, RangeType divGradPhi)
             {
@@ -752,6 +781,7 @@ namespace Dune
                 for (std::size_t s=0; s<numDofs; ++s)
                   R[alpha][s] -= weight * phi0Values[s] * divGradPhi;
             });
+            #endif
           } // quadrature loop
         } // loop over triangles in agglomerate
 
