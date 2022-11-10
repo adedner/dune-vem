@@ -264,6 +264,13 @@ namespace Dune
           const Std::vector<Std::vector<ElementSeedType> > &entitySeeds,
           unsigned int start, unsigned int end )
     {
+/*
+#ifdef NEWGRADPROJECTION
+      std::cout << "using modified gradient projection\n";
+#else
+      std::cout << "using original gradient projection\n";
+#endif
+*/
       int polOrder = order();
       typedef typename BasisSetsType::EdgeShapeFunctionSetType EdgeTestSpace;
       // this is scalar space in the case that vectorial extension is used
@@ -650,16 +657,13 @@ namespace Dune
               }
             // now compute int_e Phi_mask[i] m_alpha
             Quadrature1Type quadrature(gridPart(), intersection, 3 * polOrder, Quadrature1Type::INSIDE);
-            // Quadrature1Type quadrature(gridPart(), intersection, 12, Quadrature1Type::INSIDE);
             for (std::size_t qp = 0; qp < quadrature.nop(); ++qp)
             {
               auto x = quadrature.localPoint(qp);
               auto y = intersection.geometryInInside().global(x);
-              // const DomainFieldType weight = intersection.geometry().integrationElement(x) * quadrature.weight(qp);
-              const DomainFieldType weight = quadrature.weight(qp);
+              const DomainFieldType weight = intersection.geometry().integrationElement(x) * quadrature.weight(qp);
               const auto &jit = geo.jacobianInverseTransposed(x);
-              // auto normal = intersection.unitOuterNormal(x);
-              auto normal = intersection.integrationOuterNormal(x);
+              auto normal = intersection.unitOuterNormal(x);
               shapeFunctionSet.jacobianEach(y, [&](std::size_t alpha, JacobianRangeType phi)
               {
                   // evaluate each here for edge shape fns
@@ -753,7 +757,6 @@ namespace Dune
 
           // Compute element part for the gradient projection
           Quadrature0Type quadrature(element, 3 * polOrder);
-          // Quadrature0Type quadrature(element, 12);
           for (std::size_t qp = 0; qp < quadrature.nop(); ++qp)
           {
             const DomainFieldType weight =

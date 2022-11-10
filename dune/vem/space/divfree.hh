@@ -5,6 +5,8 @@
 #include <utility>
 
 #include <dune/common/dynmatrix.hh>
+#include <dune/grid/common/exceptions.hh>
+
 #include <dune/geometry/referenceelements.hh>
 #include <dune/fem/quadrature/elementquadrature.hh>
 #include <dune/fem/space/common/defaultcommhandler.hh>
@@ -123,6 +125,7 @@ namespace Dune
             }
           });
         }
+
         /*
              ortho   1     x    y        scalar   x     y    xy    x^2   y^2
         k=2                                      (1)   (0)
@@ -170,6 +173,41 @@ namespace Dune
           if (test != numValueShapeFunctions_)
             std::cout << "evaluated " << test << " basis functions instead of " << numValueShapeFunctions_ << std::endl;
           assert(test == numValueShapeFunctions_);
+        }
+        template< class Point, class Functor >
+        void jacValEach ( const Point &x, Functor functor ) const
+        {
+          /*
+          RangeType y = sfs_.position( x );
+          sfs_.bbox().gradientTransform(y, true);
+          y *= std::sqrt( sfs_.bbox().volume() );
+          assert( y.two_norm() < 1.5 );
+          // D ( -y phi )  = ( - y phi_x         - phi - y phi_y )
+          //   (  x phi )    ( phi + x phi_x     x phi_y         )
+          sfs_.jacobianEach(x, [&](std::size_t alpha, ScalarRangeType phi)
+          {
+            if (alpha < numOrthoShapeFunctions_)
+            {
+              //// (-y,x) * phi(x,y)
+              RangeType val{-y[1]*phi[0], y[0]*phi[0]};
+              if (alpha<numInnerShapeFunctions_)
+                functor(alpha,val);
+              else
+                functor(alpha+sfs_.size()-1,val);
+              ++test;
+            }
+          });
+          sfs_.jacobianEach(x, [&](std::size_t alpha, ScalarJacobianRangeType dphi)
+          {
+            if (alpha>=1)
+            {
+              dphi[0] *= scale_;
+              functor(alpha-1+numInnerShapeFunctions_, dphi[0]);
+              ++test;
+            }
+          });
+          */
+          DUNE_THROW( NotImplemented, "DivFree does not implement the improved gradient projection yet");
         }
 
         template< class Point, class Functor >
