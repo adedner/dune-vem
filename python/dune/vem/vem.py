@@ -117,7 +117,8 @@ def bbdgScheme(model, space=None, penalty=1, solver=None, parameters={}):
     return dg(model,space,penalty,solver,parameters,penaltyClass)
     # return galerkin(model,space,solver,parameters)
 
-def vemSpace(view, order=1, testSpaces=None, scalar=False,
+def vemSpace(view, order=1,
+             testSpaces=None, scalar=False,
              dimRange=None, conforming=True, field="double",
              storage="numpy",
              basisChoice=2, rotatedBB=True,
@@ -138,6 +139,12 @@ def vemSpace(view, order=1, testSpaces=None, scalar=False,
     Returns:
         Space: the constructed Space
     """
+    try:
+        orderTuple = order
+        order = orderTuple[0]
+    except TypeError:
+        orderTuple = [-1,-1,-1]
+
     if gradProjectionWithIByParts:
         useNewGradProjection = ["NEWGRADPROJECTION"]
     else:
@@ -197,6 +204,7 @@ def vemSpace(view, order=1, testSpaces=None, scalar=False,
                    ['pybind11::handle gridView',
                     'const pybind11::object agglomerate',
                     'unsigned int order',
+                    'const std::array<int,3> orderTuple',
                     'const std::array<std::vector<int>,'+str(view.dimension+1)+'> &testSpaces',
                     'int basisChoice','bool edgeInterpolation','bool rotatedBB'],
                    ['typedef Dune::Vem::Agglomeration<' + gridPartName + '> AggloType;',
@@ -226,10 +234,12 @@ def vemSpace(view, order=1, testSpaces=None, scalar=False,
                     '  (void) pybind11::weakref(gridView, aggloCleanup).release();',
                     '  // std::cout << "new agglo\\n";',
                     '}',
-                    'auto obj = new DuneType(*agglo, order, testSpaces, basisChoice, edgeInterpolation );',
+                    'auto obj = new DuneType(*agglo, order, orderTuple, testSpaces, basisChoice, edgeInterpolation );',
                     'return obj;'],
                    ['"gridView"_a', '"agglomerate"_a',
-                    '"order"_a', '"testSpaces"_a',
+                    '"order"_a',
+                    '"orderTuple"_a',
+                    '"testSpaces"_a',
                     '"basisChoice"_a', '"edgeInterpolation"_a', '"rotatedBB"_a',
                     'pybind11::keep_alive< 1, 2 >()'] )
     diameterMethod = Method('diameters',
@@ -248,7 +258,7 @@ def vemSpace(view, order=1, testSpaces=None, scalar=False,
     spc = module(field, includes, typeName, constructor, diameterMethod, updateMethod,
                 generator = NewGenerator(),
                 scalar=scalar, storage=storage,
-                ctorArgs=[view, agglomerate, order, testSpaces, basisChoice, edgeInterpolation, rotatedBB])
+                ctorArgs=[view, agglomerate, order, orderTuple, testSpaces, basisChoice, edgeInterpolation, rotatedBB])
     addStorage(spc, storage)
     return spc.as_ufl()
 

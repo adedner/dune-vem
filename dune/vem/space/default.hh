@@ -289,7 +289,7 @@ namespace Dune
 
       DomainFieldType maxStab = 0;
 
-      /*
+      /**/
       std::cout << "pol order / dimDomain / dimRange: "
                 << polOrder << " / "
                 << dimDomain << " / "
@@ -299,7 +299,7 @@ namespace Dune
                 << numGradShapeFunctions << " / "
                 << numHessShapeFunctions << " / "
                 << numConstraintShapeFunctions << std::endl;
-      */
+      /**/
 
       // set up matrices used for constructing gradient, value, and edge projections
       // Note: the code is set up with the assumption that the dofs suffice to compute the edge projection
