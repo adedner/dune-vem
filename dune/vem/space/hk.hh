@@ -353,23 +353,28 @@ namespace Dune
       typedef ShapeFunctionSet ShapeFunctionSetType;
       typedef EdgeShapeFunctionSet EdgeShapeFunctionSetType;
 
+      static int chooseOrder(int defaultOrder, int userOrder)
+      { return userOrder<0? defaultOrder: userOrder; }
       AgglomerationVEMBasisSets( const std::size_t order,
+                                 const std::array<int,3> orderTuple,
                                  const TestSpacesType &testSpaces,
                                  int basisChoice )
       // use order2size
       : testSpaces_(testSpaces)
       , useOnb_(basisChoice == 2)
       , dofsPerCodim_(calcDofsPerCodim())
-      , maxOrder_( std::max(order, maxEdgeDegree()) )
+      , maxOrder_( chooseOrder( std::max(order,maxEdgeDegree()),orderTuple[0] ) )
       , onbSFS_(Dune::GeometryType(Dune::GeometryType::cube, dimDomain), maxOrder_)
       , edgeSFS_( Dune::GeometryType(Dune::GeometryType::cube,dimDomain-1), maxEdgeDegree() )
       , numValueShapeFunctions_( onbSFS_.size()*BBBasisFunctionSetType::RangeType::dimension )
       , numGradShapeFunctions_ (
-          !reduced? std::min( numValueShapeFunctions_, sizeONB<0>(maxOrder_-1 ) )
+          !reduced? std::min( numValueShapeFunctions_,
+                              sizeONB<0>( chooseOrder(maxOrder_-1,orderTuple[1]) ) )
           : numValueShapeFunctions_-1*BBBasisFunctionSetType::RangeType::dimension
         )
       , numHessShapeFunctions_ (
-          !reduced? std::min( numValueShapeFunctions_, sizeONB<0>(maxOrder_-2) )
+          !reduced? std::min( numValueShapeFunctions_,
+                              sizeONB<0>( chooseOrder(maxOrder_-2,orderTuple[2]) ) )
           : 0 // numValueShapeFunctions_-3*BBBasisFunctionSetType::RangeType::dimension
         )
       , numInnerShapeFunctions_( testSpaces[2][0]<0? 0 : sizeONB<0>(testSpaces[2][0]) )
@@ -610,11 +615,12 @@ namespace Dune
       typedef typename BaseType::DomainFieldType DomainFieldType;
       AgglomerationVEMSpace(AgglomerationType &agglomeration,
           const unsigned int polOrder,
+          const std::array<int,3> orderTuple,
           const typename TraitsType::BasisSetsType::TestSpacesType &testSpaces,
           int basisChoice,
           bool edgeInterpolation)
       : BaseType(agglomeration,polOrder,
-                 typename TraitsType::BasisSetsType(polOrder, testSpaces, basisChoice),
+                 typename TraitsType::BasisSetsType(polOrder, orderTuple,testSpaces, basisChoice),
                  basisChoice,edgeInterpolation)
       {
         BaseType::update(true);
