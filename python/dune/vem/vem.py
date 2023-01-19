@@ -786,7 +786,10 @@ change the parameter to 'True' which will also speedup the grid construction.
                 if not convex: # use triangle
                     e = [ [p[i],p[(i+1)%N]] for i in range(N) ]
                     domain = { "vertices":vertices, "segments":numpy.array(e) }
-                    tri = triangle.triangulate(domain,opts="p")["triangles"]
+                    B = triangle.triangulate(domain,opts="p")
+                    tri = B["triangles"]
+                    # triangle.compare(plt, domain, B)
+                    # plt.show()
                 else: # use scipy
                     poly = numpy.append(p,[p[0]])
                     vert = vertices[p, :]
