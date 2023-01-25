@@ -56,7 +56,15 @@ namespace Dune {
       { impl_.dirichlet(bndId_,Dune::Fem::coordinate(x),ret); }
       template <class Point>
       void jacobian( const Point& x, JacobianRangeType& ret ) const
-      { ret = JacobianRangeType(0); }
+      {
+        ret = JacobianRangeType(0);
+        auto xLoc = Dune::Fem::coordinate(x);
+        auto xGlob = impl_.entity().geometry().global(xLoc);
+        // x-derivative
+        ret[0][0] = 1 - 2*xGlob[0];
+        // y-derivative
+        ret[0][1] = 1 - 2*xGlob[1];
+      }
     };
     VemDirichletConstraints( ModelType &model, const DiscreteFunctionSpaceType& space )
       : BaseType(model,space)

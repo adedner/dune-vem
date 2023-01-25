@@ -15,8 +15,8 @@ from hexagons import hexaGrid
 from ufl import *
 import dune.ufl
 
-maxLevel     = 4
-order        = 3
+maxLevel     = 6
+order        = 4
 epsilon      = 1
 laplaceCoeff = 1
 mu           = 1
@@ -30,8 +30,8 @@ dune.fem.parameter.append({"fem.verboserank": 0})
 # <codecell>
 # Note: suboptimal laplace error for bubble (space is reduced to polorder=3 but could be 4 = ts+2
 methods = [ ### "[space,scheme,spaceKwrags]"
-        ["vem","vem",{"order":order, "testSpaces":[ [0,0],[order-4,order-3], [order-4] ] }, "C1-conforming"],
-        # ["vem","vem",{"order":order, "testSpaces":[ [0],  [order-3,order-2], [order-4] ] }, "C1-non-conforming"],
+        # ["vem","vem",{"order":order, "testSpaces":[ [0,0],[order-4,order-3], [order-4] ] }, "C1-conforming"],
+        ["vem","vem",{"order":order, "testSpaces":[ [0],  [order-3,order-2], [order-4] ] }, "C1-non-conforming"],
         # ["vem","vem",{"order":order, "testSpaces":[ [0],  [order-2,order-2], [order-2] ] }, "C1C0-conforming"],
         # ["vem","vem",{"order":order, "testSpaces":[ [0],  [order-3,order-2], [order-3] ] }, "C1mod-conforming"],
           ]
@@ -53,8 +53,9 @@ parameters = {"newton.linear.tolerance": 1e-12,
 # <codecell>
 uflSpace = dune.ufl.Space(2, dimRange=1)
 x = SpatialCoordinate(uflSpace)
-exact = as_vector( [sin(2*pi*x[0])**2*sin(2*pi*x[1])**2] )
-# exact = as_vector( [x[0]**3] )
+exact  = as_vector( [sin(2*pi*x[0])**2*sin(2*pi*x[1])**2] )
+exact += as_vector( [x[0]*(1-x[0])+x[1]*(1-x[1])] )
+# exact = as_vector( [x[0]+1] )
 
 # next the bilinear form
 # Note: for function which continuous derivatives we have
@@ -99,7 +100,7 @@ else:
     diffCoeff      = laplaceCoeff*beta
     massCoeff      = mu*gamma
 
-dbc = [dune.ufl.DirichletBC(uflSpace, [0], i+1) for i in range(4)]
+dbc = [dune.ufl.DirichletBC(uflSpace, exact, i+1) for i in range(4)]
 
 # <markdowncell>
 # Now we define a grid build up of voronoi cells around $50$ random points
@@ -126,12 +127,14 @@ def compute(grid, space, schemeName):
                             gradStabilization=diffCoeff,
                             massStabilization=massCoeff,
                             parameters=parameters)
+
         # info = scheme.solve(target=df)
         jacobian = linearOperator(scheme)
         rhs = discreteFunction(space,name="rhs")
         scheme(df,rhs)
         rhs.as_numpy[:] *= -1
         df.as_numpy[:] = spsolve(jacobian.as_numpy, rhs.as_numpy[:])
+    # df.plot()
     edf = exact-df
     err = [inner(edf,edf),
            inner(grad(edf),grad(edf)),
@@ -149,8 +152,8 @@ results = []
 for level in range(maxLevel):
     constructor = cartesianDomain([0,0],[1,1],[2*2**level,2*2**level])
     # polyGrid = create.grid("agglomerate", constructor, cubes=False )
-    polyGrid = create.grid("agglomerate", voronoiCells(constructor,4*2**level*2**level,"voronoiseeds",
-               load=True,show=False,lloyd=5), convex=True )
+    polyGrid = create.grid("agglomerate", voronoiCells(constructor,4*2**level*2**level,
+               load="voronoi",show=False,lloyd=50), convex=True )
 
     # N = 10*3*2**level+1 # needs to be of the form 6*i+1
     # polyGrid = hexaGrid(N, 1, 1)

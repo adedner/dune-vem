@@ -302,6 +302,7 @@ namespace Dune
         : Base( std::forward< Args >( args )... )
       {}
       using Base::integrands;
+      auto &entity() const { return integrands().entity(); }
       template <class Point, class DRangeType>
       auto hessStabilization ( const Point &x, const DRangeType &u ) const
       {
@@ -380,6 +381,7 @@ namespace Dune
         virtual bool init ( const EntityType &entity ) = 0;
         virtual bool init ( const IntersectionType &intersection ) = 0;
         virtual void unbind() = 0;
+        virtual const EntityType &entity() const = 0;
 
         virtual bool hasInterior () const = 0;
         virtual RangeValueType interior ( const InteriorCachingPointType &x, const DomainValueType &u ) const = 0;
@@ -421,6 +423,7 @@ namespace Dune
         virtual bool init ( const EntityType &entity ) override { return impl().init( entity ); }
         virtual bool init ( const IntersectionType &intersection ) override { return impl().init( intersection ); }
         virtual void unbind() override {impl().unbind(); }
+        const EntityType &entity() const { return impl().entity(); }
 
         virtual bool hasInterior () const override { return impl().hasInterior(); }
         virtual RangeValueType interior ( const InteriorCachingPointType &x, const DomainValueType &u ) const override { return impl().interior( asQP( x ), u ); }
@@ -483,6 +486,8 @@ namespace Dune
       bool init ( const EntityType &entity ) { return impl().init( entity ); }
       bool init ( const IntersectionType &intersection ) { return impl().init( intersection ); }
       void unbind() { impl().unbind(); }
+
+      const EntityType &entity() const { return impl().entity(); }
 
       bool hasInterior () const { return impl().hasInterior(); }
 

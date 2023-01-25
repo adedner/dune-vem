@@ -690,6 +690,7 @@ namespace Dune
             }
           EdgeQuadratureType edgeQuad( gridPart(),
                 intersection, 3*polOrder_, EdgeQuadratureType::INSIDE );
+          typename LocalFunction::RangeType dnvalue;
           for (unsigned int qp=0;qp<edgeQuad.nop();++qp)
           {
             k = kStart;
@@ -698,10 +699,11 @@ namespace Dune
             localFunction.evaluate( y, value );
             double weight = edgeQuad.weight(qp) * intersection.geometry().integrationElement(x);
             if (order2size<1>(1)>0)
+            {
               localFunction.jacobian( y, dvalue);
-            typename LocalFunction::RangeType dnvalue;
-            dvalue.mv(normal,dnvalue);
-            assert( dnvalue[0] == dvalue[0]*normal );
+              dvalue.mv(normal,dnvalue);
+              assert( dnvalue[0] == dvalue[0]*normal );
+            }
             edgeBFS.evaluateTestEach(x,
               [&](std::size_t alpha, typename LocalFunction::RangeType phi ) {
                 //! SubDofWrapper has no size assert( kk < localDofVector.size() );
