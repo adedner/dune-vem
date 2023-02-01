@@ -920,7 +920,7 @@ namespace Dune
             maxStab = std::max(maxStab, abs(stabilization[i][j]) );
           }
       } // end iteration over polygons
-      std::cout << "max stabilization factor: " << maxStab << std::endl;
+      // std::cout << "max stabilization factor: " << maxStab << std::endl;
     } // end build projections
 
     // IsAgglomerationVEMSpace
