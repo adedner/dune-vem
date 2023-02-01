@@ -13,9 +13,6 @@ import dune.ufl
 
 dune.fem.parameter.append({"fem.verboserank": 0})
 order = 3
-dimR = 3
-# testSpaces = [ [0], [order-3,order-2], [order-4] ]
-# testSpaces = [-1,order-1,order-2]
 testSpaces = [0,order-2,order-2]
 
 x = SpatialCoordinate(triangle)
@@ -24,25 +21,20 @@ diffCoeff = 1 # -0.9*cos(dot(x,x))   # factor for diffusion term
 
 def model(space):
     dimR = space.dimRange
-    exact = as_vector( dimR*[x[0]*x[1] * cos(pi*x[0]*x[1])] )
-    # exact = as_vector( dimR*[cos(2*pi*x[0]) * cos(2*pi*x[1])] )
+    exact = x[0]*x[1] * cos(pi*x[0]*x[1])
 
     u = TrialFunction(space)
     v = TestFunction(space)
-
     a = (diffCoeff*inner(grad(u),grad(v)) + massCoeff*dot(u,v) ) * dx
-
-    # finally the right hand side and the boundary conditions
     b = sum( [ ( -div(diffCoeff*grad(exact[i])) + massCoeff*exact[i] ) * v[i]
              for i in range(dimR) ] ) * dx
     dbc = [dune.ufl.DirichletBC(space, exact, i+1) for i in range(4)]
     return a,b,dbc,exact
 
-def calc(polyGrid, vectorSpace,reduced):
-    space = dune.vem.vemSpace( polyGrid, order=order, dimRange=dimR, storage="numpy",
-                               testSpaces=testSpaces,
-                               vectorSpace=vectorSpace,
-                               reduced=reduced)
+def calc(polyGrid):
+    orders = (l,l,l-1)
+    space = dune.vem.vemSpace( polyGrid, order=orders, storage="numpy",
+                               testSpaces=testSpaces)
     a,b,dbc,exact = model(space)
     if False:
         df = space.interpolate(exact,name="solution")
@@ -63,15 +55,16 @@ oldErrors = []
 for i in range(1,4):
     errors = []
     N = 2*2**i
+    """
     polyGrid = dune.vem.polyGrid(
           dune.vem.voronoiCells([[-0.5,-0.5],[1,1]], N*N, lloyd=100, fileName="test", load=True)
           # cartesianDomain([-0.5,-0.5],[1,1],[N,N]),
       )
-
-    errors += calc(polyGrid, False, False) # default
-    errors += calc(polyGrid, False, True)
-    errors += calc(polyGrid, True,  False)
-    errors += calc(polyGrid, True,  True)
+    """
+    polyGrid = dune.vem.polyGrid("agglomerate",
+                                 cartesianDomain([-0.5,-0.5],[1,1],[N,N]),
+                                 cubes=True )
+    errors += calc(polyGrid)
 
     print("errors:",errors)
     if len(oldErrors)>0:

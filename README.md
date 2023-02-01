@@ -1,55 +1,119 @@
-Preparing the Sources
-=========================
+DUNE-FEM
+========
 
-Additional to the software mentioned in README you'll need the
-following programs installed on your system:
+[DUNE-VEM][20] is a [Distributed and Unified Numerics Environment][1]
+module which provides implementation of a range of virtual element
+spaces. It is based on the interfaces defined in [DUNE-FEM][0].
+In addition to the C++ implementation and extensive Python interface
+is provided.
 
-  cmake >= 3.13.3
+If you need help, please ask on our [mailinglist][5]. Bugs can also be submitted
+to the DUNE-VEM [bugtracker][6] instead.
 
-Getting started
----------------
+Tutorial
+--------
 
-If these preliminaries are met, you should run
+The general [DUNE-FEM tutorial][18] based on the Python bindings
+includes a number of examples showcasing the DUNE-VEM module.
 
-  dunecontrol all
+Installation
+------------
 
-which will find all installed dune modules as well as all dune modules
-(not installed) which sources reside in a subdirectory of the current
-directory. Note that if dune is not installed properly you will either
-have to add the directory where the dunecontrol script resides (probably
-./dune-common/bin) to your path or specify the relative path of the script.
+**Using pip**
 
-Most probably you'll have to provide additional information to dunecontrol
-(e. g. compilers, configure options) and/or make options.
+DUNE-VEM can be installed using the Package Index of Python (pip).
 
-The most convenient way is to use options files in this case. The files
-define four variables:
+```
+pip install dune-vem
+```
 
-CMAKE_FLAGS      flags passed to cmake (durin configure)
-MAKE_FLAGS       flags passed to make
+See https://dune-project.org/doc/installation-pip/ for a more detailed
+description.
 
-An example options file might look like this:
+**From source**
 
-#use this options to autogen, configure and make if no other options are given
-CMAKE_FLAGS=" \
--DCMAKE_CXX_COMPILER=g++-4.9 \
--DCMAKE_CXX_FLAGS='-Wall -pedantic' \
--DCMAKE_INSTALL_PREFIX=/install/path" #Force g++-4.9 and set compiler flags
-MAKE_FLAGS=install #Per default run make install instead of simply make
+For a full explanation of the DUNE installation process please read
+the [installation notes][2].
 
-If you save this information into example.opts you can pass the opts file to
-dunecontrol via the --opts option, e. g.
+When using the main branch observe the [build status][19]
+to make sure you get a working version.
 
-  dunecontrol --opts=example.opts all
+Dependencies
+------------
 
-More info
----------
+DUNE-VEM requires a recent C++ compiler (e.g. g++ or clang),
+cmake, pkg-config (see DUNE [installation][2] for details)
+and depends on the following DUNE modules:
 
-See
+* [dune-common][10]
 
-     dunecontrol --help
+* [dune-geometry][11]
 
-for further options.
+* [dune-grid][12]
+
+* [dune-fem][12]
+
+The following DUNE modules are suggested:
+
+* [dune-istl][13]
+
+* [dune-localfunctions][14]
+
+* [dune-alugrid][8]
+
+* [dune-spgrid][9]
+
+The following software is optional:
+
+* [PETSc][3]
+
+* [SIONlib][16]
+
+* [SuiteSparse][15]
+
+License
+-------
+
+The DUNE-VEM library, headers and test programs are free open-source software,
+licensed under version 2 or later of the GNU General Public License.
+
+See the file [LICENSE][7] for full copying permissions.
 
 
-The full build-system is described in the dune-common/doc/buildsystem (Git version) or under share/doc/dune-common/buildsystem if you installed DUNE!
+References
+----------
+
+A detailed description of DUNE-FEM can be found in
+
+* A. Dedner, A. Hodson. A framework for implementing general virtual * element space.
+  https://arxiv.org/abs/2208.08978
+
+* A. Dedner, R. Klöfkorn, M. Nolte, and M. Ohlberger. A Generic Interface for Parallel and Adaptive Scientific Computing:
+  Abstraction Principles and the DUNE-FEM Module.
+  Computing, 90(3-4):165--196, 2010. http://dx.doi.org/10.1007/s00607-010-0110-3
+
+* A. Dedner, R. Klöfkorn, and M. Nolte. Python Bindings for the DUNE-FEM module.
+  Zenodoo, 2020 http://dx.doi.org/10.5281/zenodo.3706994
+
+
+ [0]: https://www.dune-project.org/modules/dune-fem/
+ [1]: https://www.dune-project.org
+ [2]: https://www.dune-project.org/doc/installation/
+ [3]: http://www.mcs.anl.gov/petsc/
+ [4]: http://eigen.tuxfamily.org
+ [5]: http://lists.dune-project.org/mailman/listinfo/dune-fem
+ [6]: http://gitlab.dune-project.org/dune-fem/dune-fem/issues
+ [7]: LICENSE.md
+ [8]: http://gitlab.dune-project.org/extensions/dune-alugrid
+ [9]: http://gitlab.dune-project.org/extensions/dune-spgrid
+ [10]: http://gitlab.dune-project.org/core/dune-common
+ [11]: http://gitlab.dune-project.org/core/dune-geometry
+ [12]: http://gitlab.dune-project.org/core/dune-grid
+ [13]: http://gitlab.dune-project.org/core/dune-istl
+ [14]: http://gitlab.dune-project.org/core/dune-localfunctions
+ [15]: http://faculty.cse.tamu.edu/davis/suitesparse.html
+ [16]: http://www.fz-juelich.de/jsc/sionlib
+ [17]: http://icl.cs.utk.edu/papi/software/index.html
+ [18]: https://dune-project.org/sphinx/content/sphinx/dune-fem/
+ [19]: https://gitlab.dune-project.org/dune-fem/dune-fem/-/pipelines/
+ [20]: https://www.dune-project.org/modules/dune-vem/
