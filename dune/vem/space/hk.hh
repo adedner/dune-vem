@@ -382,7 +382,6 @@ namespace Dune
                  *std::max_element( testSpaces_[1].begin(), testSpaces_[1].end()) ) )
       {
         auto degrees = edgeDegrees();
-        /*
         std::cout << "order=" << order << " using " << maxOrder_ << ": "
                   << "[" << numValueShapeFunctions_ << ","
                   << numGradShapeFunctions_ << ","
@@ -395,7 +394,6 @@ namespace Dune
                   << " " << degrees[0] << " " << degrees[1]
                   << " max size of edge set: " << edgeSFS_.size()
                   << std::endl;
-        */
       }
 
       const std::size_t maxOrder() const
@@ -668,6 +666,7 @@ namespace Dune
         if (RHSconstraintsMatrix[0].size() == numInnerShapeFunctions )
           return;
 
+#if 0
         // only case covered is triangles with C^1-conf space of order 2 with extra constraint
         assert(BaseType::basisSets_.edgeSize(1)>0 && numConstraints == numConstraintShapeFunctions+1);
         std::size_t alpha = numConstraints-1;
@@ -727,6 +726,117 @@ namespace Dune
             } // quadrature loop
           } // loop over intersections
         } // loop over triangles in agglomerate
+#elif 1
+        std::size_t alpha = numConstraints-2*3;  //!!! 6
+        assert( alpha == numConstraintShapeFunctions );
+
+        // matrices for edge projections
+        Std::vector<Dune::DynamicMatrix<double> > edgePhiVector(2);
+        for (const typename BaseType::ElementSeedType &entitySeed : entitySeeds[agglomerate])
+        {
+          const typename BaseType::ElementType &element = BaseType::gridPart().entity(entitySeed);
+          const auto geometry = element.geometry();
+          const auto &shapeFunctionSet = BaseType::basisSets_.basisFunctionSet(BaseType::agglomeration(), element);
+
+          // element contribution:
+          // -int_E phi_i grad m_a = 0 if m_a is constant
+          //                       = grad m_a |E| lambda^0_E(phi_i)  if m_a is linear
+          // only non zero for i=numDofs-numInnerShapeFunctions then
+          // lambda^0_E(phi_i)=1
+          // We could move this outside of the element loop since we have
+          // the polygon volume and grad m_a is contant but then need to
+          // pick the first triangle in the polygon to evaluate grad m_a
+          int beta = numDofs-numInnerShapeFunctions;
+          if (beta < RHSconstraintsMatrix.size()) // have the constant moment (polOrder>1)
+          {
+            typename BaseType::JacobianRangeType test[2];
+            typename BaseType::Quadrature0Type quadrature(element, 1);
+            /*
+            for (std::size_t qp = 0; qp < quadrature.nop(); ++qp)
+            {
+              auto x = quadrature.point(qp);
+              const DomainFieldType weight = geometry.integrationElement(x) * quadrature.weight(qp);
+              shapeFunctionSet.jacValEach(quadrature[qp], [&](std::size_t k, typename BaseType::JacobianRangeType dpsi)
+              {
+                if (0<k && k<3)   //!!! 1
+                {
+                  if (qp==0)
+                    test[k-1] = dpsi;
+                  assert( test[k-1] == dpsi );
+                  assert( beta < RHSconstraintsMatrix.size() );
+                  assert( alpha+2*k+1 < RHSconstraintsMatrix[beta].size());
+                  RHSconstraintsMatrix[beta][alpha+2*k]   -= dpsi[0][0] * weight; // * geometry.volume();
+                  RHSconstraintsMatrix[beta][alpha+2*k+1] -= dpsi[0][1] * weight; // * geometry.volume();
+                }
+              });
+            }
+            */
+              assert( quadrature.nop() == 1);
+              assert( std::abs( geometry.integrationElement(quadrature.point(0))
+                                * quadrature.weight(0) - geometry.volume() )<1e-8 );
+              shapeFunctionSet.jacValEach(quadrature[0], [&](std::size_t k, typename BaseType::JacobianRangeType dpsi)
+              {
+                if (k<3)   //!!! 1
+                {
+                  assert( beta < RHSconstraintsMatrix.size() );
+                  assert( alpha+2*k+1 < RHSconstraintsMatrix[beta].size());
+                  RHSconstraintsMatrix[beta][alpha+2*k]   -= dpsi[0][0] * geometry.volume();
+                  RHSconstraintsMatrix[beta][alpha+2*k+1] -= dpsi[0][1] * geometry.volume();
+                }
+              });
+          }
+          // compute the boundary terms for the value projection
+          for (const auto &intersection : intersections(BaseType::gridPart(), element))
+          {
+            // ignore edges inside the given polygon
+            if (!intersection.boundary() && (BaseType::agglomeration().index(intersection.outside()) == agglomerate))
+              continue;
+            assert(intersection.conforming());
+
+            const typename BaseType::BasisSetsType::EdgeShapeFunctionSetType edgeShapeFunctionSet
+                  = BaseType::basisSets_.edgeBasisFunctionSet(BaseType::agglomeration(),
+                               intersection, BaseType::blockMapper().indexSet().twist(intersection) );
+
+            Std::vector<Std::vector<unsigned int>> mask(2,Std::vector<unsigned int>(0)); // contains indices with Phi_mask[i] is attached to given edge
+            edgePhiVector[0].resize(BaseType::basisSets_.edgeSize(0),
+                                    BaseType::basisSets_.edgeSize(0), 0);
+            edgePhiVector[1].resize(BaseType::basisSets_.edgeSize(1),
+                                    BaseType::basisSets_.edgeSize(1), 0);
+
+            BaseType::interpolation()(intersection, edgeShapeFunctionSet, edgePhiVector, mask);
+
+            // now compute int_e Phi^e m_alpha
+            typename BaseType::Quadrature1Type quadrature(BaseType::gridPart(), intersection, 2 * polOrder + 1, BaseType::Quadrature1Type::INSIDE);
+            for (std::size_t qp = 0; qp < quadrature.nop(); ++qp)
+            {
+              auto x = quadrature.localPoint(qp);
+              auto y = intersection.geometryInInside().global(x);
+              const DomainFieldType weight = intersection.geometry().integrationElement(x) * quadrature.weight(qp);
+              auto normal = intersection.unitOuterNormal(x);
+              shapeFunctionSet.evaluateEach(quadrature[qp], [&](std::size_t k, auto phi)
+              {
+                if (k<3) //!!!! 3
+                {
+                  edgeShapeFunctionSet.evaluateEach(x, [&](std::size_t beta,
+                            typename BaseType::BasisSetsType::EdgeShapeFunctionSetType::RangeType psi)
+                  {
+                    if (beta < edgePhiVector[0].size())
+                      for (std::size_t s=0; s<mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
+                      {
+                        assert( mask[0][s] < RHSconstraintsMatrix.size() );
+                        assert( alpha+2*k+1<RHSconstraintsMatrix[mask[0][s]].size() );
+                        RHSconstraintsMatrix[mask[0][s]][alpha+2*k]   += weight * normal[0]
+                                             * edgePhiVector[0][beta][s] * psi * phi[0];
+                        RHSconstraintsMatrix[mask[0][s]][alpha+2*k+1] += weight * normal[1]
+                                             * edgePhiVector[0][beta][s] * psi * phi[0];
+                     }
+                  });
+                }
+              });
+            } // quadrature loop
+          } // loop over intersections
+        } // loop over triangles in agglomerate
+#endif
       }
     };
 

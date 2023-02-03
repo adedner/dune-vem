@@ -377,7 +377,9 @@ namespace Dune
         std::size_t numConstraints = numShapeFunctions >= numDofs
                                      ? std::max( numConstraintShapeFunctions, numShapeFunctions-numDofs )
                                      : numConstraintShapeFunctions;
-
+#if 1
+        numConstraints += 2*3; //!!!! 3
+#endif
 
         // std::cout << "numConstraints " << numConstraints << std::endl;
         constraintValueProj = 0;
@@ -436,7 +438,26 @@ namespace Dune
                 constraintValueProj[alpha][beta] += laplace * weight;
               });
             }
-            else assert(numConstraints == numConstraintShapeFunctions); // no other case covered yet
+            else
+            {
+            #if 1 // add gradient constraints
+              std::size_t alpha = constraintValueProj.size()-2*3; //!!!! 6
+              assert(numConstraints == numConstraintShapeFunctions+2*3); // no other case covered yet
+              shapeFunctionSet.evaluateEach(quadrature[qp], [&](std::size_t k, RangeType phi)
+              {
+                shapeFunctionSet.jacValEach(quadrature[qp], [&](std::size_t beta, JacobianRangeType dpsi)
+                {
+                  if (k < 3) //!!!! 3
+                  {
+                    assert( alpha+2*k+1 < constraintValueProj.size() );
+                    assert( beta < constraintValueProj[alpha+2*k].size() );
+                    constraintValueProj[alpha+2*k][beta]   += dpsi[0][0] * phi[0] * weight;
+                    constraintValueProj[alpha+2*k+1][beta] += dpsi[0][1] * phi[0] * weight;
+                  }
+                });
+              });
+            #endif
+            }
 
             if (numGradShapeFunctions>0)
               shapeFunctionSet.jacobianEach(quadrature[qp], [&](std::size_t alpha, JacobianRangeType phi) {
@@ -492,7 +513,7 @@ namespace Dune
             std::cout << "CMatrix_" << beta << " = ";
             for (std::size_t alpha = 0; alpha < numShapeFunctions; ++alpha)
             {
-              std::cout << constraintValueProj[beta][alpha] << " ";
+              std::cout << std::fixed << std::setprecision(5) << constraintValueProj[beta][alpha] << " ";
             }
             std::cout << std::endl;
           }
@@ -507,7 +528,7 @@ namespace Dune
             for (std::size_t alpha=0; alpha < numDofs; ++alpha )
             {
               for (std::size_t beta=0; beta < numConstraints; ++beta )
-                std::cout << RHSconstraintsMatrix[alpha][beta] << ", ";
+                std::cout << std::fixed << std::setprecision(5) << RHSconstraintsMatrix[alpha][beta] << ", ";
               std::cout << std::endl;
             }
         }
