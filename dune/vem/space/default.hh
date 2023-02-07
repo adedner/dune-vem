@@ -378,7 +378,7 @@ namespace Dune
                                      ? std::max( numConstraintShapeFunctions, numShapeFunctions-numDofs )
                                      : numConstraintShapeFunctions;
 #if 1
-        numConstraints += 2*3; //!!!! 3
+        numConstraints += 5; // 2*3; //!!!! 3
 #endif
 
         // std::cout << "numConstraints " << numConstraints << std::endl;
@@ -441,18 +441,22 @@ namespace Dune
             else
             {
             #if 1 // add gradient constraints
-              std::size_t alpha = constraintValueProj.size()-2*3; //!!!! 6
-              assert(numConstraints == numConstraintShapeFunctions+2*3); // no other case covered yet
-              shapeFunctionSet.evaluateEach(quadrature[qp], [&](std::size_t k, RangeType phi)
+              std::size_t alpha = constraintValueProj.size()-5; // 2*3; //!!!! 6
+              // assert(numConstraints == numConstraintShapeFunctions+2*3); // no other case covered yet
+              shapeFunctionSet.jacValEach(quadrature[qp], [&](std::size_t k, JacobianRangeType dphi)
               {
                 shapeFunctionSet.jacValEach(quadrature[qp], [&](std::size_t beta, JacobianRangeType dpsi)
                 {
-                  if (k < 3) //!!!! 3
+                  if (0 < k && k < 6) //!!!! 3
                   {
-                    assert( alpha+2*k+1 < constraintValueProj.size() );
-                    assert( beta < constraintValueProj[alpha+2*k].size() );
-                    constraintValueProj[alpha+2*k][beta]   += dpsi[0][0] * phi[0] * weight;
-                    constraintValueProj[alpha+2*k+1][beta] += dpsi[0][1] * phi[0] * weight;
+                    assert( alpha+k-1 < constraintValueProj.size() );
+                    assert( beta < constraintValueProj[alpha+k-1].size() );
+                    std::cout << qp << " : " << constraintValueProj[alpha+k-1][beta] << " -> ";
+                    constraintValueProj[alpha+k-1][beta] += (dpsi[0] * dphi[0]) * weight;
+                    std::cout << alpha+k-1 << " " << beta << " : " << dpsi[0] * dphi[0]
+                              << "     " << weight
+                              << "     " << constraintValueProj[alpha+k-1][beta]
+                              << std::endl;
                   }
                 });
               });
@@ -506,7 +510,7 @@ namespace Dune
         /// ValueProjection /////////////////////////////////////////////////////
         //////////////////////////////////////////////////////////////////////////
         // std::cout << "checkpoint constructed constraint value proj matrix " << std::endl;
-#if 0
+#if 1
         {
           for (std::size_t beta = 0; beta < numConstraints; ++beta )
           {
@@ -522,7 +526,7 @@ namespace Dune
         // set up matrix RHSconstraintsMatrix
         setupConstraintRHS(entitySeeds, agglomerate, RHSconstraintsMatrix, H0);
 
-#if 0
+#if 1
         {
             std::cout << "Constraint RHS:\n";
             for (std::size_t alpha=0; alpha < numDofs; ++alpha )
@@ -534,7 +538,7 @@ namespace Dune
         }
 #endif
 #if 0
-        // std::cout << "checkpoint setupRHS constraints matrix done" << std::endl;
+        std::cout << "checkpoint setupRHS constraints matrix done" << std::endl;
         {
             std::cout << "Basis interpolation\n";
             for (std::size_t alpha=0;alpha<D.size();++alpha)
@@ -596,7 +600,7 @@ namespace Dune
             }
           }
         }
-#if 0
+#if 1
         std::cout << "*******************************\n";
         std::cout << "** RHS constraints 1        **\n";
         std::cout << "*******************************\n";
@@ -612,7 +616,7 @@ namespace Dune
         std::cout << "*******************************\n";
 #endif
 
-#if 0
+#if 1
         std::cout << "*******************************\n";
         std::cout << "****  Value projection  ****\n";
         std::cout << "*******************************\n";

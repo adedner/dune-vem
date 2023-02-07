@@ -3,6 +3,7 @@
 
 #include <cassert>
 #include <utility>
+#include <vector>
 
 #include <dune/common/dynmatrix.hh>
 #include <dune/geometry/referenceelements.hh>
@@ -116,6 +117,11 @@ namespace Dune
         void jacValEach ( const Point &x, Functor functor ) const
         {
           sfs_.jacobianEach(x, functor);
+        }
+        template< class Point, class Functor >
+        void hessValEach ( const Point &x, Functor functor ) const
+        {
+          sfs_.hessianEach(x, functor);
         }
         template< class Point, class Functor >
         void evaluateEach ( const Point &x, Functor functor ) const
@@ -727,7 +733,7 @@ namespace Dune
           } // loop over intersections
         } // loop over triangles in agglomerate
 #elif 1
-        std::size_t alpha = numConstraints-2*3;  //!!! 6
+        std::size_t alpha = numConstraints-5; // 2*3;  //!!! 6
         assert( alpha == numConstraintShapeFunctions );
 
         // matrices for edge projections
@@ -739,51 +745,32 @@ namespace Dune
           const auto &shapeFunctionSet = BaseType::basisSets_.basisFunctionSet(BaseType::agglomeration(), element);
 
           // element contribution:
-          // -int_E phi_i grad m_a = 0 if m_a is constant
-          //                       = grad m_a |E| lambda^0_E(phi_i)  if m_a is linear
-          // only non zero for i=numDofs-numInnerShapeFunctions then
-          // lambda^0_E(phi_i)=1
+          // -int_E phi_i laplace m_a = 0 if m_a is constant or linear
+          //                          = laplace m_a |E| lambda^0_E(phi_i)  if m_a is quaratic
+          // only non zero for i=numDofs-numInnerShapeFunctions (first inner moment)
+          // then lambda^0_E(phi_i)=1
           // We could move this outside of the element loop since we have
           // the polygon volume and grad m_a is contant but then need to
           // pick the first triangle in the polygon to evaluate grad m_a
           int beta = numDofs-numInnerShapeFunctions;
           if (beta < RHSconstraintsMatrix.size()) // have the constant moment (polOrder>1)
           {
-            typename BaseType::JacobianRangeType test[2];
             typename BaseType::Quadrature0Type quadrature(element, 1);
-            /*
-            for (std::size_t qp = 0; qp < quadrature.nop(); ++qp)
+            assert( quadrature.nop() == 1); // laplace m_a is constant
+            assert( std::abs( geometry.integrationElement(quadrature.point(0))
+                              * quadrature.weight(0) - geometry.volume() )<1e-8 );
+            shapeFunctionSet.hessValEach(quadrature[0], [&](std::size_t k,
+                                         typename BaseType::HessianRangeType d2psi)
             {
-              auto x = quadrature.point(qp);
-              const DomainFieldType weight = geometry.integrationElement(x) * quadrature.weight(qp);
-              shapeFunctionSet.jacValEach(quadrature[qp], [&](std::size_t k, typename BaseType::JacobianRangeType dpsi)
+              if (2<k && k<6) // quadratics are k=3,4,5
               {
-                if (0<k && k<3)   //!!! 1
-                {
-                  if (qp==0)
-                    test[k-1] = dpsi;
-                  assert( test[k-1] == dpsi );
-                  assert( beta < RHSconstraintsMatrix.size() );
-                  assert( alpha+2*k+1 < RHSconstraintsMatrix[beta].size());
-                  RHSconstraintsMatrix[beta][alpha+2*k]   -= dpsi[0][0] * weight; // * geometry.volume();
-                  RHSconstraintsMatrix[beta][alpha+2*k+1] -= dpsi[0][1] * weight; // * geometry.volume();
-                }
-              });
-            }
-            */
-              assert( quadrature.nop() == 1);
-              assert( std::abs( geometry.integrationElement(quadrature.point(0))
-                                * quadrature.weight(0) - geometry.volume() )<1e-8 );
-              shapeFunctionSet.jacValEach(quadrature[0], [&](std::size_t k, typename BaseType::JacobianRangeType dpsi)
-              {
-                if (k<3)   //!!! 1
-                {
-                  assert( beta < RHSconstraintsMatrix.size() );
-                  assert( alpha+2*k+1 < RHSconstraintsMatrix[beta].size());
-                  RHSconstraintsMatrix[beta][alpha+2*k]   -= dpsi[0][0] * geometry.volume();
-                  RHSconstraintsMatrix[beta][alpha+2*k+1] -= dpsi[0][1] * geometry.volume();
-                }
-              });
+                // laplace m_a |E| lambda^0_E(phi_beta) = laplace m_a |E|
+                double lap = d2psi[0][0][0]+d2psi[0][1][1];
+                assert( beta < RHSconstraintsMatrix.size() );
+                assert( alpha+k-1 < RHSconstraintsMatrix[beta].size());
+                RHSconstraintsMatrix[beta][alpha+k-1] -= lap * geometry.volume();
+              }
+            });
           }
           // compute the boundary terms for the value projection
           for (const auto &intersection : intersections(BaseType::gridPart(), element))
@@ -813,28 +800,38 @@ namespace Dune
               auto y = intersection.geometryInInside().global(x);
               const DomainFieldType weight = intersection.geometry().integrationElement(x) * quadrature.weight(qp);
               auto normal = intersection.unitOuterNormal(x);
-              shapeFunctionSet.evaluateEach(quadrature[qp], [&](std::size_t k, auto phi)
+              shapeFunctionSet.jacValEach(quadrature[qp], [&](std::size_t k, auto dphi)
               {
-                if (k<3) //!!!! 3
+                if (0<k && k<6)
                 {
+                  double dNphi = dphi[0]*normal;
+                  std::cout << k << " " << dphi[0][0] << " " << dphi[0][1]
+                            << " " << dNphi << " -> ";
+                  std::vector<double> vals(mask[0].size(),0);
                   edgeShapeFunctionSet.evaluateEach(x, [&](std::size_t beta,
                             typename BaseType::BasisSetsType::EdgeShapeFunctionSetType::RangeType psi)
                   {
                     if (beta < edgePhiVector[0].size())
+                    {
                       for (std::size_t s=0; s<mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
                       {
                         assert( mask[0][s] < RHSconstraintsMatrix.size() );
-                        assert( alpha+2*k+1<RHSconstraintsMatrix[mask[0][s]].size() );
-                        RHSconstraintsMatrix[mask[0][s]][alpha+2*k]   += weight * normal[0]
-                                             * edgePhiVector[0][beta][s] * psi * phi[0];
-                        RHSconstraintsMatrix[mask[0][s]][alpha+2*k+1] += weight * normal[1]
-                                             * edgePhiVector[0][beta][s] * psi * phi[0];
-                     }
+                        assert( alpha+k-1<RHSconstraintsMatrix[mask[0][s]].size() );
+                        RHSconstraintsMatrix[mask[0][s]][alpha+k-1] += weight * dNphi
+                                             * edgePhiVector[0][beta][s] * psi;
+                        vals[s] += edgePhiVector[0][beta][s] * psi;
+                      }
+                    }
                   });
+                  for (std::size_t s=0; s<mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
+                    std::cout << "(" << mask[0][s] << "," << vals[s] << "): " << RHSconstraintsMatrix[mask[0][s]][alpha+k-1] << " , ";
+                  std::cout << std::endl;
                 }
               });
             } // quadrature loop
+            std::cout << "end quadrature\n";
           } // loop over intersections
+          std::cout << "end intersections\n";
         } // loop over triangles in agglomerate
 #endif
       }
