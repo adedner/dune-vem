@@ -52,7 +52,7 @@ rkForm  = sum(f*dtForm(u,U[i],V[i])
 rkForm += tau*sum(replace(a,{psi:U[i],phi:V[i]}) for i in range(2))
 
 # set up actual Newton solver using a direct solver for the linear part
-dbc = DirichletBC(rkSpace, rkSpace.dimRange*[0], 1)
+dbc = DirichletBC(rkSpace, rkSpace.dimRange*[0])
 factor = 40 # used for stabilization, determined experimentally
 scheme = vemScheme( [rkForm == 0, dbc],
             solver=("suitesparse","umfpack"),
