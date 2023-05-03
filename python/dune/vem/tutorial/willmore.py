@@ -67,7 +67,7 @@ t = 0
 
 vtk = gridView.sequencedVTK(name, pointdata=[df], subsampling=2)
 vtk()
-saveNext = saveTimes.pop()
+saveNext = saveTimes.pop(0)
 while True:
     info = scheme.solve(target=stages)
     # the second stage of the RK method is the approximation at t^{n+1}
@@ -80,4 +80,4 @@ while True:
         print("    saving....",flush=True)
         vtk()
         if len(saveTimes) == 0: break
-        saveNext = saveTimes.pop()
+        saveNext = saveTimes.pop(0)
