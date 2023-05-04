@@ -74,7 +74,7 @@ def codeVEM(self, name, targs):
     x = SpatialCoordinate(self.space.cell())
     maxCellEdgeLength = MaxCellEdgeLength(self.space.cell())
     predefined = {}
-    self.predefineCoefficients(predefined, False)
+    # self.predefineCoefficients(predefined, False)
     spatial = Variable('const auto', 'y')
     predefined[x] = UnformattedExpression('auto', 'entity().geometry().global( Dune::Fem::coordinate( x ) )')
     predefined[maxCellEdgeLength] = maxEdgeLength(self.cellGeometry())
