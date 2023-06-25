@@ -53,11 +53,11 @@ def minBoundingRect(hull_points_2d):
     # Calculate edge angles   atan2(y/x)
     edge_angles = zeros( (len(edges)) ) # empty 1 column array
     for i in range( len(edge_angles) ):
-        edge_angles[i] = math.atan2( edges[i,1], edges[i,0] )
+        edge_angles[i] = arctan2( edges[i,1], edges[i,0] )
 
     # Check for angles in 1st quadrant
     for i in range( len(edge_angles) ):
-        edge_angles[i] = abs( edge_angles[i] % (math.pi/2) ) # want strictly positive answers
+        edge_angles[i] = abs( edge_angles[i] % (pi/2) ) # want strictly positive answers
 
     # Remove duplicate angles
     edge_angles = unique(edge_angles)
@@ -69,7 +69,7 @@ def minBoundingRect(hull_points_2d):
         # Create rotation matrix to shift points to baseline
         # R = [ cos(theta)      , cos(theta-PI/2)
         #       cos(theta+PI/2) , cos(theta)     ]
-        R = array([ [ math.cos(edge_angles[i]), math.cos(edge_angles[i]-(math.pi/2)) ], [ math.cos(edge_angles[i]+(math.pi/2)), math.cos(edge_angles[i]) ] ])
+        R = array([ [ cos(edge_angles[i]), cos(edge_angles[i]-(pi/2)) ], [ cos(edge_angles[i]+(pi/2)), cos(edge_angles[i]) ] ])
 
         # Apply this rotation to convex hull points
         rot_points = dot(R, transpose(hull_points_2d) ) # 2x2 * 2xn
@@ -93,7 +93,7 @@ def minBoundingRect(hull_points_2d):
 
     # Re-create rotation matrix for smallest rect
     angle = min_bbox[0]
-    R = array([ [ math.cos(angle), math.cos(angle-(math.pi/2)) ], [ math.cos(angle+(math.pi/2)), math.cos(angle) ] ])
+    R = array([ [ cos(angle), cos(angle-(pi/2)) ], [ cos(angle+(pi/2)), cos(angle) ] ])
 
     # Project convex hull points onto rotated frame
     proj_points = dot(R, transpose(hull_points_2d) ) # 2x2 * 2xn
