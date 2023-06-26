@@ -14,8 +14,8 @@ def rotatedBBox(points,rotate):
         e0 = corner_points[1]  - corner_points[0]
         e1 = corner_points[-1] - corner_points[0]
         # print( list(corner_points[0]), list(corner_points[2]), list(e0), list(e1), max(height,width), flush=True )
-        return list(corner_points[0]), list(corner_points[2]), list(e0), list(e1), numpy.max(height,width)
+        return list(corner_points[0]), list(corner_points[2]), list(e0), list(e1), max(height,width)
     else: # axis aligned box
         xmin,xmax = min(points[:,0]), max(points[:,0])
         ymin,ymax = min(points[:,1]), max(points[:,1])
-        return [xmin,ymin], [xmax,ymax], [xmax-xmin,0], [0,ymax-ymin], numpy.min(xmax-xmin,ymax-ymin)
+        return [xmin,ymin], [xmax,ymax], [xmax-xmin,0], [0,ymax-ymin], min(xmax-xmin,ymax-ymin)
