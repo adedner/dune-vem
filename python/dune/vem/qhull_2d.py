@@ -26,18 +26,18 @@
 # IN THE SOFTWARE.
 
 from __future__ import division
-from numpy import *
+import numpy as np
 
-link = lambda a,b: concatenate((a,b[1:]))
-edge = lambda a,b: concatenate(([a],[b]))
+link = lambda a,b: np.concatenate((a,b[1:]))
+edge = lambda a,b: np.concatenate(([a],[b]))
 
 def qhull2D(sample):
     def dome(sample,base):
         h, t = base
-        dists = dot(sample-h, dot(((0,-1),(1,0)),(t-h)))
-        outer = repeat(sample, dists>1e-16, 0)
+        dists = np.dot(sample-h, np.dot(((0,-1),(1,0)),(t-h)))
+        outer = np.repeat(sample, dists>1e-16, 0)
         if len(outer):
-            pivot = sample[argmax(dists)]
+            pivot = sample[np.argmax(dists)]
             # print("dome(pivot):",pivot)
             return link(dome(outer, edge(h, pivot)),
                         dome(outer, edge(pivot, t)))
@@ -45,7 +45,7 @@ def qhull2D(sample):
             return base
     if len(sample) > 2:
         axis = sample[:,0]
-        base = take(sample, [argmin(axis), argmax(axis)], 0)
+        base = np.take(sample, [np.argmin(axis), np.argmax(axis)], 0)
         return link(dome(sample, base), dome(sample, base[::-1]))
     else:
         return sample
