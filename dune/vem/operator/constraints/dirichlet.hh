@@ -293,7 +293,7 @@ namespace Dune
         std::vector< std::size_t > globalBlockDofs( space_.blockMapper().numDofs( entity ));
         space_.blockMapper().map( entity, globalBlockDofs );
 
-        std::vector< bool > globalBlockDofsFilter( space_.blockMapper().numDofs( entity ));
+        std::vector< char > globalBlockDofsFilter( space_.blockMapper().numDofs( entity ));
 
         IntersectionIteratorType it = gridPart.ibegin( entity );
         const IntersectionIteratorType endit = gridPart.iend( entity );
@@ -316,7 +316,7 @@ namespace Dune
               space_.blockMapper().onSubEntity( entity, face, 1, globalBlockDofsFilter );
               for( unsigned int i = 0; i < globalBlockDofs.size(); ++i )
               {
-                if( !globalBlockDofsFilter[ i ] )
+                if( globalBlockDofsFilter[ i ]==0 )
                   continue;
                 // mark global DoF number
                 for( int k = 0; k < localBlockSize; ++k )
