@@ -83,6 +83,8 @@ namespace Dune
           size_( valueProjection()[0].size() )
       {}
 
+      bool valid () const { return true; }
+
       int order () const { return shapeFunctionSet_.order(); }
 
       std::size_t size () const { return size_; }

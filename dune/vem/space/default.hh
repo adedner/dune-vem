@@ -82,14 +82,15 @@ namespace Dune
 
       // for interpolation
       struct InterpolationType {
-          InterpolationType(const IndexSetType &indexSet, const EntityType &element) noexcept
-                  : inter_(indexSet), element_(element) {}
+          InterpolationType(const AgglomerationInterpolationType &inter, const EntityType &element) noexcept
+                  : inter_(inter), element_(element) {}
           template<class U, class V>
-          void operator()(const U &u, V &v)
+          void operator()(const U &u, V &v) const
           { inter_(element_, u, v); }
-          AgglomerationInterpolationType inter_;
+          const AgglomerationInterpolationType &inter_;
           const EntityType &element_;
       };
+      using InterpolationImplType = InterpolationType;
 
       // basisChoice:
       // 1: use onb for inner moments but not for computing projections
@@ -209,7 +210,11 @@ namespace Dune
        */
       InterpolationType interpolation(const EntityType &entity) const
       {
-        return InterpolationType(blockMapper().indexSet(), basisSets_, entity);
+        return InterpolationType(interpolation(), entity);
+      }
+      InterpolationType localInterpolation(const EntityType &entity) const
+      {
+        return InterpolationType(interpolation(), entity);
       }
 
       const AgglomerationInterpolationType& interpolation() const

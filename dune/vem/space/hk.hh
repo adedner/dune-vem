@@ -11,6 +11,7 @@
 #include <dune/fem/space/common/discretefunctionspace.hh>
 #include <dune/fem/space/common/functionspace.hh>
 #include <dune/fem/space/common/capabilities.hh>
+#include <dune/fem/space/common/localrestrictprolong.hh>
 #include <dune/fem/space/shapefunctionset/orthonormal.hh>
 #include <dune/fem/function/localfunction/converter.hh>
 #include <dune/fem/space/combinedspace/interpolation.hh>
@@ -741,6 +742,20 @@ namespace Dune
             static const bool v = false;
         };
     }
+    template<class FunctionSpace, class GridPart, bool vectorSpace, bool reduced, class StorageField, class ComputeField>
+    class DefaultLocalRestrictProlong <
+        Vem::AgglomerationVEMSpace<FunctionSpace, GridPart, vectorSpace, reduced, StorageField, ComputeField> >
+    : public EmptyLocalRestrictProlong<
+        Vem::AgglomerationVEMSpace<FunctionSpace, GridPart, vectorSpace, reduced, StorageField, ComputeField> >
+    {
+      typedef EmptyLocalRestrictProlong<
+        Vem::AgglomerationVEMSpace<FunctionSpace, GridPart, vectorSpace, reduced, StorageField, ComputeField> > BaseType;
+      public:
+      DefaultLocalRestrictProlong( const Vem::AgglomerationVEMSpace<FunctionSpace, GridPart, vectorSpace, reduced, StorageField, ComputeField> &space )
+        : BaseType()
+      {}
+    };
+
   } // namespace Fem
 } // namespace Dune
 
