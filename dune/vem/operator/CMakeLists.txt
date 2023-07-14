@@ -4,6 +4,7 @@ add_subdirectory( constraints )
 set(HEADERS
   diffusionmodel.hh
   mass.hh
+  stabmatrix.hh
   vemdirichletconstraints.hh
   vemelliptic.hh
 )
