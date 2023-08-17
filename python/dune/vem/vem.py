@@ -1,14 +1,24 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import sys, logging
+import sys, logging, io
 logger = logging.getLogger(__name__)
 
 from ufl.equation import Equation
 from ufl import Form
-from dune.generator import Constructor, Method
+from dune.generator import Constructor, Method, algorithm, path
 import dune.common.checkconfiguration as checkconfiguration
 import dune
+import dune.fem
 
+def stabilization(spc):
+    if spc._stab is None:
+        stabMatrix = dune.fem.operator.linear([spc,spc])
+        spc._stab = algorithm.load("Dune::Vem::stabilization",
+           io.StringIO("#include <dune/vem/operator/stabmatrix.hh>"), stabMatrix)
+    else:
+        stabMatrix = dune.fem.operator.linear([spc,spc])
+    spc._stab(stabMatrix)
+    return stabMatrix
 
 
 def bbdgSpace(view, order=1, scalar=False, dimRange=None, field="double",
@@ -260,6 +270,10 @@ def vemSpace(view, order=1,
                 scalar=scalar, storage=storage,
                 ctorArgs=[view, agglomerate, order, orderTuple, testSpaces, basisChoice, edgeInterpolation, rotatedBB])
     addStorage(spc, storage)
+
+    spc._stab = None
+    spc.stabilization = lambda: stabilization(spc)
+
     return spc.as_ufl()
 
 def space(view, order=1, dimRange=None,
@@ -379,6 +393,8 @@ def curlFreeSpace(view, order=1,
                 storage=storage,
                 ctorArgs=[view, agglomerate, order, basisChoice, rotatedBB])
     addStorage(spc, storage)
+    spc._stab = None
+    spc.stabilization = lambda: stabilization(spc)
     return spc.as_ufl()
 
 #########################################################
@@ -461,6 +477,8 @@ def divFreeSpace(view, order=1, conforming=True,
                 storage=storage,
                 ctorArgs=[view, agglomerate, order, conforming, basisChoice, edgeInterpolation, rotatedBB])
     addStorage(spc, storage)
+    spc._stab = None
+    spc.stabilization = lambda: stabilization(spc)
     return spc.as_ufl()
 
 #########################################################
