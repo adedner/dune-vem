@@ -24,7 +24,7 @@ parameters = {"newton.linear.tolerance": 1e-8,
 Lx,Ly = 1,1.1
 orders = [0,1,2]
 useVem = True
-gridType = "voronoi"
+gridType = "cube" # "voronoi"
 
 def model(spaceU):
     x = SpatialCoordinate(triangle)
