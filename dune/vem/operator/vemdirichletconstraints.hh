@@ -1,6 +1,7 @@
 #ifndef DUNE_VEM_DIRICHLETCONSTRAINTS_HH
 #define DUNE_VEM_DIRICHLETCONSTRAINTS_HH
 
+#include <dune/common/exceptions.hh>
 #include <dune/fem/function/common/scalarproducts.hh>
 #include <dune/fem/schemes/dirichletconstraints.hh>
 #include <dune/fem/operator/common/temporarylocalmatrix.hh>
@@ -154,6 +155,15 @@ namespace Dune {
         }
       }
     }
+
+    template < class GridFunctionType, class DiscreteFunctionType,
+             typename = std::enable_if_t< std::is_base_of<Dune::Fem::HasLocalFunction, GridFunctionType>::value > >
+    void operator ()( const GridFunctionType &u,
+                      DiscreteFunctionType& w, Operation op=Operation::setDF ) const
+    {
+      DUNE_THROW( Dune::NotImplemented, "constraints can currently only be set given a discrete function not a general grid function");
+    }
+
     template <class LinearOperator>
     void applyToOperator( LinearOperator& linearOperator ) const
     {
