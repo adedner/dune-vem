@@ -801,13 +801,6 @@ class PolyAgglomerate:
     def roundBary(a):
         return tuple(round(aa,8) for aa in a)
     def construct(cubes,convex,vertices,polygons):
-        if not triangle and not convex:
-            raise ValueError("""
-a grid with non convex polygons requires the 'triangle' package.
-Run 'pip install triangle' and try again.
-Note that 'convex=False' is the default - if all your polygons are convex
-change the parameter to 'True' which will also speedup the grid construction.
-""")
         index = SortedDict()
         if cubes:
             for i,poly in enumerate(polygons):
@@ -825,6 +818,13 @@ change the parameter to 'True' which will also speedup the grid construction.
                 if True:
                     tri = earCut(vertices,p)
                 elif not convex and not checkConvex(vertices[p]):
+                    if not triangle:
+                        raise ValueError("""
+a grid with non convex polygons requires the 'triangle' package.
+Run 'pip install triangle' and try again.
+Note that 'convex=False' is the default - if all your polygons are convex
+change the parameter to 'True' which will also speedup the grid construction.
+""")
                     # use triangle
                     e = [ [p[i],p[(i+1)%N]] for i in range(N) ]
                     domain = { "vertices":vertices, "segments":numpy.array(e) }
