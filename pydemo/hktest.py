@@ -66,7 +66,10 @@ for i in range(1,4):
     # polyGrid = dune.vem.polyGrid(cartesianDomain([-0.5,-0.5],[1,1],[N,N]), cubes=False )
     cells = ncGrid(N)
     polyGrid = dune.vem.polyGrid( cells )
-    dune.vem.writePolygons(f"concave_{i}",cells)
+    try:
+        dune.vem.writePolygons(f"concave_{i}",cells)
+    except ImportError: # no meshio
+        pass
 
     errors += calc(polyGrid)
 
