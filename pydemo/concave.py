@@ -45,8 +45,12 @@ def ncGrid(N):
                 inner = reference(h, vert[c-N-2])
                 vert += inner
                 l = len(inner)
-                p1 = [c-N-2,c-N-1,c] + [L+k for k in range(l-1,-1,-1)] + [c-1]
-                p2 = [c-1] + [L+k for k in range(0,l,1)] + [c]
+                if (i+j)%2 == 0:
+                    p1 = [c-N-2,c-N-1,c] + [L+k for k in range(l-1,-1,-1)] + [c-1]
+                    p2 = [c-1] + [L+k for k in range(0,l,1)] + [c]
+                else:
+                    p1 = [c-N-2] + [L+k for k in range(0,l,1)] + [c-N-1]
+                    p2 = [c-N-2] + [L+k for k in range(0,l,1)] + [c-N-1,c,c-1]
                 polys += [p1]
                 polys += [p2]
                 # polys += [ [c-N-2,c-N-1,c,L+2,L+1,L,c-1] ]

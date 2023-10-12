@@ -10,3 +10,4 @@ add_python_targets(vem
   patch
 )
 dune_symlink_to_source_files(FILES earcut.hpp)
+install(FILES earcut.hpp)

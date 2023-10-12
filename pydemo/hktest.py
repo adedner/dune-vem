@@ -48,7 +48,7 @@ def calc(polyGrid):
                   gradStabilization=None, # diffCoeff,
                   massStabilization=massCoeff)
         info = scheme.solve(target=df)
-    # df.plot()
+    df.plot()
     edf = exact-df
     err = [inner(edf,edf),
            inner(grad(edf),grad(edf))]
