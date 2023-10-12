@@ -8,7 +8,6 @@ from dune.generator import Constructor, Method, algorithm, path
 import dune.common.checkconfiguration as checkconfiguration
 import dune
 import dune.fem
-from dune.generator import algorithm
 
 def stabilization(spc):
     if spc._stab is None:
@@ -756,6 +755,7 @@ def trivialAgglomerate(constructor, cubes=False, globalRefine=None, **kwargs):
 
 # http://zderadicka.eu/voronoi-diagrams/
 from dune.vem.voronoi import triangulated_voronoi
+from dune.vem.earcut import EarCut
 from scipy.spatial import Voronoi, voronoi_plot_2d, cKDTree, Delaunay
 import numpy
 
@@ -778,19 +778,6 @@ def checkConvex(points):
             else:
                 prev = curr
     return True
-class EarCut:
-    def __init__(self):
-        self.code = None
-    def __call__(self, coords, indices):
-        points = list(coords[indices,:])
-        for i in range(len(points)):
-            points[i] = list(points[i])
-        if self.code is None:
-            fn = os.path.join( os.path.split(__file__)[0], 'earcut.hpp' )
-            self.code = algorithm.load('earcut', fn, [points])
-        tri = self.code([points])
-        tri = numpy.array(indices)[tri]
-        return numpy.reshape( tri, (len(tri)//3,3) )
 
 try:
     import triangle

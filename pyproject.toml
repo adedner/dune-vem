@@ -4,11 +4,14 @@
 # only used for the pypi dune packages. This file will not be included in
 # the build directory.
 #
+# See https://www.dune-project.org/dev/adding_python/ for docs on
+# Python packaging for Dune modules.
+#
 # This is uses the `Python-Requires` field in the `dune.modules` file to
 # populate the `requires` entry. Additional packages needed for the package
 # build should be added in the `dune.modules`. These packages will then also be
 # included in the package install from source.
 #
 [build-system]
-requires = ['cmake', 'dune-alugrid<=2.9.0.dev20211113', 'dune-fem<=2.9.0.dev20211113', 'matplotlib', 'ninja', 'pip', 'requests', 'scikit-build', 'scipy', 'setuptools', 'sortedcontainers', 'triangle', 'wheel']
+requires = ['cmake>=3.13', 'dune-alugrid<=2.10.dev20231012', 'dune-fem<=2.10.dev20231012', 'matplotlib', 'ninja', 'pip', 'requests', 'scikit-build', 'scipy', 'setuptools', 'sortedcontainers', 'wheel']
 build-backend = 'setuptools.build_meta'

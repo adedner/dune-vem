@@ -4,10 +4,13 @@
 # only used for the pypi dune packages. This file will not be included in
 # the build directory.
 #
+# See https://www.dune-project.org/dev/adding_python/ for docs on
+# Python packaging for Dune modules.
+#
 import os, sys
 try:
     from dune.packagemetadata import metaData
 except ImportError:
     from packagemetadata import metaData
 from skbuild import setup
-setup(**metaData('2.9.0.dev20211113')[1])
+setup(**metaData('2.10.dev20231012')[1])

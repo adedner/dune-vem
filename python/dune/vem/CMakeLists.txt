@@ -8,6 +8,5 @@ add_python_targets(vem
   qhull_2d
   bbox
   patch
+  earcut
 )
-dune_symlink_to_source_files(FILES earcut.hpp)
-install(FILES earcut.hpp)
