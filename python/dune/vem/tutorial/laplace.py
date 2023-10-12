@@ -2,6 +2,7 @@ import matplotlib
 matplotlib.rc( 'image', cmap='jet' )
 import matplotlib.pyplot as plt
 from ufl import *
+import dune.fem.plotting
 import dune.ufl, dune.fem, dune.vem
 from mixedSolver import MixedSolver # solver for mixed system
 
