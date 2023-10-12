@@ -5,8 +5,10 @@ from matplotlib import pyplot
 import math, numpy
 from dune.grid import cartesianDomain, gridFunction
 from dune.fem.plotting import plotPointData as plot
-from dune.fem.function import integrate, discreteFunction
+from dune.fem import integrate
+from dune.fem.function import discreteFunction
 import dune.fem
+from concave import ncGrid
 
 from ufl import *
 import dune.ufl
@@ -16,12 +18,12 @@ order = 3
 testSpaces = [0,order-2,order-2]
 
 x = SpatialCoordinate(triangle)
-massCoeff = 1 # +sin(dot(x,x))       # factor for mass term
-diffCoeff = 1 # -0.9*cos(dot(x,x))   # factor for diffusion term
+massCoeff = 1+sin(dot(x,x))       # factor for mass term
+diffCoeff = 1-0.9*cos(dot(x,x))   # factor for diffusion term
 
 def model(space):
     dimR = space.dimRange
-    exact = x[0]*x[1] * cos(pi*x[0]*x[1])
+    exact = as_vector(dimR*[x[0]*x[1] * cos(pi*x[0]*x[1])])
 
     u = TrialFunction(space)
     v = TestFunction(space)
@@ -32,9 +34,10 @@ def model(space):
     return a,b,dbc,exact
 
 def calc(polyGrid):
-    orders = (l,l,l-1)
+    dimR = 1
+    orders = (order,order,order-1)
     space = dune.vem.vemSpace( polyGrid, order=orders, storage="numpy",
-                               testSpaces=testSpaces)
+                               dimRange=dimR,testSpaces=testSpaces)
     a,b,dbc,exact = model(space)
     if False:
         df = space.interpolate(exact,name="solution")
@@ -42,14 +45,14 @@ def calc(polyGrid):
         df = space.interpolate(dimR*[0],name="solution")
         scheme = dune.vem.vemScheme(
                   [a==b, *dbc], space, solver="cg",
-                  gradStabilization=diffCoeff,
+                  gradStabilization=None, # diffCoeff,
                   massStabilization=massCoeff)
         info = scheme.solve(target=df)
     # df.plot()
     edf = exact-df
     err = [inner(edf,edf),
            inner(grad(edf),grad(edf))]
-    return [ numpy.sqrt(e) for e in integrate(polyGrid, err, order=8) ]
+    return [ numpy.sqrt(e) for e in integrate(err) ]
 
 oldErrors = []
 for i in range(1,4):
@@ -58,16 +61,19 @@ for i in range(1,4):
     """
     polyGrid = dune.vem.polyGrid(
           dune.vem.voronoiCells([[-0.5,-0.5],[1,1]], N*N, lloyd=100, fileName="test", load=True)
-          # cartesianDomain([-0.5,-0.5],[1,1],[N,N]),
       )
     """
-    polyGrid = dune.vem.polyGrid("agglomerate",
-                                 cartesianDomain([-0.5,-0.5],[1,1],[N,N]),
-                                 cubes=True )
+    # polyGrid = dune.vem.polyGrid(cartesianDomain([-0.5,-0.5],[1,1],[N,N]), cubes=False )
+    cells = ncGrid(N)
+    polyGrid = dune.vem.polyGrid( cells )
+    dune.vem.writePolygons(f"concave_{i}",cells)
+
     errors += calc(polyGrid)
 
-    print("errors:",errors)
+    print(i,polyGrid.hierarchicalGrid.agglomerate.size,"errors:",errors)
     if len(oldErrors)>0:
-        print(i,"eocs:", [ math.log(oe/e)/math.log(2.)
-                for oe,e in zip(oldErrors,errors) ])
+        eocs = [ math.log(oe/e)/math.log(2.) for oe,e in zip(oldErrors,errors) ]
+        print(i,"eocs:", eocs)
+        assert eocs[0] > order+0.5
+        assert eocs[1] > order-0.5
     oldErrors = errors

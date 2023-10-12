@@ -1,7 +1,6 @@
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-import sys, logging, io
+import sys, logging, io, os
 logger = logging.getLogger(__name__)
+import numpy as np
 
 from ufl.equation import Equation
 from ufl import Form
@@ -9,6 +8,7 @@ from dune.generator import Constructor, Method, algorithm, path
 import dune.common.checkconfiguration as checkconfiguration
 import dune
 import dune.fem
+from dune.generator import algorithm
 
 def stabilization(spc):
     if spc._stab is None:
@@ -567,12 +567,6 @@ def vemScheme(model, space=None, solver=None, parameters={},
         operator = op
 
     spaceType = space.cppTypeName
-    # modelType = "VEMDiffusionModel< " +\
-    #       "typename " + spaceType + "::GridPartType, " +\
-    #       spaceType + "::dimRange, " +\
-    #       spaceType + "::dimRange, " +\
-    #       "typename " + spaceType + "::RangeFieldType >"
-
     includes += ["dune/vem/operator/diffusionmodel.hh"]
     valueType = 'std::tuple< typename ' + spaceType + '::RangeType, typename ' + spaceType + '::JacobianRangeType >'
     modelType = 'Dune::Fem::VirtualizedVemIntegrands< typename ' + spaceType + '::GridPartType, ' + model._domainValueType + ", " + model._rangeValueType+ ' >'
@@ -583,7 +577,7 @@ def vemScheme(model, space=None, solver=None, parameters={},
             )
 
 
-def vemOperator(model, domainSpace=None, rangeSpace=None):
+def vemOperator(model, domainSpace=None, rangeSpace=None, boundary="default"):
     # from dune.fem.model._models import elliptic as makeElliptic
     from dune.fem.operator import load
     if rangeSpace is None:
@@ -607,9 +601,9 @@ def vemOperator(model, domainSpace=None, rangeSpace=None):
             except AttributeError:
                 raise ValueError("no domain space provided and could not deduce from form provided")
         if modelParam:
-            model = vemModel(domainSpace.gridView,model,domainSpace,None,None,*modelParam)
+            model = vemModel(domainSpace.gridView,model,domainSpace,None,None,None,*modelParam)
         else:
-            model = vemModel(domainSpace.gridView,model,domainSpace,None,None)
+            model = vemModel(domainSpace.gridView,model,domainSpace,None,None,None)
 
     if not hasattr(rangeSpace,"interpolate"):
         raise ValueError("wrong range space")
@@ -642,10 +636,17 @@ def vemOperator(model, domainSpace=None, rangeSpace=None):
           "typename " + domainSpaceType + "::RangeFieldType >"
     typeName = "DifferentiableVEMEllipticOperator< " + linearOperator + ", " + modelType + ">"
     if model.hasDirichletBoundary:
-        constraints = "Dune::VemDirichletConstraints< " +\
-                ",".join([modelType,domainSpace.cppTypeName]) + " > "
+        if boundary == "default": boundary = "full"
+        assert boundary is not None
+        includes += [ "dune/fem/schemes/dirichletwrapper.hh",
+                      "dune/vem/operator/vemdirichletconstraints.hh"]
+        if boundary   == "full":       boundary = 3
+        elif boundary == "value":      boundary = 1
+        elif boundary == "derivative": boundary = 2
+        constraints = lambda model: "Dune::VemDirichletConstraints< " +\
+                    ",".join([model,rangeSpace.cppTypeName,str(boundary)]) + " > "
         typeName = "DirichletWrapperOperator< " +\
-                ",".join([typeName,constraints(model)]) + " >"
+                ",".join([typeName,constraints(modelType)]) + " >"
 
     constructor = Constructor(['const '+domainSpaceType+'& dSpace','const '+rangeSpaceType+' &rSpace', modelType + ' &model'],
                               ['return new ' + typeName + '( dSpace, rSpace, model );'],
@@ -758,6 +759,39 @@ from dune.vem.voronoi import triangulated_voronoi
 from scipy.spatial import Voronoi, voronoi_plot_2d, cKDTree, Delaunay
 import numpy
 
+def crossProduct(A):
+    x1 = (A[1][0] - A[0][0])
+    y1 = (A[1][1] - A[0][1])
+    x2 = (A[2][0] - A[0][0])
+    y2 = (A[2][1] - A[0][1])
+    return (x1*y2 - y1*x2)
+def checkConvex(points):
+    N = len(points)
+    prev = 0
+    curr = 0
+    for i in range(N):
+        temp = [points[i], points[(i + 1) % N], points[(i + 2) % N]]
+        curr = crossProduct(temp)
+        if (curr != 0):
+            if (curr * prev < 0):
+                return False
+            else:
+                prev = curr
+    return True
+class EarCut:
+    def __init__(self):
+        self.code = None
+    def __call__(self, coords, indices):
+        points = list(coords[indices,:])
+        for i in range(len(points)):
+            points[i] = list(points[i])
+        if self.code is None:
+            fn = os.path.join( os.path.split(__file__)[0], 'earcut.hpp' )
+            self.code = algorithm.load('earcut', fn, [points])
+        tri = self.code([points])
+        tri = numpy.array(indices)[tri]
+        return numpy.reshape( tri, (len(tri)//3,3) )
+
 try:
     import triangle
 except ImportError:
@@ -798,10 +832,13 @@ change the parameter to 'True' which will also speedup the grid construction.
         else:
             vertices = numpy.array(vertices)
             tr = []
+            earCut = EarCut()
             for nr, p in enumerate(polygons):
-                p = numpy.array(p)
                 N = len(p)
-                if not convex: # use triangle
+                if True:
+                    tri = earCut(vertices,p)
+                elif not convex and not checkConvex(vertices[p]):
+                    # use triangle
                     e = [ [p[i],p[(i+1)%N]] for i in range(N) ]
                     domain = { "vertices":vertices, "segments":numpy.array(e) }
                     B = triangle.triangulate(domain,opts="p")
@@ -809,6 +846,7 @@ change the parameter to 'True' which will also speedup the grid construction.
                     # triangle.compare(plt, domain, B)
                     # plt.show()
                 else: # use scipy
+                    p = numpy.array(p)
                     poly = numpy.append(p,[p[0]])
                     vert = vertices[p, :]
                     tri = p[Delaunay(vert).simplices]
@@ -863,3 +901,27 @@ def retrieveAgglo_(gv):
     return agglomerationStorage_.get(gv,None)
 def insertAgglo_(gv, agglo):
     agglomerationStorage_[gv] = agglo
+
+try:
+    import meshio
+    def writePolygons(fileBase, domain, fileFormat="vtu"):
+        points = list( domain["vertices"] )
+        polys = list( domain["polygons"] )
+
+        # in vtk points are 3d
+        points = np.insert(points, 2, 0, axis=1)
+
+        # sort polygons into buckets accoring to equal sizes
+        polys.sort(key=len)
+        cells = [[polys[0]]]
+        for p in polys[1:]:
+            if len(p) > len(cells[-1][0]):
+                cells += [[p]]
+            else:
+                cells[-1] += [p]
+        cells = [("polygon", c) for c in cells]
+        meshio.write_points_cells(fileBase+".vtu", points,
+                                  cells, file_format=fileFormat)
+except ImportError:
+    def writePolygons(fileBase, domain, fileFormat="vtu"):
+        raise ImportError("dune.vem.writePolygons requires the meshio package")
