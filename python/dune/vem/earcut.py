@@ -1,3 +1,9 @@
+############################################################
+# Based on https://github.com/mapbox/earcut.hpp            #
+# ISC License                                              #
+# https://github.com/mapbox/earcut.hpp/blob/master/LICENSE #
+############################################################
+
 from dune.generator import algorithm
 import numpy
 import io
