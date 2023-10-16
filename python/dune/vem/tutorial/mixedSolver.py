@@ -13,10 +13,10 @@ class MixedSolver(scipy.sparse.linalg.LinearOperator):
     def __init__(self, schemeM, schemeG, schemeD):
         self.schemeD = schemeD # needed for rhs
         self.schemeM = schemeM
-        self.M = dune.fem.operator.linear(schemeM).as_numpy
+        self.M = schemeM.linear().as_numpy
         self.invM = scipy.sparse.linalg.splu(self.M.tocsc())
-        self.G = dune.fem.operator.linear(schemeG).as_numpy
-        self.D = dune.fem.operator.linear(schemeD).as_numpy
+        self.G = schemeG.linear().as_numpy
+        self.D = schemeD.linear().as_numpy
         self.tmp = schemeD.domainSpace.interpolate([0,0],name="rhs")
         self.rhs = schemeD.rangeSpace.interpolate(0,name="rhs")
         self.s1 = self.tmp.copy()
