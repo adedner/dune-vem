@@ -45,6 +45,7 @@ def calc(polyGrid):
         df = space.interpolate(dimR*[0],name="solution")
         scheme = dune.vem.vemScheme(
                   [a==b, *dbc], space, solver="cg",
+                  parameters={"newton.linear.preconditioner":"sor"},
                   gradStabilization=None, # diffCoeff,
                   massStabilization=massCoeff)
         info = scheme.solve(target=df)
@@ -55,9 +56,9 @@ def calc(polyGrid):
     return [ numpy.sqrt(e) for e in integrate(err) ]
 
 oldErrors = []
-for i in range(1,4):
+for i in range(1,3):
     errors = []
-    N = 2*2**i
+    N = 5*2**i
     """
     polyGrid = dune.vem.polyGrid(
           dune.vem.voronoiCells([[-0.5,-0.5],[1,1]], N*N, lloyd=100, fileName="test", load=True)
