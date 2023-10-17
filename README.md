@@ -1,6 +1,8 @@
 DUNE-FEM
 ========
 
+[[_TOC_]]
+
 [DUNE-VEM][20] is a [Distributed and Unified Numerics Environment][1]
 module which provides implementation of a range of virtual element
 spaces. It is based on the interfaces defined in [DUNE-FEM][0].
@@ -13,11 +15,47 @@ to the DUNE-VEM [bugtracker][6] instead.
 Tutorial
 --------
 
-The general [DUNE-FEM tutorial][18] based on the Python bindings
-includes a number of examples showcasing the DUNE-VEM module.
+The general [DUNE-FEM tutorial][18] includes a number of examples showcasing the DUNE-VEM module.
 
-Installation
-------------
+Paper
+-----
+
+A detailed description of the VEM implementation is given in our paper
+[A framework for implementing general virtual element spaces][21].
+The numerical examples provided in there are included in this repository
+and are part of the Python package uploaded to PyPi. The tutorial will be
+kept up to date with the development of the DUNE code. To results from the
+paper are based on the 2.9.0 version.
+To obtain the scripts to reproduce the results from the paper you can
+either install the package from PyPi
+```
+pip install dune-vem==2.9.0
+```
+or check out the 2.9.0 tag of this repository
+```
+git clone -b 2.9.0 https://gitlab.dune-project.org/dune-fem/dune-vem.git
+```
+and follow the instruction of installing from source given below.
+After installation of the Python package you can run
+```
+python -m dune.vem
+```
+which places the scripts into the folder ``vem_tutorial``. The tutorial
+consists of the following scripts:
+
+| Script               | Section in paper | Description | | Parameters | Output |
+| ------               | ---------------- | ----------- | ------ |
+| laplace.py           | 7.1              | solves Laplace problem in primal and dual form on a Voronoi grid | None | pngs and errors |
+| mixedSolver.py       | 7.1              | helper script with solver for mixed problem | | |
+| testStabilization.py | 7.2              |
+| cylinderUzawa.py     | 7.3              |
+| uzawa.py             | 7.3              | helper script with solver for Stokes problem |
+| willmore.py          | 7.4              |
+
+
+
+General installation instructions
+---------------------------------
 
 **Using pip**
 
@@ -117,3 +155,4 @@ A detailed description of DUNE-FEM can be found in
  [18]: https://dune-project.org/sphinx/content/sphinx/dune-fem/
  [19]: https://gitlab.dune-project.org/dune-fem/dune-fem/-/pipelines/
  [20]: https://www.dune-project.org/modules/dune-vem/
+ [21]: https://arxiv.org/abs/2208.08978
