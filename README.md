@@ -90,7 +90,7 @@ consists of the following scripts:
   <tr>
     <td class="tg-0lax">cylinderUzawa.py</td>
     <td class="tg-0lax">7.3<br></td>
-    <td class="tg-0lax"></td>
+    <td class="tg-0lax">This example requires pygmsh, run<br>pip install pygmsh</td>
     <td class="tg-0lax">None</td>
     <td class="tg-0lax">time series vtk files</td>
   </tr>
