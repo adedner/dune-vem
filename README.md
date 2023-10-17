@@ -37,7 +37,13 @@ After installation of the Python package you can run
 ```
 python -m dune.vem
 ```
-which places the scripts into the folder ``vem_tutorial``. The tutorial
+which places the scripts into the folder ``vem_tutorial``.
+If your system contains MPI you will need to install ``mpi4py`` first
+```
+pip install mpi4py
+```
+
+The tutorial
 consists of the following scripts:
 
 <style type="text/css">
@@ -179,7 +185,7 @@ See the file [LICENSE][7] for full copying permissions.
 References
 ----------
 
-A detailed description of DUNE-FEM can be found in
+A detailed description of DUNE-VEM and the uderlying DUNE-FEM module can be found in
 
 * A. Dedner, A. Hodson. A framework for implementing general virtual * element space.
   https://arxiv.org/abs/2208.08978
