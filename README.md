@@ -43,15 +43,70 @@ python -m dune.vem
 which places the scripts into the folder ``vem_tutorial``. The tutorial
 consists of the following scripts:
 
-| Script               | Section in paper | Description | | Parameters | Output |
-| ------               | ---------------- | ----------- | ------ |
-| laplace.py           | 7.1              | solves Laplace problem in primal and dual form on a Voronoi grid | None | pngs and errors |
-| mixedSolver.py       | 7.1              | helper script with solver for mixed problem | | |
-| testStabilization.py | 7.2              |
-| cylinderUzawa.py     | 7.3              |
-| uzawa.py             | 7.3              | helper script with solver for Stokes problem |
-| willmore.py          | 7.4              |
-
+<style type="text/css">
+.tg  {border-collapse:collapse;border-spacing:0;}
+.tg td{border-color:black;border-style:solid;border-width:1px;font-family:Arial, sans-serif;font-size:14px;
+  overflow:hidden;padding:10px 5px;word-break:normal;}
+.tg th{border-color:black;border-style:solid;border-width:1px;font-family:Arial, sans-serif;font-size:14px;
+  font-weight:normal;overflow:hidden;padding:10px 5px;word-break:normal;}
+.tg .tg-jlhb{background-color:#ffc702;border-color:#000000;text-align:left;vertical-align:top}
+.tg .tg-0lax{text-align:left;vertical-align:top}
+</style>
+<table class="tg">
+<thead>
+  <tr>
+    <th class="tg-jlhb">Script</th>
+    <th class="tg-jlhb">Section</th>
+    <th class="tg-jlhb">Description</th>
+    <th class="tg-jlhb">Parameters</th>
+    <th class="tg-jlhb">Output</th>
+  </tr>
+</thead>
+<tbody>
+  <tr>
+    <td class="tg-0lax">laplace.py</td>
+    <td class="tg-0lax">7.1</td>
+    <td class="tg-0lax">solves Laplace problem in <br>primal and dual form on a Voronoi grid</td>
+    <td class="tg-0lax">None</td>
+    <td class="tg-0lax">pngs of solution and grids</td>
+  </tr>
+  <tr>
+    <td class="tg-0lax">mixedSolver.py</td>
+    <td class="tg-0lax">7.1<br></td>
+    <td class="tg-0lax">helper script with solver for mixed problem</td>
+    <td class="tg-0lax"></td>
+    <td class="tg-0lax"></td>
+  </tr>
+  <tr>
+    <td class="tg-0lax">testStabilization.py</td>
+    <td class="tg-0lax">7.2</td>
+    <td class="tg-0lax">Compare stabilized and non-stabilized versions<br>for Laplace and Bilaplace problem<br></td>
+    <td class="tg-0lax">-L max-level &gt; 0<br>- l polynomial order &gt;= 1<br>-p problem = [laplace|biharmonic]<br>-s use stabilization = [-1|0|1]<br>     1: standard projections and stabilization<br>     0: standard projection no stabilization<br>    -1: higher order projections, no stabilization<br>         this projects the gradient and the hessian into <br>         P_l and P_{l-1}, respectively.</td>
+    <td class="tg-0lax">errors and convergence rates</td>
+  </tr>
+  <tr>
+    <td class="tg-0lax">cylinderUzawa.py</td>
+    <td class="tg-0lax">7.3<br></td>
+    <td class="tg-0lax"></td>
+    <td class="tg-0lax">None</td>
+    <td class="tg-0lax">time series vtk files</td>
+  </tr>
+  <tr>
+    <td class="tg-0lax">uzawa.py</td>
+    <td class="tg-0lax">7.3<br></td>
+    <td class="tg-0lax">helper script with solver for Stokes problem</td>
+    <td class="tg-0lax"></td>
+    <td class="tg-0lax"></td>
+  </tr>
+  <tr>
+    <td class="tg-0lax">willmore.py</td>
+    <td class="tg-0lax">7.4</td>
+    <td class="tg-0lax"></td>
+    <td class="tg-0lax">None</td>
+    <td class="tg-0lax">ime series vtk files</td>
+  </tr>
+</tbody>
+</table>
 
 
 General installation instructions
