@@ -1,4 +1,4 @@
-DUNE-FEM
+DUNE-VEM
 ========
 
 [[_TOC_]]
@@ -11,11 +11,6 @@ is provided.
 
 If you need help, please ask on our [mailinglist][5]. Bugs can also be submitted
 to the DUNE-VEM [bugtracker][6] instead.
-
-Tutorial
---------
-
-The general [DUNE-FEM tutorial][18] includes a number of examples showcasing the DUNE-VEM module.
 
 Paper
 -----
@@ -107,6 +102,12 @@ consists of the following scripts:
   </tr>
 </tbody>
 </table>
+
+Tutorial
+--------
+
+The more general [DUNE-FEM tutorial][18] includes a number of further examples showcasing the DUNE-VEM module
+and provides an overview of DUNE.
 
 
 General installation instructions
