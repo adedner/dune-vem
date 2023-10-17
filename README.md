@@ -17,7 +17,9 @@ Paper
 
 A detailed description of the VEM implementation is given in our paper
 [A framework for implementing general virtual element spaces][21].
-The numerical examples provided in there are included in this repository
+Please cite this paper, if you find this module useful for your research.
+
+The numerical examples provided in the paper are included in this repository
 and are part of the Python package uploaded to PyPi. The tutorial will be
 kept up to date with the development of the DUNE code. To results from the
 paper are based on the 2.9.0 version.
