@@ -26,11 +26,11 @@ paper are based on the 2.9.0 version.
 To obtain the scripts to reproduce the results from the paper you can
 either install the package from PyPi
 ```
-pip install dune-vem==2.9.0
+pip install dune-vem==2.9.0.2
 ```
-or check out the 2.9.0 tag of this repository
+or check out the version with the 2.9.0.2 tag of this repository
 ```
-git clone -b 2.9.0 https://gitlab.dune-project.org/dune-fem/dune-vem.git
+git clone -b v2.9.0.2 https://gitlab.dune-project.org/dune-fem/dune-vem.git
 ```
 and follow the instruction of installing from source given below.
 After installation of the Python package you can run
