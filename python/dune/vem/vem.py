@@ -9,14 +9,29 @@ import dune.common.checkconfiguration as checkconfiguration
 import dune
 import dune.fem
 
-def stabilization(spc):
+def stabilization(spc, hessStabilization=None, gradStabilization=None, massStabilization=None):
+    if hessStabilization is None and gradStabilization is None and massStabilization is None:
+        gradStabilization = 1.
+    if hessStabilization is None:
+        hessStabilization = 0.
+    else:
+        hessStabilization = float(hessStabilization)
+    if gradStabilization is None:
+        gradStabilization = 0.
+    else:
+        gradStabilization = float(gradStabilization)
+    if massStabilization is None:
+        massStabilization = 0.
+    else:
+        massStabilization = float(massStabilization)
     if spc._stab is None:
         stabMatrix = dune.fem.operator.linear([spc,spc])
         spc._stab = algorithm.load("Dune::Vem::stabilization",
-           io.StringIO("#include <dune/vem/operator/stabmatrix.hh>"), stabMatrix)
+           io.StringIO("#include <dune/vem/operator/stabmatrix.hh>"), stabMatrix,
+                       hessStabilization,gradStabilization,massStabilization)
     else:
         stabMatrix = dune.fem.operator.linear([spc,spc])
-    spc._stab(stabMatrix)
+    spc._stab(stabMatrix, hessStabilization, gradStabilization, massStabilization)
     return stabMatrix
 
 
@@ -271,7 +286,7 @@ def vemSpace(view, order=1,
     addStorage(spc, storage)
 
     spc._stab = None
-    spc.stabilization = lambda: stabilization(spc)
+    spc.__class__.stabilization = stabilization
 
     return spc.as_ufl()
 

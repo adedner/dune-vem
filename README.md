@@ -19,104 +19,23 @@ A detailed description of the VEM implementation is given in our paper
 [A framework for implementing general virtual element spaces][21].
 Please cite this paper, if you find this module useful for your research.
 
-The numerical examples provided in the paper are included in this repository
-and are part of the Python package uploaded to PyPi. The tutorial will be
-kept up to date with the development of the DUNE code. To results from the
-paper are based on the 2.9.0 version.
-To obtain the scripts to reproduce the results from the paper you can
-either install the package from PyPi
-```
-pip install dune-vem==2.9.0.2
-```
-or check out the version with the 2.9.0.2 tag of this repository
-```
-git clone -b v2.9.0.2 https://gitlab.dune-project.org/dune-fem/dune-vem.git
-```
-and follow the instruction of installing from source given below.
-After installation of the Python package you can run
+The scripts to reproduce the numerical examples provided in the paper are
+provided in the [dune-vem-paper][22] repository. These were based on the
+2.9.0 version of DUNE. Versions of these scripts updated to match the current
+versions together with some new ones are included in this repository
+and are part of the Python package uploaded to PyPi.
+To obtain the current versions of these scripts
+after installation of the DUNE-VEM Python package you can run
 ```
 python -m dune.vem
 ```
 which places the scripts into the folder ``vem_tutorial``.
-If your system contains MPI you will need to install ``mpi4py`` first
-```
-pip install mpi4py
-```
-
-The tutorial
-consists of the following scripts:
-
-<style type="text/css">
-.tg  {border-collapse:collapse;border-spacing:0;}
-.tg td{border-color:black;border-style:solid;border-width:1px;font-family:Arial, sans-serif;font-size:14px;
-  overflow:hidden;padding:10px 5px;word-break:normal;}
-.tg th{border-color:black;border-style:solid;border-width:1px;font-family:Arial, sans-serif;font-size:14px;
-  font-weight:normal;overflow:hidden;padding:10px 5px;word-break:normal;}
-.tg .tg-jlhb{background-color:#ffc702;border-color:#000000;text-align:left;vertical-align:top}
-.tg .tg-0lax{text-align:left;vertical-align:top}
-</style>
-<table class="tg">
-<thead>
-  <tr>
-    <th class="tg-jlhb">Script</th>
-    <th class="tg-jlhb">Section</th>
-    <th class="tg-jlhb">Description</th>
-    <th class="tg-jlhb">Parameters</th>
-    <th class="tg-jlhb">Output</th>
-  </tr>
-</thead>
-<tbody>
-  <tr>
-    <td class="tg-0lax">laplace.py</td>
-    <td class="tg-0lax">7.1</td>
-    <td class="tg-0lax">solves Laplace problem in <br>primal and dual form on a Voronoi grid</td>
-    <td class="tg-0lax">None</td>
-    <td class="tg-0lax">pngs of solution and grids</td>
-  </tr>
-  <tr>
-    <td class="tg-0lax">mixedSolver.py</td>
-    <td class="tg-0lax">7.1<br></td>
-    <td class="tg-0lax">helper script with solver for mixed problem</td>
-    <td class="tg-0lax"></td>
-    <td class="tg-0lax"></td>
-  </tr>
-  <tr>
-    <td class="tg-0lax">testStabilization.py</td>
-    <td class="tg-0lax">7.2</td>
-    <td class="tg-0lax">Compare stabilized and non-stabilized versions<br>for Laplace and Bilaplace problem<br></td>
-    <td class="tg-0lax">-L max-level &gt; 0<br>- l polynomial order &gt;= 1<br>-p problem = [laplace|biharmonic]<br>-s use stabilization = [-1|0|1]<br>     1: standard projections and stabilization<br>     0: standard projection no stabilization<br>    -1: higher order projections, no stabilization<br>         this projects the gradient and the hessian into <br>         P_l and P_{l-1}, respectively.</td>
-    <td class="tg-0lax">errors and convergence rates</td>
-  </tr>
-  <tr>
-    <td class="tg-0lax">cylinderUzawa.py</td>
-    <td class="tg-0lax">7.3<br></td>
-    <td class="tg-0lax">This example requires pygmsh, run<br>pip install pygmsh</td>
-    <td class="tg-0lax">None</td>
-    <td class="tg-0lax">time series vtk files</td>
-  </tr>
-  <tr>
-    <td class="tg-0lax">uzawa.py</td>
-    <td class="tg-0lax">7.3<br></td>
-    <td class="tg-0lax">helper script with solver for Stokes problem</td>
-    <td class="tg-0lax"></td>
-    <td class="tg-0lax"></td>
-  </tr>
-  <tr>
-    <td class="tg-0lax">willmore.py</td>
-    <td class="tg-0lax">7.4</td>
-    <td class="tg-0lax"></td>
-    <td class="tg-0lax">None</td>
-    <td class="tg-0lax">ime series vtk files</td>
-  </tr>
-</tbody>
-</table>
 
 Tutorial
 --------
 
 The more general [DUNE-FEM tutorial][18] includes a number of further examples showcasing the DUNE-VEM module
 and provides an overview of DUNE.
-
 
 General installation instructions
 ---------------------------------
@@ -220,3 +139,4 @@ A detailed description of DUNE-VEM and the uderlying DUNE-FEM module can be foun
  [19]: https://gitlab.dune-project.org/dune-fem/dune-fem/-/pipelines/
  [20]: https://www.dune-project.org/modules/dune-vem/
  [21]: https://arxiv.org/abs/2208.08978
+ [22]: https://gitlab.dune-project.org/dune-fem/dune-vem-paper

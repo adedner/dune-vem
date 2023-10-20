@@ -12,10 +12,9 @@ from dune.grid import cartesianDomain
 from dune.alugrid import aluCubeGrid
 from ufl import SpatialCoordinate, CellVolume, TrialFunction, TestFunction,\
                 inner, dot, div, nabla_grad, grad, dx, as_vector, transpose, Identity, sym, \
-                FacetNormal, ds, dS, avg, jump, CellVolume, FacetArea
+                FacetNormal, ds, dS, avg, jump, CellVolume, FacetArea, conditional
 from dune.ufl import Constant, DirichletBC
 import dune.fem
-from dune.fem.operator import linear as linearOperator
 
 import dune.vem
 from dune.fem.operator import galerkin as galerkinOperator
@@ -28,7 +27,7 @@ def plot(target):
     target[1].plot(colorbar="vertical", figure=(fig, 212))
     pyplot.show()
 
-def dgLaplace(beta, p,q, spc, p_bnd, dD):
+def dgLaplace(beta, p,q, spc, p_bnd, precondDbnd):
     n             = FacetNormal(spc)
     he            = avg( CellVolume(spc) ) / FacetArea(spc)
     hbnd          = CellVolume(spc) / FacetArea(spc)
@@ -36,18 +35,17 @@ def dgLaplace(beta, p,q, spc, p_bnd, dD):
     diffSkeleton  = beta/he*jump(p)*jump(q)*dS -\
                     dot(avg(grad(p)),n('+'))*jump(q)*dS -\
                     jump(p)*dot(avg(grad(q)),n('+'))*dS
-    diffSkeleton -= ( dot(grad(p),n)*q*dD +\
-                      p_bnd*dot(grad(q),n)*dD ) * ds
-    if p_bnd is not None:
-        diffSkeleton += beta/hbnd*(p-p_bnd)*dD*q*ds
+    for cond in precondDbnd:
+        diffSkeleton  += ( beta/hbnd * (p-p_bnd) -
+                           dot(grad(p),n) ) * q * conditional(cond,1,0) * ds
     return aInternal + diffSkeleton
 class Uzawa:
     def __init__(self, grid,
                  spcU, spcP, dbc_u,
                  mainModel, gradModel, divModel,
                  mu, nu,
-                 tolerance=1e-9, precondition=True, verbose=False,
-                 lagrange=False):
+                 tolerance=1e-9, verbose=False,
+                 lagrange=False, precondDbnd=None):
         self.dimension = grid.dimension
         self.verbose = verbose
         self.tolerance2 = tolerance**2
@@ -70,28 +68,31 @@ class Uzawa:
         divOp     = galerkinOperator( divModel, spcU,spcP)
         massOp    = galerkinOperator( massModel, spcP)
 
-        self.mainLinOp = linearOperator(self.mainOp)
-        self.G    = linearOperator(gradOp).as_numpy
-        self.D    = linearOperator(divOp).as_numpy
-        self.M    = linearOperator(massOp).as_numpy
+        self.mainLinOp = self.mainOp.linear()
+        self.G    = gradOp.linear().as_numpy
+        self.D    = divOp.linear().as_numpy
+        self.M    = massOp.linear().as_numpy
         self.Minv = lambda rhs: linalg.spsolve(self.M,rhs)
 
-        if precondition and self.mainOp.model.nu > 0:
+        if self.mainOp.model.nu > 0:
             print("adding outer preconditioner",
                   "using nu=",self.mainOp.model.nu,
                   "and mu=",self.mainOp.model.mu,flush=True)
-            if True: # not lagrange:
-                preconModel = dgLaplace(10, p,q, spcP, 0, 1)
-                preconOp    = galerkinOperator( preconModel, spcP)
+            if not lagrange:
+                o = spcP.order
+                preconModel = dgLaplace(10*(o+1)**2, p,q, spcP, 0, precondDbnd)
+                preconOp    = galerkinOperator(preconModel, spcP)
             else:
+                x = SpatialCoordinate(spcP)
                 preconModel = inner(grad(p),grad(q)) * dx
-                preconOp    = galerkinOperator( (preconModel,DirichletBC(spcP,0)), spcP)
-            self.P    = linearOperator(preconOp).as_numpy.tocsc()
+                preconOp    = galerkinOperator([ preconModel ]
+                              + [ DirichletBC(spcP,0,cond) for cond in precondDbnd ])
+            self.P    = preconOp.linear().as_numpy.tocsc()
             self.Pinv = linalg.splu(self.P)
         else:
             self.Pinv = None
             print("No outer preconditioner",
-                  "since nu=",self.mainOp.model.nu,
+                  "with nu=",self.mainOp.model.nu,
                   "and mu=",self.mainOp.model.mu,flush=True)
 
         self.rhsVelo  = spcU.interpolate(spcU.dimRange*[0], name="vel")

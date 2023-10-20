@@ -96,7 +96,6 @@ namespace Dune
     {
       jOp.reserve( stencil_ );
       jOp.clear();
-      std::ofstream fMassGlobal("./mass-agglo.dat");
       const std::size_t maxNumLocalDofs = DiscreteFunctionSpaceType::localBlockSize * u.space().blockMapper().maxNumDofs();
       std::vector< typename DiscreteFunctionSpaceType::RangeType > values( maxNumLocalDofs );
 
@@ -120,7 +119,6 @@ namespace Dune
             localMatrix.column( i ).axpy( values, values[ i ], weight );
         }
       }
-      // jOp.exportMatrix().print(fMassGlobal);
       jOp.flushAssembly();
     }
 

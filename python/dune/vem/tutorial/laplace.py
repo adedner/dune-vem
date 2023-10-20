@@ -2,7 +2,6 @@ import matplotlib
 matplotlib.rc( 'image', cmap='jet' )
 import matplotlib.pyplot as plt
 from ufl import *
-import dune.fem.plotting
 import dune.ufl, dune.fem, dune.vem
 from mixedSolver import MixedSolver # solver for mixed system
 
@@ -40,8 +39,7 @@ def mixed(polyGrid, order):
 
 for order in [0,1]:
     for i in range(2,3):
-        cells = dune.vem.voronoiCells([[0,0],[Lx,Ly]],2**(2*i+1),
-                                      lloyd=250, load="test")
+        cells = dune.vem.voronoiCells([[0,0],[Lx,Ly]],2**(2*i+1), lloyd=250)
         polyGrid = dune.vem.polyGrid(cells)
         iset = polyGrid.indexSet
         @dune.fem.function.gridFunction(polyGrid, name="cells", order=0)

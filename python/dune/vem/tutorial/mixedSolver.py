@@ -49,7 +49,7 @@ class MixedSolver(scipy.sparse.linalg.LinearOperator):
         self.tmp.clear()
         self.schemeD(self.tmp,self.rhs)
         target[0].as_numpy[:] = scipy.sparse.linalg.cg(
-          self,self.rhs.as_numpy
+          self,self.rhs.as_numpy, atol=0
           # ,callback=lambda xk:self.callback(xk)
           )[0]
         self.tmp.as_numpy[:]  = -self.G@target[0].as_numpy[:]

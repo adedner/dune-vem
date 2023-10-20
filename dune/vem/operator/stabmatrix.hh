@@ -16,13 +16,19 @@ namespace Dune
   namespace Vem
   {
     template< class LinOperator >
-    void stabilization(LinOperator &op)
+    void stabilization(LinOperator &op,
+         // std::optional<double> hessStabilization, std::optional<double> gradStabilization, std::optional<double> massStabilization)
+         double hessStab, double gradStab, double massStab)
     {
       typedef typename LinOperator::DomainFunctionType DomainFunctionType;
       typedef typename LinOperator::RangeFunctionType RangeFunctionType;
       typedef typename RangeFunctionType::DiscreteFunctionSpaceType DiscreteFunctionSpaceType;
       typedef typename DiscreteFunctionSpaceType::GridPartType GridPartType;
       typedef typename GridPartType::template Codim< 0 >::EntitySeedType ElementSeedType;
+
+      // double hessStab = hessStabilization.value_or(0.);
+      // double gradStab = gradStabilization.value_or(1.);
+      // double massStab = massStabilization.value_or(0.);
 
       const DiscreteFunctionSpaceType &domainSpace = op.domainSpace();
       const DiscreteFunctionSpaceType &rangeSpace = op.rangeSpace();
@@ -41,6 +47,8 @@ namespace Dune
       for (const auto &entity : Dune::elements(gridPart, Dune::Partitions::interiorBorder))
       {
         const std::size_t agglomerate = agglomeration.index( entity );
+        const auto &bbox = agIndexSet.boundingBox( agglomerate );
+        double bbH2 = pow(bbox.volume()/bbox.diameter(),2);
         const auto &stabMatrix = rangeSpace.stabilization(entity);
         jLocal.init( entity, entity );
         jLocal.clear();
@@ -48,10 +56,13 @@ namespace Dune
         assert( jLocal.rows()    == stabMatrix.rows()*bs );
         assert( jLocal.columns() == stabMatrix.cols()*bs );
         assert( stabMatrix.cols()*bs == uLocal.size() );
+
+        auto stab = gradStab + massStab*bbH2 + hessStab/bbH2;
+
         for (std::size_t r = 0; r < stabMatrix.rows(); ++r)
           for (std::size_t c = 0; c < stabMatrix.cols(); ++c)
             for (std::size_t b = 0; b < bs; ++b)
-              jLocal.add(r*bs+b, c*bs+b, stabMatrix[r][c]);
+              jLocal.add(r*bs+b, c*bs+b, stab*stabMatrix[r][c]);
         op.addLocalMatrix( entity, entity, jLocal );
       }
       op.flushAssembly();

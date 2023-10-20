@@ -1,6 +1,8 @@
 import matplotlib
 matplotlib.rc( 'image', cmap='jet' )
 from matplotlib import pyplot
+import numpy as np
+import pandas as pd
 import math, argparse
 from scipy.sparse.linalg import spsolve
 from dune.grid import cartesianDomain, gridFunction
@@ -31,17 +33,12 @@ order         = args.l     # order (>=1 for laplace >=2 for biharmonic)
 if useStab == -1: # set range space of value, gradient, and hessian projections to P_l,P_l, and P_{l-1}
     orders = [order,order,order-1]
 else:             # default setup
-    orders = order # = [order,order-1,order-2]
+    orders = [order,order-1,order-2]
 
 if problem == "biharmonic": # parameters for H^2-conforming space
     spaceArgs = {"order":orders, "testSpaces":[ [0,0], [order-4,order-3], [order-4] ] }
 else: # parameters for H^1-conforming space
     spaceArgs = {"order":orders, "testSpaces":[ [0,-1], [order-2,-1], [order-2] ] }
-
-# parameters for solver
-parameters = {"newton.linear.preconditioning.method": "jacobi",
-              "newton.linear.tolerance":1e-12,
-              "newton.linear.verbose": False, "newton.verbose": False }
 
 # Now we define the model starting with the exact solution and boundary conditions
 uflSpace = dune.ufl.Space(2)
@@ -79,13 +76,15 @@ else: # useStab=-1
 def compute(grid, space):
     df = discreteFunction(space, name="solution") # space.interpolate([0],name="solution")
     scheme = dune.vem.vemScheme([a==b, *dbc], space,
-                        solver="cg",
-                        # solver=("suitesparse","umfpack"),
                         hessStabilization=stabCoeff if problem=="biharmonic" else None,
                         gradStabilization=stabCoeff if problem=="laplace" else None,
-                        massStabilization=None,
-                        parameters=parameters)
-    info = scheme.solve(target=df)
+                        massStabilization=None)
+    A = dune.fem.operator.linear(scheme).as_numpy
+    rhs = df.copy()
+    scheme(space.zero,rhs)
+    rhs *= -1
+    df.as_numpy[:] = spsolve(A, rhs.as_numpy[:])
+    info = {"linear_iterations":"direct"}
     edf = exact-df
     energy  = replace(a,{u:edf,v:edf}).integrals()[0].integrand()
     err = [energy,
@@ -100,24 +99,37 @@ def compute(grid, space):
 results = []
 for level in range(maxLevel+1):
     constructor = cartesianDomain([0,0],[1,1],[4*2**level,4*2**level])
-    polyGrid = dune.vem.polyGrid(constructor, cubes=True )
-    # constructor = dune.vem.voronoiCells([[0,0],[1,1]],16*2**level*2**level, load="voronoiseeds",show=False,lloyd=50)
-    # polyGrid = dune.vem.polyGrid(constructor)
+    polyGrid = dune.vem.polyGrid(constructor, cubes=True)
     res = []
     space = dune.vem.vemSpace(polyGrid, **spaceArgs)
     dfs,errors,info = compute(polyGrid, space)
-    print("[",level,"]", "Size: ",polyGrid.size(0), space.size,
-          "Energy: ", errors[0], "semi-norms: ", errors[1:],
-          info["linear_iterations"], flush=True)
     results += [ [polyGrid.hierarchicalGrid.agglomerate.size,space.size,info["linear_iterations"],*errors] ]
 
 # compute EOCs and output results
 h = lambda size: 1/sqrt(size)
-eoc = (len(results[0])-3)*[-1]
+eoc = [(len(results[0])-3)*[0]]
 for level in range(len(results)):
-    print(h(results[level][0]),*results[level],*eoc,"# result-output")
     if level<len(results)-1:
-        eoc = [math.log(results[level+1][3+j]/results[level][3+j])/
-               math.log(h(results[level+1][0])/h(results[level][0]))
-               for j in range(len(eoc))]
-print("\n")
+        eoc += [ [math.log(results[level+1][3+j]/results[level][3+j])/
+                 math.log(h(results[level+1][0])/h(results[level][0]))
+                 for j in range(len(eoc[:][0]))] ]
+
+results = np.array(results)
+eoc = np.array(eoc)
+keys = {'grid-size': results[:,0],
+        "energy-error": results[:,3],
+        "E-eoc": eoc[:,0],
+        'L2-error': results[:,4],
+        "L2-eoc": eoc[:,1],
+        'H1-error': results[:,5],
+        "H1-eoc": eoc[:,2]
+       }
+if problem == "biharmonic":
+    keys['H2-error'] = results[:,6]
+    keys["H2-eoc"] = eoc[:,3]
+columns = list(keys.keys())
+table = pd.DataFrame(keys, index=range(len(results)), columns=columns)
+for c in columns:
+    if "eoc" in c:
+        table[c] = table[c].apply('{:.2f}'.format)
+print(table)

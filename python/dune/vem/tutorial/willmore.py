@@ -8,7 +8,7 @@ conforming = True            # either conforming and non-conforming
 order = 4                    # ... space of order 4
 N     = 50                   # number of Voronoi cells
 tau   = Constant(5e-6,"dt")  # time step size
-saveTimes  = [1e-4] # add other times for longer simulations, e.g.,
+saveTimes = [1e-4]           # add further time steps to extend simulation
 # saveTimes += [4e-4,7e-4]
 
 # moments for conforming and non-conforming C^1 spaces
