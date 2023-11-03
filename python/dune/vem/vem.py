@@ -196,7 +196,13 @@ def vemSpace(view, order=1,
         if type(ts) == int:
             testSpaces[i] = [ts]
 
-    agglomerate = view.hierarchicalGrid.agglomerate
+    try:
+        agglomerate = view.hierarchicalGrid.agglomerate
+    except AttributeError:
+        # if view does not have agglomerate then we create a trivial one
+        # this only works for quads or triangles
+        view.hierarchicalGrid.agglomerate = TrivialAgglomerate(view)
+        agglomerate = view.hierarchicalGrid.agglomerate
 
     includes = [ "dune/fem/gridpart/common/gridpart.hh", "dune/vem/space/hk.hh" ] + view.cppIncludes
     dimw = view.dimWorld
@@ -734,7 +740,16 @@ def yaspGrid(constructor, dimgrid=None, coordinates="equidistant", ctype="double
 
 #################################################################
 class TrivialAgglomerate:
-    def __init__(self,grid,cubes):
+    def __init__(self,grid,cubes=None):
+        if cubes is None:
+            from dune.geometry import quadrilateral, triangle
+            if grid.type == quadrilateral:
+                cubes = True
+            elif grid.type == triangle:
+                cubes = False
+            else:
+                assert False, "Unsupported grid element type for vem space"
+
         if cubes:
             self.minEdgeNumber = 4
         else:
