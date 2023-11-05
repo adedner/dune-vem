@@ -743,11 +743,13 @@ class TrivialAgglomerate:
     def __init__(self,grid,cubes=None):
         if cubes is None:
             from dune.geometry import quadrilateral, triangle
-            if grid.type == quadrilateral:
-                cubes = True
-            elif grid.type == triangle:
+            try:
+                if grid.type == quadrilateral:
+                    cubes = True
+                elif grid.type == triangle:
+                    cubes = False
+            except AttributeError:
                 cubes = False
-            else:
                 assert False, "Unsupported grid element type for vem space"
 
         if cubes:
