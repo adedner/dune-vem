@@ -3,18 +3,14 @@
 
 #include <utility>
 
-#include <dune/common/power.hh>
 #include <dune/common/version.hh>
 
-#if DUNE_VERSION_NEWER(DUNE_FEM, 2, 6)
 #include <dune/fem/common/hybrid.hh>
-#endif // #if DUNE_VERSION_NEWER(DUNE_FEM, 2, 6)
 
 #include <dune/fem/space/common/commoperations.hh>
 #include <dune/fem/space/common/defaultcommhandler.hh>
 #include <dune/fem/space/common/discretefunctionspace.hh>
 #include <dune/fem/space/common/functionspace.hh>
-// #include <dune/fem/space/shapefunctionset/legendre.hh>
 #include <dune/fem/space/shapefunctionset/orthonormal.hh>
 #include <dune/fem/space/shapefunctionset/proxy.hh>
 #include <dune/fem/space/shapefunctionset/vectorial.hh>
@@ -71,12 +67,6 @@ namespace Dune
     private:
       typedef typename GridPartType::template Codim< codimension >::EntityType EntityType;
 
-      /*
-      typedef typename Fem::FunctionSpace< typename FunctionSpaceType::DomainFieldType, typename FunctionSpaceType::RangeFieldType, FunctionSpaceType::dimDomain, 1 > ScalarFunctionSpaceType;
-      // typedef Fem::LegendreShapeFunctionSet< ScalarFunctionSpaceType > ScalarShapeFunctionSetType;
-      typedef Fem::OrthonormalShapeFunctionSet< ScalarFunctionSpaceType > ScalarShapeFunctionSetType;
-      */
-
     public:
       typedef Dune::Fem::FunctionSpace<
           typename FunctionSpace::DomainFieldType, typename FunctionSpace::RangeFieldType,
@@ -85,10 +75,8 @@ namespace Dune
 
       struct ScalarShapeFunctionSet
         : public Dune::Fem::OrthonormalShapeFunctionSet< ScalarShapeFunctionSpaceType >
-        // : public Dune::Fem::LegendreShapeFunctionSet< ScalarShapeFunctionSpaceType,true >
       {
         typedef Dune::Fem::OrthonormalShapeFunctionSet< ScalarShapeFunctionSpaceType >   BaseType;
-        // typedef Dune::Fem::LegendreShapeFunctionSet< ScalarShapeFunctionSpaceType,true >   BaseType;
 
         static constexpr int numberShapeFunctions =
               Dune::Fem::OrthonormalShapeFunctions< ScalarShapeFunctionSpaceType::dimDomain >::size(polOrder);
@@ -112,7 +100,6 @@ namespace Dune
 
       typedef BoundingBoxBasisFunctionSet< GridPartType, ShapeFunctionSetType > BasisFunctionSetType;
 
-      // static const std::size_t localBlockSize = FunctionSpaceType::dimRange * StaticPower< polOrder+1, GridPartType::dimension >::power;
       typedef Hybrid::IndexRange< int, FunctionSpaceType::dimRange * ScalarShapeFunctionSet::numberShapeFunctions > LocalBlockIndices;
       typedef AgglomerationDGMapper< GridPartType > BlockMapperType;
 
