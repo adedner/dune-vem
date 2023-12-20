@@ -188,7 +188,7 @@ namespace Dune
         return edgeTwist_[ subIndex( intersection.inside(), intersection.indexInInside(), dimension-1 ) ];
       }
 
-
+      void build();
       void update();
     private:
       const Agglomerate &agglomerate ( std::size_t agglomerateIndex ) const { return agglomerates_[ agglomerateIndex ]; }
@@ -297,6 +297,12 @@ namespace Dune
       , allocator_( std::move( allocator ) )
       , counter_(0)
     {
+      build();
+      update();
+    }
+    template< class GridPart, class Allocator >
+    inline void AgglomerationIndexSet< GridPart, Allocator >::build ()
+    {
       const typename GridPartType::IndexSetType& indexSet = agglomeration_.gridPart().indexSet();
       std::vector< std::vector< typename GridPartType::IndexSetType::IndexType > > subAgglomerates( GlobalGeometryTypeIndex::size( dimension-1 ) );
 
@@ -391,6 +397,7 @@ namespace Dune
 
       // compress connectivity
 
+      agglomerates_.clear();
       agglomerates_.reserve( size_[ dimension ] );
       for( auto &c : connectivity )
       {
@@ -429,14 +436,16 @@ namespace Dune
           }
         }
       }
-      update();
     }
     template< class GridPart, class Allocator >
     inline void AgglomerationIndexSet< GridPart, Allocator >::update ()
     {
       ++counter_;
       if (agglomeration_.counter() < counter_)
+      {
         agglomeration_.update();
+        build();
+      }
       vertexDiameters_.resize( size(dimension), 0.);
       std::fill(vertexDiameters_.begin(), vertexDiameters_.end(), 0);
       std::vector<std::size_t> vertexCount( size(dimension), 0);

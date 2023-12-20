@@ -11,6 +11,7 @@
 #include <dune/geometry/type.hh>
 
 #include <dune/fem/gridpart/common/gridpart.hh>
+#include <dune/fem/space/common/dofmanager.hh>
 
 #include <dune/vem/agglomeration/indexset.hh>
 
@@ -171,8 +172,6 @@ namespace Dune
 
       update();
     }
-
-
     template< class GridPart, class IndexSet >
     inline unsigned int AgglomerationDofMapper< GridPart, IndexSet >::numDofs ( std::size_t agglomerate ) const
     {
@@ -286,6 +285,22 @@ namespace Dune
       }
 
     }
+
+  } // namespace Vem
+
+  namespace Fem
+  {
+    // Capabilities
+    // ------------
+
+    namespace Capabilities
+    {
+      template< class GridPart, class IndexSet >
+      struct isAdaptiveDofMapper< Dune::Vem::AgglomerationDofMapper<GridPart,IndexSet> >
+      {
+        static const bool v = false;
+      };
+    } // namespace Capabilities
 
   } // namespace Fem
 

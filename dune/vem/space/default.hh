@@ -5,6 +5,7 @@
 #include <utility>
 
 #include <dune/fem/common/hybrid.hh>
+#include <dune/fem/io/streams/streams.hh>
 
 #include <dune/fem/quadrature/elementquadrature.hh>
 #include <dune/fem/space/common/commoperations.hh>
@@ -64,6 +65,7 @@ namespace Dune
       typedef typename BasisFunctionSetType::HessianRangeType HessianRangeType;
       typedef typename GridPartType::template Codim<0>::EntityType ElementType;
       typedef typename GridPartType::template Codim<0>::EntitySeedType ElementSeedType;
+      typedef Dune::Fem::DofManager< typename GridPartType::GridType > DofManagerType;
 
       static constexpr int dimDomain = Traits::dimDomain;
       static constexpr size_t blockSize = BaseType::localBlockSize;
@@ -118,21 +120,38 @@ namespace Dune
             typename Traits::ScalarBasisFunctionSetType::JacobianProjection>()),
         hessianProjections_(new Vector<
             typename Traits::ScalarBasisFunctionSetType::HessianProjection>()),
-        stabilizations_(new Vector<Stabilization>())
+        stabilizations_(new Vector<Stabilization>()),
+        dofManager_( DofManagerType::instance( agglom.gridPart().grid() ) )
       {
+        dofManager_.addIndexSet( *this );
         if (basisChoice != 3) // !!!!! get order information from BasisSets
           agglomeration().onbBasis(basisSets_.maxOrder());
         // std::cout << "using " << useThreads_ << " threads\n";
       }
       DefaultAgglomerationVEMSpace(const DefaultAgglomerationVEMSpace&) = delete;
       DefaultAgglomerationVEMSpace& operator=(const DefaultAgglomerationVEMSpace&) = delete;
-      ~DefaultAgglomerationVEMSpace() {}
+      virtual ~DefaultAgglomerationVEMSpace()
+      {
+        dofManager_.removeIndexSet( *this );
+      }
+
+      void resize () { }
+      bool compress () { update(); return true; }
+      void backup () const {}
+      void restore () {}
+      template <class StreamTraits>
+      void write( Dune::Fem::OutStreamInterface< StreamTraits >& out ) const {}
+      template <class StreamTraits>
+      void read( Dune::Fem::InStreamInterface< StreamTraits >& in ) { update(); }
 
       void update(bool first=false)
       {
         ++counter_;
         if (agglomeration().counter()<counter_)
+        {
           agIndexSet_.update();
+          blockMapper_.update();
+        }
 
         // these are the matrices we need to compute
         valueProjections().resize(agglomeration().size());
@@ -259,6 +278,7 @@ namespace Dune
       std::shared_ptr<Vector<typename Traits::ScalarBasisFunctionSetType::JacobianProjection>> jacobianProjections_;
       std::shared_ptr<Vector<typename Traits::ScalarBasisFunctionSetType::HessianProjection>> hessianProjections_;
       std::shared_ptr<Vector<Stabilization>> stabilizations_;
+      DofManagerType& dofManager_;
     };
 
     // Computation of  projections for DefaultAgglomerationVEMSpace
