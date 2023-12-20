@@ -8,6 +8,7 @@
 #include <utility>
 #include <vector>
 
+#include <dune/fem/space/common/dofmanager.hh>
 #include <dune/grid/common/mcmgmapper.hh>
 #include <dune/vem/agglomeration/boundingbox.hh>
 #include <dune/vem/agglomeration/basisfunctionset.hh>
@@ -29,30 +30,23 @@ namespace Dune
 
     public:
       typedef GridPart GridPartType;
+      typedef typename GridPartType::GridType GridType;
 
       typedef typename GridPartType::template Codim< 0 >::EntityType ElementType;
+      typedef MultipleCodimMultipleGeomTypeMapper< typename GridPartType::GridViewType > MapperType;
 
       template <class Callback>
       Agglomeration ( GridPartType &gridPart, bool rotate, const Callback callBack )
         : gridPart_( gridPart ),
           rotate_(rotate),
           mapper_( gridPart, mcmgElementLayout() ),
-          indices_( mapper_.size() ),
+          indices_(), //  mapper_.size() ),
           size_( 0 ),
           maxOrder_( 0 ),
-          counter_( 0 )
+          counter_( 0 ),
+          gridSequence_(-1),
+          callBack_(callBack)
       {
-        const auto &is = gridPart.indexSet();
-        const auto &end = gridPart.template end<0>();
-        for ( auto it = gridPart.template begin<0>(); it != end; ++it )
-        {
-          const auto &element = *it;
-          indices_[ mapper_.index( element ) ] = callBack( is.index(element) );
-        }
-        assert( indices_.size() == static_cast< std::size_t >( mapper_.size() ) );
-        if( !indices_.empty() )
-          size_ = *std::max_element( indices_.begin(), indices_.end() ) + 1u;
-
         update();
       }
       ~Agglomeration()
@@ -67,6 +61,24 @@ namespace Dune
       }
       void update()
       {
+        auto gridSeq = Dune::Fem:: DofManager< GridType > ::
+                       instance(gridPart_.grid()).sequence();
+        if (gridSequence_ < gridSeq)
+        {
+          mapper_ = MapperType( gridPart_, mcmgElementLayout() );
+          indices_.resize( mapper_.size() );
+          const auto &is = gridPart_.indexSet();
+          const auto &end = gridPart_.template end<0>();
+          for ( auto it = gridPart_.template begin<0>(); it != end; ++it )
+          {
+            const auto &element = *it;
+            indices_[ mapper_.index( element ) ] = callBack_( is.index(element) );
+          }
+          assert( indices_.size() == static_cast< std::size_t >( mapper_.size() ) );
+          if( !indices_.empty() )
+            size_ = *std::max_element( indices_.begin(), indices_.end() ) + 1u;
+          gridSequence_ = gridSeq;
+        }
         // std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
         boundingBoxes_ = Dune::Vem::boundingBoxes( *this, rotate_ );
         if (maxOrder_>0)
@@ -112,11 +124,13 @@ namespace Dune
     private:
       GridPart &gridPart_;
       bool rotate_;
-      MultipleCodimMultipleGeomTypeMapper< typename GridPartType::GridViewType > mapper_;
+      MapperType mapper_;
       Std::vector< std::size_t > indices_;
       std::size_t size_;
       std::size_t maxOrder_;
       std::size_t counter_;
+      int gridSequence_;
+      std::function<std::size_t(std::size_t)> callBack_;
       std::shared_ptr< Std::vector< BoundingBox< GridPart > > > boundingBoxes_;
     };
 
