@@ -66,11 +66,7 @@ namespace Dune
 
         std::size_t size () const
         {
-#if DUNE_VERSION_NEWER(DUNE_GEOMETRY, 2, 6)
           return Geo::Impl::size( type().id(), type().dim(), type().dim() );
-#else // #if DUNE_VERSION_NEWER(DUNE_GEOMETRY, 2, 6)
-          return Impl::size( type().id(), type().dim(), type().dim() );
-#endif // #else // #if DUNE_VERSION_NEWER(DUNE_GEOMETRY, 2, 6)
         }
 
         GeometryType type () const { return type_; }

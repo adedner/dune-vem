@@ -4,9 +4,6 @@
 #include <utility>
 
 #include <dune/grid/common/entity.hh>
-#if !DUNE_VERSION_NEWER(DUNE_GRID, 2, 6)
-#include <dune/grid/common/entitypointer.hh>
-#endif // #if !DUNE_VERSION_NEWER(DUNE_GRID, 2, 6)
 
 namespace Dune
 {
