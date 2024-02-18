@@ -27,6 +27,9 @@ from dune.vem import vemScheme as vemScheme
 from dune.fem.operator import galerkin as galerkinOperator
 from dune.fem.scheme import galerkin as galerkinScheme
 
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+
 def plot(target):
     fig = pyplot.figure(figsize=(10,10))
     target[0].plot(colorbar="vertical", figure=(fig, 211))
@@ -96,8 +99,12 @@ class Uzawa:
                 else:
                     preconModel = inner(grad(p),grad(q)) * dx
                     preconOpF = executor.submit(galerkinOperator, (preconModel,DirichletBC(spcP,[0])), spcP)
-        self.mainOp, gradOp, divOp, massOp, preconOp = \
-          mainOpF.result(), gradOpF.result(), divOpF.result(), massOpF.result(), preconOpF.result()
+        self.mainOp, gradOp, divOp, massOp = \
+            mainOpF.result(), gradOpF.result(), divOpF.result(), massOpF.result()
+        if precondition and tau is not None:
+            preconOp = preconOpF.result()
+        else:
+            preconOp = None
 
         with ThreadPoolExecutor(max_workers=8) as executor:
             AF = executor.submit(linearOperator,self.mainOp)
@@ -192,21 +199,22 @@ def main(level = 0):
     Lx = 3
     Ly = 1
     N = 2**(level)
-    muValue = 0.01
-    tauValue = 1e-3
-    order = 3
-    # grid = dune.vem.polyGrid(cartesianDomain([0,0],[3,1],[30*N,10*N]),cubes=False)
-    grid = dune.vem.polyGrid(
-          dune.vem.voronoiCells([[0,0],[Lx,Ly]], 50*N*N, lloyd=200, load="voronoiseeds")
+    muValue = 1 # 0.01
+    tauValue = None # 1e-3
+    order = 2
+    grid = dune.vem.polyGrid(cartesianDomain([0,0],[Lx,Ly],[N,N]),cubes=False)
+    # grid = dune.vem.polyGrid(
+    #       dune.vem.voronoiCells([[0,0],[Lx,Ly]], 50*N*N, lloyd=200, load="voronoiseeds")
         #   cartesianDomain([0.,0.],[Lx,Ly],[N,N]), cubes=False
         #   cartesianDomain([0.,0.],[Lx,Ly],[2*N,2*N]), cubes=True
-       )
+    #    )
 
-    with ThreadPoolExecutor(max_workers=4) as executor:
+    with ThreadPoolExecutor(max_workers=1) as executor:
         spcUF = executor.submit(dune.vem.divFreeSpace, grid, order=order)
-        spcPF = executor.submit(dune.vem.bbdgSpace, grid)
+        spcPF = executor.submit(dune.vem.bbdgSpace, grid, order=0)
         spcPsmoothF = executor.submit(dune.vem.vemSpace, grid, order=order, testSpaces=[-1,order-1,order-2])
     spcU, spcP, spcPsmooth = spcUF.result(), spcPF.result(), spcPsmoothF.result()
+    print(grid.size(0),grid.size(1),grid.size(2)," ",spcU.size,spcP.size)
 
     x       = SpatialCoordinate(spcU)
     exact_u = as_vector( [x[1] * (1.-x[1]), 0] ) # dy u_x = 1-2y, -dy^2 u_x = 2
@@ -221,7 +229,8 @@ def main(level = 0):
     exact_uh = dune.fem.function.uflFunction(grid, order=2, name="exact_uh", ufl=exact_u)
     uzawa = Uzawa(grid, spcU, spcP, dbc, f,
                   muValue, tauValue, u_h_n=exact_uh,
-                  tolerance=1e-12, precondition=True, verbose=False)
+                  tolerance=1e-12, precondition=True, verbose=True)
+    print("Setup uzawa",flush=True)
     uzawa.solve([velocity,pressure])
 
     p,q = TrialFunction(spcPsmooth), TestFunction(spcPsmooth)
@@ -235,12 +244,12 @@ def main(level = 0):
     scheme.solve(pressure)
     average_p = Constant( pressure.integrate(), "aver_p" )
 
-    edf = as_vector( [v1-v2 for v1,v2 in zip(velocity,exact_u)] +
-                     [(pressure-average_p)-exact_p] )
+    edf = as_vector( [inner(grad(v1-v2),grad(v1-v2)) for v1,v2 in zip(velocity,exact_u)] +
+                     [((pressure-average_p)-exact_p)**2] )
     err = [ e*e for e in edf ]
     errors  = [ numpy.sqrt(e) for e in integrate(grid, err, order=8) ]
 
-    # print(errors, average_p.value)
+    print(errors, average_p.value)
     # plot([velocity,pressure])
     return errors
 

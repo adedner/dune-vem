@@ -62,12 +62,12 @@ def bbdgSpace(view, order=1, scalar=False, dimRange=None, field="double",
                 str(dimRange) + ">1")
     if dimRange < 1:
         raise KeyError(\
-            "Parameter error in DiscontinuosGalerkinSpace with "+
+            "Parameter error in BBDGSpace with "+
             "dimRange=" + str(dimRange) + ": " +\
             "dimRange has to be greater or equal to 1")
     if order < 0:
         raise KeyError(\
-            "Parameter error in DiscontinuousGalerkinSpace with "+
+            "Parameter error in BBDGSpace with "+
             "order=" + str(order) + ": " +\
             "order has to be greater or equal to 0")
     if field == "complex":
@@ -185,12 +185,12 @@ def vemSpace(view, order=1,
                 str(dimRange) + ">1")
     if dimRange < 1:
         raise KeyError(\
-            "Parameter error in DiscontinuosGalerkinSpace with "+
+            "Parameter error in vemSpace with "+
             "dimRange=" + str(dimRange) + ": " +\
             "dimRange has to be greater or equal to 1")
     if order < 0:
         raise KeyError(\
-            "Parameter error in DiscontinuousGalerkinSpace with "+
+            "Parameter error in vemSpace with "+
             "order=" + str(order) + ": " +\
             "order has to be greater or equal to 0")
     if field == "complex":
@@ -354,7 +354,7 @@ def curlFreeSpace(view, order=1,
 
     if order < 0:
         raise KeyError(\
-            "Parameter error in DiscontinuousGalerkinSpace with "+
+            "Parameter error in curlFreeSpace with "+
             "order=" + str(order) + ": " +\
             "order has to be greater or equal to 0")
 
@@ -419,7 +419,7 @@ def curlFreeSpace(view, order=1,
 
 #########################################################
 
-def divFreeSpace(view, order=1, conforming=True,
+def divFreeSpace(view, order=2, conforming=True,
              field="double", storage="numpy",
              basisChoice=2, edgeInterpolation=False, rotatedBB=True):
     """create a virtual element space over an agglomerated grid
@@ -436,11 +436,11 @@ def divFreeSpace(view, order=1, conforming=True,
 
     from dune.fem.space import module, addStorage
 
-    if order < 0:
+    if order < 2:
         raise KeyError(\
-            "Parameter error in DiscontinuousGalerkinSpace with "+
+            "Parameter error in divFreeSpace with "+
             "order=" + str(order) + ": " +\
-            "order has to be greater or equal to 0")
+            "order has to be greater or equal to 2")
 
     agglomerate = view.hierarchicalGrid.agglomerate
 
@@ -830,8 +830,11 @@ class PolyAgglomerate:
 
     def __call__(self,idx):
         return self.polys[idx]
+
+    @staticmethod
     def roundBary(a):
         return tuple(round(aa,8) for aa in a)
+    @staticmethod
     def construct(cubes,convex,vertices,polygons):
         index = SortedDict()
         if cubes:

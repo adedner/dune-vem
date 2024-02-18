@@ -194,7 +194,7 @@ namespace Dune
       {
         assert(dofs.size()==size());
         const std::size_t nop = quadrature.nop();
-        assert(values.size()==size());
+        assert(values.size()==nop);
         for( std::size_t qp = 0; qp < nop; ++qp )
           evaluateAll( quadrature[ qp ], dofs, values[ qp ] );
       }

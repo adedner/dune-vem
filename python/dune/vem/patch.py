@@ -2,6 +2,7 @@ from __future__ import division, print_function, unicode_literals
 
 from dune.ufl.codegen import generateMethod
 from ufl import SpatialCoordinate, Coefficient, replace, diff, as_vector, MaxCellEdgeLength
+from ufl.constantvalue import Zero
 from ufl.core.expr import Expr
 from ufl.tensors import ListTensor
 from dune.source.cplusplus import Variable, UnformattedExpression, AccessModifier, maxEdgeLength
@@ -14,19 +15,23 @@ def codeVEM(self, name, targs):
     ubar = Coefficient(u.ufl_function_space())
     mStab = self.mStab
     if isinstance(mStab,Expr):
+        print("mStab is Expr",mStab,flush=True)
         try:
             mStab = expand_indices(expand_derivatives(expand_compounds(mStab)))
         except:
             pass
+        print("mStab=",mStab,flush=True)
         dmStab = replace(
                    expand_derivatives( diff(replace(mStab,{u:ubar}),ubar) ),
                    {ubar:u} )
+        print("mStab shape=",mStab.ufl_shape,flush=True)
         if mStab.ufl_shape == ():
             mStab = as_vector([mStab])
         try:
             mStab = expand_indices(expand_derivatives(expand_compounds(mStab)))
         except:
             pass
+        print("mStab=",mStab,flush=True)
         assert mStab.ufl_shape == u.ufl_shape
         dmStab = as_vector([
                     replace(
@@ -34,6 +39,7 @@ def codeVEM(self, name, targs):
                     {ubar:u} )
                  for i in range(u.ufl_shape[0]) ])
     else:
+        print("mStab is not Expr",mStab,flush=True)
         dmStab = None
 
     gStab = self.gStab
@@ -118,11 +124,11 @@ def codeVEM(self, name, targs):
     return code
 
 def transform(space,hStab,gStab,mStab):
-    if not type(hStab) in [list,tuple,ListTensor]: # note __getitem__ exists for any ufl expressions
+    if not type(hStab) in [list,tuple,ListTensor,Zero]: # note __getitem__ exists for any ufl expressions
         hStab = [hStab]
-    if not type(gStab) in [list,tuple,ListTensor]: # note __getitem__ exists for any ufl expressions
+    if not type(gStab) in [list,tuple,ListTensor,Zero]: # note __getitem__ exists for any ufl expressions
         gStab = [gStab]
-    if not type(mStab) in [list,tuple,ListTensor]: # note __getitem__ exists for any ufl expressions
+    if not type(mStab) in [list,tuple,ListTensor,Zero]: # note __getitem__ exists for any ufl expressions
         mStab = [mStab]
     exprs = []
     baseSignature = []
