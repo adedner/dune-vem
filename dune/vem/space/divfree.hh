@@ -428,6 +428,7 @@ namespace Dune
         )
       , numEdgeTestShapeFunctions_( (conforming_)? sizeONB<1>(order-2):sizeONB<1>(order-1) )
       {
+        // assert(conforming_);
         auto degrees = edgeDegrees();
         /*
         std::cout << "dofsPerCodim:" << dofsPerCodim_[0].second << " "
@@ -437,16 +438,13 @@ namespace Dune
                   << numGradShapeFunctions_ << ","
                   << numHessShapeFunctions_ << ","
                   << numInnerShapeFunctions_ << "]"
-                  << constraintSize() << "]"
+                  << "   constraints: " << constraintSize()
                   << "   edge: ["
                   << edgeSize(0) << "," << edgeSize(1) << ","
                   << numEdgeTestShapeFunctions_ << "]"
                   << " " << degrees[0] << " " << degrees[1]
                   << " max size of edge set: " << edgeSFS_.size()*2
                   << " edgeSize(): " << edgeSize()
-                  << std::endl;
-        std::cout << "dofs per codim: "
-                  << dofsPerCodim_[0].second << " " << dofsPerCodim_[1].second << " " << dofsPerCodim_[2].second
                   << std::endl;
         */
       }
@@ -494,6 +492,9 @@ namespace Dune
         if (conforming_)
         {
           return numInnerShapeFunctions_ + onbSFS_.size()-1;
+          // return numInnerShapeFunctions_ +
+          //        sizeONB<0>(innerOrder_-1) / BBBasisFunctionSetType::RangeType::dimension
+          //        -1;
         }
         else
         {
@@ -708,7 +709,6 @@ namespace Dune
       {
         // TODO: move this to the default and add a method to the baisisSets to
         // obtain the required order (here polOrder+1)
-        assert( BaseType::basisSets_.maxOrder() == polOrder+1 );
         BaseType::update(true);
       }
 
@@ -755,18 +755,30 @@ namespace Dune
           since int_E q = int_E 1 q = 0 since q is from ONB set
         */
 
-#if 1
         // matrices for edge projections
         Std::vector<Dune::DynamicMatrix<double> > edgePhiVector(2);
         edgePhiVector[0].resize(BaseType::basisSets_.edgeSize(0), BaseType::basisSets_.edgeSize(0), 0);
         edgePhiVector[1].resize(BaseType::basisSets_.edgeSize(1), BaseType::basisSets_.edgeSize(1), 0);
 
+#ifndef NDEBUG
+        auto q = RHSconstraintsMatrix[0].size() - numInnerShapeFunctions;
+        std::vector<double> mass(q,0);
+#endif
         for (const typename BaseType::ElementSeedType &entitySeed : entitySeeds[agglomerate])
         {
           const typename BaseType::ElementType &element = BaseType::gridPart().entity(entitySeed);
           const auto geometry = element.geometry();
 
           const auto &shapeFunctionSet = BaseType::basisSets_.basisFunctionSet(BaseType::agglomeration(), element);
+
+#ifndef NDEBUG
+          typename BaseType::Quadrature0Type quad(element, 2 * polOrder + 1);
+          for (std::size_t qp = 0; qp < quad.nop(); ++qp)
+            shapeFunctionSet.scalarEach(quad[qp], [&](std::size_t alpha, RangeFieldType m)
+            { if (alpha<mass.size())
+              mass[alpha] += m*quad.weight(qp)*element.geometry().integrationElement(quad.point(qp));
+            });
+#endif
 
           // compute the boundary terms for the value projection
           for (const auto &intersection : intersections(BaseType::gridPart(), element))
@@ -821,6 +833,10 @@ namespace Dune
             } // quadrature loop
           } // loop over intersections
         } // loop over triangles in agglomerate
+#ifndef NDEBUG
+        for (auto i=0;i<mass.size();++i)
+          if (mass[i]>1e-10)
+            std::cout << "ERROR:" << agglomerate << " : " << i << " " << mass[i] << std::endl;
 #endif
       }
     };

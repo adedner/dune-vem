@@ -104,7 +104,7 @@ namespace Dune
           int basisChoice,
           bool edgeInterpolation)
       : BaseType(agglom.gridPart()),
-        polOrder_(basisSets.maxOrder()),
+        polOrder_(polOrder), // basisSets.maxOrder()),
         basisSets_(basisSets),
         basisChoice_(basisChoice),
         edgeInterpolation_(edgeInterpolation),
