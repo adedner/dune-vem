@@ -15,23 +15,19 @@ def codeVEM(self, name, targs):
     ubar = Coefficient(u.ufl_function_space())
     mStab = self.mStab
     if isinstance(mStab,Expr):
-        print("mStab is Expr",mStab,flush=True)
         try:
             mStab = expand_indices(expand_derivatives(expand_compounds(mStab)))
         except:
             pass
-        print("mStab=",mStab,flush=True)
         dmStab = replace(
                    expand_derivatives( diff(replace(mStab,{u:ubar}),ubar) ),
                    {ubar:u} )
-        print("mStab shape=",mStab.ufl_shape,flush=True)
         if mStab.ufl_shape == ():
             mStab = as_vector([mStab])
         try:
             mStab = expand_indices(expand_derivatives(expand_compounds(mStab)))
         except:
             pass
-        print("mStab=",mStab,flush=True)
         assert mStab.ufl_shape == u.ufl_shape
         dmStab = as_vector([
                     replace(
@@ -39,7 +35,6 @@ def codeVEM(self, name, targs):
                     {ubar:u} )
                  for i in range(u.ufl_shape[0]) ])
     else:
-        print("mStab is not Expr",mStab,flush=True)
         dmStab = None
 
     gStab = self.gStab
@@ -148,8 +143,8 @@ def transform(space,hStab,gStab,mStab):
         model._code = model.code
         model.code  = lambda *args,**kwargs: codeVEM(model,*args,**kwargs)
         model.space = space
-        model.hStab = hStab
-        model.gStab = gStab
-        model.mStab = mStab
+        model.hStab = as_vector(hStab) if hStab[0] else hStab
+        model.gStab = as_vector(gStab) if gStab[0] else gStab
+        model.mStab = as_vector(mStab) if mStab[0] else mStab
         model.baseName = "vemintegrands"
     return [transform_, exprs]
