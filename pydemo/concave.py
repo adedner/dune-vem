@@ -1,4 +1,5 @@
 import numpy as np
+from matplotlib import pyplot as plt
 import random
 import dune.vem
 from dune.grid import gridFunction
@@ -59,15 +60,21 @@ def ncGrid(N):
 
     cells = {"vertices":np.array(vert), "polygons":polys}
     return cells
-"""
-grid = dune.vem.polyGrid(cells)
-print(grid.size(0),grid.hierarchicalGrid.agglomerate.size)
 
-dune.vem.writePolygons("concave",cells)
+def main():
+    cells = ncGrid(10)
+    dune.vem.writePolygons("concave",cells)
+    fig = dune.vem.plotPolygons(cells)
+    plt.show()
+    """
+    grid = dune.vem.polyGrid(cells)
+    print(grid.size(0),grid.hierarchicalGrid.agglomerate.size)
+    indexSet = grid.indexSet
+    @gridFunction(grid, name="cells")
+    def polygons(en,x):
+        return grid.hierarchicalGrid.agglomerate(indexSet.index(en))
+    # polygons.plot()
+    """
 
-indexSet = grid.indexSet
-@gridFunction(grid, name="cells")
-def polygons(en,x):
-    return grid.hierarchicalGrid.agglomerate(indexSet.index(en))
-# polygons.plot()
-"""
+if __name__ == "__main__":
+    main()

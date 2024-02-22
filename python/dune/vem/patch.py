@@ -15,6 +15,8 @@ def codeVEM(self, name, targs):
     ubar = Coefficient(u.ufl_function_space())
     mStab = self.mStab
     if isinstance(mStab,Expr):
+        if mStab.ufl_shape == (1,):
+            mStab = as_vector(u.ufl_shape[0]*[mStab[0]])
         try:
             mStab = expand_indices(expand_derivatives(expand_compounds(mStab)))
         except:
@@ -22,12 +24,6 @@ def codeVEM(self, name, targs):
         dmStab = replace(
                    expand_derivatives( diff(replace(mStab,{u:ubar}),ubar) ),
                    {ubar:u} )
-        if mStab.ufl_shape == ():
-            mStab = as_vector([mStab])
-        try:
-            mStab = expand_indices(expand_derivatives(expand_compounds(mStab)))
-        except:
-            pass
         assert mStab.ufl_shape == u.ufl_shape
         dmStab = as_vector([
                     replace(
@@ -39,8 +35,8 @@ def codeVEM(self, name, targs):
 
     gStab = self.gStab
     if isinstance(gStab,Expr):
-        if gStab.ufl_shape == ():
-            gStab = as_vector([gStab])
+        if gStab.ufl_shape == (1,):
+            gStab = as_vector(u.ufl_shape[0]*[gStab[0]])
         try:
             gStab = expand_indices(expand_derivatives(expand_compounds(gStab)))
         except:
@@ -56,8 +52,8 @@ def codeVEM(self, name, targs):
 
     hStab = self.hStab
     if isinstance(hStab,Expr):
-        if hStab.ufl_shape == ():
-            hStab = as_vector([hStab])
+        if hStab.ufl_shape == (1,):
+            hStab = as_vector(u.ufl_shape[0]*[hStab[0]])
         try:
             hStab = expand_indices(expand_derivatives(expand_compounds(hStab)))
         except:
