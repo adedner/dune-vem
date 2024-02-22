@@ -1,6 +1,7 @@
 import sys, logging, io, os
 logger = logging.getLogger(__name__)
 import numpy as np
+from matplotlib import pyplot as plt
 
 from ufl.equation import Equation
 from ufl import Form
@@ -923,6 +924,21 @@ def retrieveAgglo_(gv):
     return agglomerationStorage_.get(gv,None)
 def insertAgglo_(gv, agglo):
     agglomerationStorage_[gv] = agglo
+
+
+def plotPolygons(domain):
+    figure = plt.figure()
+    axe = figure.add_subplot(111)
+    for cell in domain["polygons"]:
+        polygon = plt.Polygon(
+            [ domain["vertices"][i] for i in cell ],
+            edgecolor="black",
+            facecolor="white"
+        )
+        axe.add_patch(polygon)
+    axe.set_aspect('equal')
+    axe.autoscale()
+    return figure
 
 try:
     import meshio
