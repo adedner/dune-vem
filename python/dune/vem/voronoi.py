@@ -1,11 +1,10 @@
 # http://stackoverflow.com/questions/28665491/getting-a-bounded-polygon-coordinates-from-voronoi-cells
 
-import matplotlib.pyplot as pl
+#import matplotlib.pyplot as pl
 import numpy as np
 import scipy as sp
-import scipy.spatial
 import sys, os, pickle
-from scipy.spatial import Voronoi, voronoi_plot_2d, cKDTree
+from scipy.spatial import voronoi_plot_2d
 import numpy
 
 eps = sys.float_info.epsilon
