@@ -1,12 +1,11 @@
-import sys, logging, io, os
+import logging, io
 logger = logging.getLogger(__name__)
 import numpy as np
 from matplotlib import pyplot as plt
 
 from ufl.equation import Equation
 from ufl import Form
-from dune.generator import Constructor, Method, algorithm, path
-import dune.common.checkconfiguration as checkconfiguration
+from dune.generator import Constructor, Method, algorithm
 import dune
 import dune.fem
 
@@ -130,7 +129,7 @@ def bbdgSpace(view, order=1, scalar=False, dimRange=None, field="double",
     addStorage(spc, storage)
     return spc.as_ufl()
 
-from dune.fem.scheme import dg,galerkin
+from dune.fem.scheme import dg
 def bbdgScheme(model, space=None, penalty=1, solver=None, parameters={}):
     if space == None:
         try:
@@ -787,9 +786,9 @@ def trivialAgglomerate(constructor, cubes=False, globalRefine=None, **kwargs):
     return grid
 
 # http://zderadicka.eu/voronoi-diagrams/
-from dune.vem.voronoi import triangulated_voronoi
 from dune.vem.earcut import EarCut
-from scipy.spatial import Voronoi, voronoi_plot_2d, cKDTree, Delaunay
+#from scipy.spatial import Voronoi, voronoi_plot_2d, cKDTree
+from scipy.spatial import Delaunay
 import numpy
 
 def crossProduct(A):
