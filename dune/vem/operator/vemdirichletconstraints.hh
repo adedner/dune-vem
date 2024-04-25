@@ -24,7 +24,7 @@ namespace Dune {
     static_assert( 1<=bndMask && bndMask<=3 );
     typedef DirichletConstraints<Model,DiscreteFunctionSpace> BaseType;
   public:
-    enum Operation { set = 0, sub = 1 };
+    enum Operation { set = 0, sub = 1, add = 2 };
     typedef Model ModelType;
     typedef DiscreteFunctionSpace DiscreteFunctionSpaceType;
     typedef typename DiscreteFunctionSpaceType::RangeType RangeType;
@@ -269,7 +269,7 @@ namespace Dune {
     {
       // get entity
       const auto &entity = wLocal.entity();
-      if (op == Operation::sub)
+      if (op == Operation::sub || op == Operation::add)
         model_.init(entity);
 
       // get number of Lagrange Points
@@ -304,6 +304,12 @@ namespace Dune {
               std::fill(valuesModel.begin(),valuesModel.end(),0);
               space_.interpolation() ( entity, BoundaryWrapper(model_,dirichletBlocks_[global][l]), valuesModel );
               values[ localDof ] -= valuesModel[ localDof ];
+            }
+            else if (op == Operation::add)
+            {
+              std::fill(valuesModel.begin(),valuesModel.end(),0);
+              space_.interpolation() ( entity, BoundaryWrapper(model_,dirichletBlocks_[global][l]), valuesModel );
+              values[ localDof ] += valuesModel[ localDof ];
             }
             assert( (unsigned int)localDof < wLocal.size() );
             wLocal[ localDof ] = values[ localDof ];
