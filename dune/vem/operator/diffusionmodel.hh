@@ -381,6 +381,8 @@ namespace Dune
         virtual bool init ( const IntersectionType &intersection ) = 0;
         virtual void unbind() = 0;
 
+        virtual bool nonlinear() const = 0;
+
         virtual bool hasInterior () const = 0;
         virtual RangeValueType interior ( const InteriorCachingPointType &x, const DomainValueType &u ) const = 0;
         virtual RangeValueType interior ( const InteriorElementPointType &x, const DomainValueType &u ) const = 0;
@@ -421,6 +423,8 @@ namespace Dune
         virtual bool init ( const EntityType &entity ) override { return impl().init( entity ); }
         virtual bool init ( const IntersectionType &intersection ) override { return impl().init( intersection ); }
         virtual void unbind() override {impl().unbind(); }
+
+        virtual bool nonlinear () const override { return impl().nonlinear(); }
 
         virtual bool hasInterior () const override { return impl().hasInterior(); }
         virtual RangeValueType interior ( const InteriorCachingPointType &x, const DomainValueType &u ) const override { return impl().interior( asQP( x ), u ); }
@@ -483,6 +487,8 @@ namespace Dune
       bool init ( const EntityType &entity ) { return impl().init( entity ); }
       bool init ( const IntersectionType &intersection ) { return impl().init( intersection ); }
       void unbind() { impl().unbind(); }
+
+      bool nonlinear() const { return impl().nonlinear(); }
 
       bool hasInterior () const { return impl().hasInterior(); }
 
