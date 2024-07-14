@@ -68,8 +68,8 @@ def codeVEM(self, name, targs):
         dhStab = None
 
     code.append(AccessModifier("public"))
-    x = SpatialCoordinate(self.space.cell())
-    maxCellEdgeLength = MaxCellEdgeLength(self.space.cell())
+    x = SpatialCoordinate(self.space)
+    maxCellEdgeLength = MaxCellEdgeLength(self.space)
     predefined = {}
     # self.predefineCoefficients(predefined, False)
     spatial = Variable('const auto', 'y')
