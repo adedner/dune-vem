@@ -190,7 +190,7 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model>
   const int blockSize = dfSpace.localBlockSize; // is equal to 1 for scalar functions
 
   std::vector<RangeRangeType> VectorOfAveragedDiffusionCoefficients (dfSpace.agglomeration().size(), RangeRangeType(0));
-  const auto &agIndexSet = dfSpace.blockMapper().indexSet();
+  const auto &agIndexSet = dfSpace.indexSet();
 
   DomainLocalFunctionType uLocal( u );
 
@@ -307,7 +307,7 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
   RangeRangeType LinDcoeff(0);
   const GridPartType &gridPart = rangeSpace.gridPart();
 
-  const auto &agIndexSet    = rangeSpace.blockMapper().indexSet();
+  const auto &agIndexSet    = rangeSpace.indexSet();
   const auto &agglomeration = rangeSpace.agglomeration();
 
   typedef typename GridPartType::template Codim< 0 >::EntitySeedType ElementSeedType;

@@ -242,7 +242,7 @@ def main(level = 0):
                       )
     pressure = spcPsmooth.interpolate(0,name="pRecon")
     scheme.solve(pressure)
-    average_p = Constant( pressure.integrate(), "aver_p" )
+    average_p = Constant( integrate(pressure-exact_p), "aver_p" )
 
     edf = as_vector( [inner(grad(v1-v2),grad(v1-v2)) for v1,v2 in zip(velocity,exact_u)] +
                      [((pressure-average_p)-exact_p)**2] )

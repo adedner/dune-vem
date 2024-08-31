@@ -47,6 +47,8 @@
                 RRangeType &val) const = 0;\
   virtual void dirichlet( int bndId, const POINT &x,\
                 RRangeType &value) const = 0; \
+  virtual void dDirichlet( int bndId, const POINT &x,\
+                RJacobianRangeType &value) const = 0; \
   virtual RRangeType massStabilization( const POINT &x,\
                 const DRangeType &value) const = 0; \
   virtual RRangeType linMassStabilization( const POINT &x,\
@@ -99,6 +101,9 @@
   virtual void dirichlet( int bndId, const POINT &x,\
                 RRangeType &value) const \
   { impl().dirichlet(bndId, x, value); } \
+  virtual void dDirichlet( int bndId, const POINT &x,\
+                RJacobianRangeType &value) const \
+  { impl().dDirichlet(bndId, x, value); } \
   virtual RRangeType massStabilization( const POINT &x,\
                 const DRangeType &value) const \
   { return impl().massStabilization(x,value); } \
@@ -348,6 +353,8 @@ namespace Dune
       typedef typename GridPartType::IntersectionType IntersectionType;
 
       using RRangeType = typename detail::GetDimRange<std::tuple_element_t<0,RangeValueType>>::type;
+      using RJacobianRangeType = typename detail::GetDimRange<std::tuple_element_t<0,RangeValueType>>
+            :: template dtype<GridPartType::dimension>;
       using DRangeType = typename detail::GetDimRange<std::tuple_element_t<0,DomainValueType>>::type;
       typedef std::array<int,RRangeType::dimension> DirichletComponentType;
       typedef typename EntityType::Geometry::LocalCoordinate DomainType;
@@ -404,6 +411,7 @@ namespace Dune
         virtual bool hasDirichletBoundary () const = 0;
         virtual bool isDirichletIntersection( const IntersectionType& inter, DirichletComponentType &dirichletComponent ) = 0;
         virtual void dirichlet( int bndId, const DomainType &x,RRangeType &value) const = 0;
+        virtual void dDirichlet( int bndId, const DomainType &x,RJacobianRangeType &value) const = 0;
 
         virtual RRangeType hessStabilization ( const DomainType &x, const DRangeType &u ) const = 0;
         virtual RRangeType linHessStabilization ( const DomainType &x, const DRangeType &u ) const = 0;
@@ -447,6 +455,7 @@ namespace Dune
         virtual bool hasDirichletBoundary () const override { return impl().hasDirichletBoundary(); }
         virtual bool isDirichletIntersection( const IntersectionType& inter, DirichletComponentType &dirichletComponent ) override { return impl().isDirichletIntersection(inter,dirichletComponent); }
         virtual void dirichlet( int bndId, const DomainType &x,RRangeType &value) const override { impl().dirichlet(bndId,x,value); }
+        virtual void dDirichlet( int bndId, const DomainType &x,RJacobianRangeType &value) const override { impl().dDirichlet(bndId,x,value); }
 
         virtual RRangeType hessStabilization ( const DomainType &x, const DRangeType &u ) const override { return impl().hessStabilization(x,u); }
         virtual RRangeType linHessStabilization ( const DomainType &x, const DRangeType &u ) const override { return impl().linHessStabilization(x,u); }
@@ -579,6 +588,10 @@ namespace Dune
       void dirichlet( int bndId, const DomainType &x,RRangeType &value) const
       {
         return impl().dirichlet(bndId,x,value);
+      }
+      void dDirichlet( int bndId, const DomainType &x,RJacobianRangeType &value) const
+      {
+        return impl().dDirichlet(bndId,x,value);
       }
 
       RRangeType hessStabilization ( const DomainType &x, const DRangeType &u ) const
