@@ -68,6 +68,11 @@ namespace Dune
         return std::make_pair( static_cast< std::size_t >( globalIndex ), globalIndex != -1 );
       }
 
+      auto types ( int codim ) const
+      {
+        return agglomeration_.gridPart().indexSet().types( codim );
+      }
+
       std::pair< std::size_t, bool > globalIndex ( const ElementType &entity ) const
       {
         return std::make_pair( index( entity ), true );

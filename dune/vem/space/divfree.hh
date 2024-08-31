@@ -788,15 +788,12 @@ namespace Dune
               continue;
             assert(intersection.conforming());
 
-            const typename BaseType::BasisSetsType::EdgeShapeFunctionSetType edgeShapeFunctionSet
-                  = BaseType::basisSets_.edgeBasisFunctionSet(BaseType::agglomeration(),
-                               intersection, BaseType::blockMapper().indexSet().twist(intersection) );
-
             Std::vector<Std::vector<unsigned int>> mask(2,Std::vector<unsigned int>(0)); // contains indices with Phi_mask[i] is attached to given edge
             edgePhiVector[0] = 0;
             edgePhiVector[1] = 0;
 
-            BaseType::interpolation()(intersection, edgeShapeFunctionSet, edgePhiVector, mask);
+            const typename BaseType::BasisSetsType::EdgeShapeFunctionSetType edgeShapeFunctionSet
+              = BaseType::interpolation()(intersection, edgePhiVector, mask);
 
             auto normal = intersection.centerUnitOuterNormal();
 
@@ -852,6 +849,16 @@ namespace Dune
             static const bool v = false;
         };
     }
+    template<class GridPart>
+    class DefaultLocalRestrictProlong< Vem::DivFreeVEMSpace<GridPart> >
+    : public EmptyLocalRestrictProlong< Vem::DivFreeVEMSpace<GridPart> >
+    {
+      typedef EmptyLocalRestrictProlong< Vem::DivFreeVEMSpace<GridPart> > BaseType;
+      public:
+      DefaultLocalRestrictProlong( const Vem::DivFreeVEMSpace<GridPart> &space )
+        : BaseType()
+      {}
+    };
   } // namespace Fem
 } // namespace Dune
 

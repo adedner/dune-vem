@@ -7,6 +7,8 @@
 
 #include <dune/fem/common/hybrid.hh>
 
+#include <dune/fem/space/common/capabilities.hh>
+#include <dune/fem/space/common/localrestrictprolong.hh>
 #include <dune/fem/space/common/commoperations.hh>
 #include <dune/fem/space/common/defaultcommhandler.hh>
 #include <dune/fem/space/common/discretefunctionspace.hh>
@@ -135,7 +137,7 @@ namespace Dune
       typedef typename BaseType::EntityType EntityType;
       typedef typename BaseType::GridPartType GridPartType;
 
-      enum { hasLocalInterpolate = false };
+      // enum { hasLocalInterpolate = false };
 
       AgglomerationDGSpace ( AgglomerationType &agglomeration )
         : BaseType( agglomeration.gridPart() ),
@@ -265,6 +267,25 @@ namespace Dune
       invOp( rhs, vtmp );
       v.assign(vtmp);
     }
+
+    namespace Capabilities
+    {
+      template< class FunctionSpace, class GridPart, int polOrder >
+      struct hasInterpolation< Vem::AgglomerationDGSpace<FunctionSpace,GridPart,polOrder> >
+      {
+        static const bool v = false;
+      };
+    }
+    template< class FunctionSpace, class GridPart, int polOrder >
+    class DefaultLocalRestrictProlong< Vem::AgglomerationDGSpace<FunctionSpace,GridPart,polOrder> >
+    : public EmptyLocalRestrictProlong< Vem::AgglomerationDGSpace<FunctionSpace,GridPart,polOrder> >
+    {
+      typedef EmptyLocalRestrictProlong< Vem::AgglomerationDGSpace<FunctionSpace,GridPart,polOrder> > BaseType;
+      public:
+      DefaultLocalRestrictProlong( const Vem::AgglomerationDGSpace<FunctionSpace,GridPart,polOrder> &space )
+        : BaseType()
+      {}
+    };
 
   } // namespace Fem
 

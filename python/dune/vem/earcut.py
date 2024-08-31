@@ -684,7 +684,8 @@ bool Earcut<N>::isValidDiagonal(Node* a, Node* b) {
 // signed area of a triangle
 template <typename N>
 double Earcut<N>::area(const Node* p, const Node* q, const Node* r) const {
-    return (q->y - p->y) * (r->x - q->x) - (q->x - p->x) * (r->y - q->y);
+    double a = (q->y - p->y) * (r->x - q->x) - (q->x - p->x) * (r->y - q->y);
+    return std::abs(a) < 1e-10 ? 0.0:a;
 }
 
 // check if two points are equal

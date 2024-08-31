@@ -115,11 +115,11 @@ def codeVEM(self, name, targs):
     return code
 
 def transform(space,hStab,gStab,mStab):
-    if not type(hStab) in [list,tuple,ListTensor,Zero]: # note __getitem__ exists for any ufl expressions
+    if not type(hStab) in [list,tuple,ListTensor]: # note __getitem__ exists for any ufl expressions
         hStab = [hStab]
-    if not type(gStab) in [list,tuple,ListTensor,Zero]: # note __getitem__ exists for any ufl expressions
+    if not type(gStab) in [list,tuple,ListTensor]: # note __getitem__ exists for any ufl expressions
         gStab = [gStab]
-    if not type(mStab) in [list,tuple,ListTensor,Zero]: # note __getitem__ exists for any ufl expressions
+    if not type(mStab) in [list,tuple,ListTensor]: # note __getitem__ exists for any ufl expressions
         mStab = [mStab]
     exprs = []
     baseSignature = []

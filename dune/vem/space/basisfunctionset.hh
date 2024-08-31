@@ -51,8 +51,8 @@ namespace Dune
       static constexpr int dimDomain = DomainType::dimension;
       static constexpr int dimRange  = RangeType::dimension;
 
-      // typedef ReferenceElement< typename DomainType::field_type, dimDomain > ReferenceElementType;
-      typedef ReferenceElements< typename DomainType::field_type, dimDomain > ReferenceElementType;
+      // typedef ReferenceElements< typename DomainType::field_type, dimDomain > ReferenceElementType;
+      typedef typename ReferenceElements< typename DomainType::field_type, dimDomain >::ReferenceElement ReferenceElementType;
 
       const auto& valueProjection() const { return (*valueProjections_)[agglomerate_]; }
       const auto& jacobianProjection() const { return (*jacobianProjections_)[agglomerate_]; }
@@ -118,22 +118,25 @@ namespace Dune
         value = RangeType( 0 );
         if constexpr ( Point::QuadratureType::codimension == 1)
         {
-          Std::vector < Dune::DynamicMatrix<DomainFieldType> > localDofVectorMatrix(2);
-          Std::vector<Std::vector<unsigned int>> mask(2,Std::vector<unsigned int>(0));
-          auto locx = x.localPosition();
-          auto normal = x.quadrature().intersection().unitOuterNormal(locx);
-          auto edgeSF = (*interpolation_)(x.quadrature().intersection(), localDofVectorMatrix, mask);
-          edgeSF.evaluateEach(locx, [&](std::size_t beta, RangeType psi)
+          if (outsideIntersection(x)) // intersection on polygon boundary
           {
-            if (beta < localDofVectorMatrix[0].size())
-              for (std::size_t s=0; s<mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
-              {
-                std::size_t j = mask[0][s];
-                value.axpy( DomainFieldType(localDofVectorMatrix[0][beta][s]*dofs[ j ]), psi );
-              }
-          });
+            Std::vector < Dune::DynamicMatrix<DomainFieldType> > localDofVectorMatrix(2);
+            Std::vector<Std::vector<unsigned int>> mask(2,Std::vector<unsigned int>(0));
+            auto edgeSF = (*interpolation_)(x.quadrature().intersection(), localDofVectorMatrix, mask,
+                                            this,
+                                            x.quadrature().isInside());
+            edgeSF.evaluateEach(x.localPosition(), [&](std::size_t beta, RangeType psi)
+            {
+              if (beta < localDofVectorMatrix[0].size())
+                for (std::size_t s=0; s<mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
+                {
+                  std::size_t alpha = mask[0][s];
+                  value.axpy( DomainFieldType(localDofVectorMatrix[0][beta][s]*dofs[alpha]), psi );
+                }
+            });
+            return;
+          }
         }
-        else
         {
           shapeFunctionSet_.evaluateEach( x, [ this, &dofs, &value ] ( std::size_t alpha, RangeType phi_alpha ) {
               for( std::size_t j = 0; j < size(); ++j )
@@ -172,24 +175,27 @@ namespace Dune
         std::fill( values.begin(), values.end(), RangeType( 0 ) );
         if constexpr ( Point::QuadratureType::codimension == 1)
         {
-          Std::vector < Dune::DynamicMatrix<DomainFieldType> > localDofVectorMatrix(2);
-          Std::vector<Std::vector<unsigned int>> mask(2,Std::vector<unsigned int>(0));
-          auto locx = x.localPosition();
-          auto normal = x.quadrature().intersection().unitOuterNormal(locx);
-          auto edgeSF = (*interpolation_)(x.quadrature().intersection(), localDofVectorMatrix, mask);
-          edgeSF.evaluateEach(locx, [&](std::size_t beta, RangeType psi)
+          if (outsideIntersection(x)) // intersection on polygon boundary
           {
-            if (beta < localDofVectorMatrix[0].size())
-              for (std::size_t s=0; s<mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
-              {
-                std::size_t alpha = mask[0][s];
-                values[alpha].axpy( localDofVectorMatrix[0][beta][s], psi );
-              }
-          });
+            // return;
+            Std::vector < Dune::DynamicMatrix<DomainFieldType> > localDofVectorMatrix(2);
+            Std::vector<Std::vector<unsigned int>> mask(2,Std::vector<unsigned int>(0));
+            auto edgeSF = (*interpolation_)(x.quadrature().intersection(), localDofVectorMatrix, mask,
+                                            this,
+                                            x.quadrature().isInside());
+            edgeSF.evaluateEach(x.localPosition(), [&](std::size_t beta, RangeType psi)
+            {
+              if (beta < localDofVectorMatrix[0].size())
+                for (std::size_t s=0; s<mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
+                {
+                  std::size_t alpha = mask[0][s];
+                  values[alpha].axpy( localDofVectorMatrix[0][beta][s], psi );
+                }
+            });
+            return;
+          }
         }
-        else
         {
-          // std::cout << "B: using value projection\n";
           shapeFunctionSet_.evaluateEach( x, [ this, &values ] ( std::size_t alpha, RangeType phi_alpha ) {
               for( std::size_t j = 0; j < size(); ++j )
                 values[ j ].axpy( valueProjection()[ alpha ][ j ], phi_alpha );
@@ -217,61 +223,70 @@ namespace Dune
       void jacobianAll ( const Point &x, const DofVector &dofs, JacobianRangeType &jacobian ) const
       {
         jacobian = JacobianRangeType( 0 );
+
         if constexpr ( Point::QuadratureType::codimension == 1)
         {
-          Std::vector< Dune::DynamicMatrix<DomainFieldType> > localDofVectorMatrix(2);
-          Std::vector< Std::vector<unsigned int> > mask(2,Std::vector<unsigned int>(0));
-          auto locx = x.localPosition();
-          DomainType normal = x.quadrature().intersection().unitOuterNormal(locx);
-          const auto &jit = x.quadrature().intersection().geometry().jacobianInverseTransposed(locx);
+          if (outsideIntersection(x)) // intersection on polygon boundary
+          {
+            Std::vector< Dune::DynamicMatrix<DomainFieldType> > localDofVectorMatrix(2);
+            Std::vector< Std::vector<unsigned int> > mask(2,Std::vector<unsigned int>(0));
+            auto locx = x.localPosition();
+            DomainType normal = x.quadrature().intersection().unitOuterNormal(locx);
+            const auto &jit = x.quadrature().intersection().geometry().jacobianInverseTransposed(locx);
+            auto edgeSF = (*interpolation_)(x.quadrature().intersection(), localDofVectorMatrix, mask,
+                                            this,
+                                            x.quadrature().isInside());
 
-          auto edgeSF = (*interpolation_)(x.quadrature().intersection(), localDofVectorMatrix, mask);
-
-          // first step: take normal derivative if available
-          if (localDofVectorMatrix[1].size() > 0)
-            edgeSF.evaluateEach(locx, [&](std::size_t beta, RangeType psi)
+            // first step: take normal derivative if available
+            if (localDofVectorMatrix[1].size() > 0)
             {
-              if (beta < localDofVectorMatrix[1].size())
+              edgeSF.evaluateEach(locx, [&](std::size_t beta, RangeType psi)
               {
-                JacobianRangeType dpsi(0);
-                for (std::size_t r=0;r<dimRange;++r)
-                  dpsi[r].axpy(psi[r],normal);
-                for (std::size_t s=0; s<mask[1].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
+                if (beta < localDofVectorMatrix[1].size())
                 {
-                  std::size_t j = mask[1][s];
-                  jacobian.axpy( DomainFieldType(localDofVectorMatrix[1][beta][s]*dofs[j]), dpsi );
+                  JacobianRangeType dpsi(0);
+                  for (std::size_t r=0;r<dimRange;++r)
+                    dpsi[r].axpy(psi[r],normal);
+                  for (std::size_t s=0; s<mask[1].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
+                  {
+                    std::size_t j = mask[1][s];
+                    jacobian.axpy( DomainFieldType(localDofVectorMatrix[1][beta][s]*dofs[j]), dpsi );
+                  }
+                }
+              });
+            }
+            else
+            {
+              shapeFunctionSet_.jacobianEach( x, [ & ] ( std::size_t alpha, JacobianRangeType dphi_alpha ) {
+                  JacobianRangeType dpsi(0);
+                  for (std::size_t r=0;r<dimRange;++r)
+                    dpsi[r].axpy(dphi_alpha[r]*normal,normal);
+                  for( std::size_t j = 0; j < size(); ++j )
+                    jacobian.axpy( DomainFieldType(jacobianProjection()[ alpha ][ j ]*dofs[ j ]), dpsi );
+                } );
+            }
+            // second step: tangential derivatives
+            edgeSF.jacobianEach(locx, [&](std::size_t beta, auto dhatpsi)
+            {
+              if (beta < localDofVectorMatrix[0].size())
+              {
+                // note: edge sfs in reference coordinate so apply scaling 1/|S|
+                JacobianRangeType dpsi;
+                for (std::size_t r=0;r<dimRange;++r)
+                {
+                  jit.mv(dhatpsi[r], dpsi[r]);
+                  assert( std::abs(dpsi[r]*normal) < 1e-10 );
+                }
+                for (std::size_t s=0; s<mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
+                {
+                  std::size_t j = mask[0][s];
+                  jacobian.axpy( DomainFieldType(localDofVectorMatrix[0][beta][s]*dofs[ j ]), dpsi );
                 }
               }
             });
-          else
-            shapeFunctionSet_.jacobianEach( x, [ & ] ( std::size_t alpha, JacobianRangeType dphi_alpha ) {
-                JacobianRangeType dpsi(0);
-                for (std::size_t r=0;r<dimRange;++r)
-                  dpsi[r].axpy(dphi_alpha[r]*normal,normal);
-                for( std::size_t j = 0; j < size(); ++j )
-                  jacobian.axpy( DomainFieldType(jacobianProjection()[ alpha ][ j ]*dofs[ j ]), dpsi );
-              } );
-          // second step: tangential derivatives
-          edgeSF.jacobianEach(locx, [&](std::size_t beta, auto dhatpsi)
-          {
-            if (beta < localDofVectorMatrix[0].size())
-            {
-              // note: edge sfs in reference coordinate so apply scaling 1/|S|
-              JacobianRangeType dpsi;
-              for (std::size_t r=0;r<dimRange;++r)
-              {
-                jit.mv(dhatpsi[r], dpsi[r]);
-                assert( std::abs(dpsi[r]*normal) < 1e-10 );
-              }
-              for (std::size_t s=0; s<mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
-              {
-                std::size_t j = mask[0][s];
-                jacobian.axpy( DomainFieldType(localDofVectorMatrix[0][beta][s]*dofs[ j ]), dpsi );
-              }
-            }
-          });
+            return;
+          }
         }
-        else
         {
           shapeFunctionSet_.jacobianEach( x, [ this, &dofs, &jacobian ] ( std::size_t alpha, JacobianRangeType dphi_alpha ) {
               for( std::size_t j = 0; j < size(); ++j )
@@ -296,60 +311,64 @@ namespace Dune
         std::fill( jacobians.begin(), jacobians.end(), JacobianRangeType( 0 ) );
         if constexpr ( Point::QuadratureType::codimension == 1)
         {
-          Std::vector< Dune::DynamicMatrix<DomainFieldType> > localDofVectorMatrix(2);
-          Std::vector< Std::vector<unsigned int> > mask(2,Std::vector<unsigned int>(0));
-          auto locx = x.localPosition();
-          DomainType normal = x.quadrature().intersection().unitOuterNormal(locx);
-          const auto &jit = x.quadrature().intersection().geometry().jacobianInverseTransposed(locx);
+          if (outsideIntersection(x)) // intersection on polygon boundary
+          {
+            Std::vector< Dune::DynamicMatrix<DomainFieldType> > localDofVectorMatrix(2);
+            Std::vector< Std::vector<unsigned int> > mask(2,Std::vector<unsigned int>(0));
+            auto locx = x.localPosition();
+            DomainType normal = x.quadrature().intersection().unitOuterNormal(locx);
+            const auto &jit = x.quadrature().intersection().geometry().jacobianInverseTransposed(locx);
+            auto edgeSF = (*interpolation_)(x.quadrature().intersection(), localDofVectorMatrix, mask,
+                                            this,
+                                            x.quadrature().isInside());
 
-          auto edgeSF = (*interpolation_)(x.quadrature().intersection(), localDofVectorMatrix, mask);
-
-          // first step: take normal derivative if available
-          if (localDofVectorMatrix[1].size() > 0)
-            edgeSF.evaluateEach(locx, [&](std::size_t beta, RangeType psi)
-            {
-              if (beta < localDofVectorMatrix[1].size())
+            // first step: take normal derivative if available
+            if (localDofVectorMatrix[1].size() > 0)
+              edgeSF.evaluateEach(locx, [&](std::size_t beta, RangeType psi)
               {
-                JacobianRangeType dpsi(0);
-                for (std::size_t r=0;r<dimRange;++r)
-                  dpsi[r].axpy(psi[r],normal);
-                for (std::size_t s=0; s<mask[1].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
+                if (beta < localDofVectorMatrix[1].size())
                 {
-                  std::size_t alpha = mask[1][s];
-                  jacobians[alpha].axpy( localDofVectorMatrix[1][beta][s], dpsi );
+                  JacobianRangeType dpsi(0);
+                  for (std::size_t r=0;r<dimRange;++r)
+                    dpsi[r].axpy(psi[r],normal);
+                  for (std::size_t s=0; s<mask[1].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
+                  {
+                    std::size_t alpha = mask[1][s];
+                    jacobians[alpha].axpy( localDofVectorMatrix[1][beta][s], dpsi );
+                  }
+                }
+              });
+            else
+              shapeFunctionSet_.jacobianEach( x, [ & ] ( std::size_t alpha, JacobianRangeType dphi_alpha ) {
+                  JacobianRangeType dpsi(0);
+                  for (std::size_t r=0;r<dimRange;++r)
+                    dpsi[r].axpy(dphi_alpha[r]*normal,normal);
+                  for( std::size_t j = 0; j < size(); ++j )
+                    jacobians[ j ].axpy( jacobianProjection()[ alpha ][ j ], dpsi );
+                } );
+            // second step: tangential derivatives
+            edgeSF.jacobianEach(locx, [&](std::size_t beta, auto dhatpsi)
+            {
+              if (beta < localDofVectorMatrix[0].size())
+              {
+                // note: edge sfs in reference coordinate so apply jit - also
+                // transforms to tangential derivative
+                JacobianRangeType dpsi;
+                for (std::size_t r=0;r<dimRange;++r)
+                {
+                  jit.mv(dhatpsi[r], dpsi[r]);
+                  assert( std::abs(dpsi[r]*normal) < 1e-10 );
+                }
+                for (std::size_t s=0; s<mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
+                {
+                  std::size_t alpha = mask[0][s];
+                  jacobians[alpha].axpy( localDofVectorMatrix[0][beta][s], dpsi );
                 }
               }
             });
-          else
-            shapeFunctionSet_.jacobianEach( x, [ & ] ( std::size_t alpha, JacobianRangeType dphi_alpha ) {
-                JacobianRangeType dpsi(0);
-                for (std::size_t r=0;r<dimRange;++r)
-                  dpsi[r].axpy(dphi_alpha[r]*normal,normal);
-                for( std::size_t j = 0; j < size(); ++j )
-                  jacobians[ j ].axpy( jacobianProjection()[ alpha ][ j ], dpsi );
-              } );
-          // second step: tangential derivatives
-          edgeSF.jacobianEach(locx, [&](std::size_t beta, auto dhatpsi)
-          {
-            if (beta < localDofVectorMatrix[0].size())
-            {
-              // note: edge sfs in reference coordinate so apply jit - also
-              // transforms to tangential derivative
-              JacobianRangeType dpsi;
-              for (std::size_t r=0;r<dimRange;++r)
-              {
-                jit.mv(dhatpsi[r], dpsi[r]);
-                assert( std::abs(dpsi[r]*normal) < 1e-10 );
-              }
-              for (std::size_t s=0; s<mask[0].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
-              {
-                std::size_t alpha = mask[0][s];
-                jacobians[alpha].axpy( localDofVectorMatrix[0][beta][s], dpsi );
-              }
-            }
-          });
+            return;
+          }
         }
-        else
         {
           shapeFunctionSet_.jacobianEach( x, [ this, &jacobians ] ( std::size_t alpha, JacobianRangeType dphi_alpha ) {
               for( std::size_t j = 0; j < size(); ++j )
@@ -456,6 +475,16 @@ namespace Dune
       DomainType position ( const Point &x ) const
       {
         return Fem::coordinate(x);
+      }
+      template <class Point>
+      bool outsideIntersection(const Point& x) const
+      {
+        assert( Point::QuadratureType::codimension == 1);
+        int edgeNumber = x.quadrature().isInside()?
+                         x.quadrature().intersection().indexInInside():
+                         x.quadrature().intersection().indexInOutside();
+        const int k = (*interpolation_).indexSet().localIndex( entity(), edgeNumber, dimDomain-1 );
+        return k>=0;
       }
 
       const EntityType *entity_ = nullptr;

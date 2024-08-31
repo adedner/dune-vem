@@ -58,7 +58,7 @@ namespace Dune {
       { impl_.dirichlet(bndId_,Dune::Fem::coordinate(x),ret); }
       template <class Point>
       void jacobian( const Point& x, JacobianRangeType& ret ) const
-      { ret = JacobianRangeType(0); }
+      { impl_.dDirichlet(bndId_,Dune::Fem::coordinate(x),ret); }
     };
     VemDirichletConstraints( ModelType &model, const DiscreteFunctionSpaceType& space )
       : BaseType(model,space)
@@ -69,14 +69,8 @@ namespace Dune {
       // maskValue = 0: not on bnd
       //           = 1: a value dof on bnd
       //           = 2: a derivative dof on bnd
-      if (maskValue>2) {std::cout << "applyConstraint got wrong mask value: " << maskValue << std::endl; assert(false);}
-      switch (bndMask)
-      {
-        case 1: return (maskValue == 1);
-        case 2: return (maskValue == 2);
-        case 3: return (maskValue >= 1);
-      }
-      return false; // can't be reached
+      if (maskValue>3) {std::cout << "applyConstraint got wrong mask value: " << maskValue << std::endl; assert(false);}
+      return ! ((bndMask & maskValue) == 0);
     }
 
     template < class DiscreteFunctionType >
@@ -84,13 +78,6 @@ namespace Dune {
     {
       BaseType::operator()(u,w);
     }
-#if 0
-    template < class DiscreteFunctionType >
-    void operator ()( const typename DiscreteFunctionType::RangeType& value, DiscreteFunctionType& w ) const
-    {
-      BaseType::operator()(value,w);
-    }
-#endif
 
     template < class DiscreteFunctionType >
     void operator ()( const typename DiscreteFunctionType::RangeType& value, DiscreteFunctionType& w ) const
@@ -98,9 +85,11 @@ namespace Dune {
 
       BaseType::updateDirichletDofs();
       if( BaseType::hasDirichletDofs_ )
+      {
+        Dune::Fem::MutableLocalFunction< DiscreteFunctionType > wLocal( w );
         for( const EntityType &entity : space_ )
         {
-          auto wLocal = w.localFunction( entity );
+          auto wGuard = Dune::Fem::bindGuard( wLocal, entity );
           // get number of Lagrange Points
           const int localBlocks = space_.blockMapper().numDofs( entity );
 
@@ -123,6 +112,7 @@ namespace Dune {
             }
           }
         }
+      }
     }
 
     template < class DiscreteFunctionType >
@@ -206,6 +196,19 @@ namespace Dune {
       space_.blockMapper().map( entity, globalBlockDofs );
       Vem::Std::vector< char > mask( localBlocks );
       space_.interpolation()( entity, mask );
+      /*
+          for (int tmp=0;tmp<entity.geometry().corners();++tmp)
+            std::cout << entity.geometry().corner(tmp)[0] << ","
+                      << entity.geometry().corner(tmp)[1] << "    ";
+          std::cout << " -> ";
+          for (int tmp=0;tmp<9;++tmp)
+            std::cout << "(" << int(mask[tmp]) << ","
+                      << applyConstraint(mask[tmp]) << ","
+                      << (bndMask & mask[tmp]) << ","
+                      << ! ((bndMask & mask[tmp]) == 0)
+                      << ")    ";
+          std::cout << std::endl;
+      */
       // counter for all local dofs (i.e. localBlockDof * localBlockSize + ... )
       int localDof = 0;
       // iterate over face dofs and set unit row

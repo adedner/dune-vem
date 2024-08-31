@@ -1,6 +1,7 @@
 #ifndef DUNE_VEM_SPACE_INTERPOLATION_HH
 #define DUNE_VEM_SPACE_INTERPOLATION_HH
 
+#include <optional>
 #include <cassert>
 #include <utility>
 
@@ -134,6 +135,7 @@ namespace Dune
       {}
 
       const GridPartType &gridPart() const { return indexSet_.agglomeration().gridPart(); }
+      const IndexSetType &indexSet() const { return indexSet_; }
 
       template< class LocalFunction, class LocalDofVector >
       void operator() ( const ElementType &element, const LocalFunction &localFunction,
@@ -154,21 +156,6 @@ namespace Dune
       void operator() ( const ElementType &element, Std::vector<char> &mask) const
       {
         std::fill(mask.begin(),mask.end(),-1);
-        auto vertex = [&] (int poly,auto i,int k,int numDofs)
-        {
-          k /= baseBlockSize;
-          // assert(basisSets_.vectorDofs(0) / baseBlockSize == 1); // hk, curl
-          // assert(basisSets_.vectorDofs(0) / baseBlockSize == RangeType::dimension); // div free
-          for (int r=0; r<basisSets_.vectorDofs(0) / baseBlockSize; ++r)
-            mask[k+r] = 1;
-          k += basisSets_.vectorDofs(0) / baseBlockSize;
-
-          if (order2size<0>(1)>0)
-          {
-              mask[k]   = 2;
-              mask[k+1] = 2;
-          }
-        };
         auto edge = [&] (int poly,auto i,int k,int numDofs)
         {
           k /= baseBlockSize;
@@ -194,6 +181,41 @@ namespace Dune
           // assert( numDofs == basisSets_.template order2size<1>(0) );
           // std::fill(mask.begin()+k,mask.begin()+k+numDofs,1);
         };
+        auto vertex = [&] (int poly,auto i,int k,int numDofs, int edgeOrientation)
+        {
+          k /= baseBlockSize;
+          // assert(basisSets_.vectorDofs(0) / baseBlockSize == 1); // hk, curl
+          // assert(basisSets_.vectorDofs(0) / baseBlockSize == RangeType::dimension); // div free
+          for (int r=0; r<basisSets_.vectorDofs(0) / baseBlockSize; ++r)
+            mask[k+r] = 1;
+          k += basisSets_.vectorDofs(0) / baseBlockSize;
+
+          if (order2size<0>(1)>0)
+          {
+            // vertex is on corner of domain and only in one triangle so
+            // need to treat derivative dofs as both value and normal derivative
+            if (edgeOrientation == 3)
+            {
+              mask[k]   = 3;
+              mask[k+1] = 3;
+            }
+            else if (edgeOrientation == 0)
+            {
+              mask[k]   = 0;
+              mask[k+1] = 0;
+            }
+            else
+            {
+              mask[k]   = ((2 & edgeOrientation) == 0)? 2:1; // vertex on edge parallel to x-axis - so x-derivative dof is tangential, i.e., value
+              mask[k+1] = ((1 & edgeOrientation) == 0)? 2:1; // vertex on egde parallel to y-axis
+            }
+          }
+          /*
+          std::cout << poly << "," << i << "," << k << " with " << edgeOrientation
+                    << " -> " << int(mask[k]) << " " << int(mask[k+1])
+                    << std::endl;
+          */
+        };
         auto inner = [&mask] (int poly,auto i,int k,int numDofs)
         {
           // ???? assert( basisSets_.innerTestSize() == numDofs );
@@ -215,7 +237,7 @@ namespace Dune
         const auto &innerShapeFunctionSet = basisSets_.basisFunctionSet( indexSet_.agglomeration(), element );
 
         // define the corresponding vertex,edge, and inner parts of the interpolation
-        auto vertex = [&] (int poly,int i,int k,int numDofs)
+        auto vertex = [&] (int poly,auto i,int k,int numDofs, int edgeOrientation)
         { //!TS add derivatives at vertex for conforming space
           const auto &x = refElement.position( i, dimension );
           basisFunctionSet.evaluateEach( x, [ &localDofMatrix, k ] ( std::size_t alpha, typename BasisFunctionSet::RangeType phi ) {
@@ -331,28 +353,40 @@ namespace Dune
                        Std::vector < Dune::DynamicMatrix<F> > &localDofVectorMatrix,
                        Std::vector<Std::vector<unsigned int>> &mask) const
       {
+        return (*this)(intersection,localDofVectorMatrix,mask, (void*)nullptr);
+      }
+      template <class F, class ValueBasis>
+      const typename BasisSetsType::EdgeShapeFunctionSetType
+      operator() (const IntersectionType &intersection,
+                       Std::vector < Dune::DynamicMatrix<F> > &localDofVectorMatrix,
+                       Std::vector<Std::vector<unsigned int>> &mask,
+                       const ValueBasis* valueBasis,
+                       bool isInside=true) const
+      {
         localDofVectorMatrix[0].resize(basisSets_.edgeSize(0), basisSets_.edgeSize(0), 0);
         localDofVectorMatrix[1].resize(basisSets_.edgeSize(1), basisSets_.edgeSize(1), 0);
         typedef typename BasisSetsType::EdgeShapeFunctionSetType EdgeShapeFunctionSet;
         const EdgeShapeFunctionSet edgeShapeFunctionSet
               = basisSets_.edgeBasisFunctionSet(indexSet_.agglomeration(),
               intersection, indexSet_.twist(intersection));
-        (*this)(intersection,edgeShapeFunctionSet,localDofVectorMatrix,mask);
+        (*this)(intersection,edgeShapeFunctionSet,localDofVectorMatrix,mask,valueBasis,isInside);
         return edgeShapeFunctionSet;
       }
-      template< class EdgeShapeFunctionSet, class F >
+      template< class EdgeShapeFunctionSet, class F, class ValueBasis >
       void operator() (const IntersectionType &intersection,
                        const EdgeShapeFunctionSet &edgeShapeFunctionSet,
                        Std::vector < Dune::DynamicMatrix<F> > &localDofVectorMatrix,
-                       Std::vector<Std::vector<unsigned int>> &mask) const
+                       Std::vector<Std::vector<unsigned int>> &mask,
+                       const ValueBasis* valueBasis,
+                       bool isInside=true) const
       {
         for (std::size_t i=0;i<mask.size();++i)
           mask[i].clear();
-        const ElementType &element = intersection.inside();
+        const ElementType &element = isInside ? intersection.inside() : intersection.outside();
         const auto &edgeBFS = basisSets_.edgeBasisFunctionSet( indexSet_.agglomeration(),
                              intersection, indexSet_.twist(intersection) );
         const auto &refElement = ReferenceElements< ctype, dimension >::general( element.type() );
-        int edgeNumber = intersection.indexInInside();
+        int edgeNumber = isInside? intersection.indexInInside() : intersection.indexInOutside();
         const auto &edgeGeo = refElement.template geometry<1>(edgeNumber);
         /**/ // Question: is it correct that the nomral and derivatives are not needed here
         auto normal = intersection.centerUnitOuterNormal();
@@ -370,7 +404,7 @@ namespace Dune
         // define the three relevant part of the interpolation, i.e.,
         // vertices,edges - no inner needed since only doing interpolation
         // on intersectionn
-        auto vertex = [&] (int poly,int i,int k,int numDofs)
+        auto vertex = [&] (int poly,auto i,int k,int numDofs)
         { //!TS add derivatives at vertex (probably only normal component - is the mask then correct?)
           const auto &x = edgeGeo.local( refElement.position( i, dimension ) );
           edgeShapeFunctionSet.evaluateEach( x, [ &localDofVectorMatrix, &entry ] ( std::size_t alpha, typename EdgeShapeFunctionSet::RangeType phi ) {
@@ -410,11 +444,10 @@ namespace Dune
           for (unsigned int qp=0;qp<edgeQuad.nop();++qp)
           {
             auto x = edgeQuad.localPoint(qp);
-            auto xx = x;
             double weight = edgeQuad.weight(qp) *
                             intersection.geometry().integrationElement(x);
             edgeShapeFunctionSet.evaluateEach( x, [ & ] ( std::size_t beta, typename EdgeShapeFunctionSet::RangeType value ) {
-                edgeBFS.evaluateTestEach( xx,
+                edgeBFS.evaluateTestEach( x,
                   [&](std::size_t alpha, typename EdgeShapeFunctionSet::RangeType phi ) {
                     //!TS add alpha<...
                     if (alpha < order2size<1>(0) && beta < edgeSize(0))
@@ -438,7 +471,7 @@ namespace Dune
           entry[1] += order2size<1>(1);
         };
 
-        applyOnIntersection(intersection,vertex,edge,mask);
+        applyOnIntersection(intersection,vertex,edge,mask,isInside);
 
         assert( entry[0] == localDofVectorMatrix[0].size() );
         assert( entry[1] == localDofVectorMatrix[1].size() );
@@ -535,15 +568,10 @@ namespace Dune
         /* ////////////////////////////////////////////////////////////////////// */
         // It might be necessary to flip the vertex entries in the masks around
         // due to a twist in the intersection.
-        // At the moment this is done by checking that the
         /* ////////////////////////////////////////////////////////////////////// */
         {
-          auto otherTau = element.geometry().corner(
-                       refElement.subEntity(intersection.indexInInside(),1,1,2)
-                     );
-          otherTau -= element.geometry().corner(
-                        refElement.subEntity(intersection.indexInInside(),1,0,2)
-                      );
+          auto otherTau = element.geometry().corner( refElement.subEntity(edgeNumber,1,1,2));
+          otherTau -= element.geometry().corner( refElement.subEntity(edgeNumber,1,0,2));
           otherTau /= otherTau.two_norm();
           if (basisSets_.vertexSize(0) > 0) // vertices might have to be flipped
           {
@@ -608,20 +636,7 @@ namespace Dune
         int vertexSize, edgeOffset,edgeSize, innerOffset,innerSize;
         getSizesAndOffsets(poly, vertexSize,edgeOffset,edgeSize,innerOffset,innerSize);
 
-        // vertex dofs
-        //!TS needs changing
-        if (basisSets_.vertexSize(0) > 0)
-        {
-          for( int i = 0; i < refElement.size( dimension ); ++i )
-          {
-            const int k = indexSet_.localIndex( element, i, dimension) * vertexSize;
-            if ( k >= 0 ) // is a 'real' vertex of the polygon
-              vertex(poly,i,k,1);
-          }
-        }
-        //!TS needs changing
-        if (order2size<1>(0)>0 ||
-            order2size<1>(1)>0)
+        std::vector<int> vtxOnEdge(4,0); // for triangles and cubes
         {
           // to avoid any issue with twists we use an intersection iterator
           // here instead of going over the edges
@@ -631,9 +646,41 @@ namespace Dune
           {
             const auto& intersection = *it;
             const int i = intersection.indexInInside();
-            const int k = indexSet_.localIndex( element, i, dimension-1 )*edgeSize + edgeOffset; //
-            if ( k>=edgeOffset ) // 'real' edge of polygon
-              edge(poly,intersection,k,edgeSize);
+            if (order2size<1>(0)>0 || order2size<1>(1)>0)
+            {
+              const int k = indexSet_.localIndex( element, i, dimension-1 )*edgeSize + edgeOffset; //
+              if ( k>=edgeOffset ) // 'real' edge of polygon
+                edge(poly,intersection,k,edgeSize);
+            }
+            // we assume boundary are axis-aligned for C^1 spaces for which
+            // we need to know which vertex derivative dof is tangential and which is normal,
+            // i.e., is the vertex on an edge which is parallel to the x- or
+            // to the y-axis or on two boundary edges:
+            if (intersection.boundary())
+            {
+              auto normal = intersection.centerUnitOuterNormal();
+              for (int v=0;v<2;++v)
+              {
+                int vtxIndex = refElement.subEntity( i, dimension-1, v, dimension);
+                // vtxOnEdge[vtxIndex] = 0 neither x-axis nor y-axis
+                //                     = 1 on x-axis
+                //                     = 2 on y-axis
+                //                     = 3 on x- and y-axis
+                if (std::abs(normal[0]) > 0.1)
+                  vtxOnEdge[vtxIndex] += 1;
+                else if (std::abs(normal[1]) > 0.1)
+                  vtxOnEdge[vtxIndex] += 2;
+              }
+            }
+          }
+        }
+        if (basisSets_.vertexSize(0) > 0)
+        {
+          for( int i = 0; i < refElement.size( dimension ); ++i )
+          {
+            const int k = indexSet_.localIndex( element, i, dimension) * vertexSize;
+            if ( k >= 0 ) // is a 'real' vertex of the polygon
+              vertex(poly,i,k,1,vtxOnEdge[i]);
           }
         }
         //! needs changing
@@ -660,7 +707,7 @@ namespace Dune
         const auto &innerShapeFunctionSet = basisSets_.basisFunctionSet( indexSet_.agglomeration(), element );
 
         // define the vertex,edge, and inner parts of the interpolation
-        auto vertex = [&] (int poly,auto i,int k,int numDofs)
+        auto vertex = [&] (int poly,auto i,int k,int numDofs, int edgeOrientation)
         { //!TS vertex derivatives
           const auto &x = refElement.position( i, dimension );
           localFunction.evaluate( x, value );
@@ -784,16 +831,17 @@ namespace Dune
       template< class Vertex, class Edge>
       void applyOnIntersection( const IntersectionType &intersection,
                                 const Vertex &vertex, const Edge &edge,
-                                Std::vector<Std::vector<unsigned int>> &mask) const
+                                Std::vector<Std::vector<unsigned int>> &mask,
+                                bool isInside=true) const
       {
-        const ElementType &element = intersection.inside();
+        const ElementType &element = isInside? intersection.inside() : intersection.outside();
         const auto &refElement = ReferenceElements< ctype, dimension >::general( element.type() );
 
         const int poly = indexSet_.index( element );
         int vertexSize, edgeOffset,edgeSize, innerOffset,innerSize;
         getSizesAndOffsets(poly, vertexSize,edgeOffset,edgeSize,innerOffset,innerSize);
 
-        int edgeNumber = intersection.indexInInside();
+        int edgeNumber = isInside? intersection.indexInInside() : intersection.indexInOutside();
         const int k = indexSet_.localIndex( element, edgeNumber, dimension-1 );
         assert(k>=0); // should only be called for 'outside' intersection
         if (k>=0)  // this doesn't make sense - remove?
