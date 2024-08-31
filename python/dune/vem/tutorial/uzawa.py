@@ -35,9 +35,13 @@ def dgLaplace(beta, p,q, spc, p_bnd, precondDbnd):
     diffSkeleton  = beta/he*jump(p)*jump(q)*dS -\
                     dot(avg(grad(p)),n('+'))*jump(q)*dS -\
                     jump(p)*dot(avg(grad(q)),n('+'))*dS
-    for cond in precondDbnd:
+    if type(precondDbnd) == bool:
         diffSkeleton  += ( beta/hbnd * (p-p_bnd) -
-                           dot(grad(p),n) ) * q * conditional(cond,1,0) * ds
+                           dot(grad(p),n) ) * q * ds
+    else:
+        for cond in precondDbnd:
+            diffSkeleton  += ( beta/hbnd * (p-p_bnd) -
+                               dot(grad(p),n) ) * q * conditional(cond,1,0) * ds
     return aInternal + diffSkeleton
 class Uzawa:
     def __init__(self, grid,
@@ -64,9 +68,9 @@ class Uzawa:
                                      )
         else:
             self.mainOp = galerkinScheme( ( mainModel==0, *dbc_u ) )
-        gradOp    = galerkinOperator( gradModel, spcP,spcU)
-        divOp     = galerkinOperator( divModel, spcU,spcP)
-        massOp    = galerkinOperator( massModel, spcP)
+        gradOp    = galerkinOperator( [gradModel, *dbc_u] )
+        divOp     = galerkinOperator( divModel )
+        massOp    = galerkinOperator( massModel )
 
         self.mainLinOp = self.mainOp.linear()
         self.G    = gradOp.linear().as_numpy
@@ -85,8 +89,11 @@ class Uzawa:
             else:
                 x = SpatialCoordinate(spcP)
                 preconModel = inner(grad(p),grad(q)) * dx
-                preconOp    = galerkinOperator([ preconModel ]
-                              + [ DirichletBC(spcP,0,cond) for cond in precondDbnd ])
+                if type(precondDbnd) == bool:
+                    pdbcs = [ DirichletBC(spcP,0) ]
+                else:
+                    pdbcs = [ DirichletBC(spcP,0,cond) for cond in precondDbnd ]
+                preconOp    = galerkinOperator([ preconModel, *pdbcs ])
             self.P    = preconOp.linear().as_numpy.tocsc()
             self.Pinv = linalg.splu(self.P)
         else:
@@ -121,7 +128,7 @@ class Uzawa:
         self.rhs_u *= -1
         self.xi[:]  = self.G*sol_p
         self.rhs_u -= self.xi
-        self.mainOp.setConstraints(self.rhsVelo)
+        # self.mainOp.setConstraints(self.rhsVelo)
         sol_u[:]      = Ainv.solve(self.rhs_u[:])
         self.rhs_p[:] = self.D*sol_u
         self.r[:]     = self.Minv(self.rhs_p[:])
@@ -138,7 +145,7 @@ class Uzawa:
         for m in range(1,1000):
             self.xi.fill(0)
             self.rhs_u[:] = self.G*self.d
-            self.mainOp.setConstraints([0,]*self.dimension, self.rhsVelo)
+            # self.mainOp.setConstraints([0,]*self.dimension, self.rhsVelo)
             self.xi[:] = Ainv.solve(self.rhs_u[:])
             self.rhs_p[:] = self.D*self.xi
             rho = delta / numpy.dot(self.d,self.rhs_p)

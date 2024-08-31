@@ -66,7 +66,7 @@ divModel  = -div(u)*q * dx
 uzawa = Uzawa(gridView, spcU, spcP,
               [dbc_u_in,dbc_u_out,dbc_u_noflow],
               mainModel, gradModel, divModel, mu, nu,
-              tolerance=1e-6, precondition=True, verbose=False)
+              tolerance=1e-6, precondDbnd=True, verbose=False)
 
 # time loop
 if coarse:

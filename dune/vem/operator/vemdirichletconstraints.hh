@@ -14,15 +14,16 @@
 
 namespace Dune {
 
-  template < class Model, class DiscreteFunctionSpace,
+  template < class Model, class DiscreteFunctionSpace, bool useIdentity,
              int bndMask > // mask | 1: fix value
                            // mask | 2: fix normal derivative
                            // -> 2nd order: use mask=1
                            //    4th order: use mask=3 for fixing both
-  class VemDirichletConstraints : public DirichletConstraints<Model,DiscreteFunctionSpace>
+  class VemDirichletConstraints
+  : public DirichletConstraints<Model,DiscreteFunctionSpace, useIdentity>
   {
     static_assert( 1<=bndMask && bndMask<=3 );
-    typedef DirichletConstraints<Model,DiscreteFunctionSpace> BaseType;
+    typedef DirichletConstraints<Model,DiscreteFunctionSpace, useIdentity> BaseType;
   public:
     enum Operation { set = 0, sub = 1, add = 2 };
     typedef Model ModelType;
@@ -220,7 +221,7 @@ namespace Dune {
             localMatrix.clearRow( localDof );
 
             // set diagonal to 1
-            double value = auxiliaryDofs.contains( global )? 0.0 : 1.0;
+            double value = useIdentity ? 1.0 : 0.0;
             localMatrix.set( localDof, localDof, value );
           }
         }
@@ -284,9 +285,13 @@ namespace Dune {
       Vem::Std::vector< char > mask( localBlocks );
       assert( uLocal.size() == values.size() );
       assert( wLocal.size() == values.size() );
-      for (unsigned int i=0;i<uLocal.size();++i)
-        values[i] = uLocal[i];
       space_.interpolation()( entity, mask );
+      if constexpr ( useIdentity )
+      {
+        assert( LocalFunctionType::dimRange == dimRange );
+        for (unsigned int i=0;i<uLocal.size();++i)
+          values[i] = uLocal[i];
+      }
 
       int localDof = 0;
 

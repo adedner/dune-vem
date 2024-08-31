@@ -572,14 +572,14 @@ def vemScheme(model, space=None, solver=None, parameters={},
         elif boundary == "value":      boundary = 1
         elif boundary == "derivative": boundary = 2
         constraints = lambda model: "Dune::VemDirichletConstraints< " +\
-                    ",".join([model,space.cppTypeName,str(boundary)]) + " > "
+                    ",".join([model,space.cppTypeName,'true',str(boundary)]) + " > "
         operator = lambda linOp,model: "DirichletWrapperOperator< " +\
                 ",".join([op(linOp,model),constraints(model)]) + " >"
     elif boundary == 'derivative':
         includes += [ "dune/fem/schemes/dirichletwrapper.hh",
                       "dune/vem/operator/vemdirichletconstraints.hh"]
         constraints = lambda model: "Dune::VemDirichletConstraints< " +\
-                    ",".join([model,space.cppTypeName,str(2)]) + " > "
+                    ",".join([model,space.cppTypeName,'true',str(2)]) + " > "
         operator = lambda linOp,model: "DirichletWrapperOperator< " +\
                 ",".join([op(linOp,model),constraints(model)]) + " >"
     else:
@@ -663,8 +663,10 @@ def vemOperator(model, domainSpace=None, rangeSpace=None, boundary="default"):
         if boundary   == "full":       boundary = 3
         elif boundary == "value":      boundary = 1
         elif boundary == "derivative": boundary = 2
+
+        useIdentity = 'true' if rangeSpace == domainSpace else 'false'
         constraints = lambda model: "Dune::VemDirichletConstraints< " +\
-                    ",".join([model,rangeSpace.cppTypeName,str(boundary)]) + " > "
+                    ",".join([model,rangeSpace.cppTypeName,useIdentity,str(boundary)]) + " > "
         typeName = "DirichletWrapperOperator< " +\
                 ",".join([typeName,constraints(modelType)]) + " >"
 
@@ -850,9 +852,9 @@ class PolyAgglomerate:
             earCut = EarCut()
             for nr, p in enumerate(polygons):
                 N = len(p)
-                if True:
+                if not convex:
                     tri = earCut(vertices,p)
-                elif not convex and not checkConvex(vertices[p]):
+                elif False: # not convex and not checkConvex(vertices[p]):
                     if not triangle:
                         raise ValueError("""
 a grid with non convex polygons requires the 'triangle' package.
