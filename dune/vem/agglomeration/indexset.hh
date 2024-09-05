@@ -73,6 +73,12 @@ namespace Dune
         return agglomeration_.gridPart().indexSet().types( codim );
       }
 
+      template< class Entity >
+      bool contains ( const Entity &entity ) const
+      {
+        return globalIndex(entity).second;
+      }
+
       std::pair< std::size_t, bool > globalIndex ( const ElementType &entity ) const
       {
         return std::make_pair( index( entity ), true );

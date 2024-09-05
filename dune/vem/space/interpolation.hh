@@ -355,6 +355,15 @@ namespace Dune
       {
         return (*this)(intersection,localDofVectorMatrix,mask, (void*)nullptr);
       }
+      template< class EdgeShapeFunctionSet, class F >
+      void operator() (const IntersectionType &intersection,
+                       const EdgeShapeFunctionSet &edgeShapeFunctionSet,
+                       Std::vector < Dune::DynamicMatrix<F> > &localDofVectorMatrix,
+                       Std::vector<Std::vector<unsigned int>> &mask,
+                       bool isInside=true) const
+      {
+        return (*this)(intersection,edgeShapeFunctionSet,localDofVectorMatrix,mask, (void*)nullptr);
+      }
       template <class F, class ValueBasis>
       const typename BasisSetsType::EdgeShapeFunctionSetType
       operator() (const IntersectionType &intersection,

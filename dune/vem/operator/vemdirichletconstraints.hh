@@ -291,7 +291,8 @@ namespace Dune {
       space_.interpolation()( entity, mask );
       if constexpr ( useIdentity )
       {
-        assert( LocalFunctionType::dimRange == dimRange );
+        assert( LocalFunctionType::FunctionSpaceType::dimRange ==
+                DiscreteFunctionSpaceType::FunctionSpaceType::dimRange );
         for (unsigned int i=0;i<uLocal.size();++i)
           values[i] = uLocal[i];
       }
