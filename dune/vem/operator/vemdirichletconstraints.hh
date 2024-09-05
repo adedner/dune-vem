@@ -70,6 +70,7 @@ namespace Dune {
       //           = 1: a value dof on bnd
       //           = 2: a derivative dof on bnd
       if (maskValue>3) {std::cout << "applyConstraint got wrong mask value: " << maskValue << std::endl; assert(false);}
+      if (maskValue<=0) return false;
       return ! ((bndMask & maskValue) == 0);
     }
 
@@ -196,19 +197,6 @@ namespace Dune {
       space_.blockMapper().map( entity, globalBlockDofs );
       Vem::Std::vector< char > mask( localBlocks );
       space_.interpolation()( entity, mask );
-      /*
-          for (int tmp=0;tmp<entity.geometry().corners();++tmp)
-            std::cout << entity.geometry().corner(tmp)[0] << ","
-                      << entity.geometry().corner(tmp)[1] << "    ";
-          std::cout << " -> ";
-          for (int tmp=0;tmp<9;++tmp)
-            std::cout << "(" << int(mask[tmp]) << ","
-                      << applyConstraint(mask[tmp]) << ","
-                      << (bndMask & mask[tmp]) << ","
-                      << ! ((bndMask & mask[tmp]) == 0)
-                      << ")    ";
-          std::cout << std::endl;
-      */
       // counter for all local dofs (i.e. localBlockDof * localBlockSize + ... )
       int localDof = 0;
       // iterate over face dofs and set unit row
@@ -245,6 +233,7 @@ namespace Dune {
       std::vector< std::size_t > globalBlockDofs( localBlocks );
       space_.blockMapper().map( entity, globalBlockDofs );
       std::vector< double > valuesModel( localBlocks*localBlockSize );
+
       Vem::Std::vector< char > mask( localBlocks );
       space_.interpolation()( entity, mask );
 
@@ -285,10 +274,13 @@ namespace Dune {
 
       std::vector<double> values( localBlocks*localBlockSize );
       std::vector<double> valuesModel( localBlocks*localBlockSize );
-      Vem::Std::vector< char > mask( localBlocks );
+
       assert( uLocal.size() == values.size() );
       assert( wLocal.size() == values.size() );
+
+      Vem::Std::vector< char > mask( localBlocks );
       space_.interpolation()( entity, mask );
+
       if constexpr ( useIdentity )
       {
         assert( LocalFunctionType::FunctionSpaceType::dimRange ==
