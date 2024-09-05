@@ -17,6 +17,7 @@
 #include <dune/fem/space/shapefunctionset/proxy.hh>
 #include <dune/fem/space/shapefunctionset/vectorial.hh>
 #include <dune/fem/space/common/capabilities.hh>
+#include <dune/fem/common/intersectionside.hh>
 
 #include <dune/vem/space/indexset.hh>
 #include <dune/vem/misc/compatibility.hh>
@@ -56,6 +57,7 @@ namespace Dune
       typedef typename BaseType::BlockMapperType BlockMapperType;
 
       typedef typename BaseType::EntityType EntityType;
+      typedef typename BaseType::IntersectionType IntersectionType;
       typedef typename BasisSetsType::EdgeShapeFunctionSetType EdgeShapeFunctionSetType;
       typedef typename BasisFunctionSetType::DomainFieldType DomainFieldType;
       typedef typename BasisFunctionSetType::DomainType DomainType;
@@ -80,17 +82,43 @@ namespace Dune
 
       using BaseType::gridPart;
 
-      enum { hasLocalInterpolate = false };
+      // enum { hasLocalInterpolate = false };
 
       // for interpolation
       struct InterpolationType {
+          explicit InterpolationType(const AgglomerationInterpolationType &inter) noexcept
+          : inter_(inter)
+          {}
           InterpolationType(const AgglomerationInterpolationType &inter, const EntityType &element) noexcept
-                  : inter_(inter), element_(element) {}
+          : inter_(inter)
+          {
+            bind(element);
+          }
+          InterpolationType(const ThisType &space) noexcept
+          : inter_(space.interpolation())
+          {}
+          void bind(const EntityType &entity)
+          {
+            element_.emplace( entity );
+          }
+          void unbind()
+          {
+            element_.reset();
+          }
+          void bind(const IntersectionType &intersection, Fem::IntersectionSide side)
+          {
+            // store local copy to avoid problems with casting to temporary types
+            const EntityType entity = side==Fem::IntersectionSide::in?  intersection.inside(): intersection.outside();
+            bind( entity );
+          }
+
           template<class U, class V>
           void operator()(const U &u, V &v) const
-          { inter_(element_, u, v); }
+          {
+            inter_(*element_, u, v);
+          }
           const AgglomerationInterpolationType &inter_;
-          const EntityType &element_;
+          std::optional< EntityType > element_;
       };
       using InterpolationImplType = InterpolationType;
 
@@ -209,6 +237,12 @@ namespace Dune
 
       int order(const EntityType &) const { return polOrder_; }
       int order() const { return polOrder_; }
+
+      inline const auto &indexSet () const
+      {
+        return blockMapper().indexSet();
+      }
+
 
       // implementation-defined methods
       const AgglomerationType &agglomeration() const { return agIndexSet_.agglomeration(); }
@@ -656,17 +690,14 @@ namespace Dune
             assert(intersection.conforming());
             const auto &geo = intersection.geometry();
 
-            const typename BasisSetsType::EdgeShapeFunctionSetType edgeShapeFunctionSet
-                  = basisSets_.edgeBasisFunctionSet(agglomeration(),
-                  intersection, blockMapper().indexSet().twist(intersection));
-
             Std::vector<Std::vector<unsigned int>>
               mask(2,Std::vector<unsigned int>(0)); // contains indices with Phi_mask[i] is attached to given edge
             // calling the interpolation can resize the edge vector to add the 'normal' derivative vertex dof so we need to resize again
             edgePhiVector[0].resize(basisSets_.edgeSize(0), basisSets_.edgeSize(0), 0);
             edgePhiVector[1].resize(basisSets_.edgeSize(1), basisSets_.edgeSize(1), 0);
 
-            interpolation()(intersection, edgeShapeFunctionSet, edgePhiVector, mask);
+            const typename BasisSetsType::EdgeShapeFunctionSetType
+            edgeShapeFunctionSet = interpolation()(intersection, edgePhiVector, mask, &vemBasisFunction);
 
             auto normal = intersection.centerUnitOuterNormal();
             typename Dune::FieldMatrix<DomainFieldType,dimDomain,dimDomain> factorTN, factorNN;

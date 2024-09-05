@@ -129,6 +129,8 @@ namespace Dune
 
       const EntityType &entity () const { assert( entity_ ); return *entity_; }
 
+      bool valid () const { return true; }
+
       const ReferenceElementType &referenceElement () const
       {
         return referenceElement( entity().type() );

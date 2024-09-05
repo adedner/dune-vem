@@ -1,7 +1,6 @@
 set( SCRIPTS curlfree          divfree
              hk_laplace        perturbation
-             threadedgenerator varyingcoeff
-             uzawa )
+             varyingcoeff      uzawa )
 add_python_targets(testscripts ${SCRIPTS})
 foreach( script ${SCRIPTS} )
   dune_python_add_test(NAME ${script}

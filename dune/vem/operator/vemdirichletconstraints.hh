@@ -14,15 +14,16 @@
 
 namespace Dune {
 
-  template < class Model, class DiscreteFunctionSpace,
+  template < class Model, class DiscreteFunctionSpace, bool useIdentity,
              int bndMask > // mask | 1: fix value
                            // mask | 2: fix normal derivative
                            // -> 2nd order: use mask=1
                            //    4th order: use mask=3 for fixing both
-  class VemDirichletConstraints : public DirichletConstraints<Model,DiscreteFunctionSpace>
+  class VemDirichletConstraints
+  : public DirichletConstraints<Model,DiscreteFunctionSpace, useIdentity>
   {
     static_assert( 1<=bndMask && bndMask<=3 );
-    typedef DirichletConstraints<Model,DiscreteFunctionSpace> BaseType;
+    typedef DirichletConstraints<Model,DiscreteFunctionSpace, useIdentity> BaseType;
   public:
     enum Operation { set = 0, sub = 1, add = 2 };
     typedef Model ModelType;
@@ -57,7 +58,7 @@ namespace Dune {
       { impl_.dirichlet(bndId_,Dune::Fem::coordinate(x),ret); }
       template <class Point>
       void jacobian( const Point& x, JacobianRangeType& ret ) const
-      { ret = JacobianRangeType(0); }
+      { impl_.dDirichlet(bndId_,Dune::Fem::coordinate(x),ret); }
     };
     VemDirichletConstraints( ModelType &model, const DiscreteFunctionSpaceType& space )
       : BaseType(model,space)
@@ -68,14 +69,9 @@ namespace Dune {
       // maskValue = 0: not on bnd
       //           = 1: a value dof on bnd
       //           = 2: a derivative dof on bnd
-      if (maskValue>2) {std::cout << "applyConstraint got wrong mask value: " << maskValue << std::endl; assert(false);}
-      switch (bndMask)
-      {
-        case 1: return (maskValue == 1);
-        case 2: return (maskValue == 2);
-        case 3: return (maskValue >= 1);
-      }
-      return false; // can't be reached
+      if (maskValue>3) {std::cout << "applyConstraint got wrong mask value: " << maskValue << std::endl; assert(false);}
+      if (maskValue<=0) return false;
+      return ! ((bndMask & maskValue) == 0);
     }
 
     template < class DiscreteFunctionType >
@@ -83,13 +79,6 @@ namespace Dune {
     {
       BaseType::operator()(u,w);
     }
-#if 0
-    template < class DiscreteFunctionType >
-    void operator ()( const typename DiscreteFunctionType::RangeType& value, DiscreteFunctionType& w ) const
-    {
-      BaseType::operator()(value,w);
-    }
-#endif
 
     template < class DiscreteFunctionType >
     void operator ()( const typename DiscreteFunctionType::RangeType& value, DiscreteFunctionType& w ) const
@@ -97,9 +86,11 @@ namespace Dune {
 
       BaseType::updateDirichletDofs();
       if( BaseType::hasDirichletDofs_ )
+      {
+        Dune::Fem::MutableLocalFunction< DiscreteFunctionType > wLocal( w );
         for( const EntityType &entity : space_ )
         {
-          auto wLocal = w.localFunction( entity );
+          auto wGuard = Dune::Fem::bindGuard( wLocal, entity );
           // get number of Lagrange Points
           const int localBlocks = space_.blockMapper().numDofs( entity );
 
@@ -122,6 +113,7 @@ namespace Dune {
             }
           }
         }
+      }
     }
 
     template < class DiscreteFunctionType >
@@ -220,7 +212,7 @@ namespace Dune {
             localMatrix.clearRow( localDof );
 
             // set diagonal to 1
-            double value = auxiliaryDofs.contains( global )? 0.0 : 1.0;
+            double value = useIdentity ? 1.0 : 0.0;
             localMatrix.set( localDof, localDof, value );
           }
         }
@@ -241,6 +233,7 @@ namespace Dune {
       std::vector< std::size_t > globalBlockDofs( localBlocks );
       space_.blockMapper().map( entity, globalBlockDofs );
       std::vector< double > valuesModel( localBlocks*localBlockSize );
+
       Vem::Std::vector< char > mask( localBlocks );
       space_.interpolation()( entity, mask );
 
@@ -281,12 +274,20 @@ namespace Dune {
 
       std::vector<double> values( localBlocks*localBlockSize );
       std::vector<double> valuesModel( localBlocks*localBlockSize );
-      Vem::Std::vector< char > mask( localBlocks );
+
       assert( uLocal.size() == values.size() );
       assert( wLocal.size() == values.size() );
-      for (unsigned int i=0;i<uLocal.size();++i)
-        values[i] = uLocal[i];
+
+      Vem::Std::vector< char > mask( localBlocks );
       space_.interpolation()( entity, mask );
+
+      if constexpr ( useIdentity )
+      {
+        assert( LocalFunctionType::FunctionSpaceType::dimRange ==
+                DiscreteFunctionSpaceType::FunctionSpaceType::dimRange );
+        for (unsigned int i=0;i<uLocal.size();++i)
+          values[i] = uLocal[i];
+      }
 
       int localDof = 0;
 

@@ -1,6 +1,3 @@
-add_subdirectory( constraints )
-
-
 set(HEADERS
   diffusionmodel.hh
   mass.hh

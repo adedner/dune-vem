@@ -3,14 +3,14 @@ matplotlib.rc( 'image', cmap='jet' )
 from matplotlib import pyplot
 import math
 from dune import create
-from dune.grid import cartesianDomain, gridFunction
+from dune.grid import cartesianDomain
+from dune.fem.function import gridFunction
 from dune.fem.plotting import plotPointData as plot
-from dune.fem.function import integrate, discreteFunction, uflFunction
+from dune.fem.space import lagrange
+from dune.fem import integrate
 from dune.fem import parameter
 from dune.vem import voronoiCells
-from dune.fem.operator import linear as linearOperator
 from scipy.sparse.linalg import spsolve
-from hexagons import hexaGrid
 
 from ufl import *
 import dune.ufl
@@ -40,11 +40,11 @@ if epsilon == 0:
             ["vem","vem",{"order":order, "testSpaces":[ [0],  [order-2,-1], [order-2] ] },      "C0-conforming"],
             # ["vem","vem",{"order":order-1, "testSpaces":[ [0],  [order-3,-1], [order-3] ] },      "C0pm1-conforming"],
                ]
-parameters = {"newton.linear.tolerance": 1e-12,
-              "newton.linear.preconditioning.method": "jacobi",
+parameters = {"linear.tolerance": 1e-12,
+              "linear.preconditioning.method": "jacobi",
               "penalty": 40,  # for the bbdg scheme
-              "newton.linear.verbose": False,
-              "newton.verbose": False
+              "linear.verbose": False,
+              "nonlinear.verbose": False
               }
 
 # <markdowncell>
@@ -53,7 +53,7 @@ parameters = {"newton.linear.tolerance": 1e-12,
 # <codecell>
 uflSpace = dune.ufl.Space(2, dimRange=1)
 x = SpatialCoordinate(uflSpace)
-exact = as_vector( [sin(2*pi*x[0])**2*sin(2*pi*x[1])**2] )
+exact = as_vector( [sin(2.3*pi*x[0])*cos(2*pi*x[1])] )
 # exact = as_vector( [x[0]**3] )
 
 # next the bilinear form
@@ -99,7 +99,7 @@ else:
     diffCoeff      = laplaceCoeff*beta
     massCoeff      = mu*gamma
 
-dbc = [dune.ufl.DirichletBC(uflSpace, [0], i+1) for i in range(4)]
+dbc = [dune.ufl.DirichletBC(uflSpace, exact, i+1) for i in range(4)]
 
 # <markdowncell>
 # Now we define a grid build up of voronoi cells around $50$ random points
@@ -110,7 +110,7 @@ dbc = [dune.ufl.DirichletBC(uflSpace, [0], i+1) for i in range(4)]
 # <codecell>
 def compute(grid, space, schemeName):
     # solve the pde
-    df = discreteFunction(space, name="solution") # space.interpolate([0],name="solution")
+    df = space.function(name="solution") # space.interpolate([0],name="solution")
     # df.plot(level=3)
     info = {"linear_iterations":1}
     if False:
@@ -121,14 +121,25 @@ def compute(grid, space, schemeName):
     else:
         scheme = create.scheme(schemeName, [a==b, *dbc], space,
                             # solver="cg",
+                            boundary="derivative",
                             solver=("suitesparse","umfpack"),
                             hessStabilization=biLaplaceCoeff,
                             gradStabilization=diffCoeff,
                             massStabilization=massCoeff,
                             parameters=parameters)
+        scheme.setConstraints(df)
+        for d in df.dofVector:
+            print(d)
+
+        spcLag = lagrange(space.gridView,space.order)
+        fig,axs = pyplot.subplots(nrows=1,ncols=3)
+        spcLag.interpolate(df,name="v").plot(level=3,figure=(fig,axs[0]))
+        spcLag.interpolate(grad(df[0])[0],name="dx").plot(level=3,figure=(fig,axs[1]))
+        spcLag.interpolate(grad(df[0])[1],name="dy").plot(level=3,figure=(fig,axs[2]))
+        pyplot.show()
         # info = scheme.solve(target=df)
-        jacobian = linearOperator(scheme)
-        rhs = discreteFunction(space,name="rhs")
+        jacobian = scheme.linear()
+        rhs = space.function(name="rhs")
         scheme(df,rhs)
         rhs.as_numpy[:] *= -1
         df.as_numpy[:] = spsolve(jacobian.as_numpy, rhs.as_numpy[:])
@@ -136,7 +147,7 @@ def compute(grid, space, schemeName):
     err = [inner(edf,edf),
            inner(grad(edf),grad(edf)),
            inner(grad(grad(edf)),grad(grad(edf)))]
-    errors = [ math.sqrt(e) for e in integrate(grid, err, order=8) ]
+    errors = [ math.sqrt(e) for e in integrate(err, order=8) ]
     return df, errors, info
 
 # <markdowncell>
@@ -147,10 +158,12 @@ def compute(grid, space, schemeName):
 # figPos = 100*len(methods)+10*maxLevel+1
 results = []
 for level in range(maxLevel):
-    constructor = cartesianDomain([0,0],[1,1],[2*2**level,2*2**level])
-    # polyGrid = create.grid("agglomerate", constructor, cubes=False )
-    polyGrid = create.grid("agglomerate", voronoiCells(constructor,4*2**level*2**level,"voronoiseeds",
-               load=True,show=False,lloyd=5), convex=True )
+    # constructor = cartesianDomain([0,0],[1,1],[2*2**level,2*2**level])
+    constructor = cartesianDomain([0,0],[1,1],[2,2])
+    polyGrid = create.grid("agglomerate", constructor, cubes=False )
+    # polyGrid = create.grid("agglomerate",
+         # voronoiCells(constructor,4*2**level*2**level,load="voronoiseeds",
+         #        show=False,lloyd=5), convex=True )
 
     # N = 10*3*2**level+1 # needs to be of the form 6*i+1
     # polyGrid = hexaGrid(N, 1, 1)
@@ -159,6 +172,7 @@ for level in range(maxLevel):
     for i,m in enumerate(methods):
         space = create.space(m[0], polyGrid, dimRange=1, storage="numpy", **m[2])
         dfs,errors,info = compute(polyGrid, space, m[1])
+        # dfs.plot(level=3)
         print("[",level,"]","method:(",m[0],m[2],")",
               "Sizes (polys,simplex,dofs): ",polyGrid.hierarchicalGrid.agglomerate.size, polyGrid.size(0), space.size, "L^2: ", errors[0], "H^1: ", errors[1],
               "H^2: ", errors[2],

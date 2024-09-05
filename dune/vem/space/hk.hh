@@ -322,6 +322,10 @@ namespace Dune
                              unsigned int numEdgeTestFunctions)
         : intersection_(intersection), sfs_(sfs), numEdgeTestFunctions_(numEdgeTestFunctions)
         {}
+        std::size_t order() const
+        {
+          return sfs_.order();
+        }
         template< class Point, class Functor >
         void evaluateEach ( const Point &x, Functor functor ) const
         {
@@ -697,17 +701,14 @@ namespace Dune
                    BaseType::indexSet().index(intersection.outside()) )
                 flipNormal = -1;
 
-            const typename BaseType::BasisSetsType::EdgeShapeFunctionSetType edgeShapeFunctionSet
-                  = BaseType::basisSets_.edgeBasisFunctionSet(BaseType::agglomeration(),
-                               intersection, BaseType::blockMapper().indexSet().twist(intersection) );
-
             Std::vector<Std::vector<unsigned int>> mask(2,Std::vector<unsigned int>(0)); // contains indices with Phi_mask[i] is attached to given edge
             edgePhiVector[0].resize(BaseType::basisSets_.edgeSize(0),
                                     BaseType::basisSets_.edgeSize(0), 0);
             edgePhiVector[1].resize(BaseType::basisSets_.edgeSize(1),
                                     BaseType::basisSets_.edgeSize(1), 0);
 
-            BaseType::interpolation()(intersection, edgeShapeFunctionSet, edgePhiVector, mask);
+            const typename BaseType::BasisSetsType::EdgeShapeFunctionSetType
+            edgeShapeFunctionSet = BaseType::interpolation()(intersection, edgePhiVector, mask);
 
             // now compute int_e Phi^e m_alpha
             typename BaseType::Quadrature1Type quadrature(BaseType::gridPart(), intersection, 2 * polOrder + 1, BaseType::Quadrature1Type::INSIDE);

@@ -1,11 +1,7 @@
-try:
-    import pygmsh
-except ImportError:
-    print("This example needs the 'pygmsh' package.")
-    print("    pip install pygmsh")
-    import sys
-    sys.exit(77) # make ctest mark test as skipped
-
+from pathlib import Path
+import pygmsh
+import argparse
+from pathlib import Path
 import dune.fem, dune.vem
 from uzawa import Uzawa # saddle point solver
 from dune.ufl import Constant, DirichletBC
@@ -13,16 +9,24 @@ from ufl import SpatialCoordinate, TrialFunction, TestFunction,\
                 inner, dot, div, nabla_grad, dx, as_vector, sym
 
 dune.fem.threading.use = 8
-coarse = True
-order  = 3
-T      = 0.5 if coarse else 2.5
+parser = argparse.ArgumentParser(description='set order and spaces')
+parser.add_argument('-l', type=int, required=True, help="velocity order >= 2")
+parser.add_argument('-s', type=str, required=True, help="use vem or th")
+parser.add_argument('-g', type=int, required=True, help="0: coarse grid, 1: fine grid")
+
+args = parser.parse_args()
+useVem = not args.s == "th"
+coarse = args.g == 0
+order  = args.l
+
+T      = 5.0
 tau    = T / 8000
 mu     = 0.001
 
 # use pygmsh to define domain with cylinder
 with pygmsh.occ.Geometry() as geom:
     geom.set_mesh_size_callback( lambda dim, tag, x, y, z, lc:
-        min(0.02+1.5*( (x-0.2)**2+(y-0.2)**2), 0.25 if coarse else 0.04)
+        min(0.02+1.5*( (x-0.2)**2+(y-0.2)**2), 0.2 if coarse else 0.04)
     )
     rectangle = geom.add_rectangle([0, 0, 0], 2.2, 0.41)
     cylinder = geom.add_disk([0.2, 0.2, 0.0], 0.05)
@@ -35,11 +39,16 @@ with pygmsh.occ.Geometry() as geom:
         "simplices": cells["triangle"].astype(int),
     }
 gridView = dune.vem.polyGrid(domain)
-print(gridView.size(0),flush=True)
+print("grid size:", gridView.size(0),flush=True)
 
 # set up spaces for velocity and pressure
-spcU = dune.vem.divFreeSpace( gridView, order=order)
-spcP = dune.fem.space.finiteVolume( gridView )
+if useVem:
+    spcU = dune.vem.divFreeSpace( gridView, order=order )
+    spcP = dune.fem.space.finiteVolume( gridView )
+else:
+    spcU = dune.fem.space.lagrange( gridView, order=order, dimRange=2 )
+    spcP = dune.fem.space.lagrange( gridView, order=order-1 )
+
 u_h   = spcU.interpolate([0, 0], name="u_h")
 u_h_n = spcU.interpolate([0, 0], name="u_h")
 p_h   = spcP.interpolate(0, name="p_h")
@@ -51,7 +60,6 @@ inflow       = [6 * x[1] * (0.41 - x[1]) / 0.41**2, 0] # 6->18
 dbc_u_in     = DirichletBC(spcU, inflow, x[0] <= 1e-8)
 dbc_u_noflow = DirichletBC(spcU, [0, 0], None)
 dbc_u_out    = DirichletBC(spcU, [None,None], 2.2 - x[0] <= 1e-8)
-dbc_p_out    = DirichletBC(spcP, 0, 2.2 - x[0] <= 1e-8)
 
 u,v   = TrialFunction(spcU), TestFunction(spcU)
 p,q   = TrialFunction(spcP), TestFunction(spcP)
@@ -66,16 +74,28 @@ divModel  = -div(u)*q * dx
 uzawa = Uzawa(gridView, spcU, spcP,
               [dbc_u_in,dbc_u_out,dbc_u_noflow],
               mainModel, gradModel, divModel, mu, nu,
-              tolerance=1e-6, precondDbnd=True, verbose=False)
+              tolerance=1e-6,
+              verbose=False,
+              precondDbnd=[2.2 - x[0] <= 1e-8],
+              lagrange=not useVem)
 
 # time loop
+if useVem:
+    path="cylinderVem_p" + str(order)
+    p = Path(path)
+    p.mkdir(exist_ok=True)
+else:
+    path="cylinderTH_p" + str(order)
+    p = Path(path)
+    p.mkdir(exist_ok=True)
+
 if coarse:
-    gridView.writeVTK("cylinder_grid", pointdata=[p_h], pointvector=[u_h])
-    vtk = gridView.sequencedVTK("cylinder",
+    gridView.writeVTK("cylinder", pointdata=[p_h], pointvector=[u_h])
+    vtk = gridView.sequencedVTK(path+f"/2DCylinder",
                   subsampling=order, pointdata=[p_h], pointvector=[u_h])
 else:
-    gridView.writeVTK("cylinderFine_grid", pointdata=[p_h],pointvector=[u_h])
-    vtk = gridView.sequencedVTK("cylinderFine",
+    gridView.writeVTK("cylinderFine", pointdata=[p_h],pointvector=[u_h])
+    vtk = gridView.sequencedVTK(path+f"/2DCylinderFine",
                   subsampling=order, pointdata=[p_h], pointvector=[u_h])
 vtk()
 time, saveStep = 0, 0.05
@@ -85,7 +105,6 @@ while time < T:
     info = uzawa.solve([u_h,p_h])
     time += tau
     if time > nextSave:
-        print(time, tau, info, flush=True)
-        # print("  *********** saving ********  ")
+        print(time, info, flush=True)
         vtk()
         nextSave += saveStep
