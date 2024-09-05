@@ -19,7 +19,8 @@ from ufl import SpatialCoordinate, CellVolume, TrialFunction, TestFunction,\
                 FacetNormal, ds, dS, avg, jump, CellVolume, FacetArea
 from dune.ufl import Constant, DirichletBC
 import dune.fem
-from dune.fem.function import integrate, discreteFunction
+from dune.fem.function import discreteFunction
+from dune.fem import integrate
 from dune.fem.operator import linear as linearOperator
 
 import dune.vem
@@ -247,7 +248,7 @@ def main(level = 0):
     edf = as_vector( [inner(grad(v1-v2),grad(v1-v2)) for v1,v2 in zip(velocity,exact_u)] +
                      [((pressure-average_p)-exact_p)**2] )
     err = [ e*e for e in edf ]
-    errors  = [ numpy.sqrt(e) for e in integrate(grid, err, order=8) ]
+    errors  = [ numpy.sqrt(e) for e in integrate(err, order=8) ]
 
     print(errors, average_p.value)
     # plot([velocity,pressure])
