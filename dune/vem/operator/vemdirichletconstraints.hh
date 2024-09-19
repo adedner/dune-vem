@@ -83,7 +83,8 @@ namespace Dune {
     template < class DiscreteFunctionType >
     void operator ()( const typename DiscreteFunctionType::RangeType& value, DiscreteFunctionType& w ) const
     {
-
+      // not yet correctly implemented
+      assert(false);
       BaseType::updateDirichletDofs();
       if( BaseType::hasDirichletDofs_ )
       {
@@ -159,69 +160,77 @@ namespace Dune {
     template <class LinearOperator>
     void applyToOperator( LinearOperator& linearOperator ) const
     {
+      typedef typename DiscreteFunctionSpaceType :: IteratorType IteratorType;
+      typedef typename IteratorType :: Entity EntityType;
       BaseType::updateDirichletDofs();
+
       if( BaseType::hasDirichletDofs_ )
       {
-        typedef typename LinearOperator::DomainSpaceType  DomainSpaceType;
-        typedef typename LinearOperator::RangeSpaceType   RangeSpaceType;
-        typedef Dune::Fem::TemporaryLocalMatrix< DomainSpaceType, RangeSpaceType > TemporaryLocalMatrixType;
-        TemporaryLocalMatrixType localMatrix( linearOperator.domainSpace(), linearOperator.rangeSpace() );
+        typedef typename DiscreteFunctionSpaceType :: BlockMapperType BlockMapperType;
+        Dune::Fem::NonBlockMapper< BlockMapperType, localBlockSize > mapper( space_.blockMapper() );
 
-        for( const auto &entity : space_ )
+        std::vector<std::size_t> globalBlockDofs;
+        std::vector<std::size_t> globalDofs;
+
+        // storage for unit rows and auxiliary rows, should be unique and sorted
+        std::set<std::size_t> unitRows;
+        std::set<std::size_t> auxRows;
+
+        const auto& space = space_; // linearOperator.rangeSpace();
+
+        const IteratorType end = space_.end();
+        for( IteratorType it = space_.begin(); it != end; ++it )
         {
-          // init localMatrix to entity
-          localMatrix.init( entity, entity );
-          // obtain local matrix values
-          linearOperator.getLocalMatrix( entity, entity, localMatrix );
-          // adjust local matrix
-          dirichletDofsCorrectOnEntity( localMatrix );
-          // write back changed local matrix to linear operator
-          linearOperator.setLocalMatrix( entity, entity, localMatrix );
-        }
+          const EntityType &entity = *it;
+
+          // get number of basis functions
+          const int localBlocks = space.blockMapper().numDofs( entity );
+
+          // map local to global dofs
+          globalBlockDofs.resize(localBlocks);
+          // obtain all DofBlocks for this element
+          space.blockMapper().map( entity, globalBlockDofs );
+
+          // obtain all non-blocked dofs
+          globalDofs.resize(localBlocks * localBlockSize);
+          mapper.map( entity, globalDofs );
+
+          Vem::Std::vector< char > mask( localBlocks );
+          space_.interpolation()( entity, mask );
+
+          // counter for all local dofs (i.e. localBlockDof * localBlockSize + ... )
+          int localDof = 0;
+          // iterate over face dofs and set unit row
+          for( int localBlockDof = 0 ; localBlockDof < localBlocks; ++ localBlockDof )
+          {
+            int global = globalBlockDofs[localBlockDof];
+            // all diagonals were set to one anyway independent of auxDof or not
+            // so don't need this distinction anymore
+            // std::set<std::size_t>& rows = auxiliaryDofs.contains( global ) ? auxRows : unitRows;
+            std::set<std::size_t>& rows = useIdentity ?  unitRows : auxRows;
+            for( int l = 0; l < localBlockSize; ++ l, ++ localDof )
+            {
+              if( dirichletBlocks_[global][l] &&
+                  applyConstraint(mask[localBlockDof]) )
+              {
+                // push non-blocked dof
+                rows.insert( globalDofs[ localDof ] );
+              }
+            }
+          }
+        } // end for elements
+
+        // set unit and auxiliary rows at once
+        linearOperator.setUnitRows( unitRows, auxRows );
       }
     }
 
   protected:
-    template< class LocalLinearOperator >
-    void dirichletDofsCorrectOnEntity ( LocalLinearOperator &localMatrix ) const
-    {
-      const EntityType &entity = localMatrix.rangeEntity();
-      const auto &auxiliaryDofs = localMatrix.rangeSpace().auxiliaryDofs();
-
-      // get number of basis functions
-      const int localBlocks = space_.blockMapper().numDofs( entity );
-
-      // map local to global dofs
-      std::vector<std::size_t> globalBlockDofs(localBlocks);
-      // obtain all DofBlocks for this element
-      space_.blockMapper().map( entity, globalBlockDofs );
-      Vem::Std::vector< char > mask( localBlocks );
-      space_.interpolation()( entity, mask );
-      // counter for all local dofs (i.e. localBlockDof * localBlockSize + ... )
-      int localDof = 0;
-      // iterate over face dofs and set unit row
-      for( int localBlockDof = 0 ; localBlockDof < localBlocks; ++ localBlockDof )
-      {
-        int global = globalBlockDofs[localBlockDof];
-        for( int l = 0; l < localBlockSize; ++ l, ++ localDof )
-        {
-          if( dirichletBlocks_[global][l] &&
-              applyConstraint(mask[localBlockDof]) )
-          {
-            // clear all other columns
-            localMatrix.clearRow( localDof );
-
-            // set diagonal to 1
-            double value = useIdentity ? 1.0 : 0.0;
-            localMatrix.set( localDof, localDof, value );
-          }
-        }
-      }
-    }
     //! set the dirichlet points to exact values
     template< class LocalFunctionType >
     void dirichletDofTreatment( LocalFunctionType &wLocal ) const
     {
+      // assert(false);
       // get entity
       const auto &entity = wLocal.entity();
       model_.init(entity);
@@ -304,12 +313,15 @@ namespace Dune {
             {
               std::fill(valuesModel.begin(),valuesModel.end(),0);
               space_.interpolation() ( entity, BoundaryWrapper(model_,dirichletBlocks_[global][l]), valuesModel );
+              auto v = values[ localDof ];
               values[ localDof ] -= valuesModel[ localDof ];
+              assert(std::abs(values[localDof]) < 1e-8);
             }
             else if (op == Operation::add)
             {
               std::fill(valuesModel.begin(),valuesModel.end(),0);
               space_.interpolation() ( entity, BoundaryWrapper(model_,dirichletBlocks_[global][l]), valuesModel );
+              auto v = values[ localDof ];
               values[ localDof ] += valuesModel[ localDof ];
             }
             assert( (unsigned int)localDof < wLocal.size() );
