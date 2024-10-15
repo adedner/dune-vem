@@ -169,6 +169,8 @@ def vemSpace(view, order=1,
     except TypeError:
         orderTuple = [-1,-1,-1]
 
+    assert order >= 1
+
     if gradProjectionWithIByParts:
         useNewGradProjection = ["NEWGRADPROJECTION"]
     else:
@@ -575,6 +577,10 @@ def vemScheme(model, space=None, solver=None, parameters={},
                     ",".join([model,space.cppTypeName,'true',str(boundary)]) + " > "
         operator = lambda linOp,model: "DirichletWrapperOperator< " +\
                 ",".join([op(linOp,model),constraints(model)]) + " >"
+    else:
+        assert boundary is None or boundary == "default"
+        operator = op
+    """
     elif boundary == 'derivative':
         includes += [ "dune/fem/schemes/dirichletwrapper.hh",
                       "dune/vem/operator/vemdirichletconstraints.hh"]
@@ -582,9 +588,7 @@ def vemScheme(model, space=None, solver=None, parameters={},
                     ",".join([model,space.cppTypeName,'true',str(2)]) + " > "
         operator = lambda linOp,model: "DirichletWrapperOperator< " +\
                 ",".join([op(linOp,model),constraints(model)]) + " >"
-    else:
-        assert boundary is None or boundary == "default"
-        operator = op
+    """
 
     spaceType = space.cppTypeName
     includes += ["dune/vem/operator/diffusionmodel.hh"]

@@ -249,6 +249,10 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model>
   std::vector<bool> stabilization(dfSpace.agglomeration().size(), false);
   for (const auto &entity : Dune::elements( gridPart, Dune::Partitions::interiorBorder))
   {
+    const int numVertices = agIndexSet.numPolyVertices(entity, GridPartType::dimension);
+    // if (numVertices <= 6)
+    //     continue;
+
     auto wGuard = Dune::Fem::bindGuard( wLocal, entity );
     wLocal.clear();
 
@@ -320,14 +324,15 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
   for (const auto &entity : Dune::elements(gridPart, Dune::Partitions::interiorBorder))
   {
     const GeometryType &geometry = entity.geometry();
-    model().init(entity);
-
-    auto uGuard = Dune::Fem::bindGuard( uLocal, entity );
 
     const unsigned int agglomerate = agglomeration.index(entity); // the polygon we are integrating
     const auto &bbox = agIndexSet.boundingBox( agglomerate );
     const int numVertices = agIndexSet.numPolyVertices(entity, GridPartType::dimension);
+
     stabilization[ agglomerate ] = entity.seed();
+
+    model().init(entity);
+    auto uGuard = Dune::Fem::bindGuard( uLocal, entity );
 
     // Lines copied from below just before the quadrature loop:
     // For Stabilisation..
@@ -375,8 +380,12 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
   for (const auto &seed : stabilization)
   {
     const auto entity = gridPart.entity( seed );
-    const std::size_t agglomerate = agglomeration.index( entity );
 
+    const int numVertices = agIndexSet.numPolyVertices(entity, GridPartType::dimension);
+    // if (numVertices <= 6)
+    //    continue;
+
+    const std::size_t agglomerate = agglomeration.index( entity );
     const auto &stabMatrix = rangeSpace.stabilization(entity);
     jLocal.init( entity, entity );
     jLocal.clear();
