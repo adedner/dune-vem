@@ -14,7 +14,8 @@ namespace Dune
     // SimpleFunctionTraits
     // --------------------
 
-    template< class Domain, class Function, class Range = typename std::result_of< Function( const Domain & ) >::type >
+    template< class Domain, class Function,
+       class Range = typename std::invoke_result_t< Function, const Domain & > >
     struct SimpleFunctionTraits;
 
     template< class DF, int dimD, class Function, class RF, int dimR >
