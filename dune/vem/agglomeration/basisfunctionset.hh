@@ -13,6 +13,7 @@
 #include <dune/fem/quadrature/quadrature.hh>
 #include <dune/fem/space/basisfunctionset/functor.hh>
 #include <dune/fem/space/shapefunctionset/vectorial.hh>
+#include <dune/fem/storage/entitygeometry.hh>
 
 #include <dune/vem/agglomeration/functor.hh>
 #include <dune/vem/agglomeration/boundingbox.hh>
@@ -30,7 +31,9 @@ namespace Dune
 
     template< class GridPart, class ShapeFunctionSet >
     class BoundingBoxBasisFunctionSet
+      : public Dune::Fem::EntityGeometryStorage< typename GridPart::template Codim<0>::EntityType >
     {
+      typedef Dune::Fem::EntityGeometryStorage< typename GridPart::template Codim<0>::EntityType > BaseType;
       typedef BoundingBoxBasisFunctionSet< GridPart, ShapeFunctionSet > ThisType;
 
     public:
@@ -105,14 +108,14 @@ namespace Dune
 
     public:
       BoundingBoxBasisFunctionSet ()
-      : entity_(nullptr) , useOnb_(false)
+      : BaseType(), useOnb_(false)
       { }
 
       BoundingBoxBasisFunctionSet ( const EntityType &entity, std::size_t agglomerate,
                                     std::shared_ptr<Std::vector<BoundingBoxType>> bbox,
                                     bool useOnb,
                                     ShapeFunctionSet shapeFunctionSet = ShapeFunctionSet() )
-        : entity_( &entity ), shapeFunctionSet_( std::move( shapeFunctionSet ) ),
+        : BaseType( entity ), shapeFunctionSet_( std::move( shapeFunctionSet ) ),
           transformation_(agglomerate, std::move(bbox)),
           vals_(shapeFunctionSet_.size()),
           jacs_(shapeFunctionSet_.size()),
@@ -127,14 +130,10 @@ namespace Dune
 
       std::size_t size () const { return shapeFunctionSet_.size(); }
 
-      const EntityType &entity () const { assert( entity_ ); return *entity_; }
-
-      bool valid () const { return true; }
-
-      const ReferenceElementType &referenceElement () const
-      {
-        return referenceElement( entity().type() );
-      }
+      using BaseType :: entity;
+      using BaseType :: valid;
+      using BaseType :: geometry;
+      using BaseType :: referenceElement;
 
       template< class Quadrature, class Vector, class DofVector >
       void axpy ( const Quadrature &quadrature, const Vector &values, DofVector &dofs ) const
@@ -321,7 +320,7 @@ namespace Dune
       template< class Point >
       DomainType position ( const Point &x ) const
       {
-        return bbox().transform( entity().geometry().global( Fem::coordinate( x ) ) );
+        return bbox().transform( geometry().global( Fem::coordinate( x ) ) );
       }
     private:
       // make basis orthogonal
@@ -384,7 +383,6 @@ namespace Dune
         }
       }
 
-      const EntityType *entity_ = nullptr;
       ShapeFunctionSet shapeFunctionSet_;
       Transformation transformation_;
       mutable Std::vector< RangeType > vals_;

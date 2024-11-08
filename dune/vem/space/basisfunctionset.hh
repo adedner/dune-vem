@@ -14,6 +14,7 @@
 #include <dune/fem/quadrature/quadrature.hh>
 #include <dune/fem/space/basisfunctionset/functor.hh>
 #include <dune/fem/space/shapefunctionset/vectorial.hh>
+#include <dune/fem/storage/entitygeometry.hh>
 
 #include <dune/vem/agglomeration/functor.hh>
 #include <dune/vem/misc/vector.hh>
@@ -32,11 +33,14 @@ namespace Dune
     template< class Entity, class ShapeFunctionSet,
               class InterpolationType, class StorageField >
     class VEMBasisFunctionSet
+      : public Dune::Fem::EntityGeometryStorage< Entity >
     {
+      typedef Dune::Fem::EntityGeometryStorage< Entity > BaseType;
       typedef VEMBasisFunctionSet< Entity, ShapeFunctionSet, InterpolationType, StorageField > ThisType;
 
     public:
-      typedef Entity EntityType;
+      typedef typename BaseType::EntityType  EntityType;
+      typedef typename BaseType::Geometry    Geometry;
 
       typedef typename ShapeFunctionSet::FunctionSpaceType FunctionSpaceType;
 
@@ -52,7 +56,7 @@ namespace Dune
       static constexpr int dimRange  = RangeType::dimension;
 
       // typedef ReferenceElements< typename DomainType::field_type, dimDomain > ReferenceElementType;
-      typedef typename ReferenceElements< typename DomainType::field_type, dimDomain >::ReferenceElement ReferenceElementType;
+      //typedef typename ReferenceElements< typename DomainType::field_type, dimDomain >::ReferenceElement ReferenceElementType;
 
       const auto& valueProjection() const { return (*valueProjections_)[agglomerate_]; }
       const auto& jacobianProjection() const { return (*jacobianProjections_)[agglomerate_]; }
@@ -73,7 +77,7 @@ namespace Dune
                             ShapeFunctionSet shapeFunctionSet,
                             std::shared_ptr<InterpolationType> interpolation
                           )
-        : entity_( &entity ), //polygon
+        : BaseType( entity ),
           agglomerate_(agglomerate),
           shapeFunctionSet_( std::move( shapeFunctionSet ) ),
           interpolation_(interpolation),
@@ -83,16 +87,16 @@ namespace Dune
           size_( valueProjection()[0].size() )
       {}
 
-      bool valid () const { return true; }
+      using BaseType::entity;
+      using BaseType::valid;
+      using BaseType::type;
+      using BaseType::geometry;
+      using BaseType::referenceElement;
+
 
       int order () const { return shapeFunctionSet_.order(); }
 
       std::size_t size () const { return size_; }
-
-      const ReferenceElementType &referenceElement () const
-      {
-        return referenceElement( entity().type() );
-      }
 
       template< class Quadrature, class DofVector, class Values >
       void evaluateAll ( const Quadrature &quadrature, const DofVector &dofs, Values &values ) const
@@ -407,8 +411,6 @@ namespace Dune
         } );
       }
 
-      const EntityType &entity () const { assert( entity_ ); return *entity_; }
-
       /********************************************/
 
       template< class Quadrature, class Vector, class DofVector >
@@ -487,7 +489,6 @@ namespace Dune
         return k>=0;
       }
 
-      const EntityType *entity_ = nullptr;
       std::size_t agglomerate_;
       ShapeFunctionSet shapeFunctionSet_;
       std::shared_ptr<InterpolationType> interpolation_;
