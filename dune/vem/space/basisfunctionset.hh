@@ -414,14 +414,14 @@ namespace Dune
       /********************************************/
 
       template< class Quadrature, class Vector, class DofVector >
-      void_t<typename Quadrature::QuadratureKeyType> axpy ( const Quadrature &quad, const Vector &values, DofVector &dofs ) const
+      void axpy ( const Quadrature &quad, const Vector &values, DofVector &dofs ) const
       {
         const unsigned int nop = quad.nop();
         for( unsigned int qp = 0; qp < nop; ++qp )
           axpy( quad[ qp ], values[ qp ], dofs );
       }
       template< class Quadrature, class VectorA, class VectorB, class DofVector >
-      void_t<typename Quadrature::QuadratureKeyType> axpy ( const Quadrature &quad, const VectorA &valuesA, const VectorB &valuesB, DofVector &dofs ) const
+      void axpy ( const Quadrature &quad, const VectorA &valuesA, const VectorB &valuesB, DofVector &dofs ) const
       {
         const unsigned int nop = quad.nop();
         for( unsigned int qp = 0; qp < nop; ++qp )
@@ -431,7 +431,7 @@ namespace Dune
         }
       }
       template< class Point, class DofVector >
-      void axpy ( const Point &x, const RangeType &valueFactor,
+      void_t<typename Point::QuadratureType> axpy ( const Point &x, const RangeType &valueFactor,
                   const JacobianRangeType &jacobianFactor,
                   DofVector &dofs ) const
       {
@@ -439,7 +439,7 @@ namespace Dune
         axpy( x, jacobianFactor, dofs );
       }
       template< class Point, class DofVector >
-      void axpy ( const Point &x, const RangeType &valueFactor, DofVector &dofs ) const
+      void_t<typename Point::QuadratureType> axpy ( const Point &x, const RangeType &valueFactor, DofVector &dofs ) const
       {
         std::size_t size = size_;
         assert( size == dofs.size() );
@@ -449,7 +449,7 @@ namespace Dune
           dofs[i] += values[i]*valueFactor;
       }
       template< class Point, class DofVector >
-      void axpy ( const Point &x, const JacobianRangeType &jacobianFactor, DofVector &dofs ) const
+      void_t<typename Point::QuadratureType> axpy ( const Point &x, const JacobianRangeType &jacobianFactor, DofVector &dofs ) const
       {
         std::size_t size = size_;
         assert( size == dofs.size() );
@@ -460,7 +460,7 @@ namespace Dune
             dofs[i] += jacobians[i][r]*jacobianFactor[r];
       }
       template< class Point, class DofVector >
-      void axpy ( const Point &x, const HessianRangeType &hessianFactor, DofVector &dofs ) const
+      void_t<typename Point::QuadratureType> axpy ( const Point &x, const HessianRangeType &hessianFactor, DofVector &dofs ) const
       {
         std::size_t size = size_;
         assert( size == dofs.size() );
