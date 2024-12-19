@@ -249,7 +249,7 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model>
   std::vector<bool> stabilization(dfSpace.agglomeration().size(), false);
   for (const auto &entity : Dune::elements( gridPart, Dune::Partitions::interiorBorder))
   {
-    const int numVertices = agIndexSet.numPolyVertices(entity, GridPartType::dimension);
+    //const int numVertices = agIndexSet.numPolyVertices(entity, GridPartType::dimension);
     // if (numVertices <= 6)
     //     continue;
 
@@ -294,9 +294,9 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
     return;
   // std::cout << "   in assembly: base operator    " << timer.elapsed() << std::endl;
 
-  typedef typename JacobianOperator::LocalMatrixType LocalMatrixType;
-  typedef typename DomainDiscreteFunctionSpaceType::BasisFunctionSetType DomainBasisFunctionSetType;
-  typedef typename RangeDiscreteFunctionSpaceType::BasisFunctionSetType RangeBasisFunctionSetType;
+  //typedef typename JacobianOperator::LocalMatrixType LocalMatrixType;
+  //typedef typename DomainDiscreteFunctionSpaceType::BasisFunctionSetType DomainBasisFunctionSetType;
+  //typedef typename RangeDiscreteFunctionSpaceType::BasisFunctionSetType RangeBasisFunctionSetType;
 
   const DomainDiscreteFunctionSpaceType &domainSpace = jOp.domainSpace();
   const RangeDiscreteFunctionSpaceType &rangeSpace = jOp.rangeSpace();
@@ -381,7 +381,7 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
   {
     const auto entity = gridPart.entity( seed );
 
-    const int numVertices = agIndexSet.numPolyVertices(entity, GridPartType::dimension);
+    //const int numVertices = agIndexSet.numPolyVertices(entity, GridPartType::dimension);
     // if (numVertices <= 6)
     //    continue;
 
