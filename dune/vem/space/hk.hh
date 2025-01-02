@@ -645,7 +645,9 @@ namespace Dune
         static constexpr int blockSize = TraitsType::vectorSpace ? dimRange : 1;
         // const std::size_t numShapeFunctions = BaseType::basisSets_.size(0);
         const std::size_t numDofs = BaseType::blockMapper().numDofs(agglomerate) * blockSize;
+#ifndef NDEBUG
         const std::size_t numConstraintShapeFunctions = BaseType::basisSets_.constraintSize();
+#endif
         const std::size_t numInnerShapeFunctions = BaseType::basisSets_.innerSize();
         const std::size_t numConstraints = RHSconstraintsMatrix.cols();
         int polOrder = BaseType::order();
@@ -656,14 +658,14 @@ namespace Dune
         if (numConstraints == 0) return;
 
         // first fill in entries relating to inner dofs (alpha < inner shape functions)
-        for ( int beta=0; beta<numDofs; ++beta)
+        for (std::size_t beta=0; beta<numDofs; ++beta)
         {
           // TODO
           // don't need loop use
           // int alpha = beta - numDofs + numInnerShapeFunctions;
           // if (alpha>=0) RHSconstraintsMatrix[ beta ][ alpha ] = volume;
           // possibly even fix loop for beta
-          for (int alpha=0; alpha<numInnerShapeFunctions; ++alpha)
+          for (std::size_t alpha=0; alpha<numInnerShapeFunctions; ++alpha)
           {
             if( beta - numDofs + numInnerShapeFunctions == alpha )
               RHSconstraintsMatrix[ beta ][ alpha ] = volume;
@@ -695,11 +697,13 @@ namespace Dune
               continue;
             assert(intersection.conforming());
 
+            /*
             double flipNormal = 1.;
             if (intersection.neighbor()) // we need to check the orientation of the normal
               if ( BaseType::indexSet().index(intersection.inside()) >
                    BaseType::indexSet().index(intersection.outside()) )
                 flipNormal = -1;
+            */
 
             Std::vector<Std::vector<unsigned int>> mask(2,Std::vector<unsigned int>(0)); // contains indices with Phi_mask[i] is attached to given edge
             edgePhiVector[0].resize(BaseType::basisSets_.edgeSize(0),
@@ -715,9 +719,9 @@ namespace Dune
             for (std::size_t qp = 0; qp < quadrature.nop(); ++qp)
             {
               auto x = quadrature.localPoint(qp);
-              auto y = intersection.geometryInInside().global(x);
+              //auto y = intersection.geometryInInside().global(x);
               const DomainFieldType weight = intersection.geometry().integrationElement(x) * quadrature.weight(qp);
-              auto normal = intersection.unitOuterNormal(x);
+              //auto normal = intersection.unitOuterNormal(x);
               edgeShapeFunctionSet.evaluateEach(x, [&](std::size_t beta,
                         typename BaseType::BasisSetsType::EdgeShapeFunctionSetType::RangeType psi)
               {

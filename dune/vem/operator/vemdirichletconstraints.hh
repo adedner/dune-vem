@@ -313,7 +313,7 @@ namespace Dune {
             {
               std::fill(valuesModel.begin(),valuesModel.end(),0);
               space_.interpolation() ( entity, BoundaryWrapper(model_,dirichletBlocks_[global][l]), valuesModel );
-              auto v = values[ localDof ];
+              //auto v = values[ localDof ];
               values[ localDof ] -= valuesModel[ localDof ];
               assert(std::abs(values[localDof]) < 1e-8);
             }
@@ -321,7 +321,7 @@ namespace Dune {
             {
               std::fill(valuesModel.begin(),valuesModel.end(),0);
               space_.interpolation() ( entity, BoundaryWrapper(model_,dirichletBlocks_[global][l]), valuesModel );
-              auto v = values[ localDof ];
+              //auto v = values[ localDof ];
               values[ localDof ] += valuesModel[ localDof ];
             }
             assert( (unsigned int)localDof < wLocal.size() );
