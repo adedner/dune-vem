@@ -65,7 +65,8 @@ namespace Dune
                        instance(gridPart_.grid()).sequence();
         if (gridSequence_ < gridSeq)
         {
-          mapper_ = MapperType( gridPart_, mcmgElementLayout() );
+          // mapper_ = MapperType( gridPart_, mcmgElementLayout() );
+          mapper_.update( gridPart_ );
           indices_.resize( mapper_.size() );
           const auto &is = gridPart_.indexSet();
           const auto &end = gridPart_.template end<0>();
