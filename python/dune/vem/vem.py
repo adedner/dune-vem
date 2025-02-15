@@ -141,7 +141,7 @@ def bbdgScheme(model, space=None, penalty=1, solver=None, parameters={}):
     return dg(model,space,penalty,solver,parameters,penaltyClass)
     # return galerkin(model,space,solver,parameters)
 
-def vemSpace(view, order=1,
+def vemSpace(view, order=1, orderTuple=None,
              testSpaces=None, scalar=False,
              dimRange=None, conforming=True, field="double",
              storage="numpy",
@@ -163,11 +163,12 @@ def vemSpace(view, order=1,
     Returns:
         Space: the constructed Space
     """
-    try:
-        orderTuple = order
-        order = orderTuple[0]
-    except TypeError:
-        orderTuple = [-1,-1,-1]
+    if orderTuple is None:
+        try:
+            orderTuple = order
+            order = orderTuple[0]
+        except TypeError:
+            orderTuple = [-1,-1,-1]
 
     assert order >= 1
 
@@ -963,7 +964,7 @@ try:
             else:
                 cells[-1] += [p]
         cells = [("polygon", c) for c in cells]
-        meshio.write_points_cells(fileBase+".vtu", points,
+        meshio.write_points_cells(f"{fileBase}.{fileFormat}", points,
                                   cells, file_format=fileFormat)
 except ImportError:
     def writePolygons(fileBase, domain, fileFormat="vtu"):
