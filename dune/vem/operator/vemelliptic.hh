@@ -96,6 +96,9 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model>
     { return rSpace_; }
     void setQuadratureOrders(unsigned int interior, unsigned int surface)
     { baseOperator_.setQuadratureOrders(interior,surface); }
+    std::size_t gridSizeInterior () const
+    { return baseOperator_.gridSizeInterior(); }
+
 
   private:
     const DomainDiscreteFunctionSpaceType &dSpace_;
