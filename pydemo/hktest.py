@@ -17,7 +17,7 @@ dune.fem.parameter.append({"fem.verboserank": 0})
 order = 3
 testSpaces = [0,order-2,order-2]
 
-x = SpatialCoordinate(triangle)
+x = SpatialCoordinate(dune.ufl.cell(2))
 massCoeff = 1+sin(dot(x,x))       # factor for mass term
 diffCoeff = 1-0.9*cos(dot(x,x))   # factor for diffusion term
 

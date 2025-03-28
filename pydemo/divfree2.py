@@ -23,7 +23,7 @@ order, Lx,Ly = 3,  3,1
 mass = dune.ufl.Constant(1, "mu")
 D = dune.ufl.Constant(1, "D")
 
-x = SpatialCoordinate(triangle)
+x = SpatialCoordinate(dune.ufl.cell(2))
 def model(space):
     u = TrialFunction(space)
     v = TestFunction(space)

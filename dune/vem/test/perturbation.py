@@ -63,7 +63,7 @@ def perturbation(space, exact):
     return err
 
 def runTestPerturbation(testSpaces, order):
-    x = SpatialCoordinate(triangle)
+    x = SpatialCoordinate(dune.ufl.cell(2))
     exact = as_vector( [sin(2*pi*x[0])**2*sin(2*pi*x[1])**2] )
     spaceConstructor = lambda grid, r: dune.vem.vemSpace( grid,
                                                           order=order,

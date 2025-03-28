@@ -104,7 +104,7 @@ def main():
     order=3
     conformingSpaceConstructor = lambda grid, r: dune.vem.vemSpace(grid, order=order, dimRange=r, testSpaces = [-1,order-1,order-2])
     # define exact solution
-    x = ufl.SpatialCoordinate(ufl.triangle)
+    x = ufl.SpatialCoordinate(dune.ufl.cell(2))
     exact = as_vector( [x[0]*x[1] * cos(pi*x[0]*x[1])] )
 
     runTest(exact, conformingSpaceConstructor)

@@ -121,7 +121,7 @@ def main():
     # test with conforming second order VEM space
     conformingSpaceConstructor = lambda grid, r: dune.vem.vemSpace( grid, order=order, dimRange=r, storage="istl", testSpaces = [0,order-2,order-2] )
     # define exact solution
-    x = ufl.SpatialCoordinate(ufl.triangle)
+    x = ufl.SpatialCoordinate(dune.ufl.cell(2))
     exact = as_vector( [x[0]*x[1] * cos(pi*x[0]*x[1])] )
 
     # run tests for second order case
