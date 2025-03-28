@@ -6,7 +6,7 @@ import dune.ufl, dune.fem, dune.vem
 from mixedSolver import MixedSolver # solver for mixed system
 
 Lx,Ly = 1,1.1
-x = SpatialCoordinate(triangle)
+x = SpatialCoordinate(dune.ufl.cell(2))
 exact = sin(2*pi*x[0]/Lx)*sin(3*pi*x[1]/Ly)
 forcing = -div(grad(exact))
 

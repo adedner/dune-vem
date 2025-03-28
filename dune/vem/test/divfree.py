@@ -39,7 +39,7 @@ def divfree(space, exact):
     return err
 
 def runTestDivFree(order):
-    x = SpatialCoordinate(triangle)
+    x = SpatialCoordinate(dune.ufl.cell(2))
 
     p = (order+1)//2
     exact = as_vector([-x[1]+x[0]**(p+1)*x[1]**p,

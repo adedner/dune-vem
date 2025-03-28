@@ -8,6 +8,7 @@ from dune.fem.operator import linear as linearOperator
 import ufl.algorithms
 from ufl import *
 import dune.ufl
+from dune.ufl import cell
 
 from script import runTest, checkEOC, interpolate
 from interpolate import interpolate_secondorder
@@ -21,7 +22,7 @@ parameters = {"newton.linear.tolerance": 1e-12,
               "newton.verbose": True
               }
 
-x = SpatialCoordinate(triangle)
+x = SpatialCoordinate(dune.ufl.cell(2))
 
 def hk(space, exact):
     u      = TrialFunction(space)

@@ -109,7 +109,7 @@ p_h = space_p.interpolate(0, name="p_h")
 p_h_n = p_h.copy(name="p_h_n")
 
 # %%
-x = SpatialCoordinate(triangle)
+x = SpatialCoordinate(dune.ufl.cell(2))
 
 inflow = [6 * x[1] * (0.41 - x[1]) / 0.41**2, 0] # 6->18
 dbc_u_in = DirichletBC(space_u, inflow, x[0] <= 1e-8)

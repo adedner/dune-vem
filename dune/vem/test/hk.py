@@ -35,7 +35,7 @@ def hk(space, exact):
     return err
 
 def runTesthk(testSpaces, order, vectorSpace, reduced):
-    x = SpatialCoordinate(triangle)
+    x = SpatialCoordinate(dune.ufl.cell(2))
 
     exact = as_vector( dimR*[x[0]*x[1] * cos(pi*x[0]*x[1])] )
     spaceConstructor = lambda grid, r: dune.vem.vemSpace( grid,

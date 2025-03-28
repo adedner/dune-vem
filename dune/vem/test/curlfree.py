@@ -39,7 +39,7 @@ def curlfree(space, exact):
     return err
 
 def runTestCurlfree(order):
-    x = SpatialCoordinate(triangle)
+    x = SpatialCoordinate(dune.ufl.cell(2))
     ln, lm, Lx, Ly = getParameters()
     # print(ln, lm, Lx, Ly)
     exact = -grad( (cos(ln/Lx*pi*x[0])*cos(lm/Ly*pi*x[1])) )

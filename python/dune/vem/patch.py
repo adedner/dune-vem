@@ -6,7 +6,8 @@ from ufl.constantvalue import Zero
 from ufl.core.expr import Expr
 from ufl.tensors import ListTensor
 from dune.source.cplusplus import Variable, UnformattedExpression, AccessModifier, maxEdgeLength
-from ufl.algorithms import expand_compounds, expand_derivatives, expand_indices, expand_derivatives
+from ufl.algorithms import expand_derivatives, expand_indices, expand_derivatives
+from ufl.algorithms.apply_algebra_lowering import apply_algebra_lowering as expand_compounds
 
 def codeVEM(self, name, targs):
     code = self._code(name,targs)

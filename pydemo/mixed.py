@@ -27,7 +27,7 @@ useVem = True
 gridType = "cube" # "voronoi"
 
 def model(spaceU):
-    x = SpatialCoordinate(triangle)
+    x = SpatialCoordinate(dune.ufl.cell(2))
     # exact   = (x[0]-Lx)*(x[1]-Ly)*x[0]*x[1]
     exact = sin(2*pi*x[0]/Lx)*sin(3*pi*x[1]/Ly)
     forcing = -div(grad(exact))
