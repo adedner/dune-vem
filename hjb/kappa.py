@@ -114,7 +114,7 @@ def problemA1(diagA,stabFactor,linear):
         rhs    = ufl.Max(L(0,exact),L(1,exact))
         F      = lambda ubar,u: gamma(alpha(ubar)) * ( L(alpha(ubar),u) - rhs )
         return domain,dimP,lam,F, alpha,exact,[hS,gS,mS]
-    _problem.params = (diagA,stabFactor,linear)
+    _problem.params = (diagA,stabFactor.value,linear)
     return _problem
 
 
@@ -162,18 +162,20 @@ def main(order,orderTuple,N,problem,ax=None): # 0: std, 1:[o,o,o], 2:[o-2,o-2,o-
 
     dbc = [ dune.ufl.DirichletBC(space,exact) ]
 
-    scheme = dune.vem.vemScheme([a == 0], # , *dbc], boundary="value",
-        hessStabilization=stab[0], # we'll add stabilization   # !!!
-        gradStabilization=stab[1], # later by hand
-        massStabilization=stab[2], # to be able to use different orders
+    scheme = dune.vem.vemScheme([a == 0, *dbc], boundary="value",
+        hessStabilization=stab[0],
+        gradStabilization=stab[1],
+        massStabilization=stab[2],
         solver=("suitesparse","umfpack"),
         # parameters={"linear.verbose":True},
     )
 
-    errors = solver(scheme,stab,
+    errors = solver(scheme,[a == 0, *dbc],
+                    lam,
                     solution,oldSol,
                     tol=1e-8,
                     startStab=startStab,
+                    params=problem.params,
                     exact=exact,verbose=True)
     return errors
 
@@ -196,14 +198,14 @@ def simulate(order,problem,proj,ax=None):
 
     errors = []
     eocs = [[-1,-1,-1]]
-    maxLevel = 8-order # 7-order
+    maxLevel = 2 # 8-order # 7-order
     for N in [12*(2**i) for i in range(0,maxLevel)]:
         # if order==5 and proj==0 and N>24: break # issue with solver
         err2 = main(order=order, N=N+1, problem=problem, orderTuple=orderTuple,ax=ax)
         errors.append( err2 )
         if len(errors)>1:
-            eocs.append( np.log(errors[-2][-1][1]/errors[-1][-1][1]) / np.log(2) )
-        print(N,"\t", *rndSc(errors[-1][-1][1],5),"\t", *rnd(eocs[-1],2), "\t# EOC")
+            eocs.append( np.log(errors[-2][-1][2]/errors[-1][-1][2]) / np.log(2) )
+        print(N,"\t", *rndSc(errors[-1][-1][2],5),"\t", *rnd(eocs[-1],2), "\t# EOC")
     print()
 
     collected = gc.collect()

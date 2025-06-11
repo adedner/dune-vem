@@ -17,7 +17,6 @@ namespace Dune
   {
     template< class LinOperator >
     void stabilization(LinOperator &op,
-         // std::optional<double> hessStabilization, std::optional<double> gradStabilization, std::optional<double> massStabilization)
          double hessStab, double gradStab, double massStab)
     {
       typedef typename LinOperator::DomainFunctionType DomainFunctionType;
@@ -25,10 +24,6 @@ namespace Dune
       typedef typename RangeFunctionType::DiscreteFunctionSpaceType DiscreteFunctionSpaceType;
       typedef typename DiscreteFunctionSpaceType::GridPartType GridPartType;
       typedef typename GridPartType::template Codim< 0 >::EntitySeedType ElementSeedType;
-
-      // double hessStab = hessStabilization.value_or(0.);
-      // double gradStab = gradStabilization.value_or(1.);
-      // double massStab = massStabilization.value_or(0.);
 
       const DiscreteFunctionSpaceType &domainSpace = op.domainSpace();
       const DiscreteFunctionSpaceType &rangeSpace = op.rangeSpace();
@@ -62,7 +57,18 @@ namespace Dune
         for (std::size_t r = 0; r < stabMatrix.rows(); ++r)
           for (std::size_t c = 0; c < stabMatrix.cols(); ++c)
             for (std::size_t b = 0; b < bs; ++b)
+            {
+              /*
+              std::cout << "(" << agglomerate << "," << r*bs+b << "," << c*bs+b << "):"
+                        << "---" << " + "
+                        << stab * stabMatrix[r][c]
+                        << " stab matrix "
+                        << stabMatrix[r][c] << ","
+                        << stab
+                        << std::endl;
+              */
               jLocal.add(r*bs+b, c*bs+b, stab*stabMatrix[r][c]);
+            }
         op.addLocalMatrix( entity, entity, jLocal );
       }
       op.flushAssembly();

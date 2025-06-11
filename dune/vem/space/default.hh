@@ -128,11 +128,13 @@ namespace Dune
       // 3: don't use onb at all
       DefaultAgglomerationVEMSpace(AgglomerationType &agglom,
           const unsigned int polOrder,
+          const std::array<unsigned int,3> orderTuple,
           const typename Traits::BasisSetsType &basisSets,
           int basisChoice,
           bool edgeInterpolation)
       : BaseType(agglom.gridPart()),
         polOrder_(polOrder), // basisSets.maxOrder()),
+        orderTuple_(orderTuple),
         basisSets_(basisSets),
         basisChoice_(basisChoice),
         edgeInterpolation_(edgeInterpolation),
@@ -300,6 +302,7 @@ namespace Dune
 
       // issue with making these const: use of delete default constructor in some python bindings...
       unsigned int polOrder_;
+      const std::array<unsigned int,3> orderTuple_;
       BasisSetsType basisSets_;
       int basisChoice_;
       bool edgeInterpolation_;
@@ -423,11 +426,11 @@ namespace Dune
         jacobianProjection.resize(numGradShapeFunctions);
         hessianProjection.resize(numHessShapeFunctions);
         for (std::size_t alpha = 0; alpha < numShapeFunctions; ++alpha)
-          valueProjection[alpha].resize(numDofs, ComputeFieldType(0.));
+          valueProjection[alpha].resize(numDofs, StorageFieldType(0.));
         for (std::size_t alpha = 0; alpha < numGradShapeFunctions; ++alpha)
-          jacobianProjection[alpha].resize(numDofs, ComputeFieldType(0.));
+          jacobianProjection[alpha].resize(numDofs, StorageFieldType(0.));
         for (std::size_t alpha = 0; alpha < numHessShapeFunctions; ++alpha)
-          hessianProjection[alpha].resize(numDofs, ComputeFieldType(0.));
+          hessianProjection[alpha].resize(numDofs, StorageFieldType(0.));
 
         // value projection CLS
         // we need to have at least as many constraints as numShapeFunctions-numDofs
@@ -491,7 +494,7 @@ namespace Dune
               const auto &vbs = shapeFunctionSet.valueBasisSet();
               vbs.hessianEach(quadrature[qp], [&](std::size_t beta, HessianRangeType psi)
               {
-                double laplace = psi[0][0][0] + psi[0][1][1];
+                auto laplace = psi[0][0][0] + psi[0][1][1];
                 constraintValueProj[alpha][beta] += laplace * weight;
               });
             }
@@ -955,7 +958,6 @@ namespace Dune
         /////////////////////////////////////////////////////////////////////
         // stabilization matrix /////////////////////////////////////////////
         /////////////////////////////////////////////////////////////////////
-
         Stabilization S(numDofs, numDofs, 0);
         for (std::size_t i = 0; i < numDofs; ++i)
           S[i][i] = DomainFieldType(1);
@@ -975,8 +977,25 @@ namespace Dune
               stabilization[i][j] += S[k][i] * S[k][j];
             maxStab = std::max(maxStab, abs(stabilization[i][j]) );
           }
-      } // end iteration over polygons
+
+        /////////////////////////////////////////////////////////////////////
+        // reduce projection order //////////////////////////////////////////
+        /////////////////////////////////////////////////////////////////////
+        for (std::size_t beta = 0; beta < numDofs; ++beta )
+        {
+          for (std::size_t alpha = sizeONB<0>(orderTuple_[0]);
+               alpha < valueProjection.size(); ++alpha)
+            valueProjection[alpha][beta] = 0;
+          for (std::size_t alpha = 2*sizeONB<0>(orderTuple_[1]);
+               alpha < jacobianProjection.size(); ++alpha)
+            jacobianProjection[alpha][beta] = 0;
+          for (std::size_t alpha = 3*sizeONB<0>(orderTuple_[2]);
+               alpha < hessianProjection.size(); ++alpha)
+            hessianProjection[alpha][beta] = 0;
+        }
+
       // std::cout << "max stabilization factor: " << maxStab << std::endl;
+      } // end iteration over polygons
     } // end build projections
 
     // IsAgglomerationVEMSpace

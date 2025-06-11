@@ -310,8 +310,8 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
   std::vector<RangeRangeType> VectorOfAveragedDiffusionCoefficients (rangeSpace.agglomeration().size(), RangeRangeType(0));
   std::vector<RangeRangeType> VectorOfAveragedLinearlisedDiffusionCoefficients (rangeSpace.agglomeration().size(), RangeRangeType(0));
 
-  RangeRangeType Dcoeff(0);
-  RangeRangeType LinDcoeff(0);
+  // RangeRangeType Dcoeff(0);
+  // RangeRangeType LinDcoeff(0);
   const GridPartType &gridPart = rangeSpace.gridPart();
 
   const auto &agIndexSet    = rangeSpace.indexSet();
@@ -411,6 +411,15 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
           for (std::size_t ccc = 0; ccc < stabMatrix.cols(); ++ccc)
             for (std::size_t b = 0; b < bs; ++b)
               add += stabMatrix[r][ccc] * uLocal[ccc*bs+b]; //???  / (nE));
+          /*
+          std::cout << "(" << agglomerate << "," << r*bs+b << "," << c*bs+b << "):"
+                    << add << " + "
+                    << VectorOfAveragedDiffusionCoefficients[agglomerate][0] * stabMatrix[r][c]
+                    << " stab matrix "
+                    << stabMatrix[r][c] << ","
+                    << VectorOfAveragedDiffusionCoefficients[agglomerate][0]
+                    << std::endl;
+          */
           jLocal.add(r*bs+b, c*bs+b,
                      VectorOfAveragedDiffusionCoefficients[agglomerate][0] * stabMatrix[r][c] +
                      VectorOfAveragedLinearlisedDiffusionCoefficients[agglomerate][0] * add ); // FIX ME: make coeff depend on range * dimension

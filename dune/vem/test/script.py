@@ -16,9 +16,9 @@ import ufl.algorithms
 from ufl import *
 import dune.ufl
 
-dune.fem.parameter.append({"fem.verboserank": -1})
+# dune.fem.parameter.append({"fem.verboserank": -1})
 
-maxLevel = 3
+maxLevel = 2
 
 def interpolate():
     return False
@@ -27,22 +27,21 @@ def getParameters():
     ln, lm, Lx, Ly = 1,0, 1,1
     return ln, lm, Lx, Ly
 
-def runTest(exact, spaceConstructor, get_df, N0=33):
+def runTest(exact, spaceConstructor, get_df, N0=13):
     results = []
-    for level in range(1,maxLevel):
+    for level in range(0,maxLevel):
         ln, lm, Lx, Ly = getParameters()
         # set up grid for testing
-        N = 2**(level)
+        N = N0*2**(level)
         # 23*N*N works, 19*N*N fails
         grid = dune.vem.polyGrid(
-          dune.vem.voronoiCells([[0,0],[Lx,Ly]], N0*N*N, lloyd=250, load="voronoiseeds")
+        #   dune.vem.voronoiCells([[0,0],[Lx,Ly]], N0*N*N, lloyd=250, load="voronoiseeds")
         #   cartesianDomain([0.,0.],[Lx,Ly],[N,N]), cubes=False
-        #   cartesianDomain([0.,0.],[Lx,Ly],[2*N,2*N]), cubes=True
+           cartesianDomain([0.,0.],[Lx,Ly],[2*N,2*N]), cubes=True
         )
 
         # get dimension of range
         dimRange = exact.ufl_shape[0]
-        print('dim Range:', dimRange)
 
         res = []
 
@@ -50,7 +49,8 @@ def runTest(exact, spaceConstructor, get_df, N0=33):
         space = spaceConstructor(grid,dimRange)
 
         err = get_df(space,exact)
-        errors  = [ math.sqrt(e) for e in integrate(grid, err, order=8) ]
+        errors  = [ math.sqrt(e) for e in
+                 integrate(grid, err, order=11) ]
         length = len(errors)
 
         res += [ [[grid.hierarchicalGrid.agglomerate.size,space.size,*space.diameters()],*errors] ]

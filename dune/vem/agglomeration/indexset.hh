@@ -474,8 +474,43 @@ namespace Dune
       for ( std::size_t k = 0; k < vertexCount.size(); ++k)
         vertexDiameters_[k] /= double(vertexCount[k]);
 
+#if 0
+      const auto& is = agglomeration_.gridPart().indexSet();
+      std::vector<double> test(is.size(dimension),-1);
+      for( const auto element : elements( agglomeration_.gridPart(), Partitions::interiorBorder ) )
+      {
+        auto &localAgg = agglomerate( element );
+        for( std::size_t k = 0; k < localAgg.size( 0 ); ++k )
+        {
+          auto idx1_ = globalIndex(element,k,dimension);
+          if (idx1_.second == -1)
+            continue;
+          auto idx1 = idx1_.first;
+          double d = vertexDiameters_[idx1];
+          auto idx2 = is.subIndex(element,k,dimension);
+          const auto& e = element.template subEntity<dimension>(k);
+          std::cout << k << " " << idx1 << " " << idx2 << " " << subIndex(element,k,dimension)
+                    << " : "
+                    << test[idx2] << " " << d << " ("
+                    << e.geometry().center()[0] << ","
+                    << e.geometry().center()[1] << ")"
+                    << std::endl;
+          if ( test[idx2] < 0 )
+            test[idx2] = d;
+          assert( std::abs(test[idx2]-d) < 1e-10 );
+        }
+      }
+      for ( auto k=0;k<test.size();++k )
+      {
+        assert( test[k] > 0 );
+      }
+#endif
+
       maxDiameter_ = *std::max_element(vertexDiameters_.begin(),vertexDiameters_.end());
       minDiameter_ = *std::min_element(vertexDiameters_.begin(),vertexDiameters_.end());
+
+      for ( std::size_t k = 0; k < vertexCount.size(); ++k)
+        vertexDiameters_[k] = (maxDiameter_+minDiameter_)/2;
 
       // store edge twists
       if( dimension > 1 )

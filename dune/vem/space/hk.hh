@@ -361,7 +361,7 @@ namespace Dune
       static int chooseOrder(int defaultOrder, int userOrder)
       { return userOrder<0? defaultOrder: userOrder; }
       AgglomerationVEMBasisSets( const std::size_t order,
-                                 const std::array<int,3> orderTuple,
+                                 const std::array<std::size_t,3> orderTuple,
                                  const TestSpacesType &testSpaces,
                                  int basisChoice )
       // use order2size
@@ -620,12 +620,12 @@ namespace Dune
       typedef typename BaseType::DomainFieldType DomainFieldType;
       AgglomerationVEMSpace(AgglomerationType &agglomeration,
           const unsigned int polOrder,
-          const std::array<int,3> orderTuple,
+          const std::array<unsigned int,3> orderTuple,
           const typename TraitsType::BasisSetsType::TestSpacesType &testSpaces,
           int basisChoice,
           bool edgeInterpolation)
-      : BaseType(agglomeration,polOrder,
-                 typename TraitsType::BasisSetsType(polOrder, orderTuple,testSpaces, basisChoice),
+      : BaseType(agglomeration,polOrder,orderTuple,
+                 typename TraitsType::BasisSetsType(polOrder,{polOrder,polOrder,polOrder},testSpaces, basisChoice),
                  basisChoice,edgeInterpolation)
       {
         BaseType::update(true);
@@ -680,7 +680,7 @@ namespace Dune
         std::size_t alpha = numConstraints-1;
         assert( alpha == numConstraintShapeFunctions );
         // matrices for edge projections
-        Std::vector<Dune::DynamicMatrix<double> > edgePhiVector(2);
+        Std::vector<typename BaseType::ComputeMatrixType> edgePhiVector(2);
 
         for (const typename BaseType::ElementSeedType &entitySeed : entitySeeds[agglomerate])
         {
@@ -728,7 +728,8 @@ namespace Dune
                 if (beta < edgePhiVector[1].size())
                   for (std::size_t s=0; s<mask[1].size(); ++s) // note that edgePhi is the transposed of the basis transform matrix
                     RHSconstraintsMatrix[mask[1][s]][alpha] += weight *
-                                         edgePhiVector[1][beta][s] * psi;
+                                         edgePhiVector[1][beta][s] *
+                                         psi[0];  // is '0' correct here for vector valued cases?
               });
             } // quadrature loop
           } // loop over intersections

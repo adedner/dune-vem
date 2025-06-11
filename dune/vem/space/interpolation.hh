@@ -253,8 +253,8 @@ namespace Dune
               {
                 for (int r=0;r<dphi.rows;++r)
                 {
-                  localDofMatrix[ k+2*r ][ alpha ]   = dphi[r][ 0 ]; // * indexSet_.vertexDiameter(element, i);
-                  localDofMatrix[ k+2*r+1 ][ alpha ] = dphi[r][ 1 ]; // * indexSet_.vertexDiameter(element, i);
+                  localDofMatrix[ k+2*r ][ alpha ]   = dphi[r][ 0 ] * indexSet_.vertexDiameter(element, i);
+                  localDofMatrix[ k+2*r+1 ][ alpha ] = dphi[r][ 1 ] * indexSet_.vertexDiameter(element, i);
                 }
               }
             } );
@@ -432,15 +432,15 @@ namespace Dune
               if (alpha < localDofVectorMatrix[0][entry[0]].size())
                 for (int r=0;r<dphi.rows;++r)
                   localDofVectorMatrix[ 0 ][ entry[0]+r ][ alpha ] = dphi[r][0]
-                                               / intersection.geometry().volume();
-                                               // * indexSet_.vertexDiameter(element,i);
+                                     / intersection.geometry().volume()
+                                     * indexSet_.vertexDiameter(element,i);
             } );
             edgeShapeFunctionSet.evaluateEach( x, [ & ] ( std::size_t alpha, typename EdgeShapeFunctionSet::RangeType phi ) {
               assert( entry[1] < localDofVectorMatrix[1].size() );
               if (alpha < localDofVectorMatrix[1][entry[1]].size())
                 for (int r=0;r<phi.dimension;++r)
-                  localDofVectorMatrix[ 1 ][ entry[1]+r ][ alpha ] = phi[r]*flipNormal;
-                                               //  * indexSet_.vertexDiameter(element,i);
+                  localDofVectorMatrix[ 1 ][ entry[1]+r ][ alpha ] = phi[r]
+                                *flipNormal * indexSet_.vertexDiameter(element,i);
             } );
             entry[0] += EdgeShapeFunctionSet::RangeType::dimension;
             entry[1] += EdgeShapeFunctionSet::RangeType::dimension;
@@ -728,8 +728,8 @@ namespace Dune
             localFunction.jacobian( x, dvalue );
             for (int r=0;r<value.dimension;++r)
             {
-              localDofVector[ k+2*r ]   = dvalue[ r ][ 0 ]; // * indexSet_.vertexDiameter(element, i);
-              localDofVector[ k+2*r+1 ] = dvalue[ r ][ 1 ]; // * indexSet_.vertexDiameter(element, i);
+              localDofVector[ k+2*r ]   = dvalue[ r ][ 0 ] * indexSet_.vertexDiameter(element, i);
+              localDofVector[ k+2*r+1 ] = dvalue[ r ][ 1 ] * indexSet_.vertexDiameter(element, i);
             }
           }
         };

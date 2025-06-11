@@ -168,7 +168,7 @@ def vemSpace(view, order=1, orderTuple=None,
             orderTuple = order
             order = orderTuple[0]
         except TypeError:
-            orderTuple = [-1,-1,-1]
+            orderTuple = [order,order-1,order-2]
 
     assert order >= 1
 
@@ -222,6 +222,12 @@ def vemSpace(view, order=1, orderTuple=None,
         agglomerate = view.hierarchicalGrid.agglomerate
 
     includes = [ "dune/fem/gridpart/common/gridpart.hh", "dune/vem/space/hk.hh" ] + view.cppIncludes
+    includes += [ "dune/common/quadmath.hh" ]
+    if type(computeField) == int:
+        includes += [ "dune/common/gmpfield.hh" ]
+        computeField=f"Dune::GMPField<{computeField}>"
+    elif "GMPField" in computeField:
+        includes += [ "dune/common/gmpfield.hh" ]
     dimw = view.dimWorld
     viewType = view.cppTypeName
 
@@ -237,7 +243,7 @@ def vemSpace(view, order=1, orderTuple=None,
                    ['pybind11::handle gridView',
                     'const pybind11::object agglomerate',
                     'unsigned int order',
-                    'const std::array<int,3> orderTuple',
+                    'const std::array<unsigned int,3> orderTuple',
                     'const std::array<std::vector<int>,'+str(view.dimension+1)+'> &testSpaces',
                     'int basisChoice','bool edgeInterpolation','bool rotatedBB'],
                    ['typedef Dune::Vem::Agglomeration<' + gridPartName + '> AggloType;',
@@ -561,6 +567,8 @@ def vemScheme(model, space=None, solver=None, parameters={},
         else:
             model = vemModel(space.gridView,model,space,hessStabilization,gradStabilization,massStabilization)
 
+    if not hasattr(model,"cppTypeName"):
+        raise ValueError("model argument must be either a 'ufl.Equation' or a already compiled vem integrands model")
     includes = [ "dune/vem/operator/vemelliptic.hh", "dune/vem/operator/diffusionmodel.hh" ]
 
     op = lambda linOp,model: "DifferentiableVEMEllipticOperator< " +\
