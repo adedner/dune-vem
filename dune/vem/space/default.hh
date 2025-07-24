@@ -851,7 +851,7 @@ namespace Dune
           // get the bounding box monomials and apply all dofs to them
           auto shapeFunctionSet = basisSets_.basisFunctionSet(agglomeration(), element);
           auto vemBasisFunction = scalarBasisFunctionSet(element);
-#if 0 // TODO needed to provide hessians for H^1 spaces
+#if 1 // TODO needed to provide hessians for H^1 spaces
           // compute the phi.n boundary terms for the hessian projection in
           // the case that there are no dofs for the normal gradient on the edge
           if ( basisSets_.edgeSize(1) == 0 )
@@ -865,19 +865,38 @@ namespace Dune
               if (!intersection.boundary() && (agglomeration().index(intersection.outside()) == agglomerate))
                 continue;
               assert(intersection.conforming());
+
               auto normal = intersection.centerUnitOuterNormal();
+              typename Dune::FieldMatrix<DomainFieldType,dimDomain,dimDomain> factorNN;
+
+              for (std::size_t i = 0; i < factorNN.rows; ++i)
+                for (std::size_t j = 0; j < factorNN.cols; ++j)
+                {
+                  factorNN[i][j] = 0.5 * (normal[i] * normal[j] + normal[j] * normal[i]);
+                }
 
               // change to compute boundary term in Hessian Projection
               // now compute int_e Phi_mask[i] m_alpha
-              Quadrature1Type quadrature(gridPart(), intersection, 2 * polOrder, Quadrature1Type::INSIDE);
+              Quadrature1Type quadrature(gridPart(), intersection, 3 * polOrder, Quadrature1Type::INSIDE);
               for (std::size_t qp = 0; qp < quadrature.nop(); ++qp)
               {
                 auto x = quadrature.localPoint(qp);
                 auto y = intersection.geometryInInside().global(x);
                 const DomainFieldType weight = intersection.geometry().integrationElement(x) * quadrature.weight(qp);
-                shapeFunctionSet.hessianEach(y, [&](std::size_t alpha, auto phi) {
-                    phi *= weight;
-                    vemBasisFunction.axpy(y, phi, normal, P[alpha]);
+                vemBasisFunction.jacobianAll(quadrature[qp], psi1Values);
+
+                auto normal = intersection.unitOuterNormal(x);
+
+                shapeFunctionSet.hessianEach(y, [&](std::size_t alpha, HessianRangeType phi)
+                {
+                  for (std::size_t s = 0; s < numDofs; ++s)
+                  for (std::size_t i = 0; i < dimDomain; ++i)
+                  for (std::size_t j = 0; j < dimDomain; ++j)
+                    for (std::size_t r = 0; r < dimRange; ++r)
+                    {
+                      double gradpsidotnormal = weight * psi1Values[s][r] * normal;
+                      P[alpha][s] +=  gradpsidotnormal * phi[r][i][j] * factorNN[i][j];
+                    }
                 });
               } // quadrature loop
             } // loop over intersections
