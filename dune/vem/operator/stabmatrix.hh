@@ -17,6 +17,7 @@ namespace Dune
   {
     template< class LinOperator >
     void stabilization(LinOperator &op,
+      auto &entity,
          // std::optional<double> hessStabilization, std::optional<double> gradStabilization, std::optional<double> massStabilization)
          double hessStab, double gradStab, double massStab)
     {
@@ -44,27 +45,26 @@ namespace Dune
       typedef Dune::Fem::TemporaryLocalMatrix< DiscreteFunctionSpaceType,
                                                DiscreteFunctionSpaceType > TemporaryLocalMatrixType;
       TemporaryLocalMatrixType jLocal( domainSpace, rangeSpace );
-      for (const auto &entity : Dune::elements(gridPart, Dune::Partitions::interiorBorder))
-      {
-        const std::size_t agglomerate = agglomeration.index( entity );
-        const auto &bbox = agIndexSet.boundingBox( agglomerate );
-        double bbH2 = pow(bbox.volume()/bbox.diameter(),2);
-        const auto &stabMatrix = rangeSpace.stabilization(entity);
-        jLocal.init( entity, entity );
-        jLocal.clear();
-        std::size_t bs = domainBlockSize;
-        assert( jLocal.rows()    == stabMatrix.rows()*bs );
-        assert( jLocal.columns() == stabMatrix.cols()*bs );
-        assert( stabMatrix.cols()*bs == uLocal.size() );
+      const std::size_t agglomerate = agglomeration.index( entity );
+      const auto &bbox = agIndexSet.boundingBox( agglomerate );
+      double bbH2 = pow(bbox.volume()/bbox.diameter(),2);
+      const auto &stabMatrix = rangeSpace.stabilization(entity);
+      jLocal.init( entity, entity );
+      jLocal.clear();
+      std::size_t bs = domainBlockSize;
+      assert( jLocal.rows()    == stabMatrix.rows()*bs );
+      assert( jLocal.columns() == stabMatrix.cols()*bs );
+      assert( stabMatrix.cols()*bs == uLocal.size() );
 
-        auto stab = gradStab + massStab*bbH2 + hessStab/bbH2;
+      auto stab = gradStab + massStab*bbH2 + hessStab/bbH2;
 
-        for (std::size_t r = 0; r < stabMatrix.rows(); ++r)
-          for (std::size_t c = 0; c < stabMatrix.cols(); ++c)
-            for (std::size_t b = 0; b < bs; ++b)
-              jLocal.add(r*bs+b, c*bs+b, stab*stabMatrix[r][c]);
-        op.addLocalMatrix( entity, entity, jLocal );
-      }
+      for (std::size_t r = 0; r < stabMatrix.rows(); ++r)
+       for (std::size_t c = 0; c < stabMatrix.cols(); ++c)
+        for (std::size_t b = 0; b < bs; ++b)
+         jLocal.add(r*bs+b, c*bs+b, stab*stabMatrix[r][c]);
+
+      op.addLocalMatrix( entity, entity, jLocal );
+
       op.flushAssembly();
     }
 
