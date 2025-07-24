@@ -10,7 +10,7 @@ import dune.common.checkconfiguration as checkconfiguration
 import dune
 import dune.fem
 
-def stabilization(spc, hessStabilization=None, gradStabilization=None, massStabilization=None):
+def stabilization(spc, entity, hessStabilization=None, gradStabilization=None, massStabilization=None):
     if hessStabilization is None and gradStabilization is None and massStabilization is None:
         gradStabilization = 1.
     if hessStabilization is None:
@@ -29,10 +29,10 @@ def stabilization(spc, hessStabilization=None, gradStabilization=None, massStabi
         stabMatrix = dune.fem.operator.linear([spc,spc])
         spc._stab = algorithm.load("Dune::Vem::stabilization",
            io.StringIO("#include <dune/vem/operator/stabmatrix.hh>"), stabMatrix,
-                       hessStabilization,gradStabilization,massStabilization)
+                       entity,hessStabilization,gradStabilization,massStabilization)
     else:
         stabMatrix = dune.fem.operator.linear([spc,spc])
-    spc._stab(stabMatrix, hessStabilization, gradStabilization, massStabilization)
+    spc._stab(stabMatrix, entity, hessStabilization, gradStabilization, massStabilization)
     return stabMatrix
 
 
@@ -834,7 +834,7 @@ class PolyAgglomerate:
 
     @staticmethod
     def roundBary(a):
-        return tuple(round(aa,8) for aa in a)
+        return tuple(round(aa,10) for aa in a)
     @staticmethod
     def construct(cubes,convex,vertices,polygons):
         index = SortedDict()
@@ -851,7 +851,7 @@ class PolyAgglomerate:
             earCut = EarCut()
             for nr, p in enumerate(polygons):
                 N = len(p)
-                if True:
+                if False:
                     tri = earCut(vertices,p)
                 elif not convex and not checkConvex(vertices[p]):
                     if not triangle:
