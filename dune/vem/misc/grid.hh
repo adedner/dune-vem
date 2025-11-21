@@ -1,3 +1,6 @@
+#ifndef DUNE_VEM_MISC_GRID_HH
+#define DUNE_VEM_MISC_GRID_HH
+
 #include <dune/alugrid/grid.hh>
 #include <dune/alugrid/dgf.hh>
 #include <dune/grid/yaspgrid.hh>
@@ -13,3 +16,5 @@ namespace Dune
     using YGrid = Dune::YaspGrid< dg, Coordinates >;
   }
 }
+
+#endif
