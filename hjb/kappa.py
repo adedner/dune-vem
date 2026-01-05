@@ -162,9 +162,12 @@ def main(order,orderTuple,N,problem,ax=None): # 0: std, 1:[o,o,o], 2:[o-2,o-2,o-
 
     dbc = [ dune.ufl.DirichletBC(space,exact) ]
 
+    if True:
+        stab[0] = None
+        stab[1] = None
     scheme = dune.vem.vemScheme([a == 0, *dbc], boundary="value",
         hessStabilization=stab[0],
-        gradStabilization=stab[1],
+        gradStabilization=None,        # stab[1],
         massStabilization=stab[2],
         solver=("suitesparse","umfpack"),
         # parameters={"linear.verbose":True},
@@ -198,7 +201,7 @@ def simulate(order,problem,proj,ax=None):
 
     errors = []
     eocs = [[-1,-1,-1]]
-    maxLevel = 2 # 8-order # 7-order
+    maxLevel = 8-order # 7-order
     for N in [12*(2**i) for i in range(0,maxLevel)]:
         # if order==5 and proj==0 and N>24: break # issue with solver
         err2 = main(order=order, N=N+1, problem=problem, orderTuple=orderTuple,ax=ax)

@@ -956,29 +956,6 @@ namespace Dune
         finalize(entitySeeds, agglomerate);
 
         /////////////////////////////////////////////////////////////////////
-        // stabilization matrix /////////////////////////////////////////////
-        /////////////////////////////////////////////////////////////////////
-        Stabilization S(numDofs, numDofs, 0);
-        for (std::size_t i = 0; i < numDofs; ++i)
-          S[i][i] = DomainFieldType(1);
-        for (std::size_t i = 0; i < numDofs; ++i)
-          for (std::size_t alpha = 0; alpha < numShapeFunctions; ++alpha)
-            for (std::size_t j = 0; j < numDofs; ++j)
-            {
-              StorageFieldType a = ComputeFieldType( D[i][alpha] * ComputeFieldType(valueProjection[alpha][j]) );
-              S[i][j] -= a;
-            }
-        Stabilization &stabilization = stabilizations()[agglomerate];
-        stabilization.resize(numDofs, numDofs, 0);
-        for (std::size_t i = 0; i < numDofs; ++i)
-          for (std::size_t j = 0; j < numDofs; ++j)
-          {
-            for (std::size_t k = 0; k < numDofs; ++k)
-              stabilization[i][j] += S[k][i] * S[k][j];
-            maxStab = std::max(maxStab, abs(stabilization[i][j]) );
-          }
-
-        /////////////////////////////////////////////////////////////////////
         // reduce projection order //////////////////////////////////////////
         /////////////////////////////////////////////////////////////////////
         for (std::size_t beta = 0; beta < numDofs; ++beta )
@@ -994,7 +971,38 @@ namespace Dune
             hessianProjection[alpha][beta] = 0;
         }
 
-      // std::cout << "max stabilization factor: " << maxStab << std::endl;
+        /////////////////////////////////////////////////////////////////////
+        // stabilization matrix /////////////////////////////////////////////
+        /////////////////////////////////////////////////////////////////////
+        Stabilization &stabilization = stabilizations()[agglomerate];
+        stabilization.resize(numDofs, numDofs, 0);
+
+        Stabilization S(numDofs, numDofs, 0);
+        for (std::size_t i = 0; i < numDofs; ++i)
+          S[i][i] = DomainFieldType(1);
+        for (std::size_t i = 0; i < numDofs; ++i)
+          // for (std::size_t alpha = 0; alpha < numShapeFunctions; ++alpha)
+          for (std::size_t alpha = 0; alpha < sizeONB<0>(orderTuple_[0]); ++alpha)
+            for (std::size_t j = 0; j < numDofs; ++j)
+            {
+              StorageFieldType a = ComputeFieldType( D[i][alpha] * ComputeFieldType(valueProjection[alpha][j]) );
+              S[i][j] -= a;
+            }
+        #if 1
+        for (std::size_t i = 0; i < numDofs; ++i)
+          for (std::size_t j = 0; j < numDofs; ++j)
+            stabilization[i][j] = S[i][j];
+        #else
+        for (std::size_t i = 0; i < numDofs; ++i)
+          for (std::size_t j = 0; j < numDofs; ++j)
+          {
+            for (std::size_t k = 0; k < numDofs; ++k)
+              stabilization[i][j] += S[k][i] * S[k][j];
+            maxStab = std::max(maxStab, abs(stabilization[i][j]) );
+          }
+        // std::cout << "max stabilization factor: " << maxStab << std::endl;
+        #endif
+
       } // end iteration over polygons
     } // end build projections
 

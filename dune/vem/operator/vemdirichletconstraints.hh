@@ -59,9 +59,12 @@ namespace Dune {
       template <class Point>
       void jacobian( const Point& x, JacobianRangeType& ret ) const
       { impl_.dDirichlet(bndId_,Dune::Fem::coordinate(x),ret); }
+      bool valid() const
+      { return true; }
+
     };
     VemDirichletConstraints( ModelType &model, const DiscreteFunctionSpaceType& space )
-      : BaseType(model,space)
+      : BaseType(model,space), sequence2_(-1)
     {}
 
     bool applyConstraint(char maskValue) const
@@ -86,6 +89,7 @@ namespace Dune {
       // not yet correctly implemented
       assert(false);
       BaseType::updateDirichletDofs();
+      correctDirichletDofs();
       if( BaseType::hasDirichletDofs_ )
       {
         Dune::Fem::MutableLocalFunction< DiscreteFunctionType > wLocal( w );
@@ -109,7 +113,7 @@ namespace Dune {
             int global = globalBlockDofs[ localBlock ];
             for( int l = 0; l < localBlockSize; ++l, ++localDof )
             {
-              if( dirichletBlocks_[ global ][ l ] && applyConstraint(mask[ localBlock ]))
+              if( dirichletBlocks_[ global ][ l ] ) //  && applyConstraint(mask[ localBlock ]))
                 wLocal[ localDof ] = 0;
             }
           }
@@ -121,6 +125,7 @@ namespace Dune {
     void operator ()( DiscreteFunctionType& w ) const
     {
       BaseType::updateDirichletDofs();
+      correctDirichletDofs();
       if( BaseType::hasDirichletDofs_ )
       {
         Dune::Fem::MutableLocalFunction< DiscreteFunctionType > wLocal( w );
@@ -136,6 +141,7 @@ namespace Dune {
                       DiscreteFunctionType& w, Operation op) const
     {
       BaseType::updateDirichletDofs();
+      correctDirichletDofs();
       if( BaseType::hasDirichletDofs_ )
       {
         Dune::Fem::ConstLocalFunction< DiscreteFunctionType > uLocal( u );
@@ -163,6 +169,7 @@ namespace Dune {
       typedef typename DiscreteFunctionSpaceType :: IteratorType IteratorType;
       typedef typename IteratorType :: Entity EntityType;
       BaseType::updateDirichletDofs();
+      correctDirichletDofs();
 
       if( BaseType::hasDirichletDofs_ )
       {
@@ -210,8 +217,7 @@ namespace Dune {
             std::set<std::size_t>& rows = useIdentity ?  unitRows : auxRows;
             for( int l = 0; l < localBlockSize; ++ l, ++ localDof )
             {
-              if( dirichletBlocks_[global][l] &&
-                  applyConstraint(mask[localBlockDof]) )
+              if( dirichletBlocks_[global][l] ) // && applyConstraint(mask[localBlockDof]) )
               {
                 // push non-blocked dof
                 rows.insert( globalDofs[ localDof ] );
@@ -253,8 +259,7 @@ namespace Dune {
         int global = globalBlockDofs[ localBlock ];
         for( int l = 0; l < localBlockSize; ++l, ++localDof )
         {
-          if( dirichletBlocks_[ global ][ l ] &&
-              applyConstraint(mask[ localBlock ]))
+          if( dirichletBlocks_[ global ][ l ] ) // && applyConstraint(mask[ localBlock ]))
           {
             std::fill(valuesModel.begin(),valuesModel.end(),0);
             space_.interpolation()( entity, BoundaryWrapper(model_,dirichletBlocks_[global][l]),  valuesModel );
@@ -306,8 +311,7 @@ namespace Dune {
         int global = globalBlockDofs[ localBlock ];
         for( int l = 0; l < localBlockSize; ++l, ++localDof )
         {
-          if( dirichletBlocks_[ global ][l] &&
-              applyConstraint(mask[ localBlock ]) )
+          if( dirichletBlocks_[ global ][l] ) // && applyConstraint(mask[ localBlock ]) )
           {
             if (op == Operation::sub)
             {
@@ -330,10 +334,53 @@ namespace Dune {
         }
       }
     }
-  private:
+  protected:
+    void correctDirichletDofs() const
+    {
+      if (hasDirichletDofs_ && sequence2_ != space_.sequence())
+        for( const EntityType &entity : space_ )
+          correctEntityDirichletDofs(entity,model_);
+      sequence2_ = space_.sequence();
+    }
+    template< class EntityType >
+    void correctEntityDirichletDofs( const EntityType &entity, ModelType& model ) const
+    {
+      typedef typename DiscreteFunctionSpaceType :: BlockMapperType BlockMapperType;
+      Dune::Fem::NonBlockMapper< BlockMapperType, localBlockSize > mapper( space_.blockMapper() );
+      // get number of basis functions
+      const int localBlocks = space_.blockMapper().numDofs( entity );
+      // map local to global dofs
+      std::vector< std::size_t > globalBlockDofs( localBlocks );
+      std::vector<std::size_t> globalDofs( localBlocks * localBlockSize );
+      // obtain all DofBlocks for this element
+      space_.blockMapper().map( entity, globalBlockDofs );
+      // obtain all non-blocked dofs
+      mapper.map( entity, globalDofs );
+
+      Vem::Std::vector< char > mask( localBlocks );
+      space_.interpolation()( entity, mask );
+
+      // iterate over face dofs and set unit row
+      for( int localBlockDof = 0 ; localBlockDof < localBlocks; ++ localBlockDof )
+      {
+        assert(localBlockDof < mask.size());
+        if ( applyConstraint(mask[localBlockDof]) )
+          continue;
+        int global = globalBlockDofs[localBlockDof];
+        for( int l = 0; l < localBlockSize; ++ l )
+        {
+          assert(global < dirichletBlocks_.size());
+          assert(l < dirichletBlocks_[global].size());
+          dirichletBlocks_[global][l] = 0;
+        }
+      }
+    }
+
     using BaseType::model_;
     using BaseType::space_;
     using BaseType::dirichletBlocks_;
+    using BaseType::hasDirichletDofs_;
+    mutable int sequence2_;
   };
 
 } // end namespace Dune

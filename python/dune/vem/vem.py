@@ -9,6 +9,11 @@ from dune.generator import Constructor, Method, algorithm
 import dune
 import dune.fem
 
+def stabilization2(C, space, hessStabilization, gradStabilization, massStabilization, out):
+    algorithm.run("Dune::Vem::stabilization",
+           io.StringIO("#include <dune/vem/operator/stabmatrix.hh>"),
+           C, space, space, hessStabilization,gradStabilization,massStabilization, out)
+
 def stabilization(spc, hessStabilization=None, gradStabilization=None, massStabilization=None):
     if hessStabilization is None and gradStabilization is None and massStabilization is None:
         gradStabilization = 1.
@@ -24,13 +29,11 @@ def stabilization(spc, hessStabilization=None, gradStabilization=None, massStabi
         massStabilization = 0.
     else:
         massStabilization = float(massStabilization)
+    stabMatrix = dune.fem.operator.linearOperator(spc,spc)
     if spc._stab is None:
-        stabMatrix = dune.fem.operator.linear([spc,spc])
         spc._stab = algorithm.load("Dune::Vem::stabilization",
            io.StringIO("#include <dune/vem/operator/stabmatrix.hh>"), stabMatrix,
                        hessStabilization,gradStabilization,massStabilization)
-    else:
-        stabMatrix = dune.fem.operator.linear([spc,spc])
     spc._stab(stabMatrix, hessStabilization, gradStabilization, massStabilization)
     return stabMatrix
 
@@ -145,7 +148,7 @@ def vemSpace(view, order=1, orderTuple=None,
              testSpaces=None, scalar=False,
              dimRange=None, conforming=True, field="double",
              storage="numpy",
-             basisChoice=2, rotatedBB=True,
+             basisChoice=2, rotatedBB=True,   ## basisChoice=2
              edgeInterpolation=False,
              vectorSpace=False, reduced=False,
              basisField="double", computeField="long double",
@@ -169,6 +172,8 @@ def vemSpace(view, order=1, orderTuple=None,
             order = orderTuple[0]
         except TypeError:
             orderTuple = [order,order-1,order-2]
+
+    orderTuple = [o if o>0 else 0 for o in orderTuple]
 
     assert order >= 1
 
@@ -227,6 +232,11 @@ def vemSpace(view, order=1, orderTuple=None,
         includes += [ "dune/common/gmpfield.hh" ]
         computeField=f"Dune::GMPField<{computeField}>"
     elif "GMPField" in computeField:
+        includes += [ "dune/common/gmpfield.hh" ]
+    if type(basisField) == int:
+        includes += [ "dune/common/gmpfield.hh" ]
+        basisField=f"Dune::GMPField<{basisField}>"
+    elif "GMPField" in basisField:
         includes += [ "dune/common/gmpfield.hh" ]
     dimw = view.dimWorld
     viewType = view.cppTypeName

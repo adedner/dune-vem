@@ -170,6 +170,10 @@ template<class JacobianOperator, class Model>
   void jacobian(const DomainDiscreteFunctionType &u,
       JacobianOperatorType &jOp) const;
 
+  void setQuadratureOrders(unsigned int interior, unsigned int surface)
+  { BaseType::setQuadratureOrders(interior,surface);
+    baseOperator_.setQuadratureOrders(interior,surface); }
+
   using BaseType::model;
   // DifferentiableEllipticOperator<JacobianOperator,Model> baseOperator_;
   Dune::Fem::DifferentiableGalerkinOperator<Model,JacobianOperator> baseOperator_;
@@ -184,7 +188,7 @@ template<class DomainDiscreteFunction, class RangeDiscreteFunction, class Model>
       RangeDiscreteFunctionType &w) const
 {
   baseOperator_(u,w);
-#if 1
+#if 0
   if (! std::is_same<DomainDiscreteFunctionSpaceType,RangeDiscreteFunctionSpaceType>::value)
     return;
 
@@ -292,7 +296,7 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
 {
   Dune::Timer timer;
   baseOperator_.jacobian(u,jOp);
-#if 1
+#if 0
   if (! std::is_same<DomainDiscreteFunctionSpaceType,RangeDiscreteFunctionSpaceType>::value)
     return;
   // std::cout << "   in assembly: base operator    " << timer.elapsed() << std::endl;
@@ -309,6 +313,7 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
 
   std::vector<RangeRangeType> VectorOfAveragedDiffusionCoefficients (rangeSpace.agglomeration().size(), RangeRangeType(0));
   std::vector<RangeRangeType> VectorOfAveragedLinearlisedDiffusionCoefficients (rangeSpace.agglomeration().size(), RangeRangeType(0));
+  std::vector<std::vector<double>> jOpDiag( rangeSpace.agglomeration().size() );
 
   // RangeRangeType Dcoeff(0);
   // RangeRangeType LinDcoeff(0);
@@ -323,6 +328,10 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
   // std::cout << "   in assembly: start element loop time=  " << timer.elapsed() << std::endl;
 
   DomainLocalFunctionType uLocal( u );
+
+  typedef Dune::Fem::TemporaryLocalMatrix< DomainDiscreteFunctionSpaceType,
+                                           RangeDiscreteFunctionSpaceType > TemporaryLocalMatrixType;
+  TemporaryLocalMatrixType jLocal( domainSpace, rangeSpace );
 
   for (const auto &entity : Dune::elements(gridPart, Dune::Partitions::interiorBorder))
   {
@@ -340,6 +349,12 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
     // Lines copied from below just before the quadrature loop:
     // For Stabilisation..
     auto& refElement = Dune::ReferenceElements<double, 2>::general( entity.type());
+
+    jLocal.init( entity, entity );
+    jOp.getLocalMatrix( entity, entity, jLocal );
+    jOpDiag[ agglomerate ].resize( jLocal.size() );
+    for (std::size_t i=0;i<jLocal.size();++i)
+        jOpDiag[agglomerate][i] = jLocal.get(i,i);
 
     for (const auto &intersection : Dune::intersections(gridPart, entity))
     {
@@ -376,10 +391,6 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
 
   // std::cout << "   in assembly: finished element loop time=  " << timer.elapsed() << std::endl;
 
-  typedef Dune::Fem::TemporaryLocalMatrix< DomainDiscreteFunctionSpaceType,
-                                           RangeDiscreteFunctionSpaceType > TemporaryLocalMatrixType;
-  TemporaryLocalMatrixType jLocal( domainSpace, rangeSpace );
-
   for (const auto &seed : stabilization)
   {
     const auto entity = gridPart.entity( seed );
@@ -403,14 +414,28 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
     assert( jLocal.columns() == stabMatrix.cols()*bs );
     assert( stabMatrix.cols()*bs == uLocal.size() );
 
+    std::vector<double> sRow(stabMatrix.cols());
     for (std::size_t r = 0; r < stabMatrix.rows(); ++r)
+    {
+      for (std::size_t c = 0; c < stabMatrix.cols(); ++c)
+      {
+        // sRow[c] = stabMatrix[r][c];
+        sRow[c] = 0;
+        for (std::size_t k = 0; k < stabMatrix.cols(); ++k)
+        {
+          double fac = std::max( jOpDiag[ agglomerate ][k],
+                                 VectorOfAveragedDiffusionCoefficients[agglomerate][0]
+                               );
+          sRow[c] += stabMatrix[k][r] * stabMatrix[k][c] * fac;
+        }
+      }
       for (std::size_t c = 0; c < stabMatrix.cols(); ++c)
         for (std::size_t b = 0; b < bs; ++b)
         {
           double add = 0;
           for (std::size_t ccc = 0; ccc < stabMatrix.cols(); ++ccc)
-            for (std::size_t b = 0; b < bs; ++b)
-              add += stabMatrix[r][ccc] * uLocal[ccc*bs+b]; //???  / (nE));
+            for (std::size_t bb = 0; bb < bs; ++bb)
+              add += sRow[ccc] * uLocal[ccc*bs+bb]; //???  / (nE));
           /*
           std::cout << "(" << agglomerate << "," << r*bs+b << "," << c*bs+b << "):"
                     << add << " + "
@@ -421,9 +446,11 @@ void DifferentiableVEMEllipticOperator<JacobianOperator, Model>
                     << std::endl;
           */
           jLocal.add(r*bs+b, c*bs+b,
-                     VectorOfAveragedDiffusionCoefficients[agglomerate][0] * stabMatrix[r][c] +
+                     sRow[c] +
+                     // VectorOfAveragedDiffusionCoefficients[agglomerate][0] * sRow[c] +
                      VectorOfAveragedLinearlisedDiffusionCoefficients[agglomerate][0] * add ); // FIX ME: make coeff depend on range * dimension
         }
+    }
 
     jOp.addLocalMatrix( entity, entity, jLocal );
 #if 0

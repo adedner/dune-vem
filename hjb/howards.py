@@ -21,11 +21,10 @@ def Howard(scheme,model,lam,
     errSpace = dune.vem.vemSpace(solution.space.gridView,
                   order=order,
                   orderTuple=orderTuple, testSpaces=testSpaces)
-    dbc = dune.ufl.DirichletBC(scheme.space.as_ufl(),0)
     schemeS = dune.vem.vemScheme(model,space=errSpace, boundary="value",
-        hessStabilization=1,
-        gradStabilization=0., # 2*lam,
-        massStabilization=lam**2,
+        hessStabilization=dune.ufl.Constant(1,"stab"),
+        gradStabilization=None, # 0., # 2*lam,
+        massStabilization=None, # lam**2,
         solver=("suitesparse","umfpack") )
 
     errSol = errSpace.function(name="errSol")
@@ -41,15 +40,27 @@ def Howard(scheme,model,lam,
     targetStab = scheme.model.stabFactor
     stabFactor = startStab/targetStab
     A = scheme.linear()
-    S = schemeS.linear()
+    S = scheme.linear()
+    A1 = schemeS.linear()
+    S1 = schemeS.linear()
 
     def solve(solution):
-        if True:  # A0 = A0 + x ( S1 - A0 ) = (1-x) A0 + x S1
+        if True:
+            scheme.model.stabFactor = stabFactor*targetStab
+            scheme.jacobian(errSpace.zero,A,rhs)
             scheme.model.stabFactor = 0
-            scheme.jacobian(errSpace.zero,A,rhs=rhs)
-            schemeS.jacobian(errSpace.zero,S)
+            scheme.jacobian(errSpace.zero,S)
             S.as_numpy[:] -= A.as_numpy
-            A.as_numpy[:] += stabFactor*targetStab*S.as_numpy
+            # Add stabilization from (m,m,m) space
+            schemeS.model.stab = 0
+            schemeS.jacobian(errSpace.zero,A1)
+            schemeS.model.stab = stabFactor*targetStab
+            schemeS.jacobian(errSpace.zero,S1)
+            S1.as_numpy[:] -= A1.as_numpy # subtrace 'main' part of model
+            # print("Max stab=",np.max(np.abs(S1.as_numpy)),np.max(np.abs(S.as_numpy)))
+            # Add stabilization to main part of original scheme
+            A.as_numpy[:] += S1.as_numpy
+
             scheme.setConstraints(A)
             Ainv = splu(A.as_numpy.tocsc())
             solution.as_numpy[:] = Ainv.solve(rhs.as_numpy)
@@ -57,12 +68,18 @@ def Howard(scheme,model,lam,
         else:
             scheme.solve(target=solution)
     def apply(res_h):
-        if True:  # A0 = A0 + x ( S1 - A0 ) = (1-x) A0 + x S1
-            scheme.model.stabFactor = 0
-            scheme.jacobian(errSpace.zero,A,rhs=rhs)
-            schemeS.jacobian(errSpace.zero,S)
-            S.as_numpy[:] -= A.as_numpy
-            A.as_numpy[:] += stabFactor*targetStab*S.as_numpy
+        if True:
+            scheme.model.stabFactor = stabFactor*targetStab
+            scheme.jacobian(errSpace.zero,A,rhs)
+            # Add stabilization from (m,m,m) space
+            schemeS.model.stab = 0
+            schemeS.jacobian(errSpace.zero,A1)
+            schemeS.model.stab = stabFactor*targetStab
+            schemeS.jacobian(errSpace.zero,S1)
+            S1.as_numpy[:] -= A1.as_numpy # subtrace 'main' part of model
+            # Add stabilization to main part
+            A.as_numpy[:] += S1.as_numpy
+
             scheme.setConstraints(A)
             A(solution,res_h)
             res_h -= rhs
