@@ -368,7 +368,8 @@ namespace Dune
       : testSpaces_(testSpaces)
       , useOnb_(basisChoice == 2)
       , dofsPerCodim_(calcDofsPerCodim())
-      , maxOrder_( chooseOrder( std::max(order,maxEdgeDegree()),orderTuple[0] ) )
+      , maxOrder_( chooseOrder( std::max(order,maxEdgeDegree()),
+                                std::max(orderTuple[0],maxEdgeDegree()) ) )
       , onbSFS_(Dune::GeometryType(Dune::GeometryType::cube, dimDomain), maxOrder_)
       , edgeSFS_( Dune::GeometryType(Dune::GeometryType::cube,dimDomain-1), maxEdgeDegree() )
       , numValueShapeFunctions_( onbSFS_.size()*BBBasisFunctionSetType::RangeType::dimension )

@@ -11,6 +11,7 @@
 #include <dune/python/pybind11/pybind11.h>
 // #include <pybind11/pybind11.h>
 
+#include <dune/common/gmpfield.hh>
 #include <dune/common/fvector.hh>
 #include <dune/vem/misc/vector.hh>
 
@@ -104,12 +105,16 @@ namespace Dune
 
       }
       void set(pybind11::object obj) { set( obj.cast<ReturnType>() ); }
-      const /*long*/ double r(int k) const
+      // typedef Dune::GMPField<256> ComputeField;
+      // typedef long double StorageField;
+      typedef double ComputeField;
+      typedef double StorageField;
+      const StorageField r(int k) const
       {
         assert(k < r_.size() );
         return r_[k];
       }
-      /*long*/ double& r(int k)
+      StorageField& r(int k)
       {
         assert(k < r_.size() );
         return r_[k];
@@ -118,11 +123,15 @@ namespace Dune
       {
         r_.resize(N*(N+1)/2);
       }
+      std::size_t sizeR()
+      {
+        return r_.size();
+      }
       private:
       ReturnType rotation_;
       double volume_ = 0;
       Dune::FieldMatrix< typename GridPart::ctype, GridPart::dimensionworld, GridPart::dimensionworld > transform_;
-      Std::vector</*long*/ double> r_;
+      Std::vector<StorageField> r_;
     };
 
     // agglomerateBoundingBoxes

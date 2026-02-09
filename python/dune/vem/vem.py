@@ -127,7 +127,8 @@ def bbdgSpace(view, order=1, scalar=False, dimRange=None, field="double",
     updateMethod = Method('update',
        '''[]( DuneType &self ) { self.update(); }''' )
 
-    spc = module(field, includes, typeName, constructor, updateMethod, scalar=scalar, storage=storage,
+    spc = module(field, includes, typeName, constructor, #diameterMethod,
+                 updateMethod, scalar=scalar, storage=storage,
              ctorArgs=[view, agglomerate,rotatedBB])
     addStorage(spc, storage)
     return spc.as_ufl()

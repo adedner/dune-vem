@@ -136,6 +136,7 @@ namespace Dune
       using BaseType :: referenceElement;
 
       template< class Quadrature, class Vector, class DofVector >
+      // std::void_t<decltype(std::declval<Quadrature>().nop())>
       void axpy ( const Quadrature &quadrature, const Vector &values, DofVector &dofs ) const
       {
         assert(dofs.size()==size());
@@ -180,6 +181,18 @@ namespace Dune
         Fem::FunctionalAxpyFunctor< JacobianRangeType, DofVector > f( transformedFactor, dofs );
         for (std::size_t beta=0;beta<size();++beta)
           f(beta,jacs_[beta]);
+      }
+
+      template< class Point, class DofVector >
+      void axpy ( const Point &x, const HessianRangeType &hessianFactor, DofVector &dofs ) const
+      {
+        assert(dofs.size()==size());
+        // onb
+        sfEvaluateAll(x,hess_);
+        const HessianRangeType transformedFactor = transformation_( hessianFactor,true );
+        Fem::FunctionalAxpyFunctor< HessianRangeType, DofVector > f( transformedFactor, dofs );
+        for (std::size_t beta=0;beta<size();++beta)
+          f(beta,hess_[beta]);
       }
 
       template< class Point, class DofVector >
@@ -339,8 +352,8 @@ namespace Dune
         for (std::size_t i=0;i<values.size();++i,++k)
         {
           for (std::size_t j=0;j<i;++j,++k)
-            values[i].axpy(-bbox().r(k), values[j]);
-          values[i] /= bbox().r(k);
+            values[i].axpy(-(bbox().r(k)), values[j]);
+          values[i] /= (bbox().r(k));
         }
       }
       template< class Point>
@@ -378,8 +391,8 @@ namespace Dune
         {
           for (std::size_t j=0;j<i;++j,++k)
             for (std::size_t r=0;r<values[i].size();++r)
-              values[i][r].axpy(-bbox().r(k), values[j][r]);
-          values[i] /= bbox().r(k);
+              values[i][r].axpy(-(bbox().r(k)), values[j][r]);
+          values[i] /= (bbox().r(k));
         }
       }
 
@@ -395,6 +408,7 @@ namespace Dune
     inline static void onbBasis( const Agglomeration &agglomeration,
         int maxPolOrder, std::shared_ptr< Std::vector< BoundingBox< typename Agglomeration::GridPartType > > > boundingBoxes )
     {
+      typedef BoundingBox< typename Agglomeration::GridPartType > BoundingBoxType;
       typedef typename Agglomeration::GridPartType GridPart;
       typedef typename GridPart::template Codim< 0 >::EntityType ElementType;
       typedef typename GridPart::template Codim< 0 >::EntitySeedType ElementSeedType;
@@ -433,14 +447,19 @@ namespace Dune
 
       // return; // no ONB
 
-      Std::vector<DomainFieldType> weights;
+      typedef typename BoundingBoxType::ComputeField ComputeField;
+      typedef Dune::Fem::FunctionSpace< double, ComputeField, GridPart::dimension, 1 > CFFunctionSpaceType;
+      typedef typename CFFunctionSpaceType::RangeType CFRangeType;
+      typedef typename CFFunctionSpaceType::JacobianRangeType CFJacobianRangeType;
+
+      Std::vector<ComputeField> weights;
       Std::vector<RangeType> val;
       val.resize( shapeFunctionSet.size() );
-      Std::vector< Std::vector<RangeType> > values;
+      Std::vector< Std::vector<CFRangeType> > values;
       values.resize( shapeFunctionSet.size() );
       Std::vector<JacobianRangeType> jac;
       jac.resize( shapeFunctionSet.size() );
-      Std::vector< Std::vector<JacobianRangeType> > jacs;
+      Std::vector< Std::vector<CFJacobianRangeType> > jacs;
       jacs.resize( shapeFunctionSet.size() );
 
       // compute onb factors
@@ -495,15 +514,16 @@ namespace Dune
         //     b_i -= r_k b_j {Remove the projection of b_i onto b_j
         //   r_k = ( b_i, b_i )
         //   b_i /= r_k
-        auto l2Integral = [&](std::size_t i, std::size_t j) -> /*long*/ double {
-          /*long*/ double ret = 0;
+        auto l2Integral = [&](std::size_t i, std::size_t j) -> ComputeField { // -> /*long*/ double {
+          ComputeField ret = 0;
           for (std::size_t l = 0; l<weights.size(); ++l)
           {
             ret += values[i][l]*values[j][l]*weights[l];
-            // ret += jacs[i][l][0]*jacs[j][l][0]*weights[l] / bbox.volume();
+            // ret += jacs[i][l][0]*jacs[j][l][0]*weights[l]; // * bbox.volume();
           }
           return ret; // / bbox.volume();
         };
+        Std::vector<ComputeField> r(bbox.sizeR());
         std::size_t k = 0;
         for (std::size_t i=0;i<values.size();++i,++k)
         {
@@ -511,24 +531,26 @@ namespace Dune
           auto &ci = jacs[i];
           for (std::size_t j=0;j<i;++j,++k)
           {
-            bbox.r(k) = l2Integral(i,j);
-            assert( bbox.r(k) == bbox.r(k) );
+            r[k] = l2Integral(i,j);
+            assert( r[k] == r[k] );
             for (std::size_t l = 0; l<values[i].size(); ++l)
             {
-              bi[l].axpy(-bbox.r(k), values[j][l]);
-              ci[l].axpy(-bbox.r(k), jacs[j][l]);
+              bi[l].axpy(-r[k], values[j][l]);
+              ci[l].axpy(-r[k], jacs[j][l]);
             }
             // std::cout << i << " " << j << " = " << bbox.r(k) << "   ";
           }
-          bbox.r(k) = std::sqrt( l2Integral(i,i) );
-          assert( bbox.r(k) == bbox.r(k) );
+          r[k] = std::sqrt( l2Integral(i,i) );
+          assert( r[k] == r[k] );
           // std::cout << i << " " << i << " = " << bbox.r(k) << std::endl;
           for (std::size_t l = 0; l<values[i].size(); ++l)
           {
-            bi[l] /= bbox.r(k);
-            ci[l] /= bbox.r(k);
+            bi[l] /= r[k];
+            ci[l] /= r[k];
           }
         }
+        for (std::size_t k=0;k<r.size();++k)
+          bbox.r(k) = typename BoundingBoxType::StorageField( r[k] );
       }
     }
 

@@ -113,7 +113,7 @@ namespace Dune {
             int global = globalBlockDofs[ localBlock ];
             for( int l = 0; l < localBlockSize; ++l, ++localDof )
             {
-              if( dirichletBlocks_[ global ][ l ] ) //  && applyConstraint(mask[ localBlock ]))
+              if( dirichletBlocks_[ global ][ l ] ) // && applyConstraint(mask[ localBlock ]))
                 wLocal[ localDof ] = 0;
             }
           }
@@ -337,13 +337,19 @@ namespace Dune {
   protected:
     void correctDirichletDofs() const
     {
-      if (hasDirichletDofs_ && sequence2_ != space_.sequence())
+      std::vector<bool> globalMask(dirichletBlocks_.size(), false);
+      if (BaseType::hasDirichletDofs_ && sequence2_ != space_.sequence())
+      {
         for( const EntityType &entity : space_ )
-          correctEntityDirichletDofs(entity,model_);
+          correctEntityDirichletDofs(entity, globalMask);
+        for( std::size_t i=0;i<globalMask.size();++i)
+          if (!globalMask[i])
+              dirichletBlocks_[i].fill(0);
+      }
       sequence2_ = space_.sequence();
     }
     template< class EntityType >
-    void correctEntityDirichletDofs( const EntityType &entity, ModelType& model ) const
+    void correctEntityDirichletDofs( const EntityType &entity, std::vector<bool> &globalMask ) const
     {
       typedef typename DiscreteFunctionSpaceType :: BlockMapperType BlockMapperType;
       Dune::Fem::NonBlockMapper< BlockMapperType, localBlockSize > mapper( space_.blockMapper() );
@@ -351,11 +357,8 @@ namespace Dune {
       const int localBlocks = space_.blockMapper().numDofs( entity );
       // map local to global dofs
       std::vector< std::size_t > globalBlockDofs( localBlocks );
-      std::vector<std::size_t> globalDofs( localBlocks * localBlockSize );
       // obtain all DofBlocks for this element
       space_.blockMapper().map( entity, globalBlockDofs );
-      // obtain all non-blocked dofs
-      mapper.map( entity, globalDofs );
 
       Vem::Std::vector< char > mask( localBlocks );
       space_.interpolation()( entity, mask );
@@ -363,23 +366,16 @@ namespace Dune {
       // iterate over face dofs and set unit row
       for( int localBlockDof = 0 ; localBlockDof < localBlocks; ++ localBlockDof )
       {
+        auto g = globalBlockDofs[localBlockDof];
         assert(localBlockDof < mask.size());
-        if ( applyConstraint(mask[localBlockDof]) )
-          continue;
-        int global = globalBlockDofs[localBlockDof];
-        for( int l = 0; l < localBlockSize; ++ l )
-        {
-          assert(global < dirichletBlocks_.size());
-          assert(l < dirichletBlocks_[global].size());
-          dirichletBlocks_[global][l] = 0;
-        }
+        assert( g < globalMask.size() );
+        globalMask[g] = globalMask[g] || applyConstraint(mask[localBlockDof]);
       }
     }
 
     using BaseType::model_;
     using BaseType::space_;
     using BaseType::dirichletBlocks_;
-    using BaseType::hasDirichletDofs_;
     mutable int sequence2_;
   };
 
